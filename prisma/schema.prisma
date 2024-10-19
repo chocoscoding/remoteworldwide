@@ -1,14 +1,151 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Prisma schema for the Worldwide Job Board
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  email          String    @unique
+  firstName      String?
+  lastName       String?
+  googleId       String    @unique
+  role           Role      @default(USER)
+  bookmarks      Bookmark[]
+  notifications  NotificationPref?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model NotificationPref {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String    @unique @db.ObjectId
+  email         Boolean   @default(true)
+  inApp         Boolean   @default(true)
+  frequency     String    @default("daily")
+  user          User      @relation(fields: [userId], references: [id],onDelete: Cascade)
+}
+
+model Bookmark {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  jobId      String @unique @db.ObjectId
+  userId     String @unique @db.ObjectId
+  createdAt  DateTime @default(now())
+  User       User     @relation(fields: [userId], references: [id],onDelete: Cascade)
+}
+model Job {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String
+  url           String   // Link to the external job listing
+  isActive      Boolean  @default(true)
+  companyId     String @unique @db.ObjectId
+  company       Company  @relation(fields: [companyId], references: [id])
+  region        Region
+  seniority     Seniority
+  categoryId    String @unique @db.ObjectId
+  category      Category  @relation(fields: [categoryId], references: [id])
+  industryId    String? @db.ObjectId
+  industry      Industry? @relation(fields: [industryId], references: [id])
+  applicationUrl String?   // For applying to jobs externally
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  jobType       JobType
+}
+
+model Company {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  about     String?
+  logoUrl   String?
+  website   String?
+  jobs      Job[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model Industry {
+  id    String   @id @default(auto()) @map("_id") @db.ObjectId
+  name  String   @unique
+  jobs  Job[]
+}
+
+
+model Category {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  slug      String   @unique
+  jobs      Job[]
+}
+
+model Blog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  title      String
+  content    String
+  description String
+  authorId   String @unique @db.ObjectId
+  author     Author   @relation(fields: [authorId], references: [id])
+  isFeatured Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tags       BlogTag[]
+}
+
+model Tag {
+  id    String   @id @default(auto()) @map("_id") @db.ObjectId
+  name  String
+  
+  blogs BlogTag[]
+}
+
+model BlogTag {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId // Single primary key for MongoDB
+  blogId String @db.ObjectId
+  tagId  String @db.ObjectId
+
+  blog   Blog   @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([blogId, tagId]) // Unique index to ensure no duplicate blog-tag pairs
+}
+
+model Author {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  bio       String?
+  blogs     Blog[]
+  createdAt DateTime @default(now())
+}
+
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Region {
+  EMEA
+  Worldwide
+  APAC
+  LATAM
+}
+
+enum JobType {
+  FullTime
+  PartTime
+  Contract
+  Internship
+}
+
+enum Seniority {
+  Junior
+  Mid
+  Senior
+  Lead
 }
