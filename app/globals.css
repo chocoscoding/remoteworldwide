@@ -18,3 +18,29 @@ body {
     text-wrap: balance;
   }
 }
+
+.drop-shadow-secondary {
+  box-shadow: 10px 10px #000;
+}
+.drop-shadow-primary {
+  box-shadow: 10px 10px #e1f073;
+}
+.text-clamp1 {
+  font-size: clamp(2.8rem, 2.3rem + 2.6667vw, 5rem);
+  line-height: 105%;
+}
+.text-clamp2 {
+  font-size: clamp(1.5rem, 1.25rem + 1.3333vw, 2.5rem);
+}
+.text-clamp3 {
+  font-size: clamp(1.5rem, 1.125rem + 2vw, 3rem);
+}
+
+@media screen and (max-width: 1000px) {
+  .drop-shadow-primary {
+    box-shadow: 7px 7px #e1f073;
+  }
+  .drop-shadow-secondary {
+    box-shadow: 7px 7px #000;
+  }
+}

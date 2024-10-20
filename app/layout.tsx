@@ -3,16 +3,12 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { NavbarProvider } from "@/provider/NavbarContext";
 import Navbar from "./components/navigation/Navbar";
+import { Manrope } from "next/font/google";
+import Footer from "./components/navigation/Footer";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+const font = Manrope({
+  subsets: ["latin-ext"],
+  weight: ["200", "300", "400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -27,10 +23,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${font.className} antialiased`}>
         <NavbarProvider>
           <Navbar />
-          {children}
+          <div className="w-full max-w-[1580px] overflow-hidden m-auto relative">{children}</div>
+          <Footer />
         </NavbarProvider>
       </body>
     </html>

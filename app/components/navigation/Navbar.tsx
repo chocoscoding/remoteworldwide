@@ -7,7 +7,7 @@ const Navbar = () => {
   const { isOpen, toggleNavbar, closeNavbar } = useNavbar();
   return (
     <nav className="bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
@@ -24,6 +24,8 @@ const Navbar = () => {
             <Link href="/companies">
               <p className="text-gray-700 hover:text-gray-900">Companies</p>
             </Link>
+
+            <button className="px-5 py-2 bg-black text-white font-bold">Login</button>
           </div>
 
           {/* Mobile Menu Toggle (Hamburger Icon) */}
@@ -48,12 +50,12 @@ const Navbar = () => {
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1">
             <Link href="/jobs">
-              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">
+              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
                 Find jobs
               </p>
             </Link>
             <Link href="/companies">
-              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">
+              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
                 Companies
               </p>
             </Link>
