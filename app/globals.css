@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
+  --background: #f6f6f6;
   --foreground: #171717;
 }
 
@@ -25,6 +25,9 @@ body {
 .drop-shadow-primary {
   box-shadow: 10px 10px #e1f073;
 }
+.drop-shadow-primary-hover:hover {
+  box-shadow: 10px 10px #e1f073;
+}
 .text-clamp1 {
   font-size: clamp(2.8rem, 2.3rem + 2.6667vw, 5rem);
   line-height: 105%;
@@ -38,6 +41,9 @@ body {
 
 @media screen and (max-width: 1000px) {
   .drop-shadow-primary {
+    box-shadow: 7px 7px #e1f073;
+  }
+  .drop-shadow-primary-hover:hover {
     box-shadow: 7px 7px #e1f073;
   }
   .drop-shadow-secondary {

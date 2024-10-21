@@ -1,18 +1,45 @@
+import { Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
 import Image from "next/image";
 import React from "react";
 
 const JobTile = () => {
   return (
-    <div className="flex">
+    <div className="flex p-4 mb-6 rounded-lg gap-2 md:gap-3 shadow-sm border border-gray-200 transition-all">
       {/* logo
     main info */}
-      <div className="flex">
-        <div>
-          <Image src="/images/Vector.png" alt="logo" width={50} height={50} />
+      <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-3">
+        <div className="flex justify-between w-full md:w-fit items-center md:items-start">
+          <div className="border-2 rounded-full p-1 w-fit h-fit  ">
+            <Image src="/images/telegram.png" alt="logo" width={40} height={40} className="rounded-full" />
+          </div>
+          <div className="h-fit flex-0 flex-shrink-0 md:hidden block">
+            <p className="text-sm font-medium text-gray-500">2d ago</p>
+          </div>
+        </div>
+        <div className="flex-1">
+          <p className="w-full text-gray-500 font-medium text-base">Telegram</p>
+          <p className="w-full text-xl font-bold mb-2 hover:underline cursor-pointer">Frontend/Fullstack LEvel 1 Product engineer djsjdj</p>
+          <div className="mb-3 w-full flex flex-wrap gap-6">
+            <p className="text-gray-500 font-medium text-lg flex flex-shrink-0 items-center gap-2">
+              <MapPinned className="w-4 text-gray-400" />
+              <span>Remote, EMEA</span>
+            </p>
+            <p className="text-gray-500 font-medium text-lg flex flex-shrink-0 items-center gap-2">
+              <Calendar className="w-4 text-gray-400" />
+              <span>Full-time</span>
+            </p>
+            <p className="text-gray-500 font-medium text-lg flex flex-shrink-0 items-center gap-2">
+              <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />
+              <span>Mid-level</span>
+            </p>
+          </div>
         </div>
       </div>
 
       {/* date */}
+      <div className="h-fit flex-0 flex-shrink-0 md:block hidden">
+        <p className="text-sm font-medium text-gray-500">2d ago</p>
+      </div>
     </div>
   );
 };
