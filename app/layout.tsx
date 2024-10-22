@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import "./globals.css";
 import { NavbarProvider } from "@/provider/NavbarContext";
 import Navbar from "./components/navigation/Navbar";
@@ -26,7 +25,7 @@ export default function RootLayout({
       <body className={`${font.className} antialiased`}>
         <NavbarProvider>
           <Navbar />
-          <div className="w-full max-w-[1580px] overflow-hidden m-auto relative">{children}</div>
+          <div className="w-full max-w-[1580px] overflow-clip m-auto">{children}</div>
           <Footer />
         </NavbarProvider>
       </body>

@@ -1,8 +1,8 @@
 "use client";
 import React from "react";
 import Globe from "./Globe";
-import { Search } from "lucide-react";
 import { DiscordSVG, PipefySVG, SlackSVG, SpotifySVG, WebflowSVG } from "@/app/components/svg";
+import SearchBar from "./SearchBar";
 
 const Companies = [DiscordSVG, PipefySVG, SlackSVG, SpotifySVG, WebflowSVG];
 const Header = () => {
@@ -20,17 +20,8 @@ const Header = () => {
           Lorem ipsum dolor sit amet consectetur adipisicing elit. Officiis dolorem blanditiis porro minima non ex natus in, voluptate
           cupiditate excepturi, enim iste eius quisquam.
         </h3>
-        <div className="w-[98%] max-w-[1000px] h-20 outline outline-2 outline-black rounded-md bg-white drop-shadow-primary p-3 flex">
-          <div className="flex flex-1 items-center gap-4 px-3">
-            <Search className="text-primary" />
-            <input className="h-full w-full outline-none border-none text-xl" type="text" placeholder="search 2000+ remote jobs" />
-          </div>
-          <button className="px-7 h-full text-white bg-primary">
-            <span className="hidden md:block">Search</span>
-            <span className="md:hidden block">
-              <Search />
-            </span>
-          </button>
+        <div className="w-[98%] max-w-[1000px]">
+          <SearchBar />
         </div>
         <section className="mt-20">
           <p className="mb-4 text-gray-400 ">Trusted by the top companies</p>
