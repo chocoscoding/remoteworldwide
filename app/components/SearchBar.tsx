@@ -4,7 +4,7 @@ import React from "react";
 
 const SearchBar: React.FC = () => {
   return (
-    <div className="w-full h-20 outline outline-2 outline-black rounded-md bg-white drop-shadow-primary p-3 flex">
+    <div className="w-full h-[4.5rem] outline outline-2 outline-black rounded-md bg-white drop-shadow-primary p-3 flex">
       <div className="flex flex-1 items-center gap-4 px-3">
         <Search className="text-primary" />
         <input className="h-full w-full outline-none border-none text-xl" type="text" placeholder="search 2000+ remote jobs" />

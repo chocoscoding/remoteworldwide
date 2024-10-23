@@ -1,5 +1,5 @@
 import Header from "@/app/components/Header";
-import JobTile from "./components/jobs/JobTile";
+import JobTile from "./components/main/JobTile";
 
 export default function Home() {
   return (

@@ -3,9 +3,9 @@ import React, { useState, useMemo, Dispatch, SetStateAction } from "react";
 import FilterCategory from "./FilterCategory";
 
 const FilterSection = () => {
-  const [showRoles, setShowRoles] = useState(false);
-  const [showSeniority, setShowSeniority] = useState(false);
-  const [showJobType, setShowJobType] = useState(false);
+  const [showRoles, setShowRoles] = useState(true);
+  const [showSeniority, setShowSeniority] = useState(true);
+  const [showJobType, setShowJobType] = useState(true);
 
   // State to track selected options
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -37,6 +37,8 @@ const FilterSection = () => {
         selectedOptions={selectedRoles}
         handleSelectOption={(option) => handleSelectOption(setSelectedRoles, option)}
       />
+      <br />
+      <hr />
 
       {/* Seniority Filter */}
       <FilterCategory
@@ -47,6 +49,8 @@ const FilterSection = () => {
         selectedOptions={selectedSeniority}
         handleSelectOption={(option) => handleSelectOption(setSelectedSeniority, option)}
       />
+      <br />
+      <hr />
 
       {/* Job Type Filter */}
       <FilterCategory

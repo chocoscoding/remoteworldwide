@@ -5,28 +5,22 @@ import createGlobe from "cobe";
 import { useEffect, useRef } from "react";
 
 export default function Globe() {
-  const canvasRef = useRef();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const maxWidth = 700;
   useEffect(() => {
     let phi = 0;
     let width = 0;
-    let offset = [100, window.innerHeight];
+    let offset: [number, number] = [100, window.innerHeight];
     let scaleFactor = 2;
     const onResize = () => {
-      if (window.innerWidth <= 1000 && canvasRef.current.offsetWidth == maxWidth) {
+      if (window.innerWidth <= 1000 && canvasRef.current && canvasRef.current.offsetWidth == maxWidth) {
         scaleFactor = 1.75;
         offset = [100, window.innerHeight];
-        console.log("run 1");
       } else {
         scaleFactor = 2;
-        console.log("run 1.a");
-        //
-        if (canvasRef.current.offsetWidth < maxWidth) {
+        if (canvasRef.current && canvasRef.current.offsetWidth < maxWidth) {
           offset = [0, window.innerHeight];
-          console.log("run 2");
         } else {
-          console.log("run 3");
-
           offset = [100, window.innerHeight];
         }
       }
@@ -35,6 +29,7 @@ export default function Globe() {
 
     window.addEventListener("resize", onResize);
     onResize();
+    if (!canvasRef.current) return;
     const globe = createGlobe(canvasRef.current, {
       devicePixelRatio: 2,
       width: width * 2,
@@ -80,7 +75,11 @@ export default function Globe() {
         state.height = width * scaleFactor;
       },
     });
-    setTimeout(() => (canvasRef.current.style.opacity = "1"));
+    setTimeout(() => {
+      if (canvasRef.current) {
+        canvasRef.current.style.opacity = "1";
+      }
+    });
     return () => {
       globe.destroy();
       window.removeEventListener("resize", onResize);

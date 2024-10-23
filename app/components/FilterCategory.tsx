@@ -28,13 +28,13 @@ const FilterCategory: FC<FilterCategoryType> = ({ title, isOpen, toggle, options
               checked={selectedOptions.includes(option.label)}
               onChange={() => handleSelectOption(option.label)}
             />
-            <label htmlFor={`${title}-${index}`} className="text-black font-bold relative -top-0.5">
+            <label htmlFor={`${title}-${index}`} className="text-black font-medium relative -top-0.5">
               {option.label} {option.count && <span className="text-sm shrink-0 text-gray-700 font-thin">{`(${option.count})`}</span>}
             </label>
           </li>
         ))}
       </ul>
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-gray-100 to-transparent"></div>
+      {/* <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-gray-100 to-transparent"></div> */}
     </div>
   </div>
 );
