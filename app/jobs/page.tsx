@@ -1,5 +1,6 @@
 import JobTile from "../components/jobs/JobTile";
 import SearchBar from "../components/SearchBar";
+import FilterSection from "../components/FilterSection";
 
 export default function Home() {
   return (
@@ -29,7 +30,7 @@ export default function Home() {
               <JobTile key={index} />
             ))}
         </section>
-        <section className="border border-primary/80 w-3/12 max-h-[700px] rounded-xl sticky top-[20px] h-screen overflow-y-auto"></section>
+        <FilterSection />
       </section>
       <br />
     </div>
