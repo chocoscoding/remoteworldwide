@@ -19,16 +19,16 @@ const JobTile = () => {
         <div className="flex-1">
           <p className="w-full text-gray-500 font-medium text-base">Telegram</p>
           <p className="w-full text-xl font-bold mb-2 hover:underline cursor-pointer">Frontend/Fullstack LEvel 1 Product engineer djsjdj</p>
-          <div className="w-full flex flex-wrap gap-6">
-            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
+          <div className="w-full flex flex-wrap gap-4">
+            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <MapPinned className="w-4 text-gray-400" />
               <span>Remote, EMEA</span>
             </p>
-            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
+            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <Calendar className="w-4 text-gray-400" />
               <span>Full-time</span>
             </p>
-            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
+            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />
               <span>Mid-level</span>
             </p>

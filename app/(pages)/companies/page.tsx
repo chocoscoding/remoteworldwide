@@ -1,9 +1,8 @@
 "use client";
-import JobTile from "../components/main/JobTile";
-import SearchBar from "../components/SearchBar";
-import FilterSection from "../components/FilterSection";
+
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import CompanyTile from "../../components/main/CompanyTile";
 
 export default function Home() {
   const totalJobs = 100;
@@ -30,34 +29,35 @@ export default function Home() {
   const startJobIndex = (currentPage - 1) * jobsPerPage;
   const endJobIndex = startJobIndex + jobsPerPage;
   return (
-    <div className="p-10 w-full max-w-[1300px] m-auto">
+    <div className="p-2 w-full max-w-[1400px] m-auto mt-10">
       {/* search */}
 
       {/* section */}
       {/* |- list */}
       {/* |- filter that is fixed on scroll */}
-      <h2 className="text-2xl md:text-3xl font-bold text-center">Explore latest and exiciting jobs now</h2>
-      <br />
-      <div className="w-full max-w-[1500px] mb-28">
-        <SearchBar />
-      </div>
 
-      <section className="w-full px-1 flex gap-12 relative">
-        <section className="w-9/12 max-w-[1300px] m-auto px-3 lg:px-0">
+      <section className="w-full md:px-1 flex gap-12 relative">
+        <section className="w-full  m-auto px-2 lg:px-0">
           <div className="mb-5">
-            <p className="text-2xl font-extralight text-gray-400 mb-2">
-              <span className="font-bold text-primary">Job Opportunities</span> {`(205)`}
+            <p className="text-2xl mb-2">
+              <span className="font-bold text-primary">Companies</span>{" "}
+              <span className="font-extralight text-gray-400 italic text-lg">{`(A-Z)`}</span>
             </p>
             <hr />
           </div>
-          {Array(25)
-            .fill(null)
-            .map((_, index) => (
-              <JobTile key={index} />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array(25)
+              .fill(null)
+              .map((_, index) => (
+                <CompanyTile key={index} />
+              ))}
+          </div>
+
           {/* pagination */}
-          <div className="mt-5 flex justify-between items-center">
-            <p>
+          <br />
+          <hr />
+          <div className="mt-5 flex justify-between items-center sm:flex-row gap-2 sm:gap-0 flex-col">
+            <p className="flex-shrink-0">
               Showing {startJobIndex + 1} to {endJobIndex > totalJobs ? totalJobs : endJobIndex} of {totalJobs}
             </p>
             <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
@@ -79,7 +79,6 @@ export default function Home() {
             </div>
           </div>
         </section>
-        <FilterSection />
       </section>
       <br />
     </div>

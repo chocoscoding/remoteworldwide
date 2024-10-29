@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import CompanyTile from "../components/main/CompanyTile";
+import BookmarkTile from "../../components/main/BookmarkTile";
 
 export default function Home() {
   const totalJobs = 100;
@@ -38,18 +38,21 @@ export default function Home() {
 
       <section className="w-full md:px-1 flex gap-12 relative">
         <section className="w-full  m-auto px-2 lg:px-0">
-          <div className="mb-5">
-            <p className="text-2xl mb-2">
-              <span className="font-bold text-primary">Companies</span>{" "}
-              <span className="font-extralight text-gray-400 italic text-lg">{`(A-Z)`}</span>
+          <p className="font-bold text-primary text-3xl mb-2">Hello Camron</p>
+          <p className="text-primary text-lg font-light">You saved some jobs. Do apply to them before they get stale</p>
+          <div className="mb-5 my-10">
+            <p className="text-xl mb-2">
+              <span className="font-bold text-primary">My Jobs</span>{" "}
+              <span className="font-extralight text-gray-400 italic text-lg">{`(200)`}</span>
             </p>
             <hr />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array(25)
-              .fill(null)
+          <div className="grid grid-cols-1 ">
+            {/* main */}
+            {Array(jobsPerPage)
+              .fill(0)
               .map((_, index) => (
-                <CompanyTile key={index} />
+                <BookmarkTile key={index} />
               ))}
           </div>
 

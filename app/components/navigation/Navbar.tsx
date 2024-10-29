@@ -5,8 +5,9 @@ import Link from "next/link"; // Use Next.js' Link for navigation
 
 const Navbar = () => {
   const { isOpen, toggleNavbar, closeNavbar } = useNavbar();
+
   return (
-    <nav className="bg-white border-b border-gray-200">
+    <nav className="bg-white border-b border-gray-200 sticky z-20 top-0">
       <div className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
@@ -26,6 +27,33 @@ const Navbar = () => {
             </Link>
 
             <button className="px-5 py-2 bg-black text-white font-bold">Login</button>
+
+            <div className="relative">
+              <img
+                src="/path/to/user-image.jpg"
+                alt="User"
+                className="w-8 h-8 rounded-full cursor-pointer"
+                onClick={toggleNavbar} // Assuming toggleNavbar will handle the modal visibility
+              />
+
+              {isOpen && (
+                <div className="fixed right-2 mt-2 top-16 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
+                  <Link href="/bookmarks">
+                    <p onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
+                      Bookmarks
+                    </p>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      closeNavbar();
+                      // Add your logout logic here
+                    }}
+                    className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100">
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Mobile Menu Toggle (Hamburger Icon) */}
@@ -37,7 +65,7 @@ const Navbar = () => {
                 </p> // Close icon when menu is open
               ) : (
                 <p className="h-6 w-6" aria-hidden="true">
-                  l
+                  open
                 </p> // Hamburger icon when menu is closed
               )}
             </button>
