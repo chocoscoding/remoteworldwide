@@ -1,5 +1,6 @@
 import { Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import React from "react";
 
 const JobTile = () => {
@@ -17,8 +18,15 @@ const JobTile = () => {
           </div>
         </div>
         <div className="flex-1">
-          <p className="w-full text-gray-500 font-medium text-base">Telegram</p>
-          <p className="w-full text-xl font-bold mb-2 hover:underline cursor-pointer">Frontend/Fullstack LEvel 1 Product engineer djsjdj</p>
+          <Link href={"/company/123"}>
+            <p className="w-full text-gray-500 font-medium text-base">Telegram</p>
+          </Link>
+
+          <Link href={"/jobs/123"}>
+            <p className="w-full text-xl font-bold mb-2 hover:underline cursor-pointer">
+              Frontend/Fullstack LEvel 1 Product engineer djsjdj
+            </p>
+          </Link>
           <div className="w-full flex flex-wrap gap-4">
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <MapPinned className="w-4 text-gray-400" />

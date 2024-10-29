@@ -12,7 +12,7 @@ interface FilterCategoryType {
 }
 // Reusable FilterCategory component
 const FilterCategory: FC<FilterCategoryType> = ({ title, isOpen, toggle, options, handleSelectOption, selectedOptions }) => (
-  <div className="mt-6">
+  <div className="my-3">
     <div className="flex justify-between">
       <p className="font-bold">{title}</p>
       <ChevronDown onClick={toggle} className={`opacity-50 cursor-pointer transition-all ${isOpen ? "rotate-180" : ""}`} />

@@ -1,6 +1,7 @@
 "use client";
 import BookmarkStatus from "@/app/components/main/BookmarkStatus";
-import { ArrowLeft, Calendar, ChartNoAxesColumnIncreasing, Link, MapPinned, Zap } from "lucide-react";
+import { ArrowLeft, ArrowUp, Calendar, ChartNoAxesColumnIncreasing, Link, MapPinned, MoveUpRight, Zap } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React from "react";
 
@@ -19,7 +20,7 @@ const Page = () => {
         <section className="grid grid-cols-1 md:grid-cols-10 h-full w-full gap-5 md:gap-10">
           {/* |-job info */}
           <div className="col-span-full md:col-span-7 h-fit">
-            <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-10">
+            <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-5 md:p-10 overflow-hidden">
               <p className="text-gray-500 text-sm">Job Description</p>
 
               <section className="mt-5 flex">
@@ -94,7 +95,22 @@ const Page = () => {
           </div>
           {/* |-company info */}
           <div className="col-span-full -order-1 md:order-2 md:col-span-3 h-fit">
-            <div className="border-2 border-black h-[300px] rounded-lg md:aspect-square w-full md:w-auto drop-shadow-secondary bg-white"></div>
+            <div className="border-2 border-black h-fit sm:h-[300px] rounded-lg md:aspect-square w-full md:w-auto drop-shadow-secondary bg-white flex flex-col items-center p-2 sm:p-3 overflow-hidden  ">
+              <div className="border-2 rounded-full p-1 w-fit h-fit mt-2 sm:mt-4">
+                <Image src="/images/telegram.png" alt="logo" width={70} height={70} className="rounded-full sm:w-[70px] w-[50px]" />
+              </div>
+              <div className="flex flex-col items-center mt-4">
+                <p className="text-gray-500">Job By</p>
+                <div className="flex items-center gap-2 cursor-pointer">
+                  <p className="text-primary font-bold text-xl">Telegram </p>
+                  <MoveUpRight className="w-4" />
+                </div>
+              </div>
+              <hr className="bg-gray-900 my-3  w-full" />
+              <p className="text-base md:text-sm text-gray-700">
+                Lorem ipsum dolor sit amet consectetur adipisicing elit. Eius totam quasi esse aliasnim beatae atque ducimus deleniti...
+              </p>
+            </div>
           </div>
         </section>
       </section>
