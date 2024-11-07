@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import CompanyTile from "../../components/main/CompanyTile";
+import CompanyTile from "../../../components/main/CompanyTile";
 
 export default function Home() {
   const totalJobs = 100;

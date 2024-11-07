@@ -22,13 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${font.className} antialiased`}>
-        <NavbarProvider>
-          <Navbar />
-          <div className="w-full max-w-[1580px] overflow-clip m-auto">{children}</div>
-          <Footer />
-        </NavbarProvider>
-      </body>
+      <body className={`${font.className} antialiased`}>{children}</body>
     </html>
   );
 }

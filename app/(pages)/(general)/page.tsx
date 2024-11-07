@@ -6,8 +6,8 @@ export default function Home() {
     <div>
       <Header />
       <br />
-      <section className="w-full max-w-[1200px] m-auto px-3 lg:px-0">
-        <h2 className="text-2xl md:text-3xl font-bold">Explore latest and exiciting jobs now</h2>
+      <section className="w-full max-w-[1200px] m-auto px-3 xl:px-0">
+        <h2 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exiciting jobs now</h2>
         <br />
 
         {Array(10)

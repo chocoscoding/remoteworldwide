@@ -3,7 +3,7 @@ import FilterSection from "@/app/components/main/FilterSection";
 import { useEffect } from "react";
 import { Settings2 } from "lucide-react";
 import FilterSectionMobile from "@/app/components/main/FilterSectionMobile";
-import { FilterProvider, useFilter } from "@/provider/FilterProvider";
+import { useFilter } from "@/provider/FilterProvider";
 import JobsContainer from "@/app/components/main/JobsContainer";
 
 const Client = () => {

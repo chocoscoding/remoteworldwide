@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import BookmarkTile from "../../components/main/BookmarkTile";
+import BookmarkTile from "@/app/components/main/BookmarkTile";
 
 export default function Home() {
   const totalJobs = 100;
