@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { NavbarProvider } from "@/provider/NavbarContext";
-import Navbar from "./components/navigation/Navbar";
 import { Manrope } from "next/font/google";
-import Footer from "./components/navigation/Footer";
-
+import NextTopLoader from "nextjs-toploader";
 const font = Manrope({
   subsets: ["latin-ext"],
   weight: ["200", "300", "400", "500", "700"],
@@ -22,7 +19,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${font.className} antialiased`}>{children}</body>
+      <body className={`${font.className} antialiased`}>
+        <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" />
+        {children}
+      </body>
     </html>
   );
 }

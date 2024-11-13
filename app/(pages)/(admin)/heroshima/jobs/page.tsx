@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import BookmarkTile from "@/app/components/main/BookmarkTile";
+import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
 
 export default function Home() {
   const totalJobs = 100;
@@ -52,7 +53,7 @@ export default function Home() {
             {Array(jobsPerPage)
               .fill(0)
               .map((_, index) => (
-                <BookmarkTile key={index} />
+                <AdminJobTile key={index} />
               ))}
           </div>
 

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
@@ -12,7 +12,7 @@ const menuItems = [
     path: "/companies",
     section: "companies",
     subItems: [
-      { label: "Create", path: "/companies/create" },
+      { label: "Create compnay", path: "/companies/create" },
       { label: "Companies", path: "/companies" },
     ],
   },
@@ -22,7 +22,7 @@ const menuItems = [
     path: "/jobs",
     section: "jobs",
     subItems: [
-      { label: "Create", path: "/jobs/create" },
+      { label: "Create Job", path: "/jobs/create" },
       { label: "Jobs", path: "/jobs" },
       { label: "Inactive", path: "/jobs/inactive" },
     ],
@@ -33,13 +33,13 @@ const menuItems = [
     path: "/categories",
     section: "categories",
     subItems: [
-      { label: "Create", path: "/categories/create" },
+      { label: "Create category", path: "/categories/create" },
       { label: "Categories", path: "/categories" },
     ],
   },
   {
-    name: "Blog",
-    icon: List,
+    name: "Blogs",
+    icon: Book,
     path: "/blogs",
     section: "blog",
     subItems: [
@@ -66,42 +66,60 @@ const Sidebar = () => {
   return (
     <div className={`flex flex-col h-screen bg-gray-900 text-white ${isOpen ? "w-64" : "w-16"} transition-width duration-300 sticky top-0`}>
       <div className={`flex items-center ${isOpen ? "justify-between" : "justify-center"} p-4 bg-gray-900 border-b border-b-white/10`}>
-        {isOpen && <div className="text-lg font-bold">Logo</div>}
+        {isOpen && <div className="text-lg font-bold">WWR</div>}
         <button onClick={toggleSidebar} className="focus:outline-none">
           <Menu className="w-6 h-6" />
         </button>
       </div>
 
       <div className={`flex-1 p-4 space-y-4 flex flex-col gap-4 ${isOpen ? "" : "items-center"}`}>
-        {menuItems.map((item) => (
-          <div key={item.section} className="space-y-1 w-full">
-            <div
-              className={`flex items-center justify-between cursor-pointer ${
-                openAccordion === item.section ? "text-secondary" : "text-gray-300"
-              }`}
-              onClick={() => toggleAccordion(item.section)}>
-              <div className="flex items-center space-x-4">
-                <item.icon className="w-5 h-5" />
-                {isOpen && <span>{item.name}</span>}
+        {menuItems.map((item) => {
+          if (!item.subItems) {
+            return (
+              <Link key={item.section} href={`/heroshima${item.path}`} className={`space-y-1 ${isOpen ? "w-full" : "w-fit"}`}>
+                <div
+                  className={`flex items-center justify-between cursor-pointer ${
+                    openAccordion === item.section ? "text-secondary" : "text-gray-300"
+                  }`}
+                  onClick={() => toggleAccordion(item.section)}>
+                  <div className="flex items-center space-x-4">
+                    <item.icon className="w-5 h-5" />
+                    {isOpen && <span>{item.name}</span>}
+                  </div>
+                </div>
+              </Link>
+            );
+          }
+          return (
+            <div key={item.section} className={`space-y-1 ${isOpen ? "w-full" : "w-fit"}`}>
+              <div
+                className={`flex items-center justify-between cursor-pointer ${
+                  openAccordion === item.section ? "text-secondary" : "text-gray-300"
+                }`}
+                onClick={() => toggleAccordion(item.section)}>
+                <div className="flex items-center space-x-4">
+                  <item.icon className="w-5 h-5" />
+                  {isOpen && <span>{item.name}</span>}
+                </div>
+                {isOpen && item.subItems && (
+                  <ChevronDown className={`transition-all duration-500 w-5 h-5 ${openAccordion === item.section ? "rotate-180" : ""}`} />
+                )}
               </div>
               {isOpen && item.subItems && (
-                <ChevronDown className={`transition-all duration-500 w-5 h-5 ${openAccordion === item.section ? "rotate-180" : ""}`} />
+                <ul
+                  className={`pl-10 space-y-1 overflow-hidden transition-all duration-500 ${
+                    isOpen && openAccordion === item.section ? "max-h-screen" : "max-h-0"
+                  }`}>
+                  {item.subItems.map((subItem, index) => (
+                    <Link key={index} href={`/heroshima${subItem.path}`}>
+                      <li className="mt-2 mb-2">{subItem.label}</li>
+                    </Link>
+                  ))}
+                </ul>
               )}
             </div>
-            {item.subItems && (
-              <ul
-                className={`pl-10 space-y-1 overflow-hidden transition-all duration-500 ${
-                  isOpen && openAccordion === item.section ? "max-h-screen" : "max-h-0"
-                }`}>
-                {item.subItems.map((subItem, index) => (
-                  <Link key={index} href={`/heroshima${subItem.path}`}>
-                    <li className="mt-2 mb-2">{subItem.label}</li>
-                  </Link>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="p-4 bg-gray-900">
