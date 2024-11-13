@@ -36,7 +36,7 @@ export default function AdminAnalytics() {
           </div>
         </section>
         <section className="flex justify-center">
-          <button className="flex items-center px-6 py-3 bg-black text-white font-bold rounded-sm hover:bg-blue-700">
+          <button className="flex items-center px-6 py-3 bg-black text-white font-bold rounded-sm ">
             <PlusCircle className="w-6 h-6 mr-2" />
             Create New Job
           </button>

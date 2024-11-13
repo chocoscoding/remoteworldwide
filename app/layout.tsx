@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "react-quill/dist/quill.snow.css";
 import { Manrope } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 const font = Manrope({
@@ -20,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${font.className} antialiased`}>
-        <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" />
+        <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
         {children}
       </body>
     </html>

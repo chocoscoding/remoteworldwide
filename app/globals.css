@@ -23,6 +23,12 @@ body {
 .drop-shadow-secondary {
   box-shadow: 10px 10px #000;
 }
+.drop-shadow-secondary-hover:hover {
+  box-shadow: 10px 10px #000;
+}
+.drop-shadow-secondary2-hover:hover {
+  box-shadow: 5px 5px #000;
+}
 .drop-shadow-primary {
   box-shadow: 10px 10px #e1f073;
 }
@@ -48,6 +54,9 @@ body {
     box-shadow: 7px 7px #e1f073;
   }
   .drop-shadow-secondary {
+    box-shadow: 7px 7px #000;
+  }
+  .drop-shadow-secondary-hover:hover {
     box-shadow: 7px 7px #000;
   }
 }

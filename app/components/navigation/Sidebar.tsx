@@ -32,10 +32,6 @@ const menuItems = [
     icon: List,
     path: "/categories",
     section: "categories",
-    subItems: [
-      { label: "Create category", path: "/categories/create" },
-      { label: "Categories", path: "/categories" },
-    ],
   },
   {
     name: "Blogs",
@@ -98,7 +94,7 @@ const Sidebar = () => {
                 }`}
                 onClick={() => toggleAccordion(item.section)}>
                 <div className="flex items-center space-x-4">
-                  <item.icon className="w-5 h-5" />
+                  <item.icon onClick={() => setIsOpen(true)} className="w-5 h-5" />
                   {isOpen && <span>{item.name}</span>}
                 </div>
                 {isOpen && item.subItems && (
