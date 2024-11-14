@@ -10,7 +10,7 @@ interface Option {
   label: string;
 }
 
-interface Categories {
+export interface Categories {
   companies: Option[];
   sectors: Option[];
   roleTypes: Option[];

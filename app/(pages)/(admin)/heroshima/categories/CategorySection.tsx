@@ -4,6 +4,7 @@ import { useState } from "react";
 import Select from "react-select";
 import { PlusCircle, XCircle } from "lucide-react";
 import { toast, Bounce } from "react-toastify";
+import { Categories } from "./page";
 
 interface Option {
   value: string;
@@ -42,7 +43,7 @@ export default function CategorySection({ section, categories, onAddCategory }: 
         theme: "dark",
       });
       setNewCategory("");
-    } catch (error: unknown) {
+    } catch (error: any) {
       toast.error(`Failed to add ${section.slice(0, -1)}: ${error.message}`);
     } finally {
       setIsLoading(false);

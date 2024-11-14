@@ -1,6 +1,5 @@
 "use client";
 import FilterSection from "@/app/components/main/FilterSection";
-import { useEffect } from "react";
 import { Settings2 } from "lucide-react";
 import FilterSectionMobile from "@/app/components/main/FilterSectionMobile";
 import { useFilter } from "@/provider/FilterProvider";
