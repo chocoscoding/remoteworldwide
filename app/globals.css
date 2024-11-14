@@ -29,6 +29,9 @@ body {
 .drop-shadow-secondary2-hover:hover {
   box-shadow: 5px 5px #000;
 }
+.drop-shadow-primary2-hover:hover {
+  box-shadow: 5px 5px #e1f073;
+}
 .drop-shadow-primary {
   box-shadow: 10px 10px #e1f073;
 }

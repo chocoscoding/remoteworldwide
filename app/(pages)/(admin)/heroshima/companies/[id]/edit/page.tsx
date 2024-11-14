@@ -31,7 +31,7 @@ export default function CreateCompany() {
 
   return (
     <div className="w-full h-screen overflow-y-scroll p-4">
-      <h1 className="text-2xl font-bold mb-4">Create New Company</h1>
+      <h1 className="text-2xl font-bold mb-4">Edit Company Information</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className=" text-sm font-medium text-primary/95 flex items-center">Company Name</label>
@@ -153,7 +153,7 @@ export default function CreateCompany() {
             type="submit"
             className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3">
             <Plus className="w-6 h-6 mr-2" />
-            Create Company
+            Update company Info
           </button>
         </div>
       </form>
