@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
-import Sidebar from "@/app/components/navigation/Sidebar";
-import AdminNavbar from "@/app/components/navigation/AdminNavbar";
 import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
 
 const dummyData = {
@@ -32,7 +30,7 @@ export default function AdminAnalytics() {
           </div>
           <div className="w-full mt-6 bg-transparent border-none">
             <h2 className="text-xl font-semibold mb-4">Latest Job Posted</h2>
-            <AdminJobTile job={dummyData.latestJob} />
+            <AdminJobTile />
           </div>
         </section>
         <section className="flex justify-center">
