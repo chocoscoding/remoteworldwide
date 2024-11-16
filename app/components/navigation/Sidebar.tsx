@@ -40,7 +40,7 @@ const menuItems = [
     section: "blog",
     subItems: [
       { label: "Create Blog", path: "/blogs/create" },
-      { label: "Create Author", path: "/blogs/authors/create" },
+      { label: "Create Author", path: "/authors/create" },
       { label: "Blogs", path: "/blogs" },
       { label: "Authors", path: "/blogs/authors" },
     ],
