@@ -1,8 +1,7 @@
 import { NavbarProvider } from "@/provider/NavbarContext";
 import Navbar from "@/app/components/navigation/Navbar";
 import Footer from "@/app/components/navigation/Footer";
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;

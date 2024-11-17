@@ -9,103 +9,103 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model Session {
-  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
   sessionToken String   @unique @map("session_token")
-  userId        String    @unique @db.ObjectId
+  userId       String   @db.ObjectId
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("sessions")
 }
- 
+
 model Account {
-  id             String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String    @unique @db.ObjectId
-  type               String
-  provider           String
-  providerAccountId  String 
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
   refresh_token     String? @db.String
-  access_token      String  @db.String
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
- 
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
   @@unique([provider, providerAccountId])
 }
- 
+
 model User {
-  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String            @id @default(auto()) @map("_id") @db.ObjectId
   name          String?
-  email         String?   @unique
-  emailVerified Boolean? @default(true)
+  email         String?           @unique
+  emailVerified DateTime?
   image         String?
   accounts      Account[]
   sessions      Session[]
-  role           Role      @default(USER)
-  bookmarks      Bookmark[]
-  notifications  NotificationPref?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
- 
+  role          Role              @default(USER)
+  bookmarks     Bookmark[]
+  notifications NotificationPref?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
   @@map("users")
 }
 
-
-
-
- 
- 
 model VerificationToken {
-  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
   identifier String
   token      String
   expires    DateTime
- 
+
   @@unique([identifier, token])
   @@map("verification_tokens")
 }
 
-
 model NotificationPref {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String    @unique @db.ObjectId
-  email         Boolean   @default(true)
-  inApp         Boolean   @default(true)
-  frequency     String    @default("daily")
-  user          User      @relation(fields: [userId], references: [id],onDelete: Cascade)
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String  @unique @db.ObjectId
+  email     Boolean @default(true)
+  inApp     Boolean @default(true)
+  frequency String  @default("daily")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Bookmark {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  jobId      String @unique @db.ObjectId
-  userId     String @unique @db.ObjectId
-  createdAt  DateTime @default(now())
-  User       User     @relation(fields: [userId], references: [id],onDelete: Cascade)
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  jobId     String   @unique @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
 model Job {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  title         String
-  description   String
-  url           String   // Link to the external job listing
-  isActive      Boolean  @default(true)
-  companyId     String @unique @db.ObjectId
-  company       Company  @relation(fields: [companyId], references: [id])
-  region        Region
-  seniority     Seniority
-  categoryId    String @unique @db.ObjectId
-  category      Category  @relation(fields: [categoryId], references: [id])
-  industryId    String? @db.ObjectId
-  industry      Industry? @relation(fields: [industryId], references: [id])
-  applicationUrl String?   // For applying to jobs externally
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  jobType       JobType
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  description    String
+  url            String // Link to the external job listing
+  isActive       Boolean   @default(true)
+  companyId      String    @unique @db.ObjectId
+  company        Company   @relation(fields: [companyId], references: [id])
+  region         Region
+  seniority      Seniority
+  categoryId     String    @unique @db.ObjectId
+  category       Category  @relation(fields: [categoryId], references: [id])
+  industryId     String?   @db.ObjectId
+  industry       Industry? @relation(fields: [industryId], references: [id])
+  applicationUrl String? // For applying to jobs externally
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  jobType        JobType
 }
 
 model Company {
@@ -119,38 +119,36 @@ model Company {
   updatedAt DateTime @updatedAt
 }
 
-
 model Industry {
-  id    String   @id @default(auto()) @map("_id") @db.ObjectId
-  name  String   @unique
-  jobs  Job[]
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+  jobs Job[]
 }
 
-
 model Category {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String   @unique
-  slug      String   @unique
-  jobs      Job[]
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+  slug String @unique
+  jobs Job[]
 }
 
 model Blog {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  title      String
-  content    String
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  content     String
   description String
-  authorId   String @unique @db.ObjectId
-  author     Author   @relation(fields: [authorId], references: [id])
-  isFeatured Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  tags       BlogTag[]
+  authorId    String    @unique @db.ObjectId
+  author      Author    @relation(fields: [authorId], references: [id])
+  isFeatured  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tags        BlogTag[]
 }
 
 model Tag {
-  id    String   @id @default(auto()) @map("_id") @db.ObjectId
-  name  String
-  
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String
+
   blogs BlogTag[]
 }
 
@@ -159,8 +157,8 @@ model BlogTag {
   blogId String @db.ObjectId
   tagId  String @db.ObjectId
 
-  blog   Blog   @relation(fields: [blogId], references: [id], onDelete: Cascade)
-  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([blogId, tagId]) // Unique index to ensure no duplicate blog-tag pairs
 }
@@ -173,10 +171,10 @@ model Author {
   createdAt DateTime @default(now())
 }
 
-
 enum Role {
   USER
   ADMIN
+  AUTHOR
 }
 
 enum Region {

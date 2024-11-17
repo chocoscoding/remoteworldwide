@@ -1,9 +1,12 @@
 "use client"; // Since we are using React state
-
+import { FcGoogle } from "react-icons/fc";
 import { useNavbar } from "@/provider/NavbarContext";
 import Link from "next/link"; // Use Next.js' Link for navigation
+import { signIn, signOut, useSession } from "next-auth/react";
+import Image from "next/image";
 
 const Navbar = () => {
+  const { status, data } = useSession();
   const { isOpen, toggleNavbar, closeNavbar } = useNavbar();
 
   return (
@@ -26,34 +29,54 @@ const Navbar = () => {
               <p className="text-gray-700 hover:text-gray-900">Companies</p>
             </Link>
 
-            <button className="px-5 py-2 bg-black text-white font-bold">Login</button>
+            {status === "unauthenticated" ? (
+              <button className="p-2 gap-2 rounded-sm bg-primary text-white flex items-center" onClick={() => signIn("google")}>
+                <FcGoogle /> <span>Signin</span>
+              </button>
+            ) : null}
 
-            <div className="relative">
-              <img
-                src="/path/to/user-image.jpg"
-                alt="User"
-                className="w-8 h-8 rounded-full cursor-pointer"
-                onClick={toggleNavbar} // Assuming toggleNavbar will handle the modal visibility
-              />
+            {status === "authenticated" ? (
+              <div className="relative">
+                <Image
+                  width={50}
+                  height={50}
+                  src={data.user?.image ?? "/images/noimage.png"}
+                  alt="User"
+                  className="w-10 h-10 border-2 rounded-full cursor-pointer"
+                  onClick={toggleNavbar} // Assuming toggleNavbar will handle the modal visibility
+                />
 
-              {isOpen && (
-                <div className="fixed right-2 mt-2 top-16 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                  <Link href="/bookmarks">
-                    <p onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
+                {isOpen && (
+                  <div className="fixed right-2 mt-2 top-16 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
+                    <Link href="/bookmarks" onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
                       Bookmarks
-                    </p>
-                  </Link>
-                  <button
-                    onClick={() => {
-                      closeNavbar();
-                      // Add your logout logic here
-                    }}
-                    className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100">
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+                    </Link>
+                    {data.user?.role !== "AUTHOR" ? (
+                      <Link href="/heroshima/blogs">
+                        <p onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
+                          WRITER
+                        </p>
+                      </Link>
+                    ) : null}
+                    {data.user?.role !== "ADMIN" ? (
+                      <Link href="/heroshima">
+                        <p onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
+                          ADMIN
+                        </p>
+                      </Link>
+                    ) : null}
+                    <button
+                      onClick={() => {
+                        closeNavbar();
+                        signOut();
+                      }}
+                      className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100">
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* Mobile Menu Toggle (Hamburger Icon) */}

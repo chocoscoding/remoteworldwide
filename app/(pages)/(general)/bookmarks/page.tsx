@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import BookmarkTile from "../../../components/main/BookmarkTile";
+import { useSession } from "next-auth/react";
 
 export default function Home() {
+  const { status } = useSession();
+  console.log(status);
   const totalJobs = 100;
   const jobsPerPage = 50;
   const totalPages = Math.ceil(totalJobs / jobsPerPage);
@@ -28,6 +31,10 @@ export default function Home() {
   // Display range for jobs on the current page
   const startJobIndex = (currentPage - 1) * jobsPerPage;
   const endJobIndex = startJobIndex + jobsPerPage;
+
+  if (status === "unauthenticated") {
+    return <h1>Login to view bookmarks</h1>;
+  }
   return (
     <div className="p-1 xl:p-10 w-full max-w-[1400px] m-auto mt-10">
       {/* search */}
