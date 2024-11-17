@@ -8,7 +8,6 @@ import Image from "next/image";
 const Navbar = () => {
   const { status, data } = useSession();
   const { isOpen, toggleNavbar, closeNavbar } = useNavbar();
-
   return (
     <nav className="bg-white border-b border-gray-200 sticky z-20 top-0">
       <div className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -51,14 +50,14 @@ const Navbar = () => {
                     <Link href="/bookmarks" onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
                       Bookmarks
                     </Link>
-                    {data.user?.role !== "AUTHOR" ? (
+                    {data.user?.role === "AUTHOR" ? (
                       <Link href="/heroshima/blogs">
                         <p onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
                           WRITER
                         </p>
                       </Link>
                     ) : null}
-                    {data.user?.role !== "ADMIN" ? (
+                    {data.user?.role === "ADMIN" ? (
                       <Link href="/heroshima">
                         <p onClick={closeNavbar} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
                           ADMIN

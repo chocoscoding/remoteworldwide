@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
+import { auth } from "@/auth";
 
 const dummyData = {
   totalJobs: 120,
@@ -12,7 +12,19 @@ const dummyData = {
   },
 };
 
-export default function AdminAnalytics() {
+export default async function AdminAnalytics() {
+  const session = await auth();
+
+  if (session !== null && session.user?.role === "AUTHOR") {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gray-100">
+        <main className="p-8 bg-white shadow-lg rounded-lg text-center">
+          <h1 className="text-3xl font-bold mb-4">Welcome to the Authors Admin Panel</h1>
+          <p className="mb-4 text-lg">Click the sidebar to visit other pages.</p>
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="w-full h-screen overflow-y-scroll">
       <main className="p-4">

@@ -6,7 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "MANAGER - Worldwide Remote",
+  title: "WRITER - Worldwide Remote",
   description: "Get worldwide remote jobs",
 };
 
