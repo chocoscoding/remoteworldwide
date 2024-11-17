@@ -76,36 +76,62 @@ model NotificationPref {
   userId    String  @unique @db.ObjectId
   email     Boolean @default(true)
   inApp     Boolean @default(true)
-  frequency String  @default("daily")
+frequency Frequency @default(DAILY)
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+enum Frequency {
+  DAILY
+  WEEKLY
+  MONTHLY
 }
 
 model Bookmark {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  jobId     String   @unique @db.ObjectId
-  userId    String   @unique @db.ObjectId
+  jobId     String   @db.ObjectId
+  userId    String   @db.ObjectId
   createdAt DateTime @default(now())
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, jobId])
 }
 
 model Job {
   id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  slug          String
   title          String
   description    String
-  url            String // Link to the external job listing
   isActive       Boolean   @default(true)
-  companyId      String    @unique @db.ObjectId
-  company        Company   @relation(fields: [companyId], references: [id])
-  region         Region
-  seniority      Seniority
-  categoryId     String    @unique @db.ObjectId
-  category       Category  @relation(fields: [categoryId], references: [id])
-  industryId     String?   @db.ObjectId
-  industry       Industry? @relation(fields: [industryId], references: [id])
-  applicationUrl String? // For applying to jobs externally
+  companyId      String    @db.ObjectId
+  categoryId     String    @db.ObjectId
+  applicationUrl String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  jobType        JobType
+  regionId    String    @db.ObjectId
+  jobTypeId   String    @db.ObjectId
+  seniorityId String    @db.ObjectId
+  company        Company   @relation(fields: [companyId], references: [id])
+  category       Category  @relation(fields: [categoryId], references: [id])
+  region      Region    @relation(fields: [regionId], references: [id])
+  jobType     JobType   @relation(fields: [jobTypeId], references: [id])
+  seniority   Seniority @relation(fields: [seniorityId], references: [id])
+}
+
+
+model Region {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+  jobs      Job[]
+}
+
+model JobType {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+  jobs      Job[]
+}
+
+model Seniority {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique
+  jobs      Job[]
 }
 
 model Company {
@@ -119,16 +145,10 @@ model Company {
   updatedAt DateTime @updatedAt
 }
 
-model Industry {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  name String @unique
-  jobs Job[]
-}
 
 model Category {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
   name String @unique
-  slug String @unique
   jobs Job[]
 }
 
@@ -142,25 +162,7 @@ model Blog {
   isFeatured  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  tags        BlogTag[]
-}
-
-model Tag {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  name String
-
-  blogs BlogTag[]
-}
-
-model BlogTag {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId // Single primary key for MongoDB
-  blogId String @db.ObjectId
-  tagId  String @db.ObjectId
-
-  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
-  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([blogId, tagId]) // Unique index to ensure no duplicate blog-tag pairs
+  tags        String[]
 }
 
 model Author {
@@ -177,23 +179,3 @@ enum Role {
   AUTHOR
 }
 
-enum Region {
-  EMEA
-  Worldwide
-  APAC
-  LATAM
-}
-
-enum JobType {
-  FullTime
-  PartTime
-  Contract
-  Internship
-}
-
-enum Seniority {
-  Junior
-  Mid
-  Senior
-  Lead
-}
