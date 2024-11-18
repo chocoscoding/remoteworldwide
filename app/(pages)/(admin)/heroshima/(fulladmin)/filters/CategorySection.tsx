@@ -2,19 +2,14 @@
 "use client";
 import { useState } from "react";
 import Select from "react-select";
-import { PlusCircle, XCircle } from "lucide-react";
-import { toast, Bounce } from "react-toastify";
-import { Categories } from "./page";
-
-interface Option {
-  value: string;
-  label: string;
-}
+import { PlusCircle } from "lucide-react";
+import { toast } from "react-toastify";
+import { FilterData, FilterType } from "@/types/main";
 
 interface CategorySectionProps {
   section: string;
-  categories: Option[];
-  onAddCategory: (section: keyof Categories, newCategory: Option) => Promise<void>;
+  categories: FilterType[];
+  onAddCategory: (section: keyof FilterData, newCategory: FilterType) => Promise<void>;
 }
 
 export default function CategorySection({ section, categories, onAddCategory }: CategorySectionProps) {
@@ -25,13 +20,13 @@ export default function CategorySection({ section, categories, onAddCategory }: 
     if (!newCategory.trim()) return;
 
     const trimmedCategory = newCategory.trim();
-    const newOption: Option = { value: trimmedCategory, label: trimmedCategory };
+    const newOption: FilterType = { value: trimmedCategory, label: trimmedCategory };
 
     setIsLoading(true);
     toast.info(`Adding new ${section.slice(0, -1)}...`, { autoClose: 300 });
 
     try {
-      await onAddCategory(section as keyof Categories, newOption);
+      await onAddCategory(section as keyof FilterData, newOption);
       toast(`➕ New ${section} added!`, {
         position: "bottom-right",
         autoClose: 5000,

@@ -1,20 +1,7 @@
-// CategoriesPage.tsx
 "use client";
-import { useState } from "react";
-import { PlusCircle, XCircle } from "lucide-react";
-import Select from "react-select";
+import { FC, useState } from "react";
 import CategorySection from "./CategorySection";
-
-interface Option {
-  value: string;
-  label: string;
-}
-
-export interface Categories {
-  companies: Option[];
-  sectors: Option[];
-  roleTypes: Option[];
-}
+import { Categories, FilterData, FilterType, Option } from "@/types/main";
 
 const initialCategories: Categories = {
   companies: [
@@ -31,10 +18,10 @@ const initialCategories: Categories = {
   ],
 };
 
-export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Categories>(initialCategories);
+const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
+  const [categories, setCategories] = useState<FilterData>(initialData);
 
-  const addCategory = async (section: keyof Categories, newCategory: Option) => {
+  const addCategory = async (section: keyof FilterData, newCategory: FilterType) => {
     // Simulate API call
     // Replace this with your actual API request
     return new Promise<void>((resolve, reject) => {
@@ -53,17 +40,20 @@ export default function CategoriesPage() {
 
   return (
     <div className="w-full h-screen overflow-y-scroll p-4">
-      <h1 className="text-2xl font-bold mb-6">Manage Categories</h1>
+      <h1 className="text-2xl font-bold mb-6">Manage Filters</h1>
 
       {/* Render each category section */}
       {Object.keys(categories).map((sectionKey) => (
         <CategorySection
           key={sectionKey}
-          section={sectionKey as keyof Categories}
-          categories={categories[sectionKey as keyof Categories]}
+          section={sectionKey as keyof FilterData}
+          categories={categories[sectionKey as keyof FilterData]}
           onAddCategory={addCategory}
+          // sectionTitle={''}
         />
       ))}
     </div>
   );
-}
+};
+
+export default FiltersClient;

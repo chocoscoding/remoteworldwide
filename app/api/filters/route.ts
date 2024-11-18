@@ -4,30 +4,38 @@ import { NextResponse } from "next/server";
 export async function GET() {
   try {
     const [jobTypes, categories, seniorities, regions] = await Promise.all([
-      prisma.jobType.findMany({
-        select: {
-          id: true,
-          name: true,
-        },
-      }),
-      prisma.category.findMany({
-        select: {
-          id: true,
-          name: true,
-        },
-      }),
-      prisma.seniority.findMany({
-        select: {
-          id: true,
-          name: true,
-        },
-      }),
-      prisma.region.findMany({
-        select: {
-          id: true,
-          name: true,
-        },
-      }),
+      prisma.jobType
+        .findMany({
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
+      prisma.category
+        .findMany({
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
+      prisma.seniority
+        .findMany({
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
+      prisma.region
+        .findMany({
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
     ]);
 
     // Combine all results

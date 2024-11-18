@@ -29,10 +29,10 @@ const menuItemsForAdmin = [
     ],
   },
   {
-    name: "Categories",
+    name: "Filters",
     icon: List,
-    path: "/categories",
-    section: "categories",
+    path: "/filters",
+    section: "filters",
   },
   {
     name: "Blogs",
