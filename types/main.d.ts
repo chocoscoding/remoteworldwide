@@ -1,8 +1,8 @@
 export interface FilterData {
-  jobTypes: FilterType[];
-  categories: FilterType[];
-  seniorities: FilterType[];
-  regions: FilterType[];
+  job_type: FilterType[];
+  category: FilterType[];
+  seniority: FilterType[];
+  region: FilterType[];
 }
 
 export interface FilterType {

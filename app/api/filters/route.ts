@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const [jobTypes, categories, seniorities, regions] = await Promise.all([
+    const [job_type, category, seniority, region] = await Promise.all([
       prisma.jobType
         .findMany({
           select: {
@@ -40,10 +40,10 @@ export async function GET() {
 
     // Combine all results
     const combinedResults = {
-      jobTypes,
-      categories,
-      seniorities,
-      regions,
+      job_type,
+      category,
+      seniority,
+      region,
     };
 
     return NextResponse.json(

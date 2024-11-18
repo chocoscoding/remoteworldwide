@@ -2,13 +2,13 @@ import FiltersClient from "./Client";
 import { FilterData } from "@/types/main";
 
 const getFilters: () => Promise<FilterData> = async () => {
-  const res = await fetch("http://localhost:3000/api/filters");
+  const res = await fetch(process.env.NEXT_PUBLIC_URL + "/api/filters", { cache: "no-cache" });
   if (!res.ok) {
     return {
-      jobTypes: [],
-      categories: [],
-      seniorities: [],
-      regions: [],
+      job_type: [],
+      category: [],
+      seniority: [],
+      region: [],
     } as FilterData;
   }
   const data: Promise<{ data: FilterData }> = await res.json();
@@ -18,8 +18,8 @@ const getFilters: () => Promise<FilterData> = async () => {
 export default async function CategoriesPage() {
   const data = await getFilters();
   return (
-    <div>
+    <>
       <FiltersClient initialData={data} />
-    </div>
+    </>
   );
 }

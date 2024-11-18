@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           name,
         },
       }),
-      jobType: prisma.jobType.create({
+      job_type: prisma.jobType.create({
         data: {
           name,
         },
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const filterType2 = filterParam as keyof typeof filters;
 
     const createFilter = await filters[filterType2];
-    return NextResponse.json({ filterType2: createFilter }, { status: 202, statusText: "Success" });
+    return NextResponse.json({ data: createFilter }, { status: 202, statusText: "Success" });
   } catch (error: any) {
     if (error.message.includes("Unique constraint failed on the constraint")) {
       return NextResponse.json({ message: name + " aleady exist" }, { status: 404, statusText: "Error" });

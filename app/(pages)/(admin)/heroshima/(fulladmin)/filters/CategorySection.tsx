@@ -18,12 +18,17 @@ export default function CategorySection({ section, categories, onAddCategory }: 
 
   const handleAdd = async () => {
     if (!newCategory.trim()) return;
+    const doesExist = categories.filter((cate) => cate.label === newCategory);
+    if (doesExist.length > 0) {
+      toast.error(`${newCategory} already exist as a ${section.replace("_", " ")}`);
+      return;
+    }
 
     const trimmedCategory = newCategory.trim();
     const newOption: FilterType = { value: trimmedCategory, label: trimmedCategory };
 
     setIsLoading(true);
-    toast.info(`Adding new ${section.slice(0, -1)}...`, { autoClose: 300 });
+    toast.info(`Adding new ${section.replace("_", " ")}...`, { autoClose: 300 });
 
     try {
       await onAddCategory(section as keyof FilterData, newOption);
@@ -39,7 +44,7 @@ export default function CategorySection({ section, categories, onAddCategory }: 
       });
       setNewCategory("");
     } catch (error: any) {
-      toast.error(`Failed to add ${section.slice(0, -1)}: ${error.message}`);
+      toast.error(`Failed to add ${section.replace("_", " ")}: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -51,12 +56,12 @@ export default function CategorySection({ section, categories, onAddCategory }: 
 
   return (
     <div className="mb-8">
-      <h2 className="text-lg font-semibold mb-2 capitalize">{section}</h2>
+      <h2 className="text-lg font-semibold mb-2 capitalize">{section.replace("_", " ")}</h2>
 
       {/* React Select Dropdown */}
       <Select
         options={categories}
-        placeholder={`Select ${section.slice(0, -1)}`}
+        placeholder={`Select ${section.replace("_", " ")}`}
         className="w-full mb-2"
         theme={(theme) => ({
           ...theme,
@@ -75,7 +80,7 @@ export default function CategorySection({ section, categories, onAddCategory }: 
           type="text"
           value={newCategory}
           onChange={(e) => setNewCategory(e.target.value)}
-          placeholder={`Add new ${section.slice(0, -1)}`}
+          placeholder={`Add new ${section.replace("_", " ")}`}
           className="flex-1 border p-2 rounded outline-none"
         />
         <button
