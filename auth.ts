@@ -12,6 +12,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session;
     },
   },
+  session: {
+    strategy: "database",
+  },
   pages: {
     //:TODO #1
     signOut: "/",
