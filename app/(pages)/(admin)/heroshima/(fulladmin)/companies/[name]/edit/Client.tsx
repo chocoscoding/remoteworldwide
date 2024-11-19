@@ -161,7 +161,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-primary/95 flex items-center">
+          <label className=" text-sm font-medium text-primary/95 flex items-center">
             <Linkedin className="mr-2 w-4 h-4 text-primary/50" /> LinkedIn
           </label>
           <input

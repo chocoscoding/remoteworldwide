@@ -1,11 +1,12 @@
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import React from "react";
+import React, { FC } from "react";
 
-const CompanyTile = () => {
+const CompanyTile: FC<{ forCompany?: boolean; companyName: string }> = ({ forCompany = false, companyName }) => {
   return (
-    <Link href={`/heroshima/companies/123`}>
+    //:TODO
+    <Link href={forCompany ? `/heroshima/companies/${companyName}` : `/companies/${companyName}`}>
       <div className="flex flex-col gap-3 bg-white p-2 rounded-lg group transition-all">
         <div className="flex w-full items-center">
           <div className="border-2 rounded-full p-1 w-fit h-fit flex-shrink-0">

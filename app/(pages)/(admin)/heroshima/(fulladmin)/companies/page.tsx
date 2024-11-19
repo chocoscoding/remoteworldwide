@@ -56,7 +56,7 @@ export default function Home() {
             {Array(25)
               .fill(null)
               .map((_, index) => (
-                <CompanyTile key={index} />
+                <CompanyTile companyName={index.toString()} key={index} />
               ))}
           </div>
 
