@@ -14,7 +14,6 @@ interface CategorySectionProps {
 }
 
 const Option = (setter: (categoryId: string) => Promise<void>, props: OptionProps<FilterType, false, GroupBase<FilterType>>) => {
-  console.log(props);
   return (
     <div className="w-full pr-4 flex items-center gap-2 flex-row-reverse">
       <Trash className="text-red-300 peer hover:text-red-600 cursor-pointer" onClick={() => setter(props.data.value)} />

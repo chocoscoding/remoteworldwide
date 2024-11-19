@@ -6,7 +6,7 @@ import { CldUploadWidget, CloudinaryUploadWidgetInfo } from "next-cloudinary";
 import Image from "next/image";
 import { toast } from "react-toastify";
 
-export default function CreateCompany() {
+export default function EditCompanyClient() {
   const [name, setName] = useState("");
   const [about, setAbout] = useState("");
   const [logo, setLogo] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export default function CreateCompany() {
 
   return (
     <div className="w-full h-screen overflow-y-scroll p-4 lg:pr-[5%]">
-      <h1 className="text-2xl font-bold mb-4">Create New Company</h1>
+      <h1 className="text-2xl font-bold mb-4">Edit company information</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className=" text-sm font-medium text-primary/95 flex items-center">Company Name</label>

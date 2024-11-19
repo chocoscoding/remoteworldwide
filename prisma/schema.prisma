@@ -138,8 +138,11 @@ model Company {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String
   about     String?
-  logoUrl   String?
-  website   String?
+  logo   String?
+  website   String
+  linkedin String?
+  twitter String?
+  facebook String?
   jobs      Job[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
