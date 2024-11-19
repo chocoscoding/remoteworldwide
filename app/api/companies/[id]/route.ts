@@ -49,4 +49,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 //delete one company
-export async function DELETE() {}
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const companyId = (await params).id;
+    const oneCompany = await prisma.company.delete({
+      where: {
+        id: companyId,
+      },
+    });
+
+    return NextResponse.json({ data: oneCompany }, { status: 200 });
+  } catch (error: any) {
+    if (error.message.includes("Record to delete does not exist")) {
+      return NextResponse.json({ message: `company doesn't exist` }, { status: 404 });
+    }
+    console.log(error.message);
+    return NextResponse.json({ message: error.message }, { status: 404 });
+  }
+}

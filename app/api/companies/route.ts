@@ -2,7 +2,23 @@ import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 //get all companies
-export async function GET() {}
+export async function GET() {
+  try {
+    const companies = await prisma.company.findMany({
+      orderBy: {
+        name: "asc",
+      },
+      select: {
+        name: true,
+        about: true,
+        logo: true,
+      },
+    });
+    return NextResponse.json({ data: companies }, { status: 200, statusText: "success" });
+  } catch (error: any) {
+    return NextResponse.json({ message: "something went wrong" }, { status: 500 });
+  }
+}
 //create one company
 export async function POST(req: NextRequest) {
   try {
