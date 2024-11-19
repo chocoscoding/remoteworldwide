@@ -18,7 +18,7 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save category");
+        throw new Error("Failed to save this filter");
       }
       const result = await response.json();
       console.log(result);
@@ -27,8 +27,30 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
         ...prevCategories,
         [section]: [...prevCategories[section], { label: result.data.name, value: result.data.id }],
       }));
-    } catch (error) {
-      throw new Error("Error saving category");
+    } catch {
+      throw new Error("Error saving this filter");
+    }
+  };
+  const removeCategory = async (section: keyof FilterData, categoryId: string) => {
+    try {
+      const response = await fetch(`/api/filters/${section}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: categoryId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete this filter");
+      }
+
+      setCategories((prevCategories) => ({
+        ...prevCategories,
+        [section]: prevCategories[section].filter((category) => category.value !== categoryId),
+      }));
+    } catch {
+      throw new Error("Error deleting this filter");
     }
   };
 
@@ -42,7 +64,7 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
             section={sectionKey as keyof FilterData}
             categories={categories[sectionKey as keyof FilterData]}
             onAddCategory={addCategory}
-            // sectionTitle={''}
+            onRemoveCategory={removeCategory}
           />
         );
       })}

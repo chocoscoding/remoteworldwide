@@ -1,8 +1,8 @@
 // CategorySection.tsx
 "use client";
 import { useState } from "react";
-import Select from "react-select";
-import { PlusCircle } from "lucide-react";
+import Select, { components, GroupBase, OptionProps } from "react-select";
+import { PlusCircle, Trash } from "lucide-react";
 import { toast } from "react-toastify";
 import { FilterData, FilterType } from "@/types/main";
 
@@ -10,11 +10,22 @@ interface CategorySectionProps {
   section: string;
   categories: FilterType[];
   onAddCategory: (section: keyof FilterData, newCategory: FilterType) => Promise<void>;
+  onRemoveCategory: (section: keyof FilterData, categoryId: string) => Promise<void>;
 }
 
-export default function CategorySection({ section, categories, onAddCategory }: CategorySectionProps) {
+const Option = (setter: (categoryId: string) => Promise<void>, props: OptionProps<FilterType, false, GroupBase<FilterType>>) => {
+  console.log(props);
+  return (
+    <div className="w-full pr-4 flex items-center gap-2 flex-row-reverse">
+      <Trash className="text-red-300 peer hover:text-red-600 cursor-pointer" onClick={() => setter(props.data.value)} />
+      <components.Option {...props} className=" peer-hover:text-red-500" />
+    </div>
+  );
+};
+export default function CategorySection({ section, categories, onAddCategory, onRemoveCategory }: CategorySectionProps) {
   const [newCategory, setNewCategory] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // const Delete;
 
   const handleAdd = async () => {
     if (!newCategory.trim()) return;
@@ -50,6 +61,29 @@ export default function CategorySection({ section, categories, onAddCategory }: 
     }
   };
 
+  const handleDelete = async (categoryId: string) => {
+    setIsLoading(true);
+    toast.info(`Removing ${section.replace("_", " ")}...`, { autoClose: 300 });
+
+    try {
+      await onRemoveCategory(section as keyof FilterData, categoryId);
+      toast(`🗑️ ${section} removed!`, {
+        position: "bottom-right",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+    } catch (error: any) {
+      toast.error(`Failed to remove ${section.replace("_", " ")}: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleClear = () => {
     setNewCategory("");
   };
@@ -61,6 +95,7 @@ export default function CategorySection({ section, categories, onAddCategory }: 
       {/* React Select Dropdown */}
       <Select
         options={categories}
+        components={{ Option: (props) => Option(handleDelete, props) }}
         placeholder={`Select ${section.replace("_", " ")}`}
         className="w-full mb-2"
         theme={(theme) => ({
