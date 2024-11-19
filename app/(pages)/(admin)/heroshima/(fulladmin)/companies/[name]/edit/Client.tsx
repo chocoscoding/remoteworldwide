@@ -1,21 +1,24 @@
 "use client";
-import { FormEvent, useEffect, useState } from "react";
-import { Globe, Linkedin, Twitter, Facebook, Image as ImageIcon, Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { FC, FormEvent, useEffect, useState } from "react";
+import { Globe, Linkedin, Twitter, Facebook, Image as ImageIcon, Plus, RefreshCcw } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
 import { CldUploadWidget, CloudinaryUploadWidgetInfo } from "next-cloudinary";
 import Image from "next/image";
 import { toast } from "react-toastify";
+import { Company } from "@prisma/client";
 
-export default function EditCompanyClient() {
-  const [name, setName] = useState("");
-  const [about, setAbout] = useState("");
-  const [logo, setLogo] = useState<string | null>(null);
-  const [website, setWebsite] = useState("");
-  const [linkedin, setLinkedin] = useState("");
-  const [twitter, setTwitter] = useState("");
-  const [facebook, setFacebook] = useState("");
+const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
+  const [name, setName] = useState(companyData.name);
+  const [about, setAbout] = useState(companyData.about);
+  const [logo, setLogo] = useState<string | null>(companyData.logo);
+  const [website, setWebsite] = useState(companyData.website);
+  const [linkedin, setLinkedin] = useState(companyData.linkedin ?? "");
+  const [twitter, setTwitter] = useState(companyData.twitter ?? "");
+  const [facebook, setFacebook] = useState(companyData.facebook ?? "");
   const [error, setError] = useState<{ logo?: boolean }>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const pathname = useParams();
 
   const [resource, setResource] = useState<string | CloudinaryUploadWidgetInfo | undefined>();
 
@@ -27,30 +30,30 @@ export default function EditCompanyClient() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const formValues = { name, about: about.trim(), logo, website, linkedin, twitter, facebook };
     if (isLoading) return;
     if (!logo) {
       setError((prev) => ({ ...prev, logo: true }));
     }
+    const formValues = { name, about: about ? about.trim() : about, logo, website, linkedin, twitter, facebook };
 
     setIsLoading(true);
     toast.info("Adding new company...", { autoClose: 300 });
 
     try {
-      const response = await fetch("/api/companies", {
-        method: "POST",
+      const response = await fetch("/api/companies/" + companyData.id, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formValues),
       });
+      const data = (await response.json()) as { data: Company; message: string };
 
       if (!response.ok) {
-        throw new Error("Network response was not ok");
+        throw new Error(data.message);
       }
 
-      const data = await response.json();
-      toast.success("Company created successfully!", {
+      toast.success("Company updated successfully!", {
         position: "bottom-right",
         autoClose: 3500,
         hideProgressBar: false,
@@ -60,7 +63,7 @@ export default function EditCompanyClient() {
         progress: undefined,
         theme: "dark",
       });
-      push("/heroshima/companies/" + data.data.id);
+      push("/heroshima/companies/" + data.data.name + "/edit");
     } catch (error: any) {
       toast.error(`Failed to create company: ${error.message}`);
     } finally {
@@ -193,16 +196,24 @@ export default function EditCompanyClient() {
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
           />
         </div>
-        <div className="flex justify-center">
+        <div className="flex gap-2 justify-center">
           <button
             disabled={isLoading}
             type="submit"
             className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 disabled:opacity-50">
-            <Plus className="w-6 h-6 mr-2" />
-            Create Company
+            <RefreshCcw className="w-6 h-6 mr-2" />
+            Update Company info
+          </button>
+          <button
+            onClick={() => push(`/heroshima/companies/${pathname.name}`)}
+            disabled={isLoading}
+            type="button"
+            className="drop-shadow-primary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 disabled:opacity-50">
+            Visit company
           </button>
         </div>
       </form>
     </div>
   );
-}
+};
+export default EditCompanyClient;

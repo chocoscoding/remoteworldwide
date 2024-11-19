@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
 
-const CompanySection: FC<{ showFullDetails?: boolean }> = ({ showFullDetails = false }) => {
+const CompanySection: FC<{ showFullDetails?: boolean; name?: string }> = ({ showFullDetails = false, name }) => {
   const socialMediaLinks = [
     { href: "https://twitter.com", Icon: TwitchIcon },
     { href: "https://facebook.com", Icon: FacebookIcon },

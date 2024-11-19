@@ -1,21 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { FC, useState } from "react";
 import { PencilIcon, Trash } from "lucide-react";
 import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
 import CompanySection from "@/app/components/main/job/CompanySection";
 import Link from "next/link";
+import { Company } from "@prisma/client";
 
-export default function Home() {
+const CompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
   return (
     <main className="px-10 pt-10">
       <h1 className="text-2xl font-bold mb-6">Company Information</h1>
 
       <div className="w-[550px] gap-6 flex">
-        <CompanySection showFullDetails />
+        <CompanySection showFullDetails {...companyData} />
         <div className="w-[6rem]">
           <Link
-            href={`/heroshima/companies/123/edit`}
+            href={`/heroshima/companies/${companyData.name}/edit`}
             className="drop-shadow-secondary2-hover transition-all rounded-md w-full aspect-square border border-primary mb-3 grid place-items-center">
             <PencilIcon />
           </Link>
@@ -37,4 +38,5 @@ export default function Home() {
       </div>
     </main>
   );
-}
+};
+export default CompanyClient;

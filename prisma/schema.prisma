@@ -136,9 +136,9 @@ model Seniority {
 
 model Company {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  about     String?
-  logo   String?
+  name      String @unique
+  about     String
+  logo   String
   website   String
   linkedin String?
   twitter String?
