@@ -14,6 +14,7 @@
     "@prisma/extension-accelerate": "^1.2.1",
     "clsx": "^2.1.1",
     "cobe": "^0.6.3",
+    "hexoid": "^2.0.0",
     "lucide-react": "^0.453.0",
     "next": "14.2.15",
     "next-auth": "^5.0.0-beta.25",

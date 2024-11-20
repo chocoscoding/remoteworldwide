@@ -11,6 +11,11 @@ export interface FilterType {
   value: string;
   label: string;
 }
+export interface Option {
+  value: string;
+  label: string;
+  href?: string;
+}
 
 export interface FilterData2 {
   companies: Option[];
