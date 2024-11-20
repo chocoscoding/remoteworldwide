@@ -5,6 +5,7 @@ import { PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SelectField, TextField } from "@/app/components/inputs";
 import { FilterData, FilterType, Option } from "@/types/main";
+import { toast } from "react-toastify";
 
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
@@ -36,12 +37,13 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     seniority: null,
     body: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const router = useRouter();
+  const { push } = useRouter();
 
   const handleSelectChange = (field: keyof FormValues, value: { value: string; label: string; href?: string }) => {
     if (value?.href) {
-      router.push(value.href);
+      push(value.href);
     } else {
       setFormValues((prev) => ({ ...prev, [field]: value }));
     }
@@ -51,10 +53,57 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     setFormValues((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log(formValues);
-    // Handle form submission
+    const finalValue = {
+      title: formValues.title,
+      description: formValues.body,
+      companyId: formValues.company?.value,
+      applicationUrl: formValues.link,
+      category: formValues.category?.value,
+      region: formValues.region?.value,
+      jobType: formValues.job_type?.value,
+      seniority: formValues.seniority?.value,
+    };
+    const checkAllValues = Object.entries(finalValue).filter(([key, value]) => !value);
+    if (isLoading) return;
+    if (checkAllValues.length > 1) {
+      toast.error(`fill all required details: ${checkAllValues.map(([key, val]) => key).join(", ")}`);
+    } else {
+      setIsLoading(true);
+      toast.info("Creating new Job...", { autoClose: 300 });
+
+      try {
+        const response = await fetch("/api/jobs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(finalValue),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message);
+        }
+
+        toast.success("Job created successfully!", {
+          position: "bottom-right",
+          autoClose: 3500,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+          theme: "dark",
+        });
+        push("/heroshima/jobs/" + data.data.slug);
+      } catch (error: any) {
+        toast.error(`Failed to create job: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   return (
@@ -134,11 +183,11 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             />
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex justify-center ">
             <button
               type="submit"
-              className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3">
-              <PlusCircle className="w-6 h-6 mr-2" />
+              className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm group p-3 hover:rounded-md">
+              <PlusCircle className="w-6 h-6 mr-2 group-hover:scale-90 transition-all" />
               Create Job
             </button>
           </div>

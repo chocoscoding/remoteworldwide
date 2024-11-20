@@ -3,7 +3,7 @@ import { hexoid } from "hexoid";
 import { NextRequest, NextResponse } from "next/server";
 const SKIP_AMNT = 50;
 
-function createSlug(input) {
+function createSlug(input: string) {
   const timestamp = Date.now();
   return (
     input
@@ -11,7 +11,8 @@ function createSlug(input) {
       .toLowerCase()
       .trim()
       .replace(/\s+/g, "-") +
-    `${hexoid(36)}` +
+    "-" +
+    `${hexoid(36)()}` +
     `${timestamp}`
   );
 }
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { title, description, companyId, applicationUrl, category, region, jobType, seniority } = await req.json();
-    const BODY_VALUES = { title, description, companyId, applicationUrl, category, region, jobType, seniority };
+    const BODY_VALUES = { title, description, companyId, applicationUrl, category, region, jobType, seniority, slug: "0" };
 
     const missingValue = Object.entries(BODY_VALUES).filter(([key, value]) => !value);
 

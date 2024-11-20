@@ -2,15 +2,16 @@ import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET ONE JOB
-export async function GET(req: NextRequest) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = req.nextUrl.searchParams;
-    if (!id) {
-      return NextResponse.json({ message: "Job ID is required" }, { status: 400 });
+    const jobSlug = (await params).id;
+
+    if (!jobSlug) {
+      return NextResponse.json({ message: "Job slug is required" }, { status: 400 });
     }
 
     const job = await prisma.job.findUnique({
-      where: { id: parseInt(id) },
+      where: { slug: jobSlug },
       select: {
         id: true,
         title: true,
@@ -43,9 +44,9 @@ export async function GET(req: NextRequest) {
 }
 
 // EDIT JOB
-export async function PUT(req: NextRequest) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = req.nextUrl.searchParams;
+    const id = (await params).id;
     if (!id) {
       return NextResponse.json({ message: "Job ID is required" }, { status: 400 });
     }
@@ -53,7 +54,7 @@ export async function PUT(req: NextRequest) {
     const { title, description, isActive, companyId, applicationUrl, category, region, jobType, seniority } = await req.json();
 
     const updatedJob = await prisma.job.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: {
         title,
         description,
@@ -74,15 +75,15 @@ export async function PUT(req: NextRequest) {
 }
 
 // DELETE JOB
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = req.nextUrl.searchParams;
+    const id = (await params).id;
     if (!id) {
       return NextResponse.json({ message: "Job ID is required" }, { status: 400 });
     }
 
     await prisma.job.delete({
-      where: { id: parseInt(id) },
+      where: { id: id },
     });
 
     return NextResponse.json({ message: "Job deleted successfully" }, { status: 200 });
