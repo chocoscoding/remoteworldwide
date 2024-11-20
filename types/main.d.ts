@@ -1,3 +1,5 @@
+import { Company } from "@prisma/client";
+
 export interface FilterData {
   job_type: FilterType[];
   category: FilterType[];
@@ -15,4 +17,10 @@ export interface FilterData2 {
   sectors: Option[];
   roleTypes: Option[];
   regions: Option[];
+}
+
+export interface CompanyList extends Pick<Company, "name" | "about" | "logo"> {
+  _count: {
+    jobs: number;
+  };
 }

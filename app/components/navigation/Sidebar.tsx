@@ -13,7 +13,7 @@ const menuItemsForAdmin = [
     path: "/companies",
     section: "companies",
     subItems: [
-      { label: "Create compnay", path: "/companies/create" },
+      { label: "Create company", path: "/companies/create" },
       { label: "Companies", path: "/companies" },
     ],
   },

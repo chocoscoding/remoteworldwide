@@ -3,20 +3,16 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import CompanyTile from "../../../components/main/CompanyTile";
-import { Company } from "@prisma/client";
+import { CompanyList } from "@/types/main";
 
 export default function Home() {
-  const dummyData: Company = {
-    name: "company",
-    linkedin: "company",
-    about: "company",
-    twitter: "company",
-    id: "company",
-    facebook: "company",
-    logo: "company",
-    website: "coc",
-    createdAt: new Date(),
-    updatedAt: new Date(),
+  const dummyData: CompanyList = {
+    name: "Lorem Ipsum",
+    about: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    logo: "/images/telegram.png",
+    _count: {
+      jobs: 10,
+    },
   };
   const totalJobs = 100;
   const jobsPerPage = 50;

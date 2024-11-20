@@ -1,20 +1,30 @@
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
-
+const SKIP_AMNT = 50;
 //get all companies
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const companies = await prisma.company.findMany({
-      orderBy: {
-        name: "asc",
-      },
-      select: {
-        name: true,
-        about: true,
-        logo: true,
-      },
-    });
-    return NextResponse.json({ data: companies }, { status: 200, statusText: "success" });
+    const searchParams = req.nextUrl.searchParams;
+    const query = searchParams.get("page");
+
+    const skipAmount = SKIP_AMNT * (query ? parseInt(query) : 1);
+    const [companies, companiesCount] = await Promise.all([
+      prisma.company.findMany({
+        orderBy: {
+          name: "asc",
+        },
+        take: SKIP_AMNT,
+        skip: skipAmount - SKIP_AMNT,
+        select: {
+          name: true,
+          about: true,
+          logo: true,
+          _count: true,
+        },
+      }),
+      prisma.company.count(),
+    ]);
+    return NextResponse.json({ data: companies, count: companiesCount }, { status: 200, statusText: "success" });
   } catch (error: any) {
     return NextResponse.json({ message: "something went wrong" }, { status: 500 });
   }

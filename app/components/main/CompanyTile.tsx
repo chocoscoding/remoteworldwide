@@ -1,10 +1,11 @@
-import { Company } from "@prisma/client";
+import { CompanyList } from "@/types/main";
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
 
-const CompanyTile: FC<{ forCompany?: boolean; companyData: Company }> = ({ forCompany = false, companyData }) => {
+const CompanyTile: FC<{ forCompany?: boolean; companyData: CompanyList }> = ({ forCompany = false, companyData }) => {
+  const jobCount = companyData._count.jobs;
   return (
     //:TODO
     <Link href={forCompany ? `/heroshima/companies/${companyData.name}` : `/companies/${companyData.name}`}>
@@ -19,7 +20,7 @@ const CompanyTile: FC<{ forCompany?: boolean; companyData: Company }> = ({ forCo
           {companyData.about.length > 200 ? `${companyData.about.substring(0, 200)}...` : companyData.about}
         </p>
         <div className="flex justify-between items-center">
-          <div className="bg-gray-100 p-2 rounded-md flex-shrink-0">12 jobs Available</div>
+          <div className="bg-gray-100 p-2 rounded-md flex-shrink-0">{jobCount > 0 ? `${jobCount} jobs available` : "0 jobs"}</div>
           <ArrowUpRight className="flex-shrink-0 text-gray-500 group-hover:text-secondary" />
         </div>
       </div>
