@@ -29,3 +29,18 @@ export interface CompanyList extends Pick<Company, "name" | "about" | "logo"> {
     jobs: number;
   };
 }
+
+export interface CompanyWithJobs extends Company {
+  jobs: Jobs[];
+}
+export interface JobAndCompany extends Job {
+  company: Company;
+}
+export interface CompanyWithJobsCount extends Company {
+  _count?: {
+    jobs: number;
+  };
+}
+export interface JobAndCompanyWithCount extends Job {
+  company: CompanyWithJobsCount;
+}

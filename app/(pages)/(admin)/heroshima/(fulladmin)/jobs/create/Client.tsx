@@ -60,10 +60,10 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       description: formValues.body,
       companyId: formValues.company?.value,
       applicationUrl: formValues.link,
-      category: formValues.category?.value,
-      region: formValues.region?.value,
-      jobType: formValues.job_type?.value,
-      seniority: formValues.seniority?.value,
+      category: formValues.category?.label,
+      region: formValues.region?.label,
+      jobType: formValues.job_type?.label,
+      seniority: formValues.seniority?.label,
     };
     const checkAllValues = Object.entries(finalValue).filter(([key, value]) => !value);
     if (isLoading) return;

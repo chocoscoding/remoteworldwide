@@ -1,14 +1,21 @@
-import { FacebookIcon, LinkedinIcon, LinkIcon, MoveUpRight, TwitchIcon, XIcon } from "lucide-react";
+import { CompanyWithJobsCount } from "@/types/main";
+import { Company } from "@prisma/client";
+import { LinkIcon, MoveUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
-
-const CompanySection: FC<{ showFullDetails?: boolean; name?: string }> = ({ showFullDetails = false, name }) => {
+import { FaXTwitter, FaFacebookF, FaLinkedin } from "react-icons/fa6";
+const CompanySection: FC<{
+  showFullDetails?: boolean;
+  name?: string;
+  companyDetails: CompanyWithJobsCount;
+  forAdmin?: boolean;
+}> = ({ showFullDetails = false, forAdmin = false, name, companyDetails }) => {
   const socialMediaLinks = [
-    { href: "https://twitter.com", Icon: TwitchIcon },
-    { href: "https://facebook.com", Icon: FacebookIcon },
-    { href: "https://linkedin.com", Icon: LinkedinIcon },
-    { href: "https://instagram.com", Icon: LinkIcon },
+    { href: companyDetails.twitter ?? "#", Icon: FaXTwitter },
+    { href: companyDetails.facebook ?? "#", Icon: FaFacebookF },
+    { href: companyDetails.linkedin ?? "#", Icon: FaLinkedin },
+    { href: companyDetails.website ?? "#", Icon: LinkIcon },
   ];
   return (
     <div
@@ -16,18 +23,18 @@ const CompanySection: FC<{ showFullDetails?: boolean; name?: string }> = ({ show
         showFullDetails ? "lg:min-h-[320px]" : ""
       }`}>
       <div className="border-2 rounded-full p-1 w-fit h-fit mt-2 md:mt-3 lg:mt-4">
-        <Image src="/images/telegram.png" alt="logo" width={70} height={70} className="rounded-full lg:w-[70px] w-[50px]" />
+        <Image src={companyDetails.logo} alt="logo" width={70} height={70} className="rounded-full lg:w-[70px] w-[50px]" />
       </div>
       <div className="flex flex-col items-center lg:mt-4 mt-2">
         <p className="text-gray-500">Job By</p>
         {showFullDetails ? (
           <div className="flex items-center gap-2">
-            <p className="text-primary font-bold text-xl">Telegram </p>
+            <p className="text-primary font-bold text-xl">{companyDetails.name}</p>
           </div>
         ) : (
-          <Link href={"/companies/123"}>
+          <Link href={`${forAdmin ? "/heroshima" : ""}/companies/${companyDetails.name}`} passHref>
             <div className="flex items-center gap-2 cursor-pointer">
-              <p className="text-primary font-bold text-xl">Telegram </p>
+              <p className="text-primary font-bold text-xl">{companyDetails.name}</p>
               <MoveUpRight className="w-4" />
             </div>
           </Link>
@@ -47,12 +54,12 @@ const CompanySection: FC<{ showFullDetails?: boolean; name?: string }> = ({ show
         </div>
       ) : null}
       <p className="text-base md:text-sm text-gray-700">
-        Lorem ipsum dolor sit amet consectetur adipisicing elit. Eius totam quasi esse aliasnim beatae atque ducimus deleniti...
+        {companyDetails.about.length > 200 ? `${companyDetails.about.substring(0, 200)}...` : companyDetails.about}
       </p>
 
       {showFullDetails ? (
         <div className=" bg-secondary h-6 w-fit p-2.5 rounded-full flex items-center justify-center mt-2 mb-1">
-          <p className="text-base md:text-sm text-gray-700/70 bg-secondary">20 jobs available </p>
+          <p className="text-base md:text-sm text-gray-700/70 bg-secondary">{`${companyDetails._count ?? "no"} jobs available`} </p>
         </div>
       ) : null}
     </div>
