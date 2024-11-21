@@ -74,6 +74,7 @@ interface FetchDataFunction {
 
 interface OneJobListType {
   title: string;
+  id: string;
   company: {
     logo: string;
     name: string;
@@ -83,4 +84,5 @@ interface OneJobListType {
   region: string;
   jobType: string;
   seniority: string;
+  isActive: boolean;
 }

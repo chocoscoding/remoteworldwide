@@ -34,7 +34,7 @@ const JobActions: FC<{ id: string; isJobActive: boolean; slug: string }> = ({ id
   const toggleActive = async () => {
     try {
       setLoading(true);
-      await toggleJobActiveState(id, isActive);
+      await toggleJobActiveState(id, !isActive);
 
       toast.success("Job updated successfully!", {
         position: "bottom-right",

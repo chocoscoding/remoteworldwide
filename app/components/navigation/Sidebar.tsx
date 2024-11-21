@@ -24,8 +24,8 @@ const menuItemsForAdmin = [
     section: "jobs",
     subItems: [
       { label: "Create Job", path: "/jobs/create" },
-      { label: "Jobs", path: "/jobs" },
-      { label: "Inactive", path: "/jobs/inactive" },
+      { label: "All Jobs", path: "/jobs" },
+      { label: "Inactive Jobs", path: "/jobs/inactive" },
     ],
   },
   {

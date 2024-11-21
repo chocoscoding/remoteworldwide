@@ -1,6 +1,9 @@
 import { PlusCircle } from "lucide-react";
 import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
 import { auth } from "@/auth";
+import { prisma } from "@/prisma";
+import { getAdminDashboardInfo } from "@/libs/query";
+import Link from "next/link";
 
 const dummyData = {
   totalJobs: 120,
@@ -25,6 +28,7 @@ export default async function AdminAnalytics() {
       </div>
     );
   }
+  const ADMIN_DASHBOARD_INFO = await getAdminDashboardInfo();
   return (
     <div className="w-full h-screen overflow-y-scroll">
       <main className="p-4">
@@ -33,23 +37,25 @@ export default async function AdminAnalytics() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[10rem]">
             <div className="p-4 bg-white shadow rounded-lg">
               <h2 className="text-xl font-semibold">Total Jobs</h2>
-              <p className="text-3xl font-bold">{dummyData.totalJobs}</p>
+              <p className="text-3xl font-bold">{ADMIN_DASHBOARD_INFO.jobsCount}</p>
             </div>
             <div className="p-4 bg-white shadow rounded-lg">
               <h2 className="text-xl font-semibold">Total Companies</h2>
-              <p className="text-3xl font-bold">{dummyData.totalCompanies}</p>
+              <p className="text-3xl font-bold">{ADMIN_DASHBOARD_INFO.companiesCount}</p>
             </div>
           </div>
           <div className="w-full mt-6 bg-transparent border-none">
             <h2 className="text-xl font-semibold mb-4">Latest Job Posted</h2>
-            <AdminJobTile />
+            {ADMIN_DASHBOARD_INFO.latestJob && <AdminJobTile jobDetail={ADMIN_DASHBOARD_INFO.latestJob} />}
           </div>
         </section>
-        <section className="flex justify-center">
-          <button className="flex items-center px-6 py-3 bg-black text-white font-bold rounded-sm ">
-            <PlusCircle className="w-6 h-6 mr-2" />
-            Create New Job
-          </button>
+        <section className="flex justify-center transition-all">
+          <Link
+            href={"/heroshima/jobs/create"}
+            className="flex items-center px-6 py-4 group bg-primary text-white outline outline-2 outline-primary font-bold rounded-sm hover:rounded-md drop-shadow-primary2-hover transition-all">
+            <PlusCircle className="w-6 h-6 mr-2 group-hover:scale-90" />
+            Create more jobs
+          </Link>
         </section>
       </main>
     </div>

@@ -1,23 +1,14 @@
 import NotFound from "@/app/components/NotFound";
 import { Company } from "@prisma/client";
 import CompanyClient from "./Client";
+import { findCompany, findCompanyJobs } from "@/libs/query";
+import { revalidatePath } from "next/cache";
 
-const fetchCompany = async (name: string): Promise<Company | null> => {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/companies/${name}`, { cache: "no-cache" });
-    if (!response.ok) {
-      return null;
-    }
-    const data = await response.json();
-    return data.data;
-  } catch (error) {
-    console.error("Failed to fetch company:", error);
-    return null;
-  }
-};
 export default async function Page({ params }: { params: Promise<{ name: string }> }) {
-  const companyId = decodeURIComponent((await params).name);
-  const companyData = await fetchCompany(companyId);
+  revalidatePath("./");
+  const companyName = decodeURIComponent((await params).name);
+  const companyData = await findCompany(companyName);
   if (!companyData) return <NotFound buttonType="link" title="Company" link="/heroshima/companies/create" />;
-  return <CompanyClient companyData={companyData} />;
+  const companyJobs = await findCompanyJobs(companyData.data.id, 1);
+  return <CompanyClient companyData={companyData.data} initialJobs={companyJobs.data} initialCount={companyJobs.count} />;
 }

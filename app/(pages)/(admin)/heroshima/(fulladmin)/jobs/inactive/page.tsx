@@ -1,9 +1,12 @@
 import React from "react";
 import InactiveJobs from "./Client";
-import { findInactiveJobs } from "@/libs/query";
+import { findJobsAdmin } from "@/libs/query";
+import { revalidatePath } from "next/cache";
 
 const Page = async () => {
-  const inActiveJobs = await findInactiveJobs(1);
+  revalidatePath("./");
+
+  const inActiveJobs = await findJobsAdmin(1, false);
   return <InactiveJobs initialJobs={inActiveJobs.data} count={inActiveJobs.count} />;
 };
 

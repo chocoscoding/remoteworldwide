@@ -17,7 +17,6 @@ const CompanySection: FC<{
     { href: companyDetails.linkedin ?? "#", Icon: FaLinkedin },
     { href: companyDetails.website ?? "#", Icon: LinkIcon },
   ];
-  console.log(companyDetails._count?.jobs);
   return (
     <div
       className={`border-2 border-black h-fit md:min-h-[300px] rounded-lg flex-1 w-full lg:w-auto drop-shadow-secondary bg-white flex flex-col items-center p-2 sm:p-3 overflow-hidden ${

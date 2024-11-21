@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useState } from "react";
-import { PencilIcon, Trash } from "lucide-react";
+import { ChevronLeft, ChevronRight, PencilIcon, Trash } from "lucide-react";
 import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
 import CompanySection from "@/app/components/main/job/CompanySection";
 import Link from "next/link";
@@ -9,8 +9,17 @@ import { Company } from "@prisma/client";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import OverlayLoader from "@/app/components/OverlayLoader";
+import { OneJobListType, WithPaginationProps } from "@/types/main";
+import { findCompanyJobs } from "@/libs/query";
+import withPagination from "@/app/components/main/withPagination";
+import JobTileSkeletonList from "@/app/components/main/JobTileSkeletonList";
+interface ActiveJobsProps extends WithPaginationProps {}
 
-const CompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
+const CompanyClient: FC<{ companyData: Company; initialJobs: OneJobListType[]; initialCount: number }> = ({
+  companyData,
+  initialJobs,
+  initialCount,
+}) => {
   const [loading, setIsLoading] = useState(false);
   const { push } = useRouter();
   const deleteCompany = async () => {
@@ -46,6 +55,16 @@ const CompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
       setIsLoading(false);
     }
   };
+  const fetchJobs = async (currentPage: number) => {
+    try {
+      const response = await findCompanyJobs(companyData.id, currentPage);
+      return { jobs: response.data, total: response.count };
+    } catch (error) {
+      throw new Error("Something went wrong");
+    }
+  };
+
+  const PaginatedActiveJobsComp = withPagination(null, fetchJobs, 50, initialJobs, initialCount);
   return (
     <main className="relative w-full">
       {loading ? <OverlayLoader /> : null}
@@ -65,15 +84,11 @@ const CompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
           </div>
         </div>
         <br />
-        <h2 className="font-bold text-xl my-2">Jobs</h2>
         <div className="grid grid-cols-1 w-full">
           {/* main */}
-          {Array(20)
-            .fill(0)
-            .map((_, index) => (
-              <AdminJobTile key={index} />
-            ))}
+          <PaginatedActiveJobsComp />
         </div>
+        <br />
       </div>
     </main>
   );
