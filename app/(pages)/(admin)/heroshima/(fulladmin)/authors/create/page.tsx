@@ -1,25 +1,79 @@
 "use client";
-import { FormEvent, Suspense, useState } from "react";
+import { ChangeEvent, FormEvent, Suspense, useState } from "react";
 import { PlusCircle } from "lucide-react";
 import { CldUploadWidget, CloudinaryUploadWidgetInfo } from "next-cloudinary";
 import Image from "next/image";
+import { toast } from "react-toastify";
+import { createAuthor } from "@/libs/query";
+import { useRouter } from "next/navigation";
+import { revalidatePath } from "next/cache";
+
+type FormState = {
+  website: string;
+  twitter: string;
+  linkedin: string;
+  instagram: string;
+  name: string;
+  about: string;
+  profileImage: string;
+};
 
 export default function CreateBlog() {
-  const [name, setName] = useState("");
-  const [about, setAbout] = useState("");
-  const [socialLinks, setSocialLinks] = useState({
-    facebook: "",
+  const [isLoading, setIsLoading] = useState(false);
+  const [formValues, setFormValues] = useState<FormState>({
+    website: "",
     twitter: "",
     linkedin: "",
     instagram: "",
+    name: "",
+    about: "",
+    profileImage: "",
   });
-  const [profileImage, setProfileImage] = useState<string | CloudinaryUploadWidgetInfo | undefined>();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleInputChange = (field: keyof FormState) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormValues((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+  const { push } = useRouter();
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const formValues = { name, about, socialLinks, profileImage };
-    // Handle form submission
-    console.log(formValues);
+
+    // Validate form inputs
+    const requiredFields = ["name", "about", "profileImage"];
+    for (const field of requiredFields) {
+      if (!formValues[field as keyof FormState]) {
+        if (field === "profileImage") {
+          toast.error(`Please upload a profile image for author.`);
+          return;
+        }
+        toast.error(`Please fill in the ${field}.`);
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    toast.info("Creating new Author...", { autoClose: 300 });
+
+    try {
+      const author = await createAuthor({ ...formValues });
+      if (await author.data) {
+        toast.success("Author created successfully!", {
+          position: "bottom-right",
+          autoClose: 3500,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+          theme: "dark",
+        });
+        push("/heroshima/authors/" + (await author.data).slug);
+      }
+    } catch (error: any) {
+      toast.error(`Failed to create author: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -30,8 +84,8 @@ export default function CreateBlog() {
           <label className="block text-sm font-medium text-primary">Name</label>
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={formValues.name}
+            onChange={handleInputChange("name")}
             placeholder="Enter author name"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
             required
@@ -40,20 +94,20 @@ export default function CreateBlog() {
         <div>
           <label className="block text-sm font-medium text-primary">About</label>
           <textarea
-            value={about}
-            onChange={(e) => setAbout(e.target.value)}
+            value={formValues.about}
+            onChange={handleInputChange("about")}
             placeholder="Enter author bio"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-primary">Facebook</label>
+          <label className="block text-sm font-medium text-primary">website</label>
           <input
             type="url"
-            value={socialLinks.facebook}
-            onChange={(e) => setSocialLinks({ ...socialLinks, facebook: e.target.value })}
-            placeholder="Enter Facebook profile link"
+            value={formValues.website}
+            onChange={handleInputChange("website")}
+            placeholder="Enter website profile link"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
           />
         </div>
@@ -61,8 +115,8 @@ export default function CreateBlog() {
           <label className="block text-sm font-medium text-primary">Twitter</label>
           <input
             type="url"
-            value={socialLinks.twitter}
-            onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+            value={formValues.twitter}
+            onChange={handleInputChange("twitter")}
             placeholder="Enter Twitter profile link"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
           />
@@ -71,8 +125,8 @@ export default function CreateBlog() {
           <label className="block text-sm font-medium text-primary">LinkedIn</label>
           <input
             type="url"
-            value={socialLinks.linkedin}
-            onChange={(e) => setSocialLinks({ ...socialLinks, linkedin: e.target.value })}
+            value={formValues.linkedin}
+            onChange={handleInputChange("linkedin")}
             placeholder="Enter LinkedIn profile link"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
           />
@@ -81,40 +135,43 @@ export default function CreateBlog() {
           <label className="block text-sm font-medium text-primary">Instagram</label>
           <input
             type="url"
-            value={socialLinks.instagram}
-            onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+            value={formValues.instagram}
+            onChange={handleInputChange("instagram")}
             placeholder="Enter Instagram profile link"
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
           />
         </div>
         <div className=" gap-4 items-center">
-          <Image
-            src={`/images/telegram.png`}
-            alt="ddid"
-            width={1080}
-            height={720}
-            className="outline outline-2 outline-gray-300 w-1/12 aspect-square rounded-md p-1 shadow-md mb-2"
-          />
+          {formValues.profileImage ? (
+            <Image
+              src={formValues.profileImage}
+              alt="ddid"
+              width={1080}
+              height={720}
+              className="outline outline-2 outline-gray-300 w-[200px] aspect-square rounded-md p-1 shadow-md mb-2"
+            />
+          ) : null}
           <Suspense>
             <CldUploadWidget
-              options={{ sources: ["local", "url", "unsplash"] }}
-              uploadPreset="99090"
+              options={{ sources: ["local", "url", "unsplash"], folder: "/authors", resourceType: "image", multiple: false }}
+              uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_PRESET}
               onSuccess={(result, { widget }) => {
-                setProfileImage(result?.info); // { public_id, secure_url, etc }
+                setFormValues((prev) => ({ ...prev, profileImage: (result?.info as any).secure_url! })); // { public_id, secure_url, etc }
               }}
               onQueuesEnd={(result, { widget }) => {
                 widget.close();
               }}>
               {({ open }) => {
                 function handleOnClick() {
-                  setProfileImage(undefined);
+                  // setFormValues((prev) => ({ ...prev, profileImage: "" }));
                   open();
                 }
                 return (
                   <button
+                    type="button"
                     onClick={handleOnClick}
-                    className="drop-shadow-primary2-hover transition-all bg-black text-base text-white border-2 border-primary font-bold h-10 rounded-sm px-0.5 w-6/12 mb-1">
-                    Upload cover Image
+                    className="drop-shadow-primary2-hover transition-all bg-black text-base text-white border-2 border-primary font-bold h-10 rounded-sm px-0.5 w-[200px] mb-1">
+                    Upload author image
                   </button>
                 );
               }}
@@ -124,8 +181,9 @@ export default function CreateBlog() {
         <div className="flex justify-center">
           <button
             type="submit"
-            className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3">
-            <PlusCircle className="w-6 h-6 mr-2" />
+            disabled={isLoading}
+            className="drop-shadow-secondary2-hover flex items-center transition-all group hover:rounded-mds bg-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md">
+            <PlusCircle className="w-6 h-6 mr-2 group-hover:scale-90" />
             Create Author
           </button>
         </div>

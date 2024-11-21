@@ -149,12 +149,12 @@ model Category {
 
 model Blog {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  slug String
   title       String
   content     String
   description String
   authorId    String    @unique @db.ObjectId
   author      Author    @relation(fields: [authorId], references: [id])
-  isFeatured  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   tags        String[]
@@ -162,9 +162,15 @@ model Blog {
 
 model Author {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  bio       String?
+  name      String @unique
+  about       String
+    website   String?
+  linkedin String?
+  twitter String?
+  instagram String?
   blogs     Blog[]
+  profileImage String
+  slug String @unique
   createdAt DateTime @default(now())
 }
 

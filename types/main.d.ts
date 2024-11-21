@@ -1,4 +1,4 @@
-import { Company } from "@prisma/client";
+import { Author, Company } from "@prisma/client";
 
 export interface FilterData {
   job_type: FilterType[];
@@ -85,4 +85,25 @@ interface OneJobListType {
   jobType: string;
   seniority: string;
   isActive: boolean;
+}
+
+export type AuthorListChildType = {
+  name: string;
+  slug: string;
+  about: string;
+  id: string;
+  profileImage: string;
+  _count: {
+    blogs: number;
+  };
+};
+
+export type BlogSummaryForAuthorList = {
+  title: string;
+  createdAt: string;
+  slug: string;
+  description: string;
+};
+export interface AuthorWithBlog extends Author {
+  blogs: BlogSummaryForAuthorList[];
 }

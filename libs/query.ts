@@ -1,7 +1,16 @@
 "use server";
 
 import { prisma } from "@/prisma";
-import { Job } from "@prisma/client";
+import { Author, Job } from "@prisma/client";
+
+function createSlugStatic(input: string) {
+  const timestamp = Date.now();
+  return input
+    .replace(/[*+~.()'"!:@]/g, "") // Remove specified special characters
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-");
+}
 
 export const deleteOneJob = async (id: string) => {
   try {
@@ -195,4 +204,45 @@ export const getAdminDashboardInfo = async () => {
   }
 };
 
+//create an author
+
+export const createAuthor = async (body: Omit<Author, "id" | "createdAt" | "updatedAt" | "slug">) => {
+  try {
+    const requiredValues = { name: body.name, about: body.about, profileImage: body.profileImage };
+    const missingValue = Object.entries(requiredValues).filter(([key, value]) => !value);
+
+    const errorMessage = missingValue.length ? `Required values: ${missingValue.map(([key]) => key).join(", ")}` : null;
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+    const author = prisma.author.create({
+      data: { ...body, slug: createSlugStatic(body.name) },
+    });
+
+    return { data: author };
+  } catch (error: any) {
+    if (error.message.include("Unique constraint failed")) {
+      //:TODO not throwing this error
+      throw new Error("Author name taken, use another");
+    } else {
+      throw new Error(error.message ?? "something went wrong");
+    }
+  }
+};
+
 //
+export const deleteAuthor = async (id: string) => {
+  try {
+    await prisma.author.delete({
+      where: {
+        id,
+      },
+    });
+    return { status: "deleted author successfully" };
+  } catch (error: any) {
+    if (error.message.includes("Record to delete does not exist")) {
+      throw new Error("Record to delete does not exist");
+    }
+    throw new Error(error.message ?? "something went wrong");
+  }
+};

@@ -43,7 +43,7 @@ const menuItemsForAdmin = [
       { label: "Create Blog", path: "/blogs/create" },
       { label: "Create Author", path: "/authors/create" },
       { label: "Blogs", path: "/blogs" },
-      { label: "Authors", path: "/blogs/authors" },
+      { label: "Authors", path: "/authors" },
     ],
   },
 ];
@@ -58,7 +58,7 @@ const menuItemsForAuthor = [
       { label: "Create Blog", path: "/blogs/create" },
       { label: "Create Author", path: "/authors/create" },
       { label: "Blogs", path: "/blogs" },
-      { label: "Authors", path: "/blogs/authors" },
+      { label: "Authors", path: "/authors" },
     ],
   },
 ];
