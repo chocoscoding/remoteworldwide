@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Company } from "@prisma/client";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
+import OverlayLoader from "@/app/components/OverlayLoader";
 
 const CompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
   const [loading, setIsLoading] = useState(false);
@@ -47,16 +48,11 @@ const CompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
   };
   return (
     <main className="relative w-full">
-      {loading ? (
-        <div className="fixed w-full h-full backdrop-blur bg-black/40 flex items-center justify-center flex-col text-white">
-          <LoaderCircle className="w-[20vw] h-[20vh] animate-spin" />
-          <p className="text-xl">Processing...</p>
-        </div>
-      ) : null}
+      {loading ? <OverlayLoader /> : null}
       <div className="px-10 pt-10 w-full">
         <h1 className="text-2xl font-bold mb-6">Company Information</h1>
         <div className="w-[550px] gap-6 flex">
-          <CompanySection showFullDetails {...companyData} />
+          <CompanySection showFullDetails companyDetails={companyData} />
           <div className="w-[6rem]">
             <Link
               href={`/heroshima/companies/${companyData.name}/edit`}

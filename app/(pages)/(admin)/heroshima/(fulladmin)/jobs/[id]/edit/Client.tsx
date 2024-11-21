@@ -6,8 +6,13 @@ import { useRouter } from "next/navigation";
 import { SelectField, TextField } from "@/app/components/inputs";
 import { FilterData, FilterType, FormValues } from "@/types/main";
 import { toast } from "react-toastify";
+import { Job } from "@prisma/client";
+import { updateOneJob } from "@/libs/query";
+import OverlayLoader from "@/app/components/OverlayLoader";
 
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+
+type UpdateJobType = { job: Job & { company: { name: string } }; allCompanies: FilterType[]; filters: FilterData };
 
 const GenerateNewOption = (title: string, href: string) => ({
   value: "add new",
@@ -15,16 +20,16 @@ const GenerateNewOption = (title: string, href: string) => ({
   href,
 });
 
-const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ allCompanies, filters }) => {
+const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
   const [formValues, setFormValues] = useState<FormValues>({
-    title: "",
-    company: null,
-    link: "",
-    category: null,
-    region: null,
-    job_type: null,
-    seniority: null,
-    body: "",
+    title: job.title,
+    company: { label: job.company.name, value: job.companyId },
+    link: job.applicationUrl,
+    category: { label: job.category, value: job.category },
+    region: { label: job.region, value: job.region },
+    job_type: { label: job.jobType, value: job.jobType },
+    seniority: { label: job.seniority, value: job.seniority },
+    body: job.description,
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,12 +52,13 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     const finalValue = {
       title: formValues.title,
       description: formValues.body,
-      companyId: formValues.company?.value,
+      companyId: formValues.company!.value,
       applicationUrl: formValues.link,
-      category: formValues.category?.label,
-      region: formValues.region?.label,
-      jobType: formValues.job_type?.label,
-      seniority: formValues.seniority?.label,
+      category: formValues.category!.label,
+      region: formValues.region!.label,
+      jobType: formValues.job_type!.label,
+      seniority: formValues.seniority!.label,
+      slug: job.slug,
     };
     const checkAllValues = Object.entries(finalValue).filter(([key, value]) => !value);
     if (isLoading) return;
@@ -63,22 +69,13 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       toast.info("Creating new Job...", { autoClose: 300 });
 
       try {
-        const response = await fetch("/api/jobs", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(finalValue),
-        });
+        const response = await updateOneJob(job.id, finalValue);
 
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.message);
-        }
+        const data = response.data;
 
         toast.success("Job updated successfully!", {
           position: "bottom-right",
-          autoClose: 3500,
+          autoClose: 1000,
           hideProgressBar: false,
           closeOnClick: true,
           pauseOnHover: true,
@@ -86,7 +83,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
           progress: undefined,
           theme: "dark",
         });
-        push("/heroshima/jobs/" + data.data.slug);
+        push("/heroshima/jobs/" + data.slug);
       } catch (error: any) {
         toast.error(`Failed to create job: ${error.message}`);
       } finally {
@@ -96,9 +93,11 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
   };
 
   return (
-    <div className="w-full h-screen overflow-y-scroll">
-      <main className="p-4 mb-3">
-        <h1 className="text-2xl font-bold mb-4">Create New Job</h1>
+    <div className="w-full h-screen overflow-y-scroll ">
+      {isLoading ? <OverlayLoader /> : null}
+
+      <main className="p-4 mb-4">
+        <h1 className="text-2xl font-bold mb-4">Update Job</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <TextField
             label="Job Title"
@@ -177,7 +176,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
               type="submit"
               className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm group p-3 hover:rounded-md">
               <PlusCircle className="w-6 h-6 mr-2 group-hover:scale-90 transition-all" />
-              Create Job
+              Update Job
             </button>
           </div>
         </form>
@@ -186,4 +185,4 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
   );
 };
 
-export default CreateJob;
+export default UpdateJob;

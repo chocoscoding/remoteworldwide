@@ -20,7 +20,7 @@ const AdminJobTile = () => {
         </div>
         <div className="flex-1">
           <p className="w-full text-gray-500 font-medium text-base">Telegram</p>
-          <Link href={`jobs/1234`}>
+          <Link href={`/heroshima/jobs/1234`}>
             <p className="w-full text-xl font-bold mb-2 hover:underline cursor-pointer">
               Frontend/Fullstack LEvel 1 Product engineer djsjdj
             </p>

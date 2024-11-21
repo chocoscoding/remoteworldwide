@@ -4,9 +4,26 @@ import { Calendar, ChartNoAxesColumnIncreasing, Link as LinkIcon, MapPinned, Zap
 import Link from "next/link";
 import BookmarkStatus from "../BookmarkStatus";
 import { Job } from "@prisma/client";
-
+import { toast } from "react-toastify";
 const JobDescription: FC<{ data: Job; showBookmark?: boolean }> = ({ data, showBookmark = true }) => {
   const { title, description, region, createdAt, jobType, seniority, applicationUrl } = data;
+
+  const copyJobLink = () => {
+    navigator.clipboard
+      .writeText(window.location.origin + "/jobs/" + data.slug)
+      .then(() => {
+        toast.dismiss("copied");
+        toast.success("🔗 Link Copied", {
+          position: "top-center",
+          style: { top: "0.05rem", width: "fit-content" },
+          autoClose: 500,
+          toastId: "copied",
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to copy: ", err);
+      });
+  };
   return (
     <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-3 sm:p-5 md:p-10 overflow-hidden">
       <p className="text-gray-500 text-sm">Job Description</p>
@@ -31,7 +48,7 @@ const JobDescription: FC<{ data: Job; showBookmark?: boolean }> = ({ data, showB
           </div>
         </div>
         <div className="flex justify-end gap-3 flex-shrink-0 w-fit ">
-          <button className="h-8 w-8 rounded-lg hover:bg-gray-50 flex items-center justify-center">
+          <button className="h-8 w-8 rounded-lg border hover:bg-gray-50 flex items-center justify-center" onClick={copyJobLink}>
             <LinkIcon className="text-gray-500 w-[1.2rem]" />
           </button>
           {showBookmark && <BookmarkStatus />}

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderPinwheel, LoaderCircle } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -93,7 +93,9 @@ const Sidebar = () => {
 
       {status === "loading" ? (
         <>
-          <div className="h-full"></div>
+          <div className="h-full flex justify-center">
+            <LoaderCircle className=" animate-spin mt-3" />
+          </div>
         </>
       ) : (
         <div className={`flex-1 p-4 space-y-4 flex flex-col gap-4 ${isOpen ? "" : "items-center"}`}>

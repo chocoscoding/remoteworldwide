@@ -44,3 +44,14 @@ export interface CompanyWithJobsCount extends Company {
 export interface JobAndCompanyWithCount extends Job {
   company: CompanyWithJobsCount;
 }
+
+interface FormValues {
+  title: string;
+  company: Option | null;
+  link: string;
+  category: Option | null;
+  region: Option | null;
+  job_type: Option | null;
+  seniority: Option | null;
+  body: string;
+}

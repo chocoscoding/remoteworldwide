@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
-import Sidebar from "@/app/components/navigation/Sidebar";
 import { notFound } from "next/navigation";
+
+export const metadata: Metadata = {};
 
 export default async function RootLayout({
   children,
@@ -12,11 +14,9 @@ export default async function RootLayout({
   if (session === null || session.user?.role === "USER") {
     notFound();
   }
+  if (session.user?.role === "AUTHOR") {
+    metadata.title = "WRITER - Worldwide Remote";
+  }
 
-  return (
-    <div className="w-full flex">
-      <Sidebar />
-      <div className="w-full max-w-[1580px] overflow-clip m-auto">{children}</div>
-    </div>
-  );
+  return <>{children}</>;
 }

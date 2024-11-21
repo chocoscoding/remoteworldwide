@@ -4,6 +4,9 @@ import "react-quill/dist/quill.snow.css";
 import { Manrope } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { SessionProvider } from "next-auth/react";
+import { ToastContainer, Slide } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 const font = Manrope({
   subsets: ["latin-ext"],
   weight: ["200", "300", "400", "500", "700"],
@@ -23,6 +26,19 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${font.className} antialiased`}>
         <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
+        <ToastContainer
+          className={"z-50"}
+          position="bottom-right"
+          stacked={true}
+          autoClose={4000}
+          hideProgressBar={true}
+          newestOnTop={true}
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="dark"
+          transition={Slide}
+        />
         <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
