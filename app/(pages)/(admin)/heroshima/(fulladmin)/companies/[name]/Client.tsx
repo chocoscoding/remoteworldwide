@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useState } from "react";
-import { LoaderCircle, LoaderPinwheel, PencilIcon, Trash } from "lucide-react";
+import { PencilIcon, Trash } from "lucide-react";
 import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
 import CompanySection from "@/app/components/main/job/CompanySection";
 import Link from "next/link";
@@ -53,7 +53,7 @@ const CompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
         <h1 className="text-2xl font-bold mb-6">Company Information</h1>
         <div className="w-[550px] gap-6 flex">
           <CompanySection showFullDetails companyDetails={companyData} />
-          <div className="w-[6rem]">
+          <div className="w-[3rem] flex-shrink-0">
             <Link
               href={`/heroshima/companies/${companyData.name}/edit`}
               className="drop-shadow-secondary2-hover transition-all rounded-md w-full aspect-square border border-primary mb-3 grid place-items-center">

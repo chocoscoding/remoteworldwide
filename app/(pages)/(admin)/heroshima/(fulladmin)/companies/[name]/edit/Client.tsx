@@ -200,7 +200,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
           <button
             disabled={isLoading}
             type="submit"
-            className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 disabled:opacity-50">
+            className="drop-shadow-secondary2-hover hover:rounded-md flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 disabled:opacity-50">
             <RefreshCcw className="w-6 h-6 mr-2" />
             Update Company info
           </button>

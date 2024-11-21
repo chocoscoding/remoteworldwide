@@ -55,3 +55,32 @@ interface FormValues {
   seniority: Option | null;
   body: string;
 }
+
+interface WithPaginationProps {
+  jobs: Job[];
+  currentPage: number;
+  totalJobs: number;
+  totalPages: number;
+  startJobIndex: number;
+  endJobIndex: number;
+  handlePrevious: () => void;
+  handleNext: () => void;
+  loading: boolean; // Added loading state
+}
+
+interface FetchDataFunction {
+  (currentPage: number, jobsPerPage: number): Promise<{ jobs: Job[]; total: number }>;
+}
+
+interface OneJobListType {
+  title: string;
+  company: {
+    logo: string;
+    name: string;
+  };
+  slug: string;
+  category: string;
+  region: string;
+  jobType: string;
+  seniority: string;
+}

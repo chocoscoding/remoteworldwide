@@ -1,90 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { FC, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import BookmarkTile from "@/app/components/main/BookmarkTile";
+import { Job } from "@prisma/client";
+import { OneJobListType, WithPaginationProps } from "@/types/main";
+import withPagination from "@/app/components/main/withPagination";
 import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
+import { findInactiveJobs } from "@/libs/query";
+import JobTileSkeleton from "@/app/components/main/JobTileSkeleton";
+import JobTileSkeletonList from "@/app/components/main/JobTileSkeletonList";
 
-export default function InactiveJobs() {
-  const totalJobs = 100;
-  const jobsPerPage = 50;
-  const totalPages = Math.ceil(totalJobs / jobsPerPage);
+interface InactiveJobsProps extends WithPaginationProps {}
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+const fetchInactiveJobs = async (currentPage: number) => {
+  try {
+    const response = await findInactiveJobs(currentPage);
+    return { jobs: response.data, total: response.count };
+  } catch (error) {
+    throw new Error("Something went wrong");
+  }
+};
 
-  // Handlers for pagination buttons
-  const handlePrevious = () => {
-    if (currentPage > 1) {
-      setCurrentPage((prevPage) => prevPage - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage((prevPage) => prevPage + 1);
-    }
-  };
-
-  // Display range for jobs on the current page
-  const startJobIndex = (currentPage - 1) * jobsPerPage;
-  const endJobIndex = startJobIndex + jobsPerPage;
+const InactiveJobsPage: FC<{ initialJobs: OneJobListType[]; count: number }> = ({ initialJobs, count }) => {
+  const PaginatedInactiveJobsComp = withPagination(InactiveJobsComp, fetchInactiveJobs, 50, initialJobs, count);
   return (
-    <div className="p-2 w-full max-w-[1400px] m-auto mt-2">
-      {/* search */}
-
-      {/* section */}
-      {/* |- list */}
-      {/* |- filter that is fixed on scroll */}
-
+    <div className="p-2 w-full max-w-[1400px] m-auto mt-2 min-h-screen">
       <section className="w-full md:px-1 flex gap-12 relative">
         <section className="w-full m-auto px-2 lg:px-0">
           <p className="font-bold text-primary text-3xl mb-2">Inactive Jobs</p>
-          <p className="text-primary text-lg font-light">{`These jobs are already inactive and can't be seen others`}</p>
-          <div className="mb-5 my-10">
-            <p className="text-xl mb-2">
-              <span className="font-bold text-primary">Jobs</span>{" "}
-              <span className="font-extralight text-gray-400 italic text-lg">{`(200)`}</span>
-            </p>
-            <hr />
-          </div>
-          <div className="grid grid-cols-1 ">
-            {/* main */}
-            {Array(jobsPerPage)
-              .fill(0)
-              .map((_, index) => (
-                <AdminJobTile key={index} />
-              ))}
-          </div>
-
-          {/* pagination */}
-          <br />
-          <hr />
-          <div className="mt-5 flex justify-between items-center sm:flex-row gap-2 sm:gap-0 flex-col">
-            <p className="flex-shrink-0">
-              Showing {startJobIndex + 1} to {endJobIndex > totalJobs ? totalJobs : endJobIndex} of {totalJobs}
-            </p>
-            <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
-              <button
-                onClick={handlePrevious}
-                disabled={currentPage === 1}
-                className={`${currentPage === 1 ? "text-gray-400" : "text-primary"} flex`}>
-                <ChevronLeft />
-                Previous
-              </button>
-              <div className="h-[30px] border-none bg-gray-500 w-[0.5px]"></div>
-              <button
-                onClick={handleNext}
-                disabled={currentPage === totalPages}
-                className={`${currentPage === totalPages ? "text-gray-400" : "text-primary"} flex`}>
-                Next
-                <ChevronRight />
-              </button>
-            </div>
-          </div>
+          <p className="text-primary text-lg font-light">{`These jobs are already inactive and can't be seen by others`}</p>
+          <PaginatedInactiveJobsComp />
         </section>
       </section>
-      <br />
     </div>
   );
-}
+};
+export default InactiveJobsPage;
+
+const InactiveJobsComp: React.FC<InactiveJobsProps> = ({
+  jobs,
+  currentPage,
+  totalJobs,
+  totalPages,
+  startJobIndex,
+  endJobIndex,
+  handlePrevious,
+  handleNext,
+  loading, // Receive loading prop
+}) => {
+  return (
+    <>
+      <div className="mb-5 my-10">
+        <p className="text-xl mb-2">
+          <span className="font-bold text-primary">Jobs</span>{" "}
+          <span className="font-extralight text-gray-400 italic text-lg">{`(${totalJobs})`}</span>
+        </p>
+        <hr />
+      </div>
+      <div className="grid grid-cols-1">
+        {loading ? <JobTileSkeletonList amount={6} /> : jobs.map((job, index) => <AdminJobTile jobDetail={job} key={job.id || index} />)}
+      </div>
+      <br />
+      <hr />
+      <div className="mt-5 flex justify-between items-center sm:flex-row gap-2 sm:gap-0 flex-col">
+        <p className="flex-shrink-0">
+          Showing {startJobIndex + 1} to {endJobIndex > totalJobs ? totalJobs : endJobIndex} of {totalJobs}
+        </p>
+        <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
+          <button
+            onClick={handlePrevious}
+            disabled={currentPage === 1}
+            className={`${currentPage === 1 ? "text-gray-400" : "text-primary"} flex`}>
+            <ChevronLeft />
+            Previous
+          </button>
+          <div className="h-[30px] border-none bg-gray-500 w-[0.5px]"></div>
+          <button
+            onClick={handleNext}
+            disabled={currentPage === totalPages}
+            className={`${currentPage === totalPages ? "text-gray-400" : "text-primary"} flex`}>
+            Next
+            <ChevronRight />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};

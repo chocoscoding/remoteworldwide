@@ -17,9 +17,10 @@ const CompanySection: FC<{
     { href: companyDetails.linkedin ?? "#", Icon: FaLinkedin },
     { href: companyDetails.website ?? "#", Icon: LinkIcon },
   ];
+  console.log(companyDetails._count?.jobs);
   return (
     <div
-      className={`border-2 border-black h-fit md:min-h-[300px] rounded-lg w-auto w-full lg:w-auto drop-shadow-secondary bg-white flex flex-col items-center p-2 sm:p-3 overflow-hidden ${
+      className={`border-2 border-black h-fit md:min-h-[300px] rounded-lg flex-1 w-full lg:w-auto drop-shadow-secondary bg-white flex flex-col items-center p-2 sm:p-3 overflow-hidden ${
         showFullDetails ? "lg:min-h-[320px]" : ""
       }`}>
       <div className="border-2 rounded-full p-1 w-fit h-fit mt-2 md:mt-3 lg:mt-4">
@@ -59,7 +60,7 @@ const CompanySection: FC<{
 
       {showFullDetails ? (
         <div className=" bg-secondary h-6 w-fit p-2.5 rounded-full flex items-center justify-center mt-2 mb-1">
-          <p className="text-base md:text-sm text-gray-700/70 bg-secondary">{`${companyDetails._count ?? "no"} jobs available`} </p>
+          <p className="text-base md:text-sm text-gray-700/70 bg-secondary">{`${companyDetails._count?.jobs ?? "no"} jobs available`} </p>
         </div>
       ) : null}
     </div>

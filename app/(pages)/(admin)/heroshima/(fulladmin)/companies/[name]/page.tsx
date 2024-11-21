@@ -4,7 +4,7 @@ import CompanyClient from "./Client";
 
 const fetchCompany = async (name: string): Promise<Company | null> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/companies/${name}`, { cache: "no-store" });
+    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/companies/${name}`, { cache: "no-cache" });
     if (!response.ok) {
       return null;
     }

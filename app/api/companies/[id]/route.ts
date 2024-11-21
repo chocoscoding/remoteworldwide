@@ -9,6 +9,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: {
         name: companyName,
       },
+      include: {
+        _count: {
+          select: {
+            jobs: true,
+          },
+        },
+      },
     });
     if (!oneCompany) {
       return NextResponse.json({ message: "No company found" }, { status: 404 });

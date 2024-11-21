@@ -55,3 +55,38 @@ export const updateOneJob = async (id: string, jobDetails: Omit<Job, "createdAt"
     throw new Error(error.message ?? "something went wrong");
   }
 };
+
+export const findInactiveJobs = async (page: number) => {
+  try {
+    const inactiveJobsListPromise = prisma.job.findMany({
+      where: {
+        isActive: false,
+      },
+      select: {
+        title: true,
+        company: {
+          select: {
+            logo: true,
+            name: true,
+          },
+        },
+        slug: true,
+        category: true,
+        region: true,
+        jobType: true,
+        seniority: true,
+      },
+      skip: (page - 1) * 50,
+      take: 50,
+    });
+    const inactiveJobsCountPromise = prisma.job.count({
+      where: {
+        isActive: false,
+      },
+    });
+    const [inactiveJobsList, inactiveJobsCount] = await Promise.all([inactiveJobsListPromise, inactiveJobsCountPromise]);
+    return { data: inactiveJobsList, count: inactiveJobsCount };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
