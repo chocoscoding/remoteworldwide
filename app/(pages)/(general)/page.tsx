@@ -3,8 +3,6 @@ import Header from "@/app/components/Header";
 import JobTile from "@/app/components/main/JobTile";
 
 export default function Home() {
-  console.log(process.env.NEXT_PUBLIC_URL);
-  console.log(process.env.NEXT_URL);
   return (
     <div>
       <Header />

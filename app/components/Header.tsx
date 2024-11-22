@@ -3,14 +3,23 @@ import React from "react";
 import Globe from "./Globe";
 import { DiscordSVG, PipefySVG, SlackSVG, SpotifySVG, WebflowSVG } from "@/app/components/svg";
 import SearchBar from "./SearchBar";
+import Image from "next/image";
 
 const Companies = [DiscordSVG, PipefySVG, SlackSVG, SpotifySVG, WebflowSVG];
 const Header = () => {
   return (
     <div className="relative border-b">
       <section className="w-full h-screen sm:max-h-[600px] max-h-[550px] lg:max-h-[650px] border-none relative right-0">
-        <div className="w-full h-full relative">
+        <div className="w-full h-full relative overflow-hidden">
           <Globe />
+          <Image
+            src={"/globe.png"}
+            width={720}
+            height={720}
+            alt="globe fallback"
+            className="h-auto w-full md:w-auto md:h-full md:aspect-auto -bottom-14 md:bottom-0 absolute -right-4 md:scale-90"
+            id="fallbackglobe"
+          />
         </div>
       </section>
       <section className="w-full h-full z-10 absolute top-0 left-0 flex flex-col px-2.5 sm:px-5 md:px-10 pt-5 sm:pt-7 md:pt-12 bg-transparent overflow-hidden">

@@ -10,18 +10,18 @@ export default function Globe() {
   useEffect(() => {
     let phi = 0;
     let width = 0;
-    let offset: [number, number] = [100, window.innerHeight];
+    let offset: [number, number] = [45, window.innerHeight];
     let scaleFactor = 2;
     const onResize = () => {
       if (window.innerWidth <= 1000 && canvasRef.current && canvasRef.current.offsetWidth == maxWidth) {
         scaleFactor = 1.75;
-        offset = [100, window.innerHeight];
+        offset = [45, window.innerHeight];
       } else {
         scaleFactor = 2;
         if (canvasRef.current && canvasRef.current.offsetWidth < maxWidth) {
           offset = [0, window.innerHeight];
         } else {
-          offset = [100, window.innerHeight];
+          offset = [45, window.innerHeight];
         }
       }
       return canvasRef.current && (width = canvasRef.current.offsetWidth);
@@ -69,6 +69,10 @@ export default function Globe() {
       onRender: (state) => {
         // Called on every animation frame.
         // `state` will be an empty object, return updated params.
+        const fallbackImage = document.querySelector("#fallbackglobe");
+        if (fallbackImage) {
+          fallbackImage.remove();
+        }
         state.phi = phi;
         phi -= 0.005;
         state.width = width * scaleFactor;
