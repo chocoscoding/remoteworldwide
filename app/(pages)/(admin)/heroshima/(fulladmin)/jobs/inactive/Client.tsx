@@ -1,17 +1,9 @@
 "use client";
 
-import { FC, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import BookmarkTile from "@/app/components/main/BookmarkTile";
-import { Job } from "@prisma/client";
-import { OneJobListType, WithPaginationProps } from "@/types/main";
+import { FC } from "react";
+import { OneJobListType } from "@/types/main";
 import withPagination from "@/app/components/main/withPagination";
-import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
 import { findJobsAdmin } from "@/libs/query";
-import JobTileSkeleton from "@/app/components/main/JobTileSkeleton";
-import JobTileSkeletonList from "@/app/components/main/JobTileSkeletonList";
-
-interface InactiveJobsProps extends WithPaginationProps {}
 
 const fetchInactiveJobs = async (currentPage: number) => {
   try {

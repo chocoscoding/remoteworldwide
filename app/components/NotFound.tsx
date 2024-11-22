@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React from "react";
 import { FcEmptyTrash } from "react-icons/fc";
 
 const NotFound: React.FC<{ title: string; link?: string; buttonType: "link" | "back" }> = ({ title, link, buttonType }) => {
   const router = useRouter();
+  const pathname = usePathname();
   return (
     <div className="w-full h-screen flex flex-col justify-center items-center">
       <div>
@@ -15,19 +16,19 @@ const NotFound: React.FC<{ title: string; link?: string; buttonType: "link" | "b
       {buttonType === "link" ? (
         <Link
           href={link!}
-          className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3">
+          className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md">
           Create new {title}
         </Link>
       ) : (
-        <div>
+        <div className=" flex gap-4">
           <button
-            className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3"
+            className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md"
             onClick={() => router.back()}>
             Go back
           </button>
           <Link
-            href={link?.includes("heroshima") ? "/heroshima" : "/"}
-            className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 mt-2">
+            href={pathname.includes("heroshima") ? "/heroshima" : "/"}
+            className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md">
             Go Home
           </Link>
         </div>

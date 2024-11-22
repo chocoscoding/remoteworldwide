@@ -1,24 +1,16 @@
 "use client";
-import { ChangeEvent, FormEvent, Suspense, useState } from "react";
-import { PlusCircle } from "lucide-react";
+import { ChangeEvent, FC, FormEvent, Suspense, useState } from "react";
+import { RotateCcwSquareIcon } from "lucide-react";
 import { CldUploadWidget } from "next-cloudinary";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import { createAuthor } from "@/libs/query";
+import { updateAuthor } from "@/libs/query";
 import { useRouter } from "next/navigation";
 import { FormStateAuthor_Client } from "@/types/main";
 
-export default function CreateBlog() {
+const UpdateAuthorClient: FC<{ data: FormStateAuthor_Client; id: string }> = ({ data, id }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [formValues, setFormValues] = useState<FormStateAuthor_Client>({
-    website: "",
-    twitter: "",
-    linkedin: "",
-    instagram: "",
-    name: "",
-    about: "",
-    profileImage: "",
-  });
+  const [formValues, setFormValues] = useState<FormStateAuthor_Client>(data);
 
   const handleInputChange = (field: keyof FormStateAuthor_Client) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormValues((prev) => ({ ...prev, [field]: e.target.value }));
@@ -45,9 +37,9 @@ export default function CreateBlog() {
     toast.info("Creating new Author...", { autoClose: 300 });
 
     try {
-      const author = await createAuthor({ ...formValues });
+      const author = await updateAuthor(id, { ...formValues });
       if (await author.data) {
-        toast.success("Author created successfully!", {
+        toast.success("Author updated successfully!", {
           position: "bottom-right",
           autoClose: 3500,
           hideProgressBar: false,
@@ -57,13 +49,13 @@ export default function CreateBlog() {
           progress: undefined,
           theme: "dark",
         });
-        push("/heroshima/authors/" + (await author.data).slug);
       }
+      push("/heroshima/authors/" + (await author.data).slug + "/edit");
     } catch (error: any) {
       if (error.message.includes("Unique constraint failed")) {
         toast.error(`Author name taken, use another`);
       } else {
-        toast.error(`Failed to create author: ${error.message}`);
+        toast.error(`Failed to update author: ${error.message}`);
       }
     } finally {
       setIsLoading(false);
@@ -72,7 +64,7 @@ export default function CreateBlog() {
 
   return (
     <div className="w-full h-screen overflow-y-scroll p-4">
-      <h1 className="text-2xl font-bold mb-4">Create New Author</h1>
+      <h1 className="text-2xl font-bold mb-4">Update author information</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-primary">Name</label>
@@ -177,11 +169,13 @@ export default function CreateBlog() {
             type="submit"
             disabled={isLoading}
             className="drop-shadow-secondary2-hover flex items-center transition-all group hover:rounded-mds bg-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md">
-            <PlusCircle className="w-6 h-6 mr-2 group-hover:scale-90" />
-            Create Author
+            <RotateCcwSquareIcon className="w-6 h-6 mr-2 group-hover:scale-90" />
+            Update Author
           </button>
         </div>
       </form>
     </div>
   );
-}
+};
+
+export default UpdateAuthorClient;

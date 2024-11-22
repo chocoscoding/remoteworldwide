@@ -2,14 +2,27 @@
 
 import { prisma } from "@/prisma";
 import { Author, Job } from "@prisma/client";
+import { hexoid } from "hexoid";
 
 function createSlugStatic(input: string) {
-  const timestamp = Date.now();
   return input
     .replace(/[*+~.()'"!:@]/g, "") // Remove specified special characters
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "-");
+}
+function createSlug(input: string) {
+  const timestamp = Date.now();
+  return (
+    input
+      .replace(/[*+~.()'"!:@]/g, "") // Remove specified special characters
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-") +
+    "-" +
+    `${hexoid(36)()}` +
+    `${timestamp}`
+  );
 }
 
 export const deleteOneJob = async (id: string) => {
@@ -168,7 +181,7 @@ export const findCompanyJobs = async (companyId: string, page: number) => {
 
 export const getAdminDashboardInfo = async () => {
   try {
-    const [latestJob, jobsCount, companiesCount] = await Promise.all([
+    const [latestJob, jobsCount, companiesCount, blogsCount] = await Promise.all([
       prisma.job.findFirst({
         where: {
           isActive: true,
@@ -196,9 +209,10 @@ export const getAdminDashboardInfo = async () => {
       }),
       prisma.job.count(),
       prisma.company.count(),
+      prisma.blog.count(),
     ]);
 
-    return { latestJob, jobsCount, companiesCount };
+    return { latestJob, jobsCount, companiesCount, blogsCount };
   } catch (error) {
     throw new Error("something went wrong");
   }
@@ -221,16 +235,35 @@ export const createAuthor = async (body: Omit<Author, "id" | "createdAt" | "upda
 
     return { data: author };
   } catch (error: any) {
-    if (error.message.include("Unique constraint failed")) {
-      //:TODO not throwing this error
-      throw new Error("Author name taken, use another");
-    } else {
-      throw new Error(error.message ?? "something went wrong");
-    }
+    throw new Error(error.message ?? "something went wrong");
   }
 };
 
-//
+//update an author
+
+export const updateAuthor = async (id: string, body: Omit<Author, "id" | "createdAt" | "updatedAt" | "slug">) => {
+  try {
+    const requiredValues = { id };
+    const missingValue = Object.entries(requiredValues).filter(([key, value]) => !value);
+
+    const errorMessage = missingValue.length ? `Required values: ${missingValue.map(([key]) => key).join(", ")}` : null;
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+    const author = prisma.author.update({
+      where: {
+        id,
+      },
+      data: { ...body, slug: createSlugStatic(body.name) },
+    });
+
+    return { data: author };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+//delete an author
 export const deleteAuthor = async (id: string) => {
   try {
     await prisma.author.delete({
@@ -239,6 +272,136 @@ export const deleteAuthor = async (id: string) => {
       },
     });
     return { status: "deleted author successfully" };
+  } catch (error: any) {
+    if (error.message.includes("Record to delete does not exist")) {
+      throw new Error("Record to delete does not exist");
+    }
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+export const findAuthorBySlug = async (slug: string) => {
+  try {
+    const author = await prisma.author.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        id: true,
+        website: true,
+        twitter: true,
+        linkedin: true,
+        instagram: true,
+        name: true,
+        about: true,
+        profileImage: true,
+      },
+    });
+    return { data: author };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+export const allAuthorsSelect = async () => {
+  try {
+    const authors = await prisma.author.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+    return authors.map((author) => ({
+      label: author.name,
+      value: author.id,
+    }));
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+// Create Blog
+export const createBlog = async (data: {
+  title: string;
+  content: string;
+  description: string;
+  authorId: string;
+  tags: string[];
+  coverImage: string;
+}) => {
+  try {
+    const slug = createSlug(data.title);
+    const blog = await prisma.blog.create({
+      data: { ...data, slug },
+    });
+    return { data: blog };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+// Get Blog by Slug
+export const getBlogBySlug = async (slug: string) => {
+  try {
+    const blog = await prisma.blog.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        description: true,
+        tags: true,
+        coverImage: true,
+        authorId: true,
+        slug: true,
+        author: {
+          select: {
+            name: true,
+          },
+        },
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return { data: blog };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+// Edit Blog
+export const editBlog = async (
+  id: string,
+  data: {
+    title?: string;
+    content?: string;
+    description?: string;
+    tags?: string[];
+    authorId?: string;
+    coverImage?: string;
+  }
+) => {
+  try {
+    const blog = await prisma.blog.update({
+      where: { id },
+      data,
+    });
+    return { data: blog };
+  } catch (error: any) {
+    if (error.message.includes("Record to update does not exist")) {
+      throw new Error("Record to update does not exist");
+    }
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+// Delete Blog
+export const deleteBlog = async (id: string) => {
+  try {
+    await prisma.blog.delete({
+      where: { id },
+    });
+    return { status: "deleted blog successfully" };
   } catch (error: any) {
     if (error.message.includes("Record to delete does not exist")) {
       throw new Error("Record to delete does not exist");

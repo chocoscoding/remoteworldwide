@@ -1,19 +1,16 @@
 "use client";
 
 import { FC, useState } from "react";
-import { ChevronLeft, ChevronRight, PencilIcon, Trash } from "lucide-react";
-import AdminJobTile from "@/app/components/ADMIN/AdminJobTile";
+import { PencilIcon, Trash } from "lucide-react";
 import CompanySection from "@/app/components/main/job/CompanySection";
 import Link from "next/link";
 import { Company } from "@prisma/client";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import OverlayLoader from "@/app/components/OverlayLoader";
-import { OneJobListType, WithPaginationProps } from "@/types/main";
+import { OneJobListType } from "@/types/main";
 import { findCompanyJobs } from "@/libs/query";
 import withPagination from "@/app/components/main/withPagination";
-import JobTileSkeletonList from "@/app/components/main/JobTileSkeletonList";
-interface ActiveJobsProps extends WithPaginationProps {}
 
 const CompanyClient: FC<{ companyData: Company; initialJobs: OneJobListType[]; initialCount: number }> = ({
   companyData,

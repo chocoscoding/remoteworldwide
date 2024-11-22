@@ -21,7 +21,22 @@ const Page = () => {
         <section className="grid grid-cols-1 md:grid-cols-10 h-full w-full gap-5 md:gap-10">
           {/* |-company info */}
           <div className="col-span-full md:col-span-3 h-fit md:top-[70px] md:sticky">
-            <CompanySection showFullDetails />
+            <CompanySection
+              companyDetails={{
+                id: "dklkdsklklklsd",
+                name: "Tech Corp",
+                about: "A leading tech company specializing in innovative solutions.",
+                _count: { jobs: 5 },
+                website: "https://techcorp.com",
+                logo: "https://via.placeholder.com/150",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                linkedin: "https://linkedin.com/company/techcorp",
+                twitter: "https://twitter.com/techcorp",
+                facebook: "https://facebook.com/techcorp",
+              }}
+              showFullDetails
+            />
           </div>
           {/* |-job lists */}
           <div className="col-span-full md:col-span-7 h-fit">

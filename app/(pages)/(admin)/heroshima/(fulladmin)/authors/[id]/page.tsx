@@ -1,6 +1,5 @@
 import NotFound from "@/app/components/NotFound";
 import { AuthorWithBlog } from "@/types/main";
-import { revalidatePath } from "next/cache";
 import React from "react";
 import AuthorDetailsPage from "./Client";
 

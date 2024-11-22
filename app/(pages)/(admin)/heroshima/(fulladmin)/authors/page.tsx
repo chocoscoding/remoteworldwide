@@ -1,8 +1,4 @@
-import NotFound from "@/app/components/NotFound";
 import { AuthorListChildType } from "@/types/main";
-import { revalidatePath } from "next/cache";
-import React from "react";
-import AuthorDetailsPage from "./Client";
 import AllAuthorsPage from "./Client";
 import { FcEmptyTrash } from "react-icons/fc";
 import Link from "next/link";

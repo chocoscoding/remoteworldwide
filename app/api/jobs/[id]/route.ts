@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     return NextResponse.json({ data: job }, { status: 200 });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
   }
 }
@@ -69,7 +69,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     return NextResponse.json({ data: updatedJob }, { status: 200 });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
   }
 }
@@ -87,7 +87,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     });
 
     return NextResponse.json({ message: "Job deleted successfully" }, { status: 200 });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
   }
 }

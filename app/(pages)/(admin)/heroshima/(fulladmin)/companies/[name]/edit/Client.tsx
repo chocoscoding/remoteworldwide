@@ -106,7 +106,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-primary/95 flex items-center">
+          <label className="text-sm font-medium text-primary/95 flex items-center">
             <ImageIcon className="mr-2 w-4 h-4 text-primary/50" /> Company Logo
           </label>
           <div className="flex flex-col gap-4 items-start pt-4">
@@ -148,7 +148,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-primary/95 flex items-center">
+          <label className=" text-sm font-medium text-primary/95 flex items-center">
             <Globe className="mr-2 w-4 h-4 text-primary/50" /> Website
           </label>
           <input
@@ -173,7 +173,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-primary/95 flex items-center">
+          <label className=" text-sm font-medium text-primary/95 flex items-center">
             <Twitter className="mr-2 w-4 h-4 text-primary/50" /> Twitter
           </label>
           <input

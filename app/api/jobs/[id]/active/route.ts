@@ -2,15 +2,15 @@ import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 // MAKE JOB ACTIVE/ INACTIVE
-export async function PUT(req: NextRequest) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = req.nextUrl.searchParams;
+    const id = (await params).id;
     if (!id) {
       return NextResponse.json({ message: "Job ID is required" }, { status: 400 });
     }
 
     const updatedJob = await prisma.job.update({
-      where: { id: parseInt(id) },
+      where: { id },
       data: { isActive: true },
     });
 

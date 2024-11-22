@@ -1,5 +1,4 @@
 import { FetchDataFunction, OneJobListType, WithPaginationProps } from "@/types/main";
-import { Job } from "@prisma/client";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import JobTileSkeletonList from "./JobTileSkeletonList";
@@ -8,7 +7,7 @@ import AdminJobTile from "../ADMIN/AdminJobTile";
 // Higher-Order Component to handle pagination with loading state
 const withPagination = (
   WrappedComponent: React.ComponentType<WithPaginationProps> | null,
-  fetchDataFunction: FetchDataFunction,
+  fetchDataFunction: FetchDataFunction<OneJobListType>,
   jobsPerPage: number = 50,
   initialJobs: OneJobListType[] = [],
   initialTotalJobs: number = 0
@@ -36,7 +35,7 @@ const withPagination = (
       if (currentPage > 1) {
         fetchJobs();
       }
-    }, [currentPage, jobsPerPage]);
+    }, [currentPage]);
 
     // Pagination logic
     const totalPages = Math.ceil(totalJobs / jobsPerPage);

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderPinwheel, LoaderCircle } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -21,7 +21,7 @@ const menuItemsForAdmin = [
     name: "Job",
     icon: Briefcase,
     path: "/jobs",
-    section: "jobs",
+    section: "filters",
     subItems: [
       { label: "Create Job", path: "/jobs/create" },
       { label: "All Jobs", path: "/jobs" },
@@ -72,7 +72,22 @@ const Sidebar = () => {
   const toggleSidebar = () => setIsOpen(!isOpen);
   const toggleAccordion = (section: string) => setOpenAccordion(openAccordion === section ? "home" : section);
 
-  useEffect(() => setIsOpen(false), [pathname]);
+  useEffect(() => {
+    setIsOpen(false);
+    if (pathname.includes("/authors")) {
+      setOpenAccordion("blog");
+    } else if (pathname.includes("/blogs")) {
+      setOpenAccordion("blog");
+    } else if (pathname.includes("/filters")) {
+      setOpenAccordion("filters");
+    } else if (pathname.includes("/filters")) {
+      setOpenAccordion("filters");
+    } else if (pathname.includes("/companies")) {
+      setOpenAccordion("companies");
+    } else {
+      setOpenAccordion("home");
+    }
+  }, [pathname]);
 
   const isActive = (route: string) => pathname === "/heroshima" + route;
 

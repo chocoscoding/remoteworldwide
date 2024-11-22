@@ -1,5 +1,4 @@
 import { CompanyWithJobsCount } from "@/types/main";
-import { Company } from "@prisma/client";
 import { LinkIcon, MoveUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

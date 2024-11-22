@@ -17,7 +17,7 @@ const AllAuthorsPage: FC<{ data: AuthorListChildType[] }> = ({ data }) => {
           <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {authorList.map((author, index) => (
               <li key={index} className="max-w-[700px]">
-                <Link href={author.profileImage} className="mb-4 flex items-center shadow-md rounded-md p-3 my-2 border">
+                <Link href={`/heroshima/authors/${author.slug}`} className="mb-4 flex items-center shadow-md rounded-md p-3 my-2 border">
                   <Image
                     width={100}
                     height={100}

@@ -1,4 +1,4 @@
-import { Author, Company } from "@prisma/client";
+import { Author, Blog, Company } from "@prisma/client";
 
 export interface FilterData {
   job_type: FilterType[];
@@ -68,8 +68,12 @@ interface WithPaginationProps {
   loading: boolean; // Added loading state
 }
 
-interface FetchDataFunction {
-  (currentPage: number, jobsPerPage: number): Promise<{ jobs: Job[]; total: number }>;
+interface FetchDataFunction<T> {
+  (currentPage: number, jobsPerPage: number): Promise<{ jobs: T[]; total: number }>;
+}
+
+interface FetchDataFunction_2<T> {
+  (currentPage: number, jobsPerPage: number): Promise<{ data: T[]; count: number }>;
 }
 
 interface OneJobListType {
@@ -106,4 +110,21 @@ export type BlogSummaryForAuthorList = {
 };
 export interface AuthorWithBlog extends Author {
   blogs: BlogSummaryForAuthorList[];
+}
+
+export type FormStateAuthor_Client = {
+  website: string;
+  twitter: string;
+  linkedin: string;
+  instagram: string;
+  name: string;
+  about: string;
+  profileImage: string;
+};
+
+export interface BlogListWithAuthor extends Blog {
+  author: {
+    name: string;
+    profileImage: string;
+  };
 }

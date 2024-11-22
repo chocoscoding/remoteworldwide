@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, Dispatch, SetStateAction, FC, useEffect } from "react";
+import { FC } from "react";
 import FilterCategory from "./FilterCategory";
 import { cn } from "../../lib/utils";
 import { X } from "lucide-react";
