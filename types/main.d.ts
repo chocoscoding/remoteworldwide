@@ -76,6 +76,20 @@ interface FetchDataFunction_2<T> {
   (currentPage: number, jobsPerPage: number): Promise<{ data: T[]; count: number }>;
 }
 
+export interface JobTileType {
+  title: string;
+  id: string;
+  company: {
+    logo: string;
+    name: string;
+  };
+  slug: string;
+  category: string;
+  region: string;
+  jobType: string;
+  seniority: string;
+  createdAt: Date;
+}
 interface OneJobListType {
   title: string;
   id: string;

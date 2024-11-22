@@ -501,3 +501,50 @@ export const checkBookmarkForUser = async (userId: string, jobId: string) => {
     throw new Error(error.message ?? "something went wrong");
   }
 };
+
+export const getAllActiveJobsCount = async () => {
+  try {
+    const count = await prisma.job.count({
+      where: {
+        isActive: true,
+      },
+    });
+    return { count };
+  } catch (error: any) {
+    // throw new Error(error.message ?? "something went wrong");
+    return { count: null };
+  }
+};
+
+export const fetchLatestJobs = async (amount: number) => {
+  try {
+    const jobs = await prisma.job.findMany({
+      where: {
+        isActive: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: amount,
+      select: {
+        id: true,
+        title: true,
+        company: {
+          select: {
+            logo: true,
+            name: true,
+          },
+        },
+        slug: true,
+        category: true,
+        region: true,
+        jobType: true,
+        seniority: true,
+        createdAt: true,
+      },
+    });
+    return { data: jobs };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};

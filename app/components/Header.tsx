@@ -6,7 +6,7 @@ import SearchBar from "./SearchBar";
 import Image from "next/image";
 
 const Companies = [DiscordSVG, PipefySVG, SlackSVG, SpotifySVG, WebflowSVG];
-const Header = () => {
+const Header = ({ count }: { count: number | null }) => {
   return (
     <div className="relative border-b">
       <section className="w-full h-screen sm:max-h-[600px] max-h-[550px] lg:max-h-[650px] border-none relative right-0">
@@ -23,7 +23,7 @@ const Header = () => {
         </div>
       </section>
       <section className="w-full h-full z-10 absolute top-0 left-0 flex flex-col px-2.5 sm:px-5 md:px-10 pt-5 sm:pt-7 md:pt-12 bg-transparent overflow-hidden">
-        <p className="bg-gray-200 w-fit p-2.5 md:p-3 text-xs rounded-full md:text-sm">2886 open positions</p>
+        <p className="bg-gray-200 w-fit p-2.5 md:p-3 text-xs rounded-full md:text-sm">{count ?? "3k"} open positions today 🔥</p>
         <h1 className="font-bold max-w-[550px] mt-4 mb-3 text-clamp1">Find your next remote job</h1>
         <h3 className="text-gray-700 max-w-[500px] mb-5 text-sm xs:text-base">
           Discover verified worldwide remote roles. Confidently apply to roles that fit your location, skills, and ambition-No surprises,
@@ -32,8 +32,8 @@ const Header = () => {
         <div className="w-[98%] max-w-[1000px]">
           <SearchBar />
         </div>
-        <section className="mt-8 md:mt-10 flex flex-col justify-start">
-          <p className="mb-2 text-gray-400 ">Jobs from the top remote companies</p>
+        <section className="mt-6 md:mt-8 flex flex-col justify-start">
+          <p className="mb-2 text-gray-600 ">Jobs from the top remote companies</p>
           <div className="flex flex-wrap gap-2 xxs:gap-4">
             {Companies.map((Company, index) => (
               <div className="w-[70px] xxs:w-[85px] sm:w-[90px] xl:w-[100px]" key={index}>

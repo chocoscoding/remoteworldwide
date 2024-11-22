@@ -1,23 +1,25 @@
-"use client";
 import Header from "@/app/components/Header";
-import JobTile from "@/app/components/main/JobTile";
+import JobListSection from "./JobListSection";
+import Link from "next/link";
+import { getAllActiveJobsCount } from "@/libs/query";
 
-export default function Home() {
+export default async function Home() {
+  const jobsCount = await getAllActiveJobsCount();
   return (
     <div>
-      <Header />
+      <Header count={jobsCount.count} />
       <br />
       <section className="w-full max-w-[1200px] m-auto px-3 xl:px-0">
-        <h2 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exiciting jobs now</h2>
+        <h2 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exciting jobs now</h2>
         <br />
 
-        {Array(10)
-          .fill(0)
-          .map((_, index) => (
-            <JobTile key={index} />
-          ))}
+        <JobListSection />
         <div className="w-full flex justify-center">
-          <button className="bg-secondary text-primary px-16 py-3 text-lg font-bold hover:rounded-lg">View all jobs</button>
+          <Link
+            href={"/jobs"}
+            className="bg-secondary drop-shadow-secondary2-hover text-primary px-16 py-3 text-lg font-bold hover:rounded-md transition-all my-1">
+            View all jobs
+          </Link>
         </div>
       </section>
       <br />
