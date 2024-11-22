@@ -5,7 +5,12 @@ import Link from "next/link";
 import BookmarkStatus from "../BookmarkStatus";
 import { Job } from "@prisma/client";
 import { toast } from "react-toastify";
-const JobDescription: FC<{ data: Job; showBookmark?: boolean }> = ({ data, showBookmark = true }) => {
+
+const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?: boolean }> = ({
+  data,
+  showBookmark = true,
+  hasUserBookmarked,
+}) => {
   const { title, description, region, createdAt, jobType, seniority, applicationUrl } = data;
 
   const copyJobLink = () => {
@@ -51,7 +56,7 @@ const JobDescription: FC<{ data: Job; showBookmark?: boolean }> = ({ data, showB
           <button className="h-8 w-8 rounded-lg border hover:bg-gray-50 flex items-center justify-center" onClick={copyJobLink}>
             <LinkIcon className="text-gray-500 w-[1.2rem]" />
           </button>
-          {showBookmark && <BookmarkStatus />}
+          {showBookmark && <BookmarkStatus hasUserBookmarked={hasUserBookmarked} jobId={data.id} />}
         </div>
       </section>
       <hr className="bg-gray-500 my-6" />

@@ -29,6 +29,7 @@ export default function RootLayout({
         <ToastContainer
           className={"z-50"}
           position="bottom-right"
+          toastClassName={"!bg-primary"}
           stacked={true}
           autoClose={4000}
           hideProgressBar={true}

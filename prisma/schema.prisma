@@ -90,6 +90,7 @@ model Bookmark {
   jobId     String   @db.ObjectId
   userId    String   @db.ObjectId
   createdAt DateTime @default(now())
+  job      Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, jobId])
 }
@@ -109,6 +110,8 @@ model Job {
   region      String
   jobType     String   
   seniority   String
+
+  Bookmark Bookmark[]
 }
 
 

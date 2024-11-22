@@ -29,6 +29,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
   };
 
   const getCompanies = async (page: number): Promise<void> => {
+    initialRef.current = 1;
     try {
       setIsLoading(true);
       const response = await fetch(`/api/companies?page=${page}`);
@@ -96,7 +97,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
           {isLoading ? null : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {companies.map((company, index) => (
-                <CompanyTile forCompany companyData={company} key={index} />
+                <CompanyTile companyData={company} key={index} />
               ))}
             </div>
           )}

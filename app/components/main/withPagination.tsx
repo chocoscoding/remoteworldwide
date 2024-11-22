@@ -16,7 +16,7 @@ const withPagination = (
     const [jobs, setJobs] = useState<OneJobListType[]>(initialJobs);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [totalJobs, setTotalJobs] = useState<number>(initialTotalJobs);
-    const [loading, setLoading] = useState<boolean>(false); // Loading state added
+    const [loading, setLoading] = useState<boolean>(false);
 
     // Fetch jobs when the component mounts or when the currentPage changes
     useEffect(() => {
@@ -32,6 +32,7 @@ const withPagination = (
           setLoading(false); // Set loading to false after the fetch completes (success or error)
         }
       };
+      //:BUG
       if (currentPage > 1) {
         fetchJobs();
       }

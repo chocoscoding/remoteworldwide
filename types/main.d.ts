@@ -1,4 +1,4 @@
-import { Author, Blog, Company } from "@prisma/client";
+import { Author, Blog, Company, Job } from "@prisma/client";
 
 export interface FilterData {
   job_type: FilterType[];
@@ -126,5 +126,21 @@ export interface BlogListWithAuthor extends Blog {
   author: {
     name: string;
     profileImage: string;
+  };
+}
+
+export interface OneBookmarkType {
+  job: {
+    region: string;
+    jobType: string;
+    seniority: string;
+    company: {
+      name: string;
+      logo: string;
+    };
+    category: string;
+    id: string;
+    slug: string;
+    title: string;
   };
 }

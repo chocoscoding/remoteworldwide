@@ -409,3 +409,95 @@ export const deleteBlog = async (id: string) => {
     throw new Error(error.message ?? "something went wrong");
   }
 };
+
+//get all bookmarks
+export const getAllBookmarksForUser = async (userId: string, page: number) => {
+  try {
+    const bookmarksPromise = prisma.bookmark.findMany({
+      where: { userId },
+      select: {
+        job: {
+          select: {
+            title: true,
+            slug: true,
+            region: true,
+            jobType: true,
+            id: true,
+            seniority: true,
+            category: true,
+            company: {
+              select: {
+                name: true,
+                logo: true,
+              },
+            },
+          },
+        },
+      },
+      skip: (page - 1) * 30,
+      take: 30,
+    });
+
+    const totalCountPromise = prisma.bookmark.count({
+      where: { userId },
+    });
+
+    const [bookmarks, count] = await Promise.all([bookmarksPromise, totalCountPromise]);
+    return { data: bookmarks, count };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
+//delete a bookmark
+export const deleteBookmarkForUser = async (userId: string, jobId: string) => {
+  try {
+    await prisma.bookmark.delete({
+      where: {
+        userId_jobId: {
+          userId,
+          jobId,
+        },
+      },
+    });
+    return { status: "deleted bookmark successfully" };
+  } catch (error: any) {
+    if (error.message.includes("Record to delete does not exist")) {
+      throw new Error("Record to delete does not exist");
+    }
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+//crate a bookmark
+export const createBookmarkForUser = async (userId: string, jobId: string) => {
+  try {
+    const bookmark = await prisma.bookmark.create({
+      data: {
+        userId,
+        jobId,
+      },
+    });
+    return { data: bookmark };
+  } catch (error: any) {
+    if (error.message.includes("Unique constraint failed")) {
+      throw new Error("Bookmark already exists");
+    }
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+//check if a user has job bookmarked
+export const checkBookmarkForUser = async (userId: string, jobId: string) => {
+  try {
+    const bookmark = await prisma.bookmark.findUnique({
+      where: {
+        userId_jobId: {
+          userId,
+          jobId,
+        },
+      },
+    });
+    return { data: bookmark };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
