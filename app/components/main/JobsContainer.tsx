@@ -81,7 +81,23 @@ const JobsContainer = () => {
       {Array(25)
         .fill(null)
         .map((_, index) => (
-          <JobTile key={index} />
+          <JobTile
+            {...{
+              id: "1234567890-",
+              title: "jkljlkjd dkjsljds ",
+              company: {
+                logo: "/images/telegram.png",
+                name: "Telegraa",
+              },
+              slug: "jkljlkjd-dkjsljds-95d2b013007a4a6851041ef934b6ef8e35001732182066359",
+              category: "sksks",
+              region: "EMEA",
+              jobType: "dkd",
+              seniority: "Mid-level",
+              createdAt: new Date("2024-11-21T09:41:06.360Z"),
+            }}
+            key={index}
+          />
         ))}
 
       {/* pagination */}
