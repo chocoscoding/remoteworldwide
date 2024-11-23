@@ -2,6 +2,7 @@ import { FilterProvider } from "@/provider/FilterProvider";
 import Client from "../Client";
 
 import { FilterData } from "@/types/main";
+import { Suspense } from "react";
 
 const getFilters: () => Promise<FilterData> = async () => {
   try {
@@ -25,8 +26,10 @@ export default async function CategoriesPage() {
   const filters = await getFilters();
 
   return (
-    <FilterProvider filterData={filters}>
-      <Client />
-    </FilterProvider>
+    <Suspense>
+      <FilterProvider filterData={filters}>
+        <Client />
+      </FilterProvider>
+    </Suspense>
   );
 }

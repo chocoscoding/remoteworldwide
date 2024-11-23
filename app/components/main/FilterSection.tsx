@@ -4,9 +4,8 @@ import FilterCategory from "./FilterCategory";
 import { cn } from "../../lib/utils";
 import { X } from "lucide-react";
 import { useFilter } from "@/provider/FilterProvider";
-import FilterSkeleton from "../skeleton/FilterSkeleton";
 
-const FilterSection: FC<{ className?: string; isMobile?: boolean }> = ({ className, isMobile }) => {
+const FilterSection: FC<{ className?: string; isMobile?: boolean }> = ({ className }) => {
   const {
     rolesOptions,
     seniorityOptions,

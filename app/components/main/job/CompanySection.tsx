@@ -9,7 +9,7 @@ const CompanySection: FC<{
   name?: string;
   companyDetails: CompanyWithJobsCount;
   forAdmin?: boolean;
-}> = ({ showFullDetails = false, forAdmin = false, name, companyDetails }) => {
+}> = ({ showFullDetails = false, forAdmin = false, companyDetails }) => {
   const socialMediaLinks = [
     { href: companyDetails.twitter ?? "#", Icon: FaXTwitter },
     { href: companyDetails.facebook ?? "#", Icon: FaFacebookF },

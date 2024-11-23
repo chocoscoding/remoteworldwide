@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useFilter } from "@/provider/FilterProvider";
 import { FC } from "react";
 
-const FilterSkeleton: FC<{ className?: string; isMobile?: boolean }> = ({ className, isMobile }) => {
+const FilterSkeleton: FC<{ className?: string }> = ({ className }) => {
   const { toggleMobileFilter } = useFilter();
   return (
     <section
