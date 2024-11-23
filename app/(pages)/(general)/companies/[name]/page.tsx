@@ -58,7 +58,7 @@ const Page = async ({ params }: { params: Promise<{ name: string }> }) => {
           </div>
           {/* |-job lists */}
           <div className="col-span-full md:col-span-7 h-fit">
-            <JobsContainer />
+            <JobsContainer companyId={companyData.id} />
           </div>
         </section>
       </section>

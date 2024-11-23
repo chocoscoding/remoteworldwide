@@ -1,15 +1,18 @@
 "use client";
-import React, { useState, useEffect, FC } from "react";
+import React, { useState, useEffect } from "react";
 import JobTile from "./JobTile";
 import { ChevronRight, ChevronLeft, AlertCircle } from "lucide-react";
 import JobTileSkeleton from "./JobTileSkeleton";
 import { JobTileType } from "@/types/main";
+import { useSearchParams } from "next/navigation";
 
-const JobsContainer: FC<{ companyId: string }> = ({ companyId }) => {
+const JobsContainerForSearch = () => {
   const jobsPerPage = 50;
   const [totalJobs, setTotalJobs] = useState<number>(0);
   const totalPages = Math.ceil(totalJobs / jobsPerPage);
   const [jobs, setJobs] = useState<JobTileType[]>([]);
+  const searchParams = useSearchParams();
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -34,7 +37,7 @@ const JobsContainer: FC<{ companyId: string }> = ({ companyId }) => {
   const getJobs = async (page: number): Promise<void> => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/jobs/company/${companyId}?page=${page}`);
+      const response = await fetch(`/api/jobs?page=${page}&${searchParams.toString()}`);
       if (!response.ok) {
         throw new Error("Failed to fetch jobs");
       }
@@ -52,7 +55,7 @@ const JobsContainer: FC<{ companyId: string }> = ({ companyId }) => {
       return await getJobs(currentPage);
     };
     fetchJobs();
-  }, [currentPage]);
+  }, [currentPage, searchParams]);
 
   // Display range for jobs on the current page
   const startJobIndex = (currentPage - 1) * jobsPerPage;
@@ -120,4 +123,4 @@ const JobsContainer: FC<{ companyId: string }> = ({ companyId }) => {
   );
 };
 
-export default JobsContainer;
+export default JobsContainerForSearch;
