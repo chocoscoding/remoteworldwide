@@ -13,9 +13,16 @@ interface FilterCategoryType {
 // Reusable FilterCategory component
 const FilterCategory: FC<FilterCategoryType> = ({ title, isOpen, toggle, options, handleSelectOption, selectedOptions }) => (
   <div className="my-3">
-    <div className="flex justify-between">
-      <p className="font-bold">{title}</p>
-      <ChevronDown onClick={toggle} className={`opacity-50 cursor-pointer transition-all ${isOpen ? "rotate-180" : ""}`} />
+    <div className="flex justify-between" onClick={toggle}>
+      <p className="font-bold relative flex items-center ">
+        {title}
+        {selectedOptions.length > 0 ? (
+          <span className="px-1 bg-primary/90 font-light text-white rounded-full text-[0.5rem] md:text-xs top-0 ml-[6px]">
+            {selectedOptions.length}
+          </span>
+        ) : null}
+      </p>
+      <ChevronDown className={`opacity-50 cursor-pointer transition-all ${isOpen ? "rotate-180" : ""}`} />
     </div>
     <div className={`transition-all relative ${isOpen ? "h-auto" : "h-0 overflow-hidden"}`}>
       <ul className="h-fit max-h-[320px] overflow-y-auto pt-2 mt-3 pb-2">

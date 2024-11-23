@@ -1,63 +1,88 @@
 "use client";
 
-import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useEffect, useMemo, useState } from "react";
-
-type FilterOptions = Array<{ label: string; count?: number }>;
-
+import { FilterData, FilterType } from "@/types/main";
+import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+const ShowType = { roles: false, seniority: false, jobType: false, region: false };
 interface FilterContextType {
-  rolesOptions: FilterOptions;
-  seniorityOptions: FilterOptions;
-  jobTypeOptions: FilterOptions;
-  showRoles: boolean;
-  showSeniority: boolean;
-  showJobType: boolean;
+  rolesOptions: FilterType[];
+  seniorityOptions: FilterType[];
+  jobTypeOptions: FilterType[];
+  regionOptions: FilterType[];
+  showSection: typeof ShowType;
   isMobile?: boolean;
   showOnMobile: boolean;
   selectedRoles: string[];
   selectedSeniority: string[];
   selectedJobTypes: string[];
+  selectedRegions: string[];
+  activeFilterCount: number;
+  setSelectedRegions: Dispatch<SetStateAction<string[]>>;
   setSelectedRoles: Dispatch<SetStateAction<string[]>>;
   setSelectedSeniority: Dispatch<SetStateAction<string[]>>;
   setSelectedJobTypes: Dispatch<SetStateAction<string[]>>;
   handleSelectOption: (setSelectedOption: Dispatch<SetStateAction<string[]>>, option: string) => void;
-  toggleShowType: (type: "roles" | "seniority" | "jobType") => void;
-  processState: "idle" | "error" | "loading";
+  toggleShowType: (type: keyof typeof ShowType) => void;
   toggleMobileFilter: () => void;
 }
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
-export const FilterProvider = ({ children }: { children: ReactNode }) => {
-  // Memoized options for better performance
-  const rolesOptions = useMemo(() => Array(30).fill({ label: "Business development developers", count: 202 }), []);
-  const seniorityOptions = useMemo(() => ["Junior", "Mid-level", "Senior", "Expert & Leadership"].map((label) => ({ label })), []);
-  const jobTypeOptions = useMemo(() => ["Full-time", "Part-time", "Freelance/Contract", "Internship"].map((label) => ({ label })), []);
+export const FilterProvider = ({ filterData, children }: { filterData: FilterData; children: ReactNode }) => {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const rolesOptions = filterData.category;
+  const seniorityOptions = filterData.seniority;
+  const jobTypeOptions = filterData.job_type;
+  const regionOptions = filterData.region;
 
-  const [processState, setProcessState] = useState<"loading" | "idle" | "error">("loading");
-  const [showRoles, setShowRoles] = useState(false);
-  const [showSeniority, setShowSeniority] = useState(false);
-  const [showJobType, setShowJobType] = useState(false);
-
+  const [showSection, setShowSection] = useState<typeof ShowType>(ShowType);
   const [showOnMobile, setShowOnMobile] = useState(false);
   // State to track selected options
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
-
+  const activeFilterCount = useMemo(() => {
+    return selectedRoles.length + selectedRegions.length + selectedSeniority.length + selectedJobTypes.length;
+  }, [selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes]);
   const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined);
   // Function to handle selecting and disselecting an option
   const handleSelectOption = (setSelectedOption: Dispatch<SetStateAction<string[]>>, option: string) => {
     setSelectedOption((prev) => (prev.includes(option) ? prev.filter((item) => item !== option) : [...prev, option]));
   };
 
+  //handle route update
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    params.delete("roles");
+    params.delete("regions");
+    params.delete("seniority");
+    params.delete("jobTypes");
+
+    if (selectedRoles.length > 0) {
+      params.append("roles", selectedRoles.join("_"));
+    }
+    if (selectedRegions.length > 0) {
+      params.append("regions", selectedRegions.join("_"));
+    }
+    if (selectedSeniority.length > 0) {
+      params.append("seniority", selectedSeniority.join("_"));
+    }
+    if (selectedJobTypes.length > 0) {
+      params.append("jobTypes", selectedJobTypes.join("_"));
+    }
+
+    router.push(pathname + "?" + params.toString());
+    router.refresh();
+  }, [selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes]);
+
   //to toggle the showing each filter category
-  const setShowingType = {
-    roles: setShowRoles,
-    seniority: setShowSeniority,
-    jobType: setShowJobType,
+  const toggleShowType = (type: keyof typeof ShowType) => {
+    setShowSection((prev) => ({ ...prev, [type]: !prev[type] }));
   };
-  const toggleShowType = (type: keyof typeof setShowingType) => {
-    setShowingType[type]((prev) => !prev);
-  };
+
   const toggleMobileFilter = () => {
     setShowOnMobile((prev) => !prev);
   };
@@ -88,39 +113,26 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const fetchData = new Promise((resolve, reject) => {
-    setTimeout(() => {
-      resolve({ data: "1234" });
-    }, 3000);
-  });
-
-  useEffect(() => {
-    const getAllFilters = async () => {
-      await fetchData;
-      setProcessState("idle");
-    };
-    getAllFilters();
-  }, []);
-
   const finalValues = {
     rolesOptions,
     seniorityOptions,
     jobTypeOptions,
-    showRoles,
-    showSeniority,
-    showJobType,
     showOnMobile,
     selectedRoles,
     selectedSeniority,
     selectedJobTypes,
+    selectedRegions,
     setSelectedRoles,
+    setSelectedRegions,
     setSelectedSeniority,
     setSelectedJobTypes,
     handleSelectOption,
     toggleShowType,
-    processState,
     toggleMobileFilter,
+    activeFilterCount,
     isMobile,
+    regionOptions,
+    showSection,
   };
   return <FilterContext.Provider value={finalValues}>{children}</FilterContext.Provider>;
 };

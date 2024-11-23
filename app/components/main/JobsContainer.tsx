@@ -3,11 +3,18 @@ import React, { useState, useEffect } from "react";
 import JobTile from "./JobTile";
 import { ChevronRight, ChevronLeft, AlertCircle } from "lucide-react";
 import JobTileSkeleton from "./JobTileSkeleton";
+import { JobTileType } from "@/types/main";
+import { Settings2 } from "lucide-react";
+import { useFilter } from "@/provider/FilterProvider";
+import { useSearchParams } from "next/navigation";
 
 const JobsContainer = () => {
-  const totalJobs = 100;
+  const { toggleMobileFilter, activeFilterCount } = useFilter();
   const jobsPerPage = 50;
+  const [totalJobs, setTotalJobs] = useState<number>(0);
   const totalPages = Math.ceil(totalJobs / jobsPerPage);
+  const [jobs, setJobs] = useState<JobTileType[]>([]);
+  const searchParams = useSearchParams();
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,18 +37,28 @@ const JobsContainer = () => {
   };
 
   // Simulate fetching data
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-
-    // Simulate an API call
-    setTimeout(() => {
-      // Simulate a successful fetch
+  const getJobs = async (page: number): Promise<void> => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/jobs?page=${page}&${searchParams.toString()}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch jobs");
+      }
+      const jobs = await response.json();
+      setTotalJobs(jobs.count);
+      setJobs(jobs.data);
+    } catch (error: any) {
+      setError("Error fetching jobs:" + error.message);
+    } finally {
       setLoading(false);
-      // Uncomment the following line to simulate an error
-      // setError("Failed to fetch jobs");
-    }, 2000);
-  }, [currentPage]);
+    }
+  };
+  useEffect(() => {
+    const fetchJobs = async () => {
+      return await getJobs(currentPage);
+    };
+    fetchJobs();
+  }, [currentPage, searchParams]);
 
   // Display range for jobs on the current page
   const startJobIndex = (currentPage - 1) * jobsPerPage;
@@ -62,7 +79,7 @@ const JobsContainer = () => {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-start h-[90%]">
-        <AlertCircle className="text-red-500 w-12 h-12 mb-2" />
+        <AlertCircle className="text-red-500 w-[20vw] md:w-[10vw] h-[20vh] md:h-[10vh] mt-4 mb-2" />
         <p className="text-red-500">{error}</p>
       </div>
     );
@@ -78,27 +95,27 @@ const JobsContainer = () => {
 
   return (
     <div>
-      {Array(25)
-        .fill(null)
-        .map((_, index) => (
-          <JobTile
-            {...{
-              id: "1234567890-",
-              title: "jkljlkjd dkjsljds ",
-              company: {
-                logo: "/images/telegram.png",
-                name: "Telegraa",
-              },
-              slug: "jkljlkjd-dkjsljds-95d2b013007a4a6851041ef934b6ef8e35001732182066359",
-              category: "sksks",
-              region: "EMEA",
-              jobType: "dkd",
-              seniority: "Mid-level",
-              createdAt: new Date("2024-11-21T09:41:06.360Z"),
-            }}
-            key={index}
-          />
-        ))}
+      <div className="mb-5 w-full">
+        <div className="w-full flex justify-between items-center">
+          <p className="text-xl md:text-2xl font-extralight text-gray-400 mb-2">
+            <span className="font-bold text-primary">Job Opportunities</span> <span className="text-base">{`(${totalJobs})`}</span>
+          </p>
+
+          <div className="relative block sm:hidden">
+            <Settings2 className="" onClick={toggleMobileFilter} />
+            {activeFilterCount > 0 ? (
+              <span className=" absolute -right-2 -top-2.5 px-1 bg-primary font-light text-white rounded-full text-[0.5rem] ml-[6px]">
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <hr />
+      </div>
+
+      {jobs.map((job, index) => (
+        <JobTile {...job} key={index} />
+      ))}
 
       {/* pagination */}
       <div className="mt-5 flex justify-between items-center">

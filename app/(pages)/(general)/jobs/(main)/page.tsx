@@ -1,18 +1,31 @@
 import { FilterProvider } from "@/provider/FilterProvider";
 import Client from "../Client";
 
-export default async function Home() {
-  const fetchData = new Promise((resolve, reject) => {
-    // Simulate an asynchronous operation
-    setTimeout(() => {
-      const data = { message: "Hello, world!" };
-      resolve(data);
-    }, 2000);
-  });
+import { FilterData } from "@/types/main";
 
-  await fetchData;
+const getFilters: () => Promise<FilterData> = async () => {
+  try {
+    const res = await fetch(process.env.NEXT_PUBLIC_URL + "/api/filters");
+    if (!res.ok) {
+      return {
+        job_type: [],
+        category: [],
+        seniority: [],
+        region: [],
+      } as FilterData;
+    }
+    const data: Promise<{ data: FilterData }> = await res.json();
+    return (await data).data;
+  } catch (error) {
+    throw new Error("Something went wrong");
+  }
+};
+
+export default async function CategoriesPage() {
+  const filters = await getFilters();
+
   return (
-    <FilterProvider>
+    <FilterProvider filterData={filters}>
       <Client />
     </FilterProvider>
   );
