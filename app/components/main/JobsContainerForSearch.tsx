@@ -84,8 +84,9 @@ const JobsContainerForSearch = () => {
 
   if (totalJobs < 1) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <p>No job found</p>
+      <div className="flex flex-col items-center justify-center h-[50vh] text-center md:h-[90%]">
+        <p className="font-bold text-xl mb-2">No opening found for now 😟</p>
+        <p className="">Clear filters or search queries to see more oppotunities 😇</p>
       </div>
     );
   }

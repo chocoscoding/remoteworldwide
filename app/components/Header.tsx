@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { Suspense } from "react";
 import Globe from "./Globe";
 import { DiscordSVG, PipefySVG, SlackSVG, SpotifySVG, WebflowSVG } from "@/app/components/svg";
 import SearchBar from "./SearchBar";
@@ -30,7 +30,9 @@ const Header = ({ count }: { count: number | null }) => {
           just opportunities that want you.
         </h3>
         <div className="w-[98%] max-w-[1000px]">
-          <SearchBar />
+          <Suspense>
+            <SearchBar />
+          </Suspense>
         </div>
         <section className="mt-6 md:mt-8 flex flex-col justify-start">
           <p className="mb-2 text-gray-600 ">Jobs from the top remote companies</p>

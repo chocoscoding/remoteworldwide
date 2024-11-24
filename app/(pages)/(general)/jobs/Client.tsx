@@ -6,7 +6,7 @@ import { useFilter } from "@/provider/FilterProvider";
 import JobsContainerForSearch from "@/app/components/main/JobsContainerForSearch";
 
 const Client = () => {
-  const { toggleMobileFilter, activeFilterCount, isMobile } = useFilter();
+  const { toggleMobileFilter, activeFilterCount } = useFilter();
 
   return (
     <div className="w-full">
@@ -32,11 +32,11 @@ const Client = () => {
 
           <JobsContainerForSearch />
         </section>
-        <FilterSection className="sm:block hidden" isMobile={isMobile} />
+        <FilterSection className="sm:block hidden" isMobile={false} />
       </section>
       <br />
 
-      <FilterSectionMobile className="block sm:hidden" isMobile={isMobile} />
+      <FilterSectionMobile className="block sm:hidden" isMobile={true} />
     </div>
   );
 };

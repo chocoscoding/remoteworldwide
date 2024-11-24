@@ -21,16 +21,44 @@ function createSlug(input: string) {
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
-    const query = searchParams.get("page");
 
-    const skipAmount = SKIP_AMNT * (query ? parseInt(query) : 1);
+    // Extract parameters
+    const page = parseInt(searchParams.get("page") || "1");
+    const rolesParam = searchParams.get("roles");
+    const regionsParam = searchParams.get("regions");
+    const seniorityParam = searchParams.get("seniority");
+    const jobTypesParam = searchParams.get("jobTypes");
+    const searchByTitle = searchParams.get("search");
+
+    // Parse and split parameters into arrays
+    const roles = rolesParam ? rolesParam.split("_") : undefined;
+    const regions = regionsParam ? regionsParam.split("_") : undefined;
+    const seniority = seniorityParam ? seniorityParam.split("_") : undefined;
+    const jobTypes = jobTypesParam ? jobTypesParam.split("_") : undefined;
+
+    // Pagination logic
+    const SKIP_AMNT = 10; // Adjust this value as needed
+    const skipAmount = SKIP_AMNT * (page - 1);
+
+    // Construct dynamic filter object
+    const filters: any = {};
+    if (roles) filters.category = { in: roles };
+    if (regions) filters.region = { in: regions };
+    if (seniority) filters.seniority = { in: seniority };
+    if (jobTypes) filters.jobType = { in: jobTypes };
+    if (searchByTitle) {
+      filters.title = { contains: searchByTitle, mode: "insensitive" };
+    }
+
+    // Execute query using Prisma's filtering and pagination
     const [jobs, jobsCount] = await Promise.all([
       prisma.job.findMany({
+        where: filters,
         orderBy: {
           createdAt: "desc",
         },
         take: SKIP_AMNT,
-        skip: skipAmount - SKIP_AMNT,
+        skip: skipAmount,
         select: {
           id: true,
           title: true,
@@ -51,11 +79,14 @@ export async function GET(req: NextRequest) {
           seniority: true,
         },
       }),
-      prisma.job.count(),
+      prisma.job.count({ where: filters }),
     ]);
+
+    // Return response
     return NextResponse.json({ data: jobs, count: jobsCount }, { status: 200, statusText: "success" });
   } catch (error: any) {
-    return NextResponse.json({ message: "something went wrong" }, { status: 404 });
+    console.error("Error fetching jobs:", error);
+    return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
   }
 }
 

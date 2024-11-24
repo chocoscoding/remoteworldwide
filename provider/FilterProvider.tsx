@@ -10,7 +10,6 @@ interface FilterContextType {
   jobTypeOptions: FilterType[];
   regionOptions: FilterType[];
   showSection: typeof ShowType;
-  isMobile?: boolean;
   showOnMobile: boolean;
   selectedRoles: string[];
   selectedSeniority: string[];
@@ -46,7 +45,6 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
   const activeFilterCount = useMemo(() => {
     return selectedRoles.length + selectedRegions.length + selectedSeniority.length + selectedJobTypes.length;
   }, [selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes]);
-  const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined);
   // Function to handle selecting and disselecting an option
   const handleSelectOption = (setSelectedOption: Dispatch<SetStateAction<string[]>>, option: string) => {
     setSelectedOption((prev) => (prev.includes(option) ? prev.filter((item) => item !== option) : [...prev, option]));
@@ -87,32 +85,6 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
     setShowOnMobile((prev) => !prev);
   };
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth > 640) {
-        setIsMobile(false);
-      } else {
-        console.log(window.innerWidth);
-        setIsMobile(true);
-      }
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  //useeffct to close the filter on mobile when the screen is resized
-  useEffect(() => {
-    if (window.innerWidth > 640) return;
-
-    const handleResize = () => {
-      setShowOnMobile(true);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   const finalValues = {
     rolesOptions,
     seniorityOptions,
@@ -130,7 +102,6 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
     toggleShowType,
     toggleMobileFilter,
     activeFilterCount,
-    isMobile,
     regionOptions,
     showSection,
   };

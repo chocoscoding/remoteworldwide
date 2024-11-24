@@ -3,6 +3,7 @@ import Client from "../Client";
 
 import { FilterData } from "@/types/main";
 import { Suspense } from "react";
+import SearchBar from "@/app/components/SearchBar";
 
 const getFilters: () => Promise<FilterData> = async () => {
   try {
@@ -26,10 +27,17 @@ export default async function CategoriesPage() {
   const filters = await getFilters();
 
   return (
-    <Suspense>
-      <FilterProvider filterData={filters}>
-        <Client />
-      </FilterProvider>
-    </Suspense>
+    <main className="p-3 md:p-10 w-full max-w-[1100px] m-auto">
+      <h2 className="text-2xl md:text-3xl font-bold text-center">Explore latest and exiciting jobs now</h2>
+      <br />
+      <Suspense>
+        <div className="w-full max-w-[1500px] mb-20">
+          <SearchBar activeSearch />
+        </div>
+        <FilterProvider filterData={filters}>
+          <Client />
+        </FilterProvider>
+      </Suspense>
+    </main>
   );
 }

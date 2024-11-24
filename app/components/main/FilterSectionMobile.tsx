@@ -26,13 +26,12 @@ const FilterSectionMobile: FC<{ className?: string; isMobile?: boolean }> = ({ c
     regionOptions,
   } = useFilter();
 
-  if (typeof isMobile === "undefined") return null;
-  if (isMobile === true && showOnMobile === false) return null;
+  if (showOnMobile === false) return null;
 
   return (
     <section
       className={cn(
-        "border border-primary/10 col-span-4 xl:col-span-3 w-full sm:max-w-[300px] overflow-y-auto sm:rounded-xl fixed sm:sticky sm:bg-transparent bg-white left-0 top-[65px] h-[calc(100vh-64px)] p-3",
+        "border border-primary/10 col-span-4 xl:col-span-3 w-full sm:max-w-[300px] overflow-y-auto sm:rounded-xl fixed z-50 sm:sticky sm:bg-transparent bg-white left-0 top-[65px] h-[calc(100vh-64px)] p-3",
         className
       )}>
       <div className="sm:hidden flex items-center justify-center">

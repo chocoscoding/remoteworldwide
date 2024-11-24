@@ -45,6 +45,7 @@ export async function GET() {
       seniority,
       region,
     };
+    console.log(combinedResults);
 
     return NextResponse.json(
       { data: combinedResults },

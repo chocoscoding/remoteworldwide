@@ -59,7 +59,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
   const startJobIndex = (currentPage - 1) * companiesPerPage;
   const endJobIndex = startJobIndex + companiesPerPage;
   return (
-    <div className="p-2 w-full max-w-[1400px] m-auto mt-10 min-h-screen">
+    <div className="p-2 w-full max-w-[1400px] m-auto mt-5 lg:mt-10 min-h-screen">
       {/* search */}
 
       {/* section */}
@@ -68,15 +68,15 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
 
       <section className="w-full md:px-1 flex gap-12 relative">
         <section className="w-full m-auto px-2 lg:px-0">
-          <div className="flex justify-between">
-            <p className="text-2xl mb-2">
+          <div className="flex justify-between flex-wrap-reverse items-center">
+            <p className="md:text-2xl mb-2 flex-shrink-0">
               <span className="font-bold text-primary">Companies</span>{" "}
-              <span className="font-extralight text-gray-400 italic text-lg">{`(A-Z)`}</span>
+              <span className="font-extralight text-gray-400 italic text-sm md:text-lg">{`(A-Z)`}</span>
             </p>
 
-            <div className="flex border border-black rounded-md items-center w-[300px] bg-white overflow-hidden gap-2 flex-shrink-0 mb-3">
+            <div className="flex border border-black rounded-md items-center w-full sm:w-[300px] bg-white overflow-hidden gap-2 flex-shrink-0 mb-3">
               <input placeholder={`search company`} className={`h-10 px-1 flex-1 bg-transparent outline-none`} />
-              <button className={`h-full aspect-square bg-black text-white flex items-center justify-center`}>
+              <button className={`h-10 aspect-square bg-primary text-white flex items-center justify-center flex-shrink-0`}>
                 <Search />
               </button>
             </div>
