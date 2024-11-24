@@ -1,14 +1,15 @@
 import Image from "next/image";
+import Link from "next/link";
 import React from "react";
 
 const Footer = () => {
   return (
     <footer className="bg-primary relative overflow-hidden p-5">
-      <div className="absolute h-[200px] w-[200px] top-5 left-5 flex z-[3]">
+      <div className="absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] top-5 left-5 flex opacity-70 md:opacity-100 z-[3]">
         <Image src={`/images/Vector.png`} alt="kdkd" width={150} height={150} />
         <Image src={`/images/star.png`} alt="kdkd" width={40} height={40} className="h-max" />
       </div>
-      <div className="absolute h-[200px] w-[200px] bottom-10 right-5 flex z-[3] items-end gap-2">
+      <div className="absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] bottom-10 right-5 flex opacity-70 md:opacity-100 z-[3] items-end gap-2">
         <Image src={`/images/Vector.png`} alt="kdkd" width={150} height={150} />
       </div>
 
@@ -27,14 +28,13 @@ const Footer = () => {
             <div className="flex flex-1 max-w-[700px] gap-10">
               <p className="font-extralight text-white/30">2024 Worldwideremote</p>
               <div className="flex gap-5">
-                <p>Find Jobs</p>
-                <p>Companies</p>
-                <p>Blog</p>
+                <Link href={"/jobs"}>Find Jobs</Link>
+                <Link href={"/companies"}>Companies</Link>
+                <Link href={"/blogs"}>Blogs</Link>
               </div>
             </div>
             <div className="flex gap-6 shrink-0">
-              <p>Terms of Service</p>
-              <p>Privacy Policy</p>
+              <Link href={"/privacy-policy"}>Privacy Policy</Link>
             </div>
           </div>
         </div>
