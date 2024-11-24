@@ -3,7 +3,7 @@ import BlogPageClient from "./Client";
 import { revalidatePath } from "next/cache";
 
 const getBlogBySlug = async (slug: string) => {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/blog/${slug}`, { cache: "no-cache" });
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/blog/${slug}`, { cache: "no-cache" });
   const data = await res.json();
   if (!res.ok) {
     if (data.message === "Blog not found") {

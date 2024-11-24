@@ -5,7 +5,7 @@ import blogWithPagination from "@/app/components/main/blogWithPagination";
 
 const fetchJobs = async (page: number): Promise<{ data: BlogListWithAuthor[]; count: number }> => {
   try {
-    const response = await fetch(process.env.NEXT_PUBLIC_URL + "/api/blog?page=" + page, { cache: "no-cache" });
+    const response = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/blog?page=" + page, { cache: "no-cache" });
     if (!response.ok) {
       throw new Error("Failed to fetch companies");
     }
