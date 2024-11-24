@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/prisma";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 
 export async function GET(request: Request) {
   try {
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
             select: {
               name: true,
               profileImage: true,
+              slug: true,
             },
           },
         },

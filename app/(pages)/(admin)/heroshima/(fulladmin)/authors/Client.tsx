@@ -21,7 +21,7 @@ const AllAuthorsPage: FC<{ data: AuthorListChildType[] }> = ({ data }) => {
                   <Image
                     width={100}
                     height={100}
-                    src={`/images/telegram.png`}
+                    src={author.profileImage}
                     alt={author.name}
                     className="w-20 h-20 border-2 rounded-full mr-4"
                   />

@@ -140,6 +140,7 @@ export interface BlogListWithAuthor extends Blog {
   author: {
     name: string;
     profileImage: string;
+    slug: string;
   };
 }
 
