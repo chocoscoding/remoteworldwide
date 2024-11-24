@@ -23,7 +23,7 @@ interface PageProps {
 }
 const fetchCompany = async (name: string): Promise<CompanyWithJobsCount | null> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/companies/${name}`, { cache: "no-cache" });
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/${name}`, { cache: "no-cache" });
     if (!response.ok) {
       return null;
     }

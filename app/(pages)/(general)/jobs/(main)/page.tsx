@@ -6,7 +6,7 @@ import { Suspense } from "react";
 
 const getFilters: () => Promise<FilterData> = async () => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_URL + "/api/filters");
+    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters");
     if (!res.ok) {
       return {
         job_type: [],
