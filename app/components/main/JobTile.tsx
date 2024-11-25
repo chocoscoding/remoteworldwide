@@ -21,7 +21,7 @@ const JobTile: FC<JobTileType> = (props) => {
           </div>
         </div>
         <div className="flex-1">
-          <Link href={"/company/" + company.name}>
+          <Link href={"/companies/" + company.name}>
             <p className="w-full text-gray-500 font-medium text-base">{company.name}</p>
           </Link>
 
