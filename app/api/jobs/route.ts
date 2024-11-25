@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
         take: SKIP_AMNT,
         skip: skipAmount,
         select: {
+          slug:true,
           id: true,
           title: true,
           description: true,
