@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "react-quill/dist/quill.snow.css";
+import "react-quill/dist/quill.bubble.css";
 import { Manrope } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { SessionProvider } from "next-auth/react";

@@ -5,6 +5,7 @@ import Link from "next/link";
 import BookmarkStatus from "../BookmarkStatus";
 import { Job } from "@prisma/client";
 import { toast } from "react-toastify";
+import ReactQuill from "react-quill";
 
 const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?: boolean }> = ({
   data,
@@ -12,6 +13,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
   hasUserBookmarked,
 }) => {
   const { title, description, region, createdAt, jobType, seniority, applicationUrl } = data;
+  console.log(description);
 
   const copyJobLink = () => {
     navigator.clipboard
@@ -61,7 +63,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       </section>
       <hr className="bg-gray-500 my-6" />
       <section className="middle min-h-[50vh]">
-        <div dangerouslySetInnerHTML={{ __html: description }}></div>
+        <ReactQuill value={description} readOnly={true} theme={"bubble"} />
       </section>
       <Link
         href={applicationUrl}
