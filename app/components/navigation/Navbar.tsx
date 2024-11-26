@@ -12,8 +12,8 @@ const Navbar = () => {
   const User = () => (
     <>
       {status === "unauthenticated" ? (
-        <button className="p-2 gap-2 rounded-md bg-primary text-white flex items-center" onClick={() => signIn("google")}>
-          <span>Signin</span>
+        <button className="p-1.5 px-6 gap-2 rounded-md bg-primary text-white flex items-center" onClick={() => signIn("google")}>
+          <span>Sign In</span>
         </button>
       ) : null}
 
