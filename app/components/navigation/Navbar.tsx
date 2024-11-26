@@ -3,19 +3,24 @@ import { useNavbar } from "@/provider/NavbarContext";
 import Link from "next/link"; // Use Next.js' Link for navigation
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
-import { Menu, X } from "lucide-react";
-
+import { LoaderCircle, Menu, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 const Navbar = () => {
   const { status, data } = useSession();
   const { isOpen, toggleNavbar, closeNavbar, isOpen2, toggleNavbar2, closeNavbar2 } = useNavbar();
-
+  const { push } = useRouter();
   const User = () => (
     <>
       {status === "unauthenticated" ? (
-        <button className="p-1.5 px-6 gap-2 rounded-md bg-primary text-white flex items-center" onClick={() => signIn("google")}>
+        <button
+          className="p-1.5 px-6 gap-2 rounded-sm hover:rounded-md bg-primary text-white flex items-center"
+          onClick={() => {
+            signIn("google");
+          }}>
           <span>Sign In</span>
         </button>
       ) : null}
+      {status === "loading" ? <LoaderCircle className="gap-2  text-primary" /> : null}
 
       {status === "authenticated" ? (
         <div className="relative">
@@ -48,9 +53,10 @@ const Navbar = () => {
                 </Link>
               ) : null}
               <button
-                onClick={() => {
+                onClick={async () => {
                   closeNavbar2();
-                  signOut();
+                  await signOut();
+                  push("/");
                 }}
                 className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100">
                 Logout

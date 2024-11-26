@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 
@@ -68,7 +68,7 @@ const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string>("home");
   const pathname = usePathname();
-
+  const { push } = useRouter();
   const toggleSidebar = () => setIsOpen(!isOpen);
   const toggleAccordion = (section: string) => setOpenAccordion(openAccordion === section ? "home" : section);
 
@@ -177,7 +177,10 @@ const Sidebar = () => {
           className={`flex items-center space-x-4 mt-4 cursor-pointer hover:text-white ${
             isActive("/logout") ? "text-secondary" : "text-gray-300"
           }`}
-          onClick={() => signOut()}>
+          onClick={async () => {
+            await signOut();
+            push("/");
+          }}>
           <LogOut className="w-5 h-5" />
           {isOpen && <span>Logout</span>}
         </div>
