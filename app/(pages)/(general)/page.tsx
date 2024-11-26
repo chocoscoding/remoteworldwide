@@ -11,13 +11,21 @@ const getLatestJobs = async () => {
     return [];
   }
 };
+const getCounts = async () => {
+  try {
+    const latestJobs = await getAllActiveJobsCount();
+    return latestJobs.count;
+  } catch (error) {
+    return 10;
+  }
+};
 export default async function Home() {
-  const jobsCount = await getAllActiveJobsCount();
+  const jobsCount = await getCounts();
   const latestJobs = await getLatestJobs();
 
   return (
     <div>
-      <Header count={jobsCount.count} />
+      <Header count={jobsCount} />
       <br />
       <section className="w-full max-w-[1200px] m-auto px-3 xl:px-0">
         <h2 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exciting jobs now</h2>

@@ -1,5 +1,4 @@
 "use client"; // Since we are using React state
-import { FcGoogle } from "react-icons/fc";
 import { useNavbar } from "@/provider/NavbarContext";
 import Link from "next/link"; // Use Next.js' Link for navigation
 import { signIn, signOut, useSession } from "next-auth/react";
@@ -13,8 +12,8 @@ const Navbar = () => {
   const User = () => (
     <>
       {status === "unauthenticated" ? (
-        <button className="p-2 gap-2 rounded-sm bg-primary text-white flex items-center" onClick={() => signIn("google")}>
-          <FcGoogle /> <span>Signin</span>
+        <button className="p-2 gap-2 rounded-md bg-primary text-white flex items-center" onClick={() => signIn("google")}>
+          <span>Signin</span>
         </button>
       ) : null}
 

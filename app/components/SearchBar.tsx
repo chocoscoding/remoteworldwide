@@ -47,7 +47,7 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full h-[3.5rem] md:h-[4.5rem] outline outline-2 outline-black rounded-md bg-white drop-shadow-primary p-1.5 md:p-3 flex">
+      className="w-full h-[3.5rem] md:h-[4.5rem] outline outline-2 outline-black rounded-md bg-white drop-shadow-primary2 p-1.5 md:p-3 flex">
       <div className="flex flex-1 items-center gap-4 px-3">
         <Search className="text-primary hidden md:block" />
         <input
