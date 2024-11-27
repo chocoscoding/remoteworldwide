@@ -37,20 +37,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       },
     };
   }
-  const { company: companyDetails, ..._jobDetails } = JOB;
+  const { company: companyDetails } = JOB;
 
   // fetch data
-  const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(_jobDetails.title)}&type=${encodeURIComponent(
-    _jobDetails.region
+  const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(JOB.title)}&type=${encodeURIComponent(
+    JOB.region
   )}&company=${encodeURIComponent(companyDetails.name)}`;
   return {
-    title: _jobDetails.title,
-    description: `Remoteworldwide - ${_jobDetails.title}`,
+    title: JOB.title,
+    description: `Remoteworldwide - ${JOB.title}`,
     openGraph: {
       images: imageUrl,
-      title: _jobDetails.title,
-      description: `Find out more about the ${_jobDetails.title} position at ${companyDetails.name}.`,
-      url: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${jobSlug}`,
+      title: JOB.title,
+      description: `Find out more about the ${JOB.title} position at ${companyDetails.name}.`,
     },
   };
 }
