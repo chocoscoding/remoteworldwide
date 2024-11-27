@@ -56,11 +56,6 @@ body {
   font-size: 15px;
 }
 
-@media screen and (max-width: 600px) {
-  .ql-bubble * {
-    font-size: 13px;
-  }
-}
 @media screen and (max-width: 1000px) {
   .ql-bubble * {
     font-size: 14px;

@@ -23,10 +23,26 @@ const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
   }
 };
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const jobSlug = decodeURIComponent((await params).id);
+  const JOB = await fetchJob(jobSlug);
+  const { company: companyDetails, ..._jobDetails } = JOB!;
+  // fetch data
+  const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(_jobDetails.title)}&type=${encodeURIComponent(
+    _jobDetails.region
+  )}&company=${encodeURIComponent(companyDetails.name)}`;
+  return {
+    title: _jobDetails.title,
+    descrption: `Remoteworldwide - ${_jobDetails.title}`,
+    openGraph: {
+      images: imageUrl,
+    },
+  };
+}
+
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const jobSlug = decodeURIComponent((await params).id);
   const JOB = await fetchJob(jobSlug);
-  console.log(jobSlug);
 
   if (!JOB) return <NotFound buttonType="back" title="Job" />;
   const userSession = await auth();
@@ -40,6 +56,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       hasUserBookmarked = true;
     }
   }
+
   return (
     <main className="min-h-screen w-full">
       <section className="w-full m-auto max-w-[1200px] min-h-screen my-2 p-3">
