@@ -53,7 +53,8 @@ body {
 }
 
 .ql-bubble * {
-  font-size: 15px;
+  font-size: 16px;
+  color: #0e0e0e;
 }
 
 @media screen and (max-width: 1000px) {

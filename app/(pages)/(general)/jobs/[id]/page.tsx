@@ -26,16 +26,31 @@ const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const jobSlug = decodeURIComponent((await params).id);
   const JOB = await fetchJob(jobSlug);
-  const { company: companyDetails, ..._jobDetails } = JOB!;
+
+  if (!JOB) {
+    return {
+      title: "Job Not Found",
+      description: "The job you are looking for does not exist.",
+      openGraph: {
+        title: "Job Not Found - Find more remote roles jobs on RemoteWorldWide",
+        images: `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`,
+      },
+    };
+  }
+  const { company: companyDetails, ..._jobDetails } = JOB;
+
   // fetch data
   const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(_jobDetails.title)}&type=${encodeURIComponent(
     _jobDetails.region
   )}&company=${encodeURIComponent(companyDetails.name)}`;
   return {
     title: _jobDetails.title,
-    descrption: `Remoteworldwide - ${_jobDetails.title}`,
+    description: `Remoteworldwide - ${_jobDetails.title}`,
     openGraph: {
       images: imageUrl,
+      title: _jobDetails.title,
+      description: `Find out more about the ${_jobDetails.title} position at ${companyDetails.name}.`,
+      url: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${jobSlug}`,
     },
   };
 }
