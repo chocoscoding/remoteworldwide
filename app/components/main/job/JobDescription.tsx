@@ -2,10 +2,12 @@
 import React, { FC, Suspense } from "react";
 import { Calendar, ChartNoAxesColumnIncreasing, Link as LinkIcon, MapPinned, Zap } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import BookmarkStatus from "../BookmarkStatus";
 import { Job } from "@prisma/client";
 import { toast } from "react-toastify";
-import ReactQuill from "react-quill";
+
+const ReactQuill = dynamic(() => import("react-quill"), { ssr: false, loading: () => <p>Loading...</p> });
 
 const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?: boolean }> = ({
   data,
