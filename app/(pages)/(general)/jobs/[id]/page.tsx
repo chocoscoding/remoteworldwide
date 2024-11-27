@@ -7,6 +7,7 @@ import { prisma } from "@/prisma";
 import { JobAndCompany } from "@/types/main";
 import { Job } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import OneJobClient from "./Client";
 
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
   try {
@@ -89,6 +90,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   const { company: companyDetails, ..._jobDetails } = JOB!;
   const jobDetails = _jobDetails as unknown as Job;
+
   let hasUserBookmarked = undefined;
   if (userSession?.user) {
     const _hasUserBookmarked = await checkBookmarkForUser(userSession.user.id, jobDetails.id);
@@ -97,21 +99,5 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     }
   }
 
-  return (
-    <main className="min-h-screen w-full">
-      <section className="w-full m-auto max-w-[1200px] min-h-screen my-2 p-3">
-        {/* main section */}
-        <section className="grid grid-cols-1 md:grid-cols-10 h-full w-full gap-5 md:gap-10">
-          {/* |-job info */}
-          <div className="col-span-full md:col-span-7 h-fit">
-            <JobDescription hasUserBookmarked={hasUserBookmarked} showBookmark={true} data={jobDetails} />
-          </div>
-          {/* |-company info */}
-          <div className="col-span-full -order-1 md:order-2 md:col-span-3 h-fit">
-            <CompanySection companyDetails={companyDetails} />
-          </div>
-        </section>
-      </section>
-    </main>
-  );
+  return <OneJobClient Job={JOB} hasUserBookmarked={hasUserBookmarked} />;
 }

@@ -14,7 +14,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
 }) => {
   const { title, description, region, createdAt, jobType, seniority, applicationUrl } = data;
 
-  const copyJobLink = () => {
+  const copyJobLink = React.useCallback(() => {
     navigator.clipboard
       .writeText(window.location.origin + "/jobs/" + data.slug)
       .then(() => {
@@ -29,7 +29,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       .catch((err) => {
         console.error("Failed to copy: ", err);
       });
-  };
+  }, [data.slug]);
   return (
     <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-3 sm:p-5 md:p-10 overflow-hidden">
       <p className="text-gray-500 text-sm">Job Description</p>
