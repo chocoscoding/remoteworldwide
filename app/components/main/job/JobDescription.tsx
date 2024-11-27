@@ -1,5 +1,5 @@
 "use client";
-import React, { FC } from "react";
+import React, { FC, Suspense } from "react";
 import { Calendar, ChartNoAxesColumnIncreasing, Link as LinkIcon, MapPinned, Zap } from "lucide-react";
 import Link from "next/link";
 import BookmarkStatus from "../BookmarkStatus";
@@ -13,7 +13,6 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
   hasUserBookmarked,
 }) => {
   const { title, description, region, createdAt, jobType, seniority, applicationUrl } = data;
-  console.log(description);
 
   const copyJobLink = () => {
     navigator.clipboard
@@ -63,7 +62,9 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       </section>
       <hr className="bg-gray-500 my-6" />
       <section className="middle min-h-[50vh]">
-        <ReactQuill value={description} readOnly={true} theme={"bubble"} />
+        <Suspense fallback={<p>Loading...</p>}>
+          <ReactQuill value={description} readOnly={true} theme={"bubble"} />
+        </Suspense>
       </section>
       <Link
         href={applicationUrl}

@@ -99,7 +99,6 @@ export async function GET(request: Request) {
               color: "white",
               lineHeight: 1.4,
             }}>
-            {" "}
             {title}
           </div>
           <div
@@ -119,7 +118,7 @@ export async function GET(request: Request) {
               color: "black",
               marginTop: 8,
             }}>
-            @ {companyName}
+            {`@ ${companyName}`}
           </div>
           <div
             style={{
@@ -136,7 +135,7 @@ export async function GET(request: Request) {
               color: "white",
               marginTop: 8,
             }}>
-            🌎 Remote, {remoteType}
+            {`🌎 Remote, ${remoteType}`}
           </div>
         </div>
       </div>

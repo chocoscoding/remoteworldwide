@@ -6,6 +6,7 @@ import { checkBookmarkForUser } from "@/libs/query";
 import { prisma } from "@/prisma";
 import { JobAndCompany } from "@/types/main";
 import { Job } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
   try {
@@ -23,9 +24,32 @@ const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
   }
 };
 
+const fetchJobMetaData = async (slug: string): Promise<any | null> => {
+  try {
+    const job = await prisma.job.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        slug: true,
+        title: true,
+        region: true,
+        company: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+    return job;
+  } catch (error) {
+    throw new Error("Something went wrong");
+  }
+};
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const jobSlug = decodeURIComponent((await params).id);
-  const JOB = await fetchJob(jobSlug);
+  const JOB = await fetchJobMetaData(jobSlug);
 
   if (!JOB) {
     return {
@@ -37,24 +61,26 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       },
     };
   }
-  const { company: companyDetails } = JOB;
 
   // fetch data
   const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(JOB.title)}&type=${encodeURIComponent(
     JOB.region
-  )}&company=${encodeURIComponent(companyDetails.name)}`;
+  )}&company=${encodeURIComponent(JOB.company.name)}`;
+
   return {
     title: JOB.title,
     description: `Remoteworldwide - ${JOB.title}`,
     openGraph: {
       images: imageUrl,
       title: JOB.title,
-      description: `Find out more about the ${JOB.title} position at ${companyDetails.name}.`,
+      description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
+      url: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${JOB.slug}`,
     },
   };
 }
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  revalidatePath("./");
   const jobSlug = decodeURIComponent((await params).id);
   const JOB = await fetchJob(jobSlug);
 

@@ -43,6 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       images: imageUrl,
       title: title,
       description,
+      author: author.name,
       url: `${process.env.NEXT_PUBLIC_SITE_URL}/blogs/${slug}`,
     },
   };
