@@ -7,7 +7,27 @@ import BookmarkStatus from "../BookmarkStatus";
 import { Job } from "@prisma/client";
 import { toast } from "react-toastify";
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false, loading: () => <p>Loading...</p> });
+const ReactQuill = dynamic(() => import("react-quill"), { ssr: false, loading: () => <JobDescriptionSkeleton /> });
+
+const JobDescriptionSkeleton: FC = () => {
+  return (
+    <div className="animate-pulse space-y-2">
+      <div className="h-5 bg-gray-300 rounded w-full mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-3/4 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-full mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-1/2 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-5/6 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-2/3 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-1/4 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-3/5 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-4/5 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-1/3 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-3/4 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-1/6 mt-7"></div>
+      <div className="h-5 bg-gray-300 rounded w-full mt-7"></div>
+    </div>
+  );
+};
 
 const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?: boolean }> = ({
   data,
@@ -16,7 +36,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
 }) => {
   const { title, description, region, createdAt, jobType, seniority, applicationUrl } = data;
 
-  const copyJobLink = React.useCallback(() => {
+  const copyJobLink = () => {
     navigator.clipboard
       .writeText(window.location.origin + "/jobs/" + data.slug)
       .then(() => {
@@ -31,7 +51,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       .catch((err) => {
         console.error("Failed to copy: ", err);
       });
-  }, [data.slug]);
+  };
   return (
     <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-3 sm:p-5 md:p-10 overflow-hidden">
       <p className="text-gray-500 text-sm">Job Description</p>
