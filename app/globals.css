@@ -54,12 +54,12 @@ body {
 
 .ql-bubble * {
   font-size: 16px;
-  color: #0e0e0e;
+  color: #272727;
 }
 
 @media screen and (max-width: 1000px) {
   .ql-bubble * {
-    font-size: 14px;
+    font-size: 15px;
   }
   .drop-shadow-primary {
     box-shadow: 7px 7px #e1f073;

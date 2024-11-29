@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 const Navbar = () => {
   const { status, data } = useSession();
   const { isOpen, toggleNavbar, closeNavbar, isOpen2, toggleNavbar2, closeNavbar2 } = useNavbar();
-  const { push } = useRouter();
+  const { replace } = useRouter();
   const User = () => (
     <>
       {status === "unauthenticated" ? (
@@ -56,7 +56,7 @@ const Navbar = () => {
                 onClick={async () => {
                   closeNavbar2();
                   await signOut();
-                  push("/");
+                  replace("/");
                 }}
                 className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100">
                 Logout

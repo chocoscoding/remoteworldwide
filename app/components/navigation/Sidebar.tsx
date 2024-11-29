@@ -68,7 +68,7 @@ const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string>("home");
   const pathname = usePathname();
-  const { push } = useRouter();
+  const { push, replace } = useRouter();
   const toggleSidebar = () => setIsOpen(!isOpen);
   const toggleAccordion = (section: string) => setOpenAccordion(openAccordion === section ? "home" : section);
 
@@ -179,7 +179,7 @@ const Sidebar = () => {
           }`}
           onClick={async () => {
             await signOut();
-            push("/");
+            replace("/", {});
           }}>
           <LogOut className="w-5 h-5" />
           {isOpen && <span>Logout</span>}

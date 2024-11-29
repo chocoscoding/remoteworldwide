@@ -17,7 +17,9 @@ const JobTile: FC<JobTileType> = (props) => {
             <Image src={company.logo} alt="logo" width={40} height={40} className="rounded-full" />
           </div>
           <div className="h-fit flex-0 flex-shrink-0 md:hidden block">
-            <p className="text-sm font-medium text-gray-500">2d ago</p>
+            <p className="text-sm font-medium text-gray-500">
+              <TimeAgo datetime={createdAt} />
+            </p>
           </div>
         </div>
         <div className="flex-1">

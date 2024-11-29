@@ -41,7 +41,10 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       .writeText(window.location.origin + "/jobs/" + data.slug)
       .then(() => {
         toast.dismiss("copied");
+      })
+      .then(() => {
         toast.success("🔗 Link Copied", {
+          icon: false,
           position: "top-center",
           style: { top: "0.05rem", width: "fit-content" },
           autoClose: 500,
