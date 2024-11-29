@@ -74,7 +74,7 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/">
-              <p className="text-2xl font-bold">Logo</p>
+              <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">RWW</p>
             </Link>
           </div>
 
