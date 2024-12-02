@@ -13,7 +13,7 @@ const Navbar = () => {
     <>
       {status === "unauthenticated" ? (
         <button
-          className="p-1.5 px-6 gap-2 rounded-sm hover:rounded-md bg-primary text-white flex items-center"
+          className="p-1.5 px-6 gap-2 transition-all rounded-sm hover:rounded-md bg-primary text-white flex items-center"
           onClick={() => {
             signIn("google");
           }}>

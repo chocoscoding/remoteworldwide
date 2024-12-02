@@ -15,14 +15,18 @@ const Footer = () => {
 
       <div className="w-full flex items-center text-white flex-col z-10 relative item justify-between h-full mt-2">
         <div className="w-full h-full flex flex-col items-center gap-1">
-          <h3 className="w-fit text-clamp2">Explore a Job Now! ✨</h3>
+          <h3 className="w-fit text-clamp2">Get the hottest and fresh openings! ✨</h3>
           <p className="text-lg w-[90%] max-w-[500px] text-center font-thin">
-            Worldwideremote is the platform, startups can get assistance with their recruitment of talent as well as connection with
-            investors.
+            Worldwideremote consistently delivers well-vetted remote job opportunities—this time, directly to you.
+            <br />
+            Join our Telegram group to skip website distractions and receive daily job updates straight to your feed!
           </p>
-          <button className="bg-white text-primary px-5 py-4 mt-6 rounded-sm hover:rounded-md drop-shadow-primary2-hover transition-all font-bold">
-            Explore Jobs
-          </button>
+          <Link
+            href={"https://t.me/worldwideremote"}
+            target="_blank"
+            className="bg-white text-primary px-5 py-4 mt-6 rounded-sm hover:rounded-md drop-shadow-primary2-hover transition-all font-bold">
+            JOIN NOW!
+          </Link>
         </div>
 
         <div className="w-full mt-5">
