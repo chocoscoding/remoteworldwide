@@ -15,10 +15,8 @@ const Footer = () => {
 
       <div className="w-full flex items-center text-white flex-col z-10 relative item justify-between h-full mt-2">
         <div className="w-full h-full flex flex-col items-center gap-1">
-          <h3 className="w-fit text-clamp2">Get the hottest and fresh openings! ✨</h3>
+          <h3 className="w-fit text-clamp2">Get that unfair advantage! ✨</h3>
           <p className="text-lg w-[90%] max-w-[500px] text-center font-thin">
-            Worldwideremote consistently delivers well-vetted remote job opportunities—this time, directly to you.
-            <br />
             Join our Telegram group to skip website distractions and receive daily job updates straight to your feed!
           </p>
           <Link
