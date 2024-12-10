@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { prisma } from "@/prisma";
 import { hexoid } from "hexoid";
 import { NextRequest, NextResponse } from "next/server";
@@ -60,10 +61,9 @@ export async function GET(req: NextRequest) {
         take: SKIP_AMNT,
         skip: skipAmount,
         select: {
-          slug:true,
+          slug: true,
           id: true,
           title: true,
-          description: true,
           isActive: true,
           applicationUrl: true,
           createdAt: true,
@@ -94,6 +94,9 @@ export async function GET(req: NextRequest) {
 // CREATE JOB
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+
+    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const { title, description, companyId, applicationUrl, category, region, jobType, seniority } = await req.json();
     const BODY_VALUES = { title, description, companyId, applicationUrl, category, region, jobType, seniority, slug: "0" };
 

@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -30,6 +31,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 //edit one company
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth();
+
+    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const companyId = (await params).id;
 
     const { name, about, logo, website, linkedin, twitter, facebook } = await req.json();
@@ -58,6 +62,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 //delete one company
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth();
+
+    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const companyId = (await params).id;
     const oneCompany = await prisma.company.delete({
       where: {

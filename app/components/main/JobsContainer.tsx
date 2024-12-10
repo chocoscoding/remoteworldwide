@@ -30,11 +30,11 @@ const JobsContainer: FC<{ companyId: string }> = ({ companyId }) => {
     }
   };
 
-  // Simulate fetching data
+  // fetching data
   const getJobs = async (page: number): Promise<void> => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/jobs/company/${companyId}?page=${page}`);
+      const response = await fetch(`/api/jobs/company/${companyId}?page=${page}`, { cache: "no-cache" });
       if (!response.ok) {
         throw new Error("Failed to fetch jobs");
       }

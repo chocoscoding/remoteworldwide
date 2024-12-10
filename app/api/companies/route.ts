@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 const SKIP_AMNT = 50;
@@ -32,6 +33,10 @@ export async function GET(req: NextRequest) {
 //create one company
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+
+    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+
     const { name, about, logo, website, linkedin, twitter, facebook } = await req.json();
     const REQUIRED_BODY_VALUES = { name, about, logo, website };
     const BODY_VALUES = { name, about, logo, website, linkedin, twitter, facebook };

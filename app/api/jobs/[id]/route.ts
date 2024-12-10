@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -46,6 +47,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // EDIT JOB
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth();
+
+    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const id = (await params).id;
     if (!id) {
       return NextResponse.json({ message: "Job ID is required" }, { status: 400 });
@@ -77,6 +81,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE JOB
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth();
+
+    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const id = (await params).id;
     if (!id) {
       return NextResponse.json({ message: "Job ID is required" }, { status: 400 });
