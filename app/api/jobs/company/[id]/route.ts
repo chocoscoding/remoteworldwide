@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         skip: skipAmount,
         select: {
           title: true,
-          description: true,
+          slug: true,
           isActive: true,
           createdAt: true,
           company: {
