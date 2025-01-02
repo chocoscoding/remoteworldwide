@@ -76,8 +76,8 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="">
-              <LogoFull width={150} height={150} className="w-full !h-auto md:block hidden" />
-              <LogoMini width={200} height={200} className="w-full !h-auto block sm:hidden" />
+              <LogoFull width={230} height={190} className="w-full !h-auto sm:block hidden" />
+              <LogoMini width={35} height={35} className="w-full !h-auto block sm:hidden" />
             </Link>
           </div>
 

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     url: "https://remoteworldwide.net",
     title: "Remote Worldwide",
     description: "Get worldwide remote jobs",
-    images: [`/globe.png`],
+    images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
   },
   twitter: {
     card: "summary_large_image",
