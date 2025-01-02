@@ -2,8 +2,9 @@ import Header from "@/app/components/Header";
 import JobListSection from "./JobListSection";
 import Link from "next/link";
 import { fetchLatestJobs, getAllActiveJobsCount } from "@/libs/query";
-import { revalidatePath } from "next/cache";
+// import { revalidatePath } from "next/cache";
 
+export const revalidate = 3600 * 60 * 24;
 const getLatestJobs = async () => {
   try {
     const latestJobs = await fetchLatestJobs(10);
@@ -23,7 +24,6 @@ const getCounts = async () => {
 export default async function Home() {
   const jobsCount = await getCounts();
   const latestJobs = await getLatestJobs();
-  revalidatePath("./");
 
   return (
     <div>
