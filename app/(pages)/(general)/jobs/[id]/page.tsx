@@ -1,5 +1,3 @@
-import CompanySection from "@/app/components/main/job/CompanySection";
-import JobDescription from "@/app/components/main/job/JobDescription";
 import NotFound from "@/app/components/NotFound";
 import { auth } from "@/auth";
 import { checkBookmarkForUser } from "@/libs/query";

@@ -1,3 +1,4 @@
+import LogoMini from "@/app/components/svg/LogoMini";
 import { ImageResponse } from "next/og";
 
 export async function GET(request: Request) {
@@ -20,11 +21,10 @@ export async function GET(request: Request) {
             fontSize: 32,
             fontWeight: 600,
           }}>
-          <span
+          <LogoMini
             style={{
               width: 24,
               height: 24,
-              background: "black",
             }}
           />
           <div style={{ marginTop: 1, margin: 50, marginBottom: 0, textAlign: "center" }}>Visit remoteworldwide.vercel.app </div>
@@ -59,11 +59,10 @@ export async function GET(request: Request) {
             display: "flex",
             alignItems: "center",
           }}>
-          <span
+          <LogoMini
             style={{
               width: 24,
               height: 24,
-              background: "black",
             }}
           />
           <span

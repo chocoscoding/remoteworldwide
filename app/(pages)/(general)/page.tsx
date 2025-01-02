@@ -35,9 +35,7 @@ export default async function Home() {
 
         <JobListSection latestJobs={latestJobs} />
         <div className="w-full flex justify-center">
-          <Link
-            href={"/jobs"}
-            className="bg-secondary drop-shadow-secondary2-hover text-primary px-16 py-3 text-lg font-bold hover:rounded-md transition-all my-1">
+          <Link href={"/jobs"} className="bg-secondary drop-shadow-secondary2 text-primary px-16 py-3 text-lg font-bold rounded-md my-1">
             View all jobs
           </Link>
         </div>

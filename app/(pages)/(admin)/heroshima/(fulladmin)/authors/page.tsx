@@ -29,7 +29,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
         <p className="text-xl font-bold">No authors yet</p>
         <Link
           href={"/heroshima/authors/create"}
-          className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm hover:rounded-md p-3 mt-2">
+          className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-md p-3 mt-2">
           Create author
         </Link>
       </div>

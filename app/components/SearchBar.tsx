@@ -67,12 +67,12 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
         {!activeSearch ? (
           <Link
             href={`/jobs${searchValue ? `?search=${encodeURIComponent(searchValue)}` : ""}`}
-            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-sm hover:rounded-md transition-all flex items-center justify-center gap-3">
+            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md transition-all flex items-center justify-center gap-3">
             <InnerContent />
           </Link>
         ) : (
           <button
-            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-sm hover:rounded-md transition-all items-center flex justify-center gap-3"
+            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md transition-all items-center flex justify-center gap-3"
             type="submit">
             <InnerContent />
           </button>

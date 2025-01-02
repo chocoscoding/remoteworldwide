@@ -5,6 +5,8 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import { LoaderCircle, Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import LogoFull from "../svg/LogoFull";
+import LogoMini from "../svg/LogoMini";
 const Navbar = () => {
   const { status, data } = useSession();
   const { isOpen, toggleNavbar, closeNavbar, isOpen2, toggleNavbar2, closeNavbar2 } = useNavbar();
@@ -13,7 +15,7 @@ const Navbar = () => {
     <>
       {status === "unauthenticated" ? (
         <button
-          className="p-1.5 px-6 gap-2 transition-all rounded-sm hover:rounded-md bg-primary text-white flex items-center"
+          className="p-1.5 px-6 gap-2 transition-all rounded-md bg-primary text-white flex items-center"
           onClick={() => {
             signIn("google");
           }}>
@@ -73,8 +75,9 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/">
-              <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">RWW</p>
+            <Link href="/" className="">
+              <LogoFull width={150} height={150} className="w-full !h-auto md:block hidden" />
+              <LogoMini width={200} height={200} className="w-full !h-auto block sm:hidden" />
             </Link>
           </div>
 

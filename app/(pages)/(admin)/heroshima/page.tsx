@@ -45,7 +45,7 @@ export default async function AdminAnalytics() {
         <section className="flex justify-center transition-all">
           <Link
             href={"/heroshima/jobs/create"}
-            className="flex items-center px-6 py-4 group bg-primary text-white outline outline-2 outline-primary font-bold rounded-sm hover:rounded-md drop-shadow-primary2-hover transition-all">
+            className="flex items-center px-6 py-4 group bg-primary text-white outline outline-2 outline-primary font-bold rounded-md drop-shadow-primary2-hover transition-all">
             <PlusCircle className="w-6 h-6 mr-2 group-hover:scale-90" />
             Create more jobs
           </Link>

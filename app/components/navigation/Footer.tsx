@@ -22,7 +22,7 @@ const Footer = () => {
           <Link
             href={"https://t.me/worldwideremote"}
             target="_blank"
-            className="bg-white text-primary px-5 py-4 mt-6 rounded-sm hover:rounded-md drop-shadow-primary2-hover transition-all font-bold">
+            className="bg-white text-primary px-5 py-4 mt-6 rounded-md drop-shadow-primary2-hover transition-all font-bold">
             JOIN NOW!
           </Link>
         </div>
