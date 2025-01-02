@@ -17,6 +17,7 @@ export default async function AdminAnalytics() {
       </div>
     );
   }
+  //get admin dashboard info
   const ADMIN_DASHBOARD_INFO = await getAdminDashboardInfo();
   return (
     <div className="w-full h-screen overflow-y-scroll">

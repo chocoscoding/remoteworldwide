@@ -94,7 +94,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       <Link
         href={applicationUrl}
         target="_blank"
-        className="bg-primary text-white w-full h-12 text-lg flex justify-center gap-3 items-center hover:rounded-lg transition-all mt-5">
+        className="bg-primary text-white w-full h-12 text-lg flex justify-center gap-3 items-center hover:rounded-lg transition-all mt-5 rounded-md">
         <Zap />
         <span className="font-bold">Apply Now</span>
       </Link>
