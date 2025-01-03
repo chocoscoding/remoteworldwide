@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     // creator: '@remoteworldwide',
     images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
   },
-  keywords: ["job", "remote", "work", "remote jobs", "tech", "worldwide jobs"],
+  keywords: ["job", "remote", "remote work", "remote worldwide", "work", "remote jobs", "tech jobs", "worldwide jobs"],
 };
 
 export default function RootLayout({

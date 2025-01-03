@@ -28,7 +28,7 @@ export async function GET(request: Request) {
               width: 500,
             }}
           />
-          <div style={{ marginTop: 1, margin: 50, marginBottom: 0, textAlign: "center" }}>Visit remoteworldwide.vercel.app </div>
+          <div style={{ marginTop: 1, margin: 50, marginBottom: 0, textAlign: "center" }}>Visit remoteworldwide.net </div>
           <div>for latest blog posts</div>
         </div>
       ),

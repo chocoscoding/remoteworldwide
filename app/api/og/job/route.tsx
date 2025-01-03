@@ -26,9 +26,7 @@ export async function GET(request: Request) {
               width: "550px",
             }}
           />
-          <div style={{ marginTop: 1, margin: 50, marginBottom: 0, textAlign: "center", fontWeight: "600" }}>
-            Visit remoteworldwide.vercel.app{" "}
-          </div>
+          <div style={{ marginTop: 1, margin: 50, marginBottom: 0, textAlign: "center", fontWeight: "600" }}>Visit remoteworldwide.net</div>
           <div>for latest remote jobs</div>
         </div>
       ),
