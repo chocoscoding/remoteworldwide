@@ -1,4 +1,4 @@
-import LogoMini from "@/app/components/svg/LogoMini";
+import LogoFull2 from "@/app/components/svg/LogoFull2";
 import { ImageResponse } from "next/og";
 
 export async function GET(request: Request) {
@@ -21,13 +21,14 @@ export async function GET(request: Request) {
             fontSize: 32,
             fontWeight: 600,
           }}>
-          <LogoMini
+          <LogoFull2
             style={{
-              width: 24,
-              height: 24,
+              width: "550px",
             }}
           />
-          <div style={{ marginTop: 1, margin: 50, marginBottom: 0, textAlign: "center" }}>Visit remoteworldwide.vercel.app </div>
+          <div style={{ marginTop: 1, margin: 50, marginBottom: 0, textAlign: "center", fontWeight: "600" }}>
+            Visit remoteworldwide.vercel.app{" "}
+          </div>
           <div>for latest remote jobs</div>
         </div>
       ),
@@ -59,19 +60,12 @@ export async function GET(request: Request) {
             display: "flex",
             alignItems: "center",
           }}>
-          <LogoMini
+          <LogoFull2
             style={{
               width: 24,
               height: 24,
             }}
           />
-          <span
-            style={{
-              marginLeft: 8,
-              fontSize: 20,
-            }}>
-            remoteworldwide.vercel.app
-          </span>
         </div>
         <div
           style={{
