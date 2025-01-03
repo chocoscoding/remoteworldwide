@@ -15,19 +15,19 @@ const font = Manrope({
 
 export const metadata: Metadata = {
   title: "Remote Worldwide",
-  description: "Get worldwide remote jobs",
+  description: "Get worldwide remote jobs and get hired in no time!",
   icons: "/favicon.ico",
   metadataBase: new URL("https://remoteworldwide.net"),
   openGraph: {
     url: "https://remoteworldwide.net",
     title: "Remote Worldwide",
-    description: "Get worldwide remote jobs",
+    description: "Get worldwide remote jobs and get hired in no time!",
     images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
   },
   twitter: {
     card: "summary_large_image",
     title: "Remote Worldwide",
-    description: "Get worldwide remote jobs",
+    description: "Get worldwide remote jobs and get hired in no time!",
     // creator: '@remoteworldwide',
     images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
   },

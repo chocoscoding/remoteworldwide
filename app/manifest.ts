@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Remote Worldwide",
     short_name: "Remote worldwide",
-    description: "Get worldwide remote jobs",
+    description: "Get worldwide remote jobs and get hired in no time!",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
