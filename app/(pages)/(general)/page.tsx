@@ -3,8 +3,7 @@ import JobListSection from "./JobListSection";
 import Link from "next/link";
 import { fetchLatestJobs, getAllActiveJobsCount } from "@/libs/query";
 // import { revalidatePath } from "next/cache";
-
-// export const revalidate = 3600 * 60 * 24;
+export const revalidate = 3600 * 24;
 const getLatestJobs = async () => {
   try {
     const latestJobs = await fetchLatestJobs(10);
