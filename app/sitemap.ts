@@ -38,17 +38,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       url: "/blogs",
       changeFrequency: "weekly",
-      priority: 1,
+      priority: 0.5,
     },
     {
       url: "/jobs",
       changeFrequency: "weekly",
-      priority: 1,
+      priority: 0.9,
     },
     {
       url: "/companies",
       changeFrequency: "weekly",
-      priority: 1,
+      priority: 0.2,
     },
   ];
 
@@ -57,16 +57,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   blogs.forEach((thook) => {
     routes.push({
-      url: "/blog/" + thook.slug,
+      url: "/blogs/" + thook.slug,
       changeFrequency: "daily",
-      priority: 0.3,
+      priority: 0.5,
     });
   });
   jobs.forEach((thook) => {
     routes.push({
       url: "/jobs/" + thook.slug,
       changeFrequency: "daily",
-      priority: 1,
+      priority: 0.8,
     });
   });
 
