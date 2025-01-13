@@ -45,6 +45,7 @@ const AuthorDetailsPage: FC<{ data: AuthorWithBlog }> = ({ data }) => {
       <p className="mt-2 mb-10 text-2xl font-bold">{`Author's Information`}</p>
       <div className="flex items-center gap-4 mb-6">
         <Image
+        loading="eager"
           width={400}
           height={400}
           src={authorsInfo.profileImage}

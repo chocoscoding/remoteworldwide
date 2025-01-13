@@ -12,7 +12,7 @@ const CompanyTile: FC<{ forCompany?: boolean; companyData: CompanyList }> = ({ f
       <div className="flex flex-col gap-3 bg-white p-2 rounded-lg group transition-all">
         <div className="flex w-full items-center">
           <div className="border-2 rounded-full p-1 w-fit h-fit flex-shrink-0">
-            <Image src={companyData.logo} alt="logo" width={40} height={40} className="rounded-full flex-shrink-0" />
+            <Image loading="eager" src={companyData.logo} alt="logo" width={40} height={40} className="rounded-full flex-shrink-0" />
           </div>
           <p className="text-lg font-semibold text-primary ml-2">{companyData.name}</p>
         </div>

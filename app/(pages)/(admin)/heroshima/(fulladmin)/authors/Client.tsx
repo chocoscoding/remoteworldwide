@@ -19,6 +19,7 @@ const AllAuthorsPage: FC<{ data: AuthorListChildType[] }> = ({ data }) => {
               <li key={index} className="max-w-[700px]">
                 <Link href={`/heroshima/authors/${author.slug}`} className="mb-4 flex items-center shadow-md rounded-md p-3 my-2 border">
                   <Image
+                  loading="eager"
                     width={100}
                     height={100}
                     src={author.profileImage}

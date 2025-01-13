@@ -65,6 +65,7 @@ const BlogPage: FC<{ blog: Blog }> = ({ blog }) => {
           <div className="max-w-3xl mx-auto text-xl leading-8 text-center text-gray-200 sm:mt-1 z-10 relative">{blog.description}</div>
           <div className="flex items-center justify-center mt-1 z-10 relative">
             <Image
+              loading="eager"
               className="rounded-full border-2 border-gray-300 h-10 w-10"
               src={blog.author.profileImage}
               alt={blog.author.name}

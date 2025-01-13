@@ -130,6 +130,7 @@ const UpdateAuthorClient: FC<{ data: FormStateAuthor_Client; id: string }> = ({ 
         <div className=" gap-4 items-center">
           {formValues.profileImage ? (
             <Image
+              loading="eager"
               src={formValues.profileImage}
               alt="ddid"
               width={1080}

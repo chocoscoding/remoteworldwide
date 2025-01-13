@@ -12,7 +12,7 @@ const BookmarkTile: FC<{ job: OneBookmarkType["job"]; removeBookmark: (id: strin
       <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-3">
         <div className="flex justify-between w-full md:w-fit items-center md:items-start">
           <div className="border-2 rounded-full p-1 w-fit h-fit  ">
-            <Image src={job.company.logo} alt="logo" width={40} height={40} className="rounded-full" />
+            <Image loading="eager" src={job.company.logo} alt="logo" width={40} height={40} className="rounded-full" />
           </div>
           <div
             onClick={() => removeBookmark(job.id)}
