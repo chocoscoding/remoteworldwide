@@ -26,7 +26,7 @@ const fetchJob = async (slug: string): Promise<(Job & { company: { name: string 
 };
 const getAllFilters = async (): Promise<FilterData> => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-cache" });
+    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
     if (!res.ok) {
       throw new Error("error");
     }

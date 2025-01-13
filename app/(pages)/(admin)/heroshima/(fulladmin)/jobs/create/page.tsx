@@ -3,7 +3,7 @@ import CreateJob from "./Client";
 import { FilterData, FilterType } from "@/types/main";
 const getAllFilters = async (): Promise<FilterData> => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-cache" });
+    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
     if (!res.ok) {
       throw new Error("error");
     }

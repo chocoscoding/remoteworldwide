@@ -2,12 +2,11 @@
 import { FC, useState } from "react";
 import CategorySection from "./CategorySection";
 import { FilterData, FilterType } from "@/types/main";
+import { useRouter } from "next/navigation";
 
 const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
   const [categories, setCategories] = useState<FilterData>(initialData);
-
   const addCategory = async (section: keyof FilterData, newCategory: FilterType) => {
-    console.log(section, newCategory);
     try {
       const response = await fetch("/api/filters/" + section, {
         method: "POST",
@@ -21,12 +20,12 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
         throw new Error("Failed to save this filter");
       }
       const result = await response.json();
-      console.log(result);
 
       setCategories((prevCategories) => ({
         ...prevCategories,
         [section]: [...prevCategories[section], { label: result.data.name, value: result.data.id }],
       }));
+      
     } catch {
       throw new Error("Error saving this filter");
     }

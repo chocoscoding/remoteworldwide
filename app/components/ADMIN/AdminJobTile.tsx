@@ -1,10 +1,9 @@
 "use client";
-import { Bookmark, Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
+import { Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
 import JobStatus from "./JobStatus";
-import { Job } from "@prisma/client";
 import { OneJobListType } from "@/types/main";
 
 const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {

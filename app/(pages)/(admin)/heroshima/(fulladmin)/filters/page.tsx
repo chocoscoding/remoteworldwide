@@ -2,7 +2,7 @@ import FiltersClient from "./Client";
 import { FilterData } from "@/types/main";
 
 const getFilters: () => Promise<FilterData> = async () => {
-  const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-cache" });
+  const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
   if (!res.ok) {
     return {
       job_type: [],
