@@ -4,10 +4,11 @@ import Client from "../Client";
 import { FilterData } from "@/types/main";
 import { Suspense } from "react";
 import SearchBar from "@/app/components/SearchBar";
+import { randomUUID } from "crypto";
 
 const getFilters: () => Promise<FilterData> = async () => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-cache" });
+    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters?=" + randomUUID(), { cache: "no-cache" });
     if (!res.ok) {
       return {
         job_type: [],

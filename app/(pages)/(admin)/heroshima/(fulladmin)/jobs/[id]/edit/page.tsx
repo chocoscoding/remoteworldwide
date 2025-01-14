@@ -1,9 +1,9 @@
 import { prisma } from "@/prisma";
-import CreateJob from "./Client";
 import { FilterData, FilterType } from "@/types/main";
 import { Job } from "@prisma/client";
 import NotFound from "@/app/components/NotFound";
 import UpdateJob from "./Client";
+import { randomUUID } from "crypto";
 
 const fetchJob = async (slug: string): Promise<(Job & { company: { name: string } }) | null> => {
   try {
@@ -26,7 +26,7 @@ const fetchJob = async (slug: string): Promise<(Job & { company: { name: string 
 };
 const getAllFilters = async (): Promise<FilterData> => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
+    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters?"+randomUUID(), { cache: "no-store" });
     if (!res.ok) {
       throw new Error("error");
     }

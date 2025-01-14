@@ -1,9 +1,10 @@
 import { revalidatePath } from "next/cache";
 import FiltersClient from "./Client";
 import { FilterData } from "@/types/main";
+import { randomUUID } from "crypto";
 
 const getFilters: () => Promise<FilterData> = async () => {
-  const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
+  const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters?="+randomUUID(), { cache: "no-store" });
   if (!res.ok) {
     return {
       job_type: [],
