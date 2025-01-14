@@ -1,6 +1,6 @@
 import { prisma } from "@/prisma"; // Adjust import path accordingly
 import { NextResponse } from "next/server";
-
+export const revalidate = 0;
 export async function GET() {
   try {
     const [job_type, category, seniority, region] = await Promise.all([
