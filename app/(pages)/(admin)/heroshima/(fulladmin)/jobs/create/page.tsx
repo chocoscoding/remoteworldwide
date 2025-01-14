@@ -39,9 +39,10 @@ const getAllCompanies = async () => {
   }
 };
 const Page = async () => {
-  revalidatePath('./')
+  revalidatePath("./");
   const allCompanies = await getAllCompanies();
   const filters = await getAllFilters();
+  console.log(filters);
 
   return (
     <>
