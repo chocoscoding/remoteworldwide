@@ -4,7 +4,7 @@ import { FilterData, FilterType } from "@/types/main";
 import { revalidatePath } from "next/cache";
 const getAllFilters = async (): Promise<FilterData> => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
+    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "reload" });
     if (!res.ok) {
       throw new Error("error");
     }
