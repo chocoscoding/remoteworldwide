@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
   const [categories, setCategories] = useState<FilterData>(initialData);
+  const router = useRouter();
   const addCategory = async (section: keyof FilterData, newCategory: FilterType) => {
     try {
       const response = await fetch("/api/filters/" + section, {
@@ -25,7 +26,8 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
         ...prevCategories,
         [section]: [...prevCategories[section], { label: result.data.name, value: result.data.id }],
       }));
-      
+
+      router.refresh();
     } catch {
       throw new Error("Error saving this filter");
     }
@@ -48,6 +50,7 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
         ...prevCategories,
         [section]: prevCategories[section].filter((category) => category.value !== categoryId),
       }));
+      router.refresh();
     } catch {
       throw new Error("Error deleting this filter");
     }
