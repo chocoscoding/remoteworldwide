@@ -21,7 +21,7 @@ const menuItemsForAdmin = [
     name: "Job",
     icon: Briefcase,
     path: "/jobs",
-    section: "filters",
+    section: "jobs",
     subItems: [
       { label: "Create Job", path: "/jobs/create" },
       { label: "All Jobs", path: "/jobs" },
@@ -78,8 +78,8 @@ const Sidebar = () => {
       setOpenAccordion("blog");
     } else if (pathname.includes("/blogs")) {
       setOpenAccordion("blog");
-    } else if (pathname.includes("/filters")) {
-      setOpenAccordion("filters");
+    } else if (pathname.includes("/jobs")) {
+      setOpenAccordion("jobs");
     } else if (pathname.includes("/filters")) {
       setOpenAccordion("filters");
     } else if (pathname.includes("/companies")) {
