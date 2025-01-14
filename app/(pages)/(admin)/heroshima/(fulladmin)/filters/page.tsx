@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import FiltersClient from "./Client";
 import { FilterData } from "@/types/main";
 
@@ -16,6 +17,7 @@ const getFilters: () => Promise<FilterData> = async () => {
 };
 
 export default async function CategoriesPage() {
+  revalidatePath("./");
   const data = await getFilters();
   return (
     <>
