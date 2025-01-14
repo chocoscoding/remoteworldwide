@@ -46,20 +46,12 @@ export async function GET() {
       region,
     };
 
-    // return NextResponse.json(
-    //   { data: combinedResults },
-    //   {
-    //     status: 200,
-    //   }
-    // );
-    const response = NextResponse.json(
+    return NextResponse.json(
       { data: combinedResults },
       {
         status: 200,
       }
     );
-    response.headers.set("Cache-Control", "no-store");
-    return response;
   } catch (error) {
     console.error(error);
     return NextResponse.json("Server error", { status: 500 });

@@ -1,9 +1,8 @@
 import { prisma } from "@/prisma";
 import CreateJob from "./Client";
 import { FilterData, FilterType } from "@/types/main";
-import { revalidatePath } from "next/cache";
+import { unstable_noStore as noStore } from "next/cache";
 
-export const dynamic = 'force-dynamic';
 const getAllFilters = async (): Promise<FilterData> => {
   try {
     const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
@@ -41,6 +40,7 @@ const getAllCompanies = async () => {
   }
 };
 const Page = async () => {
+  noStore();
   const allCompanies = await getAllCompanies();
   const filters = await getAllFilters();
   console.log(filters);
