@@ -2,9 +2,11 @@ import { prisma } from "@/prisma";
 import CreateJob from "./Client";
 import { FilterData, FilterType } from "@/types/main";
 import { revalidatePath } from "next/cache";
+
+export const dynamic = 'force-dynamic';
 const getAllFilters = async (): Promise<FilterData> => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "reload" });
+    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters", { cache: "no-store" });
     if (!res.ok) {
       throw new Error("error");
     }
@@ -39,7 +41,6 @@ const getAllCompanies = async () => {
   }
 };
 const Page = async () => {
-  revalidatePath("./");
   const allCompanies = await getAllCompanies();
   const filters = await getAllFilters();
   console.log(filters);
