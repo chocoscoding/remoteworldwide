@@ -17,9 +17,9 @@ export const metadata: Metadata = {
   title: "Remote Worldwide",
   description: "Get worldwide remote jobs and get hired in no time!",
   icons: "/favicon.ico",
-  metadataBase: new URL("https://remoteworldwide.net"),
+  metadataBase: new URL("https://www.remoteworldwide.net"),
   openGraph: {
-    url: "https://remoteworldwide.net",
+    url: "https://www.remoteworldwide.net",
     title: "Remote Worldwide",
     description: "Get worldwide remote jobs and get hired in no time!",
     images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
