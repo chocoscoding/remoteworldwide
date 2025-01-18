@@ -13,8 +13,8 @@ const JobTile: FC<JobTileType> = (props) => {
     main info */}
       <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-3">
         <div className="flex justify-between w-full md:w-fit items-center md:items-start">
-          <div className="border-2 rounded-full p-1 w-fit h-fit  ">
-            <Image loading="eager" src={company.logo} alt="logo" width={40} height={40} className="rounded-full" />
+          <div className="border-2 rounded-full p-1 w-fit h-fit aspect-square object-center flex-shrink-0 flex justify-center items-center">
+            <Image loading="eager" src={company.logo} alt="logo" width={40} height={40} className="rounded-full flex-shrink-0" />
           </div>
           <div className="h-fit flex-0 flex-shrink-0 md:hidden block">
             <p className="text-sm font-medium text-gray-500">

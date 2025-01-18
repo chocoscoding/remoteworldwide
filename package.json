@@ -12,6 +12,7 @@
     "@auth/prisma-adapter": "^2.7.4",
     "@prisma/client": "^5.22.0",
     "@prisma/extension-accelerate": "^1.2.1",
+    "@tailwindcss/line-clamp": "^0.4.4",
     "clsx": "^2.1.1",
     "cobe": "^0.6.3",
     "hexoid": "^2.0.0",
