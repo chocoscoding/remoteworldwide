@@ -4,9 +4,9 @@ import { checkBookmarkForUser } from "@/libs/query";
 import { prisma } from "@/prisma";
 import { JobAndCompany } from "@/types/main";
 import { Job } from "@prisma/client";
-import { revalidatePath } from "next/cache";
 import OneJobClient from "./Client";
 
+export const revalidate = 3600 * 12;
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
   try {
     const job = await prisma.job.findUnique({
@@ -67,11 +67,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   )}&company=${encodeURIComponent(JOB.company.name)}`;
 
   return {
-    title: JOB.title,
+    title: `${JOB.title} - Remoteworldwide`,
     description: `Remoteworldwide - ${JOB.title}`,
     openGraph: {
       images: imageUrl,
-      title: JOB.title,
+      title: `${JOB.title} - Remoteworldwide`,
       description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
       url: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${JOB.slug}`,
     },
@@ -79,7 +79,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  revalidatePath("./");
   const jobSlug = decodeURIComponent((await params).id);
   const JOB = await fetchJob(jobSlug);
 

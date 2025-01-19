@@ -60,8 +60,8 @@ export async function GET(request: Request) {
           }}>
           <LogoFull2
             style={{
-              width: 24,
-              height: 24,
+              width: "250px",
+              height: "32px",
             }}
           />
         </div>
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            marginTop: "30px",
+            marginTop: "80px",
           }}>
           <div
             style={{
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
               borderRadius: "5px",
               boxShadow: "3.5px 3.5px #e1f073",
               margin: "5px 30px",
-              fontSize: 35,
+              fontSize: 25,
               width: "auto",
               maxWidth: 700,
               textAlign: "center",

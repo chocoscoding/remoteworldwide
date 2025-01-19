@@ -24,13 +24,13 @@ export const metadata: Metadata = {
     description: "Get worldwide remote jobs and get hired in no time!",
     images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Remote Worldwide",
-    description: "Get worldwide remote jobs and get hired in no time!",
-    // creator: '@remoteworldwide',
-    images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
-  },
+  // twitter: {
+  //   card: "summary_large_image",
+  //   title: "Remote Worldwide",
+  //   description: "Get worldwide remote jobs and get hired in no time!",
+  //   // creator: '@remoteworldwide',
+  //   images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
+  // },
   keywords: ["job", "remote", "remote work", "remote worldwide", "work", "remote jobs", "tech jobs", "worldwide jobs"],
 };
 
