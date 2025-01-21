@@ -52,9 +52,7 @@ const CompanySection: FC<{
           )}
         </div>
       ) : null}
-      <p className="text-base md:text-sm text-gray-700">
-        {companyDetails.about.length > 200 ? `${companyDetails.about.substring(0, 200)}...` : companyDetails.about}
-      </p>
+      <p className="text-base md:text-sm text-gray-700 line-clamp-3 text-center">{companyDetails.about}</p>
 
       {showFullDetails ? (
         <div className=" bg-secondary h-6 w-fit p-2.5 rounded-full flex items-center justify-center mt-2 mb-1">

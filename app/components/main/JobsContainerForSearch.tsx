@@ -51,11 +51,22 @@ const JobsContainerForSearch = () => {
     }
   };
   useEffect(() => {
-    const fetchJobs = async () => {
-      return await getJobs(currentPage);
-    };
-    fetchJobs();
+    const timeout = setTimeout(() => {
+      const fetchJobs = async () => {
+        return await getJobs(currentPage);
+      };
+      fetchJobs();
+    }, 500);
+    return () => clearTimeout(timeout);
   }, [currentPage, searchParams]);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      }
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [searchParams]);
 
   // Display range for jobs on the current page
   const startJobIndex = (currentPage - 1) * jobsPerPage;

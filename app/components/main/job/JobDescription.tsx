@@ -56,7 +56,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       });
   };
   return (
-    <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-3 sm:p-5 md:p-10 overflow-hidden">
+    <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-3 sm:p-5 md:p-8 overflow-hidden">
       <p className="text-gray-500 text-sm">Job Description</p>
 
       <section className="mt-5 flex w-full flex-wrap xs:flex-row flex-col">

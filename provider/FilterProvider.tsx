@@ -42,6 +42,7 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false); // Flag to track initial load
   const activeFilterCount = useMemo(() => {
     return selectedRoles.length + selectedRegions.length + selectedSeniority.length + selectedJobTypes.length;
   }, [selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes]);
@@ -50,31 +51,45 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
     setSelectedOption((prev) => (prev.includes(option) ? prev.filter((item) => item !== option) : [...prev, option]));
   };
 
-  //handle route update
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
 
-    params.delete("roles");
-    params.delete("regions");
-    params.delete("seniority");
-    params.delete("jobTypes");
+    if (!isInitialized) {
+      // Parse URL parameters on initial load
+      const roles = params.get("roles")?.split("_") || [];
+      const regions = params.get("regions")?.split("_") || [];
+      const seniority = params.get("seniority")?.split("_") || [];
+      const jobTypes = params.get("jobTypes")?.split("_") || [];
 
-    if (selectedRoles.length > 0) {
-      params.append("roles", selectedRoles.join("_"));
-    }
-    if (selectedRegions.length > 0) {
-      params.append("regions", selectedRegions.join("_"));
-    }
-    if (selectedSeniority.length > 0) {
-      params.append("seniority", selectedSeniority.join("_"));
-    }
-    if (selectedJobTypes.length > 0) {
-      params.append("jobTypes", selectedJobTypes.join("_"));
-    }
+      setSelectedRoles(roles);
+      setSelectedRegions(regions);
+      setSelectedSeniority(seniority);
+      setSelectedJobTypes(jobTypes);
 
-    router.push(pathname + "?" + params.toString());
-    router.refresh();
-  }, [selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes]);
+      setIsInitialized(true); // Mark initialization as complete
+    } else {
+      // Update URL when states change
+      params.delete("roles");
+      params.delete("regions");
+      params.delete("seniority");
+      params.delete("jobTypes");
+
+      if (selectedRoles.length > 0) {
+        params.append("roles", selectedRoles.join("_"));
+      }
+      if (selectedRegions.length > 0) {
+        params.append("regions", selectedRegions.join("_"));
+      }
+      if (selectedSeniority.length > 0) {
+        params.append("seniority", selectedSeniority.join("_"));
+      }
+      if (selectedJobTypes.length > 0) {
+        params.append("jobTypes", selectedJobTypes.join("_"));
+      }
+
+      router.push(pathname + "?" + params.toString());
+    }
+  }, [searchParams, selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes, isInitialized]);
 
   //to toggle the showing each filter category
   const toggleShowType = (type: keyof typeof ShowType) => {

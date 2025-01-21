@@ -37,8 +37,6 @@ export async function GET(req: NextRequest) {
     const seniority = seniorityParam ? seniorityParam.split("_") : undefined;
     const jobTypes = jobTypesParam ? jobTypesParam.split("_") : undefined;
 
-    // Pagination logic
-    const SKIP_AMNT = 10; // Adjust this value as needed
     const skipAmount = SKIP_AMNT * (page - 1);
 
     // Construct dynamic filter object
@@ -50,6 +48,7 @@ export async function GET(req: NextRequest) {
     if (searchByTitle) {
       filters.title = { contains: searchByTitle, mode: "insensitive" };
     }
+    console.log(filters);
 
     // Execute query using Prisma's filtering and pagination
     const [jobs, jobsCount] = await Promise.all([

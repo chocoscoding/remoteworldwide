@@ -53,7 +53,7 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
         <input
           className="h-full w-full outline-none border-none text-sm md:text-xl"
           type="text"
-          placeholder="search 1000+ remote jobs"
+          placeholder="search 500+ remote jobs"
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
         />
