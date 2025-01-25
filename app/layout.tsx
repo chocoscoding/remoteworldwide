@@ -7,7 +7,7 @@ import NextTopLoader from "nextjs-toploader";
 import { SessionProvider } from "next-auth/react";
 import { ToastContainer, Slide } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import Script from "next/script";
 const font = Manrope({
   subsets: ["latin-ext"],
   weight: ["200", "300", "400", "500", "700"],
@@ -41,6 +41,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <Script strategy="afterInteractive" src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_TOKEN}`} />
+        <Script strategy="afterInteractive" id="google-analytics">
+          {`
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '${process.env.GOOGLE_ANALYTICS_TOKEN}');`}
+        </Script>
+      </head>
       <body className={`${font.className} antialiased`}>
         <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
         <ToastContainer
