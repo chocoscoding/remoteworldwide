@@ -4,16 +4,17 @@ import { hexoid } from "hexoid";
 import { NextRequest, NextResponse } from "next/server";
 const SKIP_AMNT = 50;
 
+//create a slug for job
 function createSlug(input: string) {
   const timestamp = Date.now();
   return (
     input
-      .replace(/[*+~.()'"!:@]/g, "") // Remove specified special characters
+      .replace(/[*+~.()'"!:@/,#%]/g, "")
       .toLowerCase()
       .trim()
       .replace(/\s+/g, "-") +
     "-" +
-    `${hexoid(36)()}` +
+    `${hexoid(30)()}` +
     `${timestamp}`
   );
 }
