@@ -8,7 +8,7 @@ const getLatestJobs = async () => {
   try {
     const latestJobs = await fetchLatestJobs(10);
     return latestJobs.data;
-  } catch (error) {
+  } catch {
     return [];
   }
 };
@@ -16,7 +16,7 @@ const getCounts = async () => {
   try {
     const latestJobs = await getAllActiveJobsCount();
     return latestJobs.count;
-  } catch (error) {
+  } catch {
     return 10;
   }
 };
@@ -26,12 +26,14 @@ export default async function Home() {
 
   return (
     <div>
+      {/* the header of the page */}
       <Header count={jobsCount} />
       <br />
       <section className="w-full max-w-[1200px] m-auto px-3 xl:px-0">
         <h2 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exciting jobs now</h2>
         <br />
 
+        {/* few jobs list */}
         <JobListSection latestJobs={latestJobs} />
         <div className="w-full flex justify-center">
           <Link href={"/jobs"} className="bg-secondary drop-shadow-secondary2 text-primary px-16 py-3 text-lg font-bold rounded-md my-1">

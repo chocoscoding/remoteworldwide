@@ -9,7 +9,7 @@ function createSlug(input: string) {
   const timestamp = Date.now();
   return (
     input
-      .replace(/[*+~.()'"!:@/,#%]/g, "")
+      .replace(/[*+~.()^'"!#:@&/|{}[\]\\]/g, "")
       .toLowerCase()
       .trim()
       .replace(/\s+/g, "-") +

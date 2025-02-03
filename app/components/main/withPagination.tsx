@@ -1,8 +1,8 @@
 import { FetchDataFunction, OneJobListType, WithPaginationProps } from "@/types/main";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import JobTileSkeletonList from "./JobTileSkeletonList";
 import AdminJobTile from "../ADMIN/AdminJobTile";
+import PaginationControl from "./PaginationControl";
 
 // Higher-Order Component to handle pagination with loading state
 const withPagination = (
@@ -89,30 +89,16 @@ const withPagination = (
             </div>
           </>
         )}
-        <br />
-        <hr />
-        <div className="mt-5 flex justify-between items-center sm:flex-row gap-2 sm:gap-0 flex-col">
-          <p className="flex-shrink-0">
-            Showing {startJobIndex + 1} to {endJobIndex > totalJobs ? totalJobs : endJobIndex} of {totalJobs}
-          </p>
-          <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
-            <button
-              onClick={handlePrevious}
-              disabled={currentPage === 1}
-              className={`${currentPage === 1 ? "text-gray-400" : "text-primary"} flex`}>
-              <ChevronLeft />
-              Previous
-            </button>
-            <div className="h-[30px] border-none bg-gray-500 w-[0.5px]"></div>
-            <button
-              onClick={handleNext}
-              disabled={currentPage === totalPages}
-              className={`${currentPage === totalPages ? "text-gray-400" : "text-primary"} flex`}>
-              Next
-              <ChevronRight />
-            </button>
-          </div>
-        </div>
+        {/* pagination */}
+        <PaginationControl
+          handlePrevious={handlePrevious}
+          handleNext={handleNext}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          dataTotal={totalJobs}
+          startIndex={startJobIndex}
+          endIndex={endJobIndex}
+        />
       </div>
     );
   };

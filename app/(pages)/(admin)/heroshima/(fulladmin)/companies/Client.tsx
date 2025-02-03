@@ -1,9 +1,10 @@
 "use client";
 
 import { FC, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, LoaderCircle, Search } from "lucide-react";
+import { LoaderCircle, Search } from "lucide-react";
 import CompanyTile from "@/app/components/main/CompanyTile";
 import { CompanyList } from "@/types/main";
+import PaginationControl from "@/app/components/main/PaginationControl";
 
 const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> = ({ initialData, totalCompanies }) => {
   const companiesPerPage = 50;
@@ -55,8 +56,8 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
   }, [currentPage]);
 
   // Display range for jobs on the current page
-  const startJobIndex = (currentPage - 1) * companiesPerPage;
-  const endJobIndex = startJobIndex + companiesPerPage;
+  const startCompanyIndex = (currentPage - 1) * companiesPerPage;
+  const endCompanyIndex = startCompanyIndex + companiesPerPage;
   return (
     <div className="p-2 w-full max-w-[1400px] m-auto mt-10 min-h-screen">
       {/* search */}
@@ -102,30 +103,15 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
           )}
 
           {/* pagination */}
-          <br />
-          <hr />
-          <div className="mt-5 flex justify-between items-center sm:flex-row gap-2 sm:gap-0 flex-col">
-            <p className="flex-shrink-0">
-              Showing {startJobIndex + 1} to {endJobIndex > totalCompanies ? totalCompanies : endJobIndex} of {totalCompanies}
-            </p>
-            <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
-              <button
-                onClick={handlePrevious}
-                disabled={currentPage === 1}
-                className={`${currentPage === 1 ? "text-gray-400" : "text-primary"} flex`}>
-                <ChevronLeft />
-                Previous
-              </button>
-              <div className="h-[30px] border-none bg-gray-500 w-[0.5px]"></div>
-              <button
-                onClick={handleNext}
-                disabled={currentPage === totalPages}
-                className={`${currentPage === totalPages ? "text-gray-400" : "text-primary"} flex`}>
-                Next
-                <ChevronRight />
-              </button>
-            </div>
-          </div>
+          <PaginationControl
+            handlePrevious={handlePrevious}
+            handleNext={handleNext}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            dataTotal={totalCompanies}
+            startIndex={startCompanyIndex}
+            endIndex={endCompanyIndex}
+          />
         </section>
       </section>
       <br />

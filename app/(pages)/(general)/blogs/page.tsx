@@ -1,10 +1,10 @@
 "use client";
 
+import BlogModal from "@/app/components/main/BlogModal";
+import PaginationControl from "@/app/components/main/PaginationControl";
 import { BlogListWithAuthor } from "@/types/main";
-import { ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { FC, useState, useEffect, useMemo } from "react";
+import { LoaderCircle } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 
 const BlogPage = () => {
   const blogsPerPage = 30;
@@ -83,61 +83,19 @@ const BlogPage = () => {
             ))}
           </div>
         )}
-        <br />
-        <hr />
-        <div className="mt-5 flex justify-between items-center sm:flex-row gap-2 sm:gap-0 flex-col">
-          <p className="flex-shrink-0">
-            Showing {startBlogIndex + 1} to {endBlogIndex > totalBlogs ? totalBlogs : endBlogIndex} of {totalBlogs}
-          </p>
-          <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
-            <button
-              onClick={handlePrevious}
-              disabled={currentPage === 1}
-              className={`${currentPage === 1 ? "text-gray-400" : "text-primary"} flex`}>
-              <ChevronLeft />
-              Previous
-            </button>
-            <div className="h-[30px] border-none bg-gray-500 w-[0.5px]"></div>
-            <button
-              onClick={handleNext}
-              disabled={currentPage === totalPages}
-              className={`${currentPage === totalPages ? "text-gray-400" : "text-primary"} flex`}>
-              Next
-              <ChevronRight />
-            </button>
-          </div>
-        </div>
+        {/* pagination */}
+        <PaginationControl
+          handlePrevious={handlePrevious}
+          handleNext={handleNext}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          dataTotal={totalBlogs}
+          startIndex={startBlogIndex}
+          endIndex={endBlogIndex}
+        />
       </section>
     </main>
   );
 };
 
 export default BlogPage;
-
-interface BlogModalProps {
-  blog: BlogListWithAuthor;
-}
-
-const BlogModal: FC<BlogModalProps> = ({ blog }) => {
-  return (
-    <article className="h-90 col-span-1 m-auto min-h-full cursor-pointer overflow-hidden rounded-md drop-shadow-secondary2-hover border border-primary/10 pb-2 shadow-lg duration-200 hover:translate-y-1 transition-all">
-      <Link href={`/blogs/${blog.slug}`} className="block h-full w-full">
-        <Image loading="eager" width={1080} height={720} className="max-h-40 w-full object-cover" alt={blog.title} src={blog.coverImage} />
-        <div className="w-full bg-white p-4">
-          <p className="mb-1 text-xl font-medium text-gray-800 line-clamp-3">{blog.title}</p>
-          <p className="text-md font-light text-gray-400 line-clamp-2">{blog.description}</p>
-          <Link href={"/authors/" + blog.author.slug} className="text-md font-medium text-indigo-500 mt-1">
-            By {blog.author.name}
-          </Link>
-          <div className="justify-starts mt-2 flex flex-wrap items-center">
-            {blog.tags.map((tag, index) => (
-              <div key={index} className="mr-2 mt-1 rounded-md bg-primary py-1.5 px-4 text-xs text-white border border-primary">
-                #{tag}
-              </div>
-            ))}
-          </div>
-        </div>
-      </Link>
-    </article>
-  );
-};

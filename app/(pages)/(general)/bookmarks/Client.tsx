@@ -9,6 +9,7 @@ import { OneBookmarkType } from "@/types/main";
 import { deleteBookmarkForUser, getAllBookmarksForUser } from "@/libs/query";
 import { toast } from "react-toastify";
 import JobTileSkeletonList from "@/app/components/main/JobTileSkeletonList";
+import PaginationControl from "@/app/components/main/PaginationControl";
 
 const BookmarkClient = () => {
   const { status, data } = useSession();
@@ -104,30 +105,15 @@ const BookmarkClient = () => {
           </div>
 
           {/* pagination */}
-          <br />
-          <hr />
-          <div className="mt-5 flex justify-between items-center sm:flex-row gap-2 sm:gap-0 flex-col">
-            <p className="flex-shrink-0">
-              Showing {startJobIndex + 1} to {endJobIndex > totalBookmarks ? totalBookmarks : endJobIndex} of {totalBookmarks}
-            </p>
-            <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
-              <button
-                onClick={handlePrevious}
-                disabled={currentPage === 1}
-                className={`${currentPage === 1 ? "text-gray-400" : "text-primary"} flex`}>
-                <ChevronLeft />
-                Previous
-              </button>
-              <div className="h-[30px] border-none bg-gray-500 w-[0.5px]"></div>
-              <button
-                onClick={handleNext}
-                disabled={currentPage === totalPages}
-                className={`${currentPage === totalPages || totalPages === 0 ? "text-gray-400" : "text-primary"} flex`}>
-                Next
-                <ChevronRight />
-              </button>
-            </div>
-          </div>
+          <PaginationControl
+            handlePrevious={handlePrevious}
+            handleNext={handleNext}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            dataTotal={totalBookmarks}
+            startIndex={startJobIndex}
+            endIndex={endJobIndex}
+          />
         </section>
       </section>
       <br />

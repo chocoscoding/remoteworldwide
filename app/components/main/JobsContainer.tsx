@@ -1,9 +1,10 @@
 "use client";
 import React, { useState, useEffect, FC } from "react";
 import JobTile from "./JobTile";
-import { ChevronRight, ChevronLeft, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import JobTileSkeleton from "./JobTileSkeleton";
 import { JobTileType } from "@/types/main";
+import PaginationControl from "./PaginationControl";
 
 const JobsContainer: FC<{ companyId: string }> = ({ companyId }) => {
   const jobsPerPage = 50;
@@ -94,28 +95,15 @@ const JobsContainer: FC<{ companyId: string }> = ({ companyId }) => {
       ))}
 
       {/* pagination */}
-      <div className="mt-5 flex justify-between items-center">
-        <p>
-          Showing {startJobIndex + 1} to {endJobIndex > totalJobs ? totalJobs : endJobIndex} of {totalJobs}
-        </p>
-        <div className="flex gap-4 items-center px-4 py-2 border rounded-full">
-          <button
-            onClick={handlePrevious}
-            disabled={currentPage === 1}
-            className={`${currentPage === 1 ? "text-gray-400" : "text-primary"} flex`}>
-            <ChevronLeft />
-            Previous
-          </button>
-          <div className="h-[30px] border-none bg-gray-500 w-[0.5px]"></div>
-          <button
-            onClick={handleNext}
-            disabled={currentPage === totalPages}
-            className={`${currentPage === totalPages ? "text-gray-400" : "text-primary"} flex`}>
-            Next
-            <ChevronRight />
-          </button>
-        </div>
-      </div>
+      <PaginationControl
+        handlePrevious={handlePrevious}
+        handleNext={handleNext}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        dataTotal={totalJobs}
+        startIndex={startJobIndex}
+        endIndex={endJobIndex}
+      />
     </div>
   );
 };
