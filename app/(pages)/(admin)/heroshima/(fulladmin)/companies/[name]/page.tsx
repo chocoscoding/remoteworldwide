@@ -1,5 +1,4 @@
 import NotFound from "@/app/components/NotFound";
-import { Company } from "@prisma/client";
 import CompanyClient from "./Client";
 import { findCompany, findCompanyJobs } from "@/libs/query";
 import { revalidatePath } from "next/cache";

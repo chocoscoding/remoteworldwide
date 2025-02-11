@@ -34,7 +34,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
     if (!logo) {
       setError((prev) => ({ ...prev, logo: true }));
     }
-    const formValues = { name, about: about ? about.trim() : about, logo, website, linkedin, twitter, facebook };
+    const formValues = { name: name.trim(), about: about.trim(), logo, website, linkedin, twitter, facebook };
 
     setIsLoading(true);
     toast.info("Adding new company...", { autoClose: 300 });

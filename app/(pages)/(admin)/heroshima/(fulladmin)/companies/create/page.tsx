@@ -27,7 +27,7 @@ export default function CreateCompany() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const formValues = { name, about: about.trim(), logo, website, linkedin, twitter, facebook };
+    const formValues = { name: name.trim(), about: about.trim(), logo, website, linkedin, twitter, facebook };
     if (isLoading) return;
     if (!logo) {
       setError((prev) => ({ ...prev, logo: true }));

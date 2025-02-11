@@ -21,7 +21,9 @@ const CompanySection: FC<{
       className={`border-2 border-black h-fit md:min-h-[300px] rounded-lg flex-1 w-full lg:w-auto drop-shadow-secondary bg-white flex flex-col items-center p-2 sm:p-3 overflow-hidden ${
         showFullDetails ? "lg:min-h-[320px]" : ""
       }`}>
-      <div className="border-2 rounded-full p-1 w-fit h-fit mt-2 md:mt-3 lg:mt-4">
+      <div
+        className=" mt-2 md:mt-3 lg:mt-4 
+      border-2 rounded-full p-1 w-fit h-fit aspect-square object-center flex-shrink-0 flex justify-center items-center">
         <Image src={companyDetails.logo} alt="logo" width={70} height={70} className="rounded-full lg:w-[70px] w-[50px]" />
       </div>
       <div className="flex flex-col items-center lg:mt-4 mt-2">

@@ -13,7 +13,7 @@ const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {
     main info */}
       <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-3">
         <div className="flex justify-between w-full md:w-fit items-center md:items-start">
-          <div className="border-2 rounded-full p-1 w-fit h-fit  ">
+          <div className="border-2 rounded-full p-1 w-fit h-fit aspect-square object-center flex-shrink-0 flex justify-center items-center ">
             <Image loading="eager" src={jobDetail.company.logo} alt="logo" width={40} height={40} className="rounded-full" />
           </div>
           <div className="flex-0 flex-shrink-0 md:hidden flex h-8 w-fit rounded-md items-center justify-center">
