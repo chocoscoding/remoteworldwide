@@ -45,11 +45,11 @@ export default function CreateCompany() {
         body: JSON.stringify(formValues),
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error("Network response was not ok");
+        throw new Error(data.message);
       }
 
-      const data = await response.json();
       toast.success("Company created successfully!", {
         position: "bottom-right",
         autoClose: 3500,
@@ -158,7 +158,7 @@ export default function CreateCompany() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-primary/95 flex items-center">
+          <label className="text-sm font-medium text-primary/95 flex items-center">
             <Linkedin className="mr-2 w-4 h-4 text-primary/50" /> LinkedIn
           </label>
           <input
@@ -170,7 +170,7 @@ export default function CreateCompany() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-primary/95 flex items-center">
+          <label className="text-sm font-medium text-primary/95 flex items-center">
             <Twitter className="mr-2 w-4 h-4 text-primary/50" /> Twitter
           </label>
           <input
