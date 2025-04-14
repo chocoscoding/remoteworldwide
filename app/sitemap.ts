@@ -73,7 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     });
   });
-  jobs.forEach((job) => {
+  jobs.slice(0, 1).forEach((job) => {
     routes.push({
       url: "/jobs/" + job.slug,
       changeFrequency: "daily",
