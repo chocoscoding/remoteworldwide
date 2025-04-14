@@ -73,6 +73,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return routes.map(({ url, ...rest }) => ({
     ...rest,
     url: `https://www.remoteworldwide.net${url}`,
-    lastModified: new Date(),
+    lastModified: new Date().toISOString(),
   }));
 }
+
+export const fetchCache = "default-no-store";
