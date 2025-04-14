@@ -77,4 +77,4 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 }
 
-export const fetchCache = "default-no-store";
+export const dynamic = "force-dynamic";
