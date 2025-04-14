@@ -1,6 +1,9 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const dynamicParams = true;
+
 import { prisma } from "@/prisma";
 import { MetadataRoute } from "next";
-
 const fetchJobMetaData_Jobs = async () => {
   try {
     const job = await prisma.job.findMany({
@@ -76,5 +79,3 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date().toISOString(),
   }));
 }
-
-export const dynamic = "force-dynamic";
