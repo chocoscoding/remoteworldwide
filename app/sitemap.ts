@@ -54,12 +54,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       url: "/jobs",
       changeFrequency: "weekly",
-      priority: 0.9,
+      priority: 0.8,
     },
     {
       url: "/companies",
       changeFrequency: "weekly",
-      priority: 0.2,
+      priority: 0.8,
     },
   ];
 
@@ -73,11 +73,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     });
   });
-  jobs.slice(50, 60).forEach((job) => {
+  jobs.slice(60, 70).forEach((job) => {
     routes.push({
       url: "/jobs/" + job.slug,
       changeFrequency: "daily",
-      priority: 0.8,
+      priority: 0.7,
     });
   });
 
