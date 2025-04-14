@@ -9,11 +9,11 @@ const fetchJobMetaData_Jobs = async () => {
     const job = await prisma.job.findMany({
       where: {
         isActive: true,
-        slug: {
-          not: {
-            contains: ",",
-          },
-        },
+        // slug: {
+        //   not: {
+        //     contains: ",",
+        //   },
+        // },
       },
       select: {
         slug: true,
