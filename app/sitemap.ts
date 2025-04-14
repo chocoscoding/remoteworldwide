@@ -74,8 +74,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   });
 
   return routes.map(({ url, ...rest }) => ({
-    ...rest,
     url: `https://www.remoteworldwide.net${url}`,
+    ...rest,
     lastModified: new Date().toISOString(),
   }));
 }
