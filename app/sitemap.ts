@@ -56,7 +56,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const blogs = await fetchJobMetaData_Blogs();
-  const jobs = await fetchJobMetaData_Jobs();
+  // const jobs = await fetchJobMetaData_Jobs();
 
   blogs.forEach((blog) => {
     routes.push({
@@ -65,13 +65,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     });
   });
-  jobs.forEach((job) => {
-    routes.push({
-      url: "/jobs/" + job.slug,
-      changeFrequency: "daily",
-      priority: 0.8,
-    });
-  });
+  // jobs.forEach((job) => {
+  //   routes.push({
+  //     url: "/jobs/" + job.slug,
+  //     changeFrequency: "daily",
+  //     priority: 0.8,
+  //   });
+  // });
 
   return routes.map(({ url, ...rest }) => ({
     url: `https://www.remoteworldwide.net${url}`,
