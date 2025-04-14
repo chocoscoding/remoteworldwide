@@ -66,6 +66,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     JOB.region
   )}&company=${encodeURIComponent(JOB.company.name)}`;
 
+  const keywordText = JOB.slug.split("-").slice(0, -1);
   return {
     title: `${JOB.title} - Remoteworldwide`,
     description: `Remoteworldwide - ${JOB.title}`,
@@ -75,6 +76,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
       url: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${JOB.slug}`,
     },
+    keywords: ["Remoteworldwide", ...keywordText],
   };
 }
 

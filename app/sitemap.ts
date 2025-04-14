@@ -55,16 +55,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const blogs = await fetchJobMetaData_Blogs();
   const jobs = await fetchJobMetaData_Jobs();
 
-  blogs.forEach((thook) => {
+  blogs.forEach((blog) => {
     routes.push({
-      url: "/blogs/" + thook.slug,
+      url: "/blogs/" + blog.slug,
       changeFrequency: "daily",
       priority: 0.5,
     });
   });
-  jobs.forEach((thook) => {
+  jobs.forEach((job) => {
     routes.push({
-      url: "/jobs/" + thook.slug,
+      url: "/jobs/" + job.slug,
       changeFrequency: "daily",
       priority: 0.8,
     });
