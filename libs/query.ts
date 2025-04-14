@@ -6,7 +6,7 @@ import { hexoid } from "hexoid";
 
 function createSlugStatic(input: string) {
   return input
-    .replace(/[*+~|%.()'"!:@]/g, "") // Remove specified special characters
+    .replace(/[*+,~|%.()'"!:@]/g, "") // Remove specified special characters
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "-");
@@ -15,7 +15,7 @@ function createSlug(input: string) {
   const timestamp = Date.now();
   return (
     input
-      .replace(/[*+|%~.()'"!:@]/g, "") // Remove specified special characters
+      .replace(/[*+|,%~.()'"!:@]/g, "") // Remove specified special characters
       .toLowerCase()
       .trim()
       .replace(/\s+/g, "-") +
