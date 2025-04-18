@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import BookmarkTile from "../../../components/main/BookmarkTile";
 import { useSession } from "next-auth/react";
 import { LoaderCircle } from "lucide-react";

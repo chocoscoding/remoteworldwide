@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useEffect, useRef, useState } from "react";
-import { LoaderCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import CompanyTile from "@/app/components/main/CompanyTile";
 import { CompanyList } from "@/types/main";
 import PaginationControl from "@/app/components/main/PaginationControl";

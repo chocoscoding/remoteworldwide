@@ -1,6 +1,6 @@
 "use client";
 import { FC, FormEvent, useEffect, useState } from "react";
-import { Globe, Linkedin, Twitter, Facebook, Image as ImageIcon, Plus, RefreshCcw } from "lucide-react";
+import { Globe, Linkedin, Twitter, Facebook, Image as ImageIcon, RefreshCcw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { CldUploadWidget, CloudinaryUploadWidgetInfo } from "next-cloudinary";
 import Image from "next/image";

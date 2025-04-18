@@ -3,7 +3,7 @@
 import { AuthorListChildType } from "@/types/main";
 import Image from "next/image";
 import Link from "next/link";
-import { FC, useEffect, useState } from "react";
+import { FC, useState } from "react";
 
 const AllAuthorsPage: FC<{ data: AuthorListChildType[] }> = ({ data }) => {
   const [authorList, setAuthorList] = useState(data);
@@ -19,7 +19,7 @@ const AllAuthorsPage: FC<{ data: AuthorListChildType[] }> = ({ data }) => {
               <li key={index} className="max-w-[700px]">
                 <Link href={`/heroshima/authors/${author.slug}`} className="mb-4 flex items-center shadow-md rounded-md p-3 my-2 border">
                   <Image
-                  loading="eager"
+                    loading="eager"
                     width={100}
                     height={100}
                     src={author.profileImage}
