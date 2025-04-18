@@ -22,7 +22,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     link: "",
     category: null,
     region: null,
-    job_type: null,
+    job_type: filters.job_type[0],
     seniority: null,
     body: "",
   });
@@ -120,7 +120,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
           <SelectField
             label="Company"
             value={formValues.company}
-            options={[...allCompanies, GenerateNewOption("Company", "/heroshima/companies/create")]}
+            options={[GenerateNewOption("Company", "/heroshima/companies/create"), ...allCompanies]}
             onChange={(value) => handleSelectChange("company", value)}
             placeholder="Select company"
             required
@@ -129,7 +129,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
           <SelectField
             label="Category"
             value={formValues.category}
-            options={[...filters.category, GenerateNewOption("Category", "/heroshima/filters")]}
+            options={[GenerateNewOption("Category", "/heroshima/filters"), ...filters.category]}
             onChange={(value) => handleSelectChange("category", value)}
             placeholder="Select category"
             required
@@ -138,7 +138,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
           <SelectField
             label="Region"
             value={formValues.region}
-            options={[...filters.region, GenerateNewOption("Region", "/heroshima/filters")]}
+            options={[GenerateNewOption("Region", "/heroshima/filters"), ...filters.region]}
             onChange={(value) => handleSelectChange("region", value)}
             placeholder="Select region"
             required
@@ -147,7 +147,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
           <SelectField
             label="Job Type"
             value={formValues.job_type}
-            options={[...filters.job_type, GenerateNewOption("Job Type", "/heroshima/filters")]}
+            options={[GenerateNewOption("Job Type", "/heroshima/filters"), ...filters.job_type]}
             onChange={(value) => handleSelectChange("job_type", value)}
             placeholder="Select job type"
             required
@@ -156,7 +156,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
           <SelectField
             label="Seniority"
             value={formValues.seniority}
-            options={[...filters.seniority, GenerateNewOption("Seniority", "/heroshima/filters")]}
+            options={[GenerateNewOption("Seniority", "/heroshima/filters"), ...filters.seniority]}
             onChange={(value) => handleSelectChange("seniority", value)}
             placeholder="Select seniority"
             required

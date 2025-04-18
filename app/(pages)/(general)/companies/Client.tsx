@@ -7,7 +7,11 @@ import { CompanyList } from "@/types/main";
 import PaginationControl from "@/app/components/main/PaginationControl";
 import CompaniesSkeleton from "@/app/components/skeleton/CompaniesSkeleton";
 
-const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> = ({ initialData, totalCompanies }) => {
+const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; forCompany?: boolean }> = ({
+  initialData,
+  totalCompanies,
+  forCompany = false,
+}) => {
   const companiesPerPage = 50;
   const totalPages = Math.ceil(totalCompanies / companiesPerPage);
   const [companies, setCompanies] = useState<CompanyList[]>(initialData);
@@ -107,7 +111,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
           {isLoading ? null : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {companies.map((company, index) => (
-                <CompanyTile companyData={company} key={index} />
+                <CompanyTile forCompany={forCompany} companyData={company} key={index} />
               ))}
             </div>
           )}

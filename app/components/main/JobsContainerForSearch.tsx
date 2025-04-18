@@ -4,7 +4,7 @@ import JobTile from "./JobTile";
 import { AlertCircle } from "lucide-react";
 import JobTileSkeleton from "./JobTileSkeleton";
 import { JobTileType } from "@/types/main";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PaginationControl from "./PaginationControl";
 
 const JobsContainerForSearch = () => {
@@ -13,9 +13,15 @@ const JobsContainerForSearch = () => {
   const totalPages = Math.ceil(totalJobs / jobsPerPage);
   const [jobs, setJobs] = useState<JobTileType[]>([]);
   const searchParams = useSearchParams();
+  const params = new URLSearchParams(searchParams.toString());
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = params.get("page") || 1;
+    return ~~page;
+  });
 
   // Loading and error state
   const [loading, setLoading] = useState(true);
@@ -24,21 +30,28 @@ const JobsContainerForSearch = () => {
   // Handlers for pagination buttons
   const handlePrevious = () => {
     if (currentPage > 1) {
+      params.delete("page");
+      params.append("page", `${currentPage - 1}`);
+      router.replace(pathname + "?" + params.toString());
       setCurrentPage((prevPage) => prevPage - 1);
     }
   };
 
   const handleNext = () => {
     if (currentPage < totalPages) {
+      params.delete("page");
+      params.append("page", `${currentPage + 1}`);
+      router.replace(pathname + "?" + params.toString());
       setCurrentPage((prevPage) => prevPage + 1);
     }
   };
 
   // Simulate fetching data
-  const getJobs = async (page: number): Promise<void> => {
+  const getJobs = async (): Promise<void> => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/jobs?page=${page}&${searchParams.toString()}`);
+      const pageParams = params.get("page");
+      const response = await fetch(`/api/jobs?${!pageParams ? `page=1` : searchParams.toString()}`);
       if (!response.ok) {
         throw new Error("Failed to fetch jobs");
       }
@@ -54,20 +67,12 @@ const JobsContainerForSearch = () => {
   useEffect(() => {
     const timeout = setTimeout(() => {
       const fetchJobs = async () => {
-        return await getJobs(currentPage);
+        return await getJobs();
       };
       fetchJobs();
     }, 500);
     return () => clearTimeout(timeout);
   }, [currentPage, searchParams]);
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-      }
-    }, 400);
-    return () => clearTimeout(timeout);
-  }, [searchParams]);
 
   // Display range for jobs on the current page
   const startJobIndex = (currentPage - 1) * jobsPerPage;

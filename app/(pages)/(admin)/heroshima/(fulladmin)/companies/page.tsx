@@ -1,4 +1,4 @@
-import CompaniesList from "./Client";
+import CompaniesList from "@/app/(pages)/(general)/companies/Client";
 import { CompanyList } from "@/types/main";
 
 const getCompanies = async (): Promise<{ data: CompanyList[]; count: number }> => {
@@ -19,7 +19,7 @@ export default async function Home() {
   const companies = await getCompanies();
   return (
     <>
-      <CompaniesList initialData={companies.data} totalCompanies={companies.count} />
+      <CompaniesList forCompany={true} initialData={companies.data} totalCompanies={companies.count} />
     </>
   );
 }

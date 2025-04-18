@@ -1,7 +1,7 @@
 "use client";
 
 import { FilterData, FilterType } from "@/types/main";
-import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 const ShowType = { roles: false, seniority: false, jobType: false, region: false };
 interface FilterContextType {
@@ -76,15 +76,23 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
 
       if (selectedRoles.length > 0) {
         params.append("roles", selectedRoles.join("_"));
+        params.delete("page");
+        params.append("page", `1`);
       }
       if (selectedRegions.length > 0) {
         params.append("regions", selectedRegions.join("_"));
+        params.delete("page");
+        params.append("page", `1`);
       }
       if (selectedSeniority.length > 0) {
         params.append("seniority", selectedSeniority.join("_"));
+        params.delete("page");
+        params.append("page", `1`);
       }
       if (selectedJobTypes.length > 0) {
         params.append("jobTypes", selectedJobTypes.join("_"));
+        params.delete("page");
+        params.append("page", `1`);
       }
 
       router.push(pathname + "?" + params.toString());

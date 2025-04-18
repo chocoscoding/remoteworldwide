@@ -21,7 +21,7 @@ const CompanyTile: FC<{ forCompany?: boolean; companyData: CompanyList }> = ({ f
           <div className="bg-gray-100 p-2 rounded-md flex-shrink-0">
             {jobCount > 0 ? `${jobCount} job${jobCount === 1 ? "" : "s"} available` : "0 jobs available"}
           </div>
-          <ArrowUpRight className="flex-shrink-0 text-gray-500 group-hover:text-secondary" />
+          <ArrowUpRight className="flex-shrink-0 text-gray-500 group-hover:text-[#7fb608]" />
         </div>
       </div>
     </Link>

@@ -6,7 +6,7 @@ import React, { FC } from "react";
 import TimeAgo from "timeago-react";
 
 const JobTile: FC<JobTileType> = (props) => {
-  const { title, slug, company, region, createdAt } = props;
+  const { title, slug, company, region, createdAt, seniority } = props;
   return (
     <div className="flex p-4 mb-5 rounded-md gap-2 md:gap-3 shadow-sm transition-all bg-white">
       {/* logo
@@ -41,7 +41,7 @@ const JobTile: FC<JobTileType> = (props) => {
             </p>
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />
-              <span>Mid-level</span>
+              <span>{seniority}</span>
             </p>
           </div>
         </div>

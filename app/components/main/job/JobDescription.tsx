@@ -62,11 +62,11 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       <section className="mt-5 flex w-full flex-wrap xs:flex-row flex-col">
         <div className="w-full flex-1">
           <h1 className="font-semibold text-2xl md:text-3xl mb-1 sm:mb-3 w-full break-words text-pretty">{title}</h1>
-          <text className="text-gray-500 mb-1.5">Posted: {new Date(createdAt).toLocaleDateString("en-GB")}</text>
-          <div className="w-full flex flex-wrap gap-3 md:gap-5 mb-3">
+          <text className="text-lime-500 mb-1.5">Posted: {new Date(createdAt).toLocaleDateString("en-GB")}</text>
+          <div className="w-full flex flex-col flex-wrap gap-1 my-1">
             <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
               <MapPinned className="w-3 md:w-4 text-gray-400" />
-              <span>Remote, {region}</span>
+              <span>{region}</span>
             </h2>
             <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
               <Calendar className="w-3 md:w-4 text-gray-400" />
