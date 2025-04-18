@@ -23,19 +23,19 @@ const Header = ({ count }: { count: number | null }) => {
         </div>
       </section>
       <section className="w-full h-full z-10 absolute top-0 left-0 flex flex-col px-2.5 sm:px-5 md:px-10 pt-5 sm:pt-7 md:pt-12 bg-transparent overflow-hidden">
-        <p className="bg-gray-200 w-fit p-2.5 md:p-3 text-xs rounded-full md:text-sm">{count ?? "100"} open positions today 🔥</p>
+        <text className="bg-gray-200 w-fit p-2.5 md:p-3 text-xs rounded-full md:text-sm">{count ?? "100"} open positions today 🔥</text>
         <h1 className="font-bold max-w-[550px] mt-4 mb-3 text-clamp1">Find your next remote job</h1>
-        <h3 className="text-gray-700 max-w-[500px] mb-5 text-sm xs:text-base">
+        <p className="text-gray-700 max-w-[500px] mb-5 text-sm xs:text-base">
           Discover verified worldwide remote roles. Confidently apply to roles that fit your location, skills, and ambition-No surprises,
           just opportunities that want you.
-        </h3>
+        </p>
         <div className="w-[98%] max-w-[1000px]">
           <Suspense>
             <SearchBar />
           </Suspense>
         </div>
         <section className="mt-6 md:mt-8 flex flex-col justify-start">
-          <p className="mb-2 text-gray-600 ">Jobs from the top remote companies</p>
+          <p className="mb-2 text-gray-600 ">Vetted jobs from the top remote companies</p>
           <div className="flex flex-wrap gap-2 xxs:gap-4">
             {Companies.map((Company, index) => (
               <div className="w-[70px] xxs:w-[85px] sm:w-[90px] xl:w-[100px]" key={index}>

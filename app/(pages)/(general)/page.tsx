@@ -30,7 +30,7 @@ export default async function Home() {
       <Header count={jobsCount} />
       <br />
       <section className="w-full max-w-[1200px] m-auto px-3 xl:px-0">
-        <h2 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exciting jobs now</h2>
+        <h3 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exciting jobs now</h3>
         <br />
 
         {/* few jobs list */}
