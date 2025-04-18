@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useFilter } from "@/provider/FilterProvider";
 import { FC } from "react";
 
-const FilterSkeleton: FC<{ className?: string }> = ({ className }) => {
+const FilterSkeleton: FC<{ className?: string; amount?: number }> = ({ className, amount = 4 }) => {
   const { toggleMobileFilter } = useFilter();
   return (
     <section
@@ -14,8 +14,7 @@ const FilterSkeleton: FC<{ className?: string }> = ({ className }) => {
       )}>
       <div className="sm:hidden flex items-center justify-center">
         <button
-          className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center focus:outline-none focus:ring-2 focus
-          :ring-red-700 p-2"
+          className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-700 p-2"
           onClick={toggleMobileFilter}>
           <X className="text-primary" />
         </button>
@@ -26,11 +25,11 @@ const FilterSkeleton: FC<{ className?: string }> = ({ className }) => {
       </header>
       <br />
 
-      {Array(4)
+      {Array(amount)
         .fill(0)
         .map((_, index) => (
           <div key={index} className="mb-6">
-            <div className="flex justify-between gap-2 ">
+            <div className="flex justify-between gap-2">
               <div className="font-bold w-full h-6 rounded-md bg-gray-300 animate-pulse"></div>
               <div className="font-bold w-[30px] h-6 rounded-md bg-gray-300 animate-pulse"></div>
             </div>

@@ -28,7 +28,7 @@ export default async function CategoriesPage() {
   const filters = await getFilters();
 
   return (
-    <main className="p-3 md:p-10 w-full max-w-[1100px] m-auto">
+    <main className="p-3 md:p-10 w-full max-w-[1100px] m-auto min-h-screen">
       <h2 className="text-2xl md:text-3xl font-bold text-center">Explore latest and exiciting jobs now</h2>
       <br />
       <Suspense>

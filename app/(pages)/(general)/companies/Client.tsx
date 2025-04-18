@@ -5,6 +5,7 @@ import { LoaderCircle, Search } from "lucide-react";
 import CompanyTile from "@/app/components/main/CompanyTile";
 import { CompanyList } from "@/types/main";
 import PaginationControl from "@/app/components/main/PaginationControl";
+import CompaniesSkeleton from "@/app/components/skeleton/CompaniesSkeleton";
 
 const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> = ({ initialData, totalCompanies }) => {
   const companiesPerPage = 50;
@@ -12,6 +13,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
   const [companies, setCompanies] = useState<CompanyList[]>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const initialRef = useRef(0);
+  const [searchParam, setSearchParam] = useState<string>("");
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,10 +32,9 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
   };
 
   const getCompanies = async (page: number): Promise<void> => {
-    initialRef.current = 1;
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/companies?page=${page}`);
+      const response = await fetch(`/api/companies?page=${page}&find=${searchParam}`);
       if (!response.ok) {
         throw new Error("Failed to fetch companies");
       }
@@ -47,14 +48,18 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
     }
   };
   useEffect(() => {
-    if ((initialRef.current = 0)) {
-      return;
-    }
-    const fetchCompanies = async () => {
-      return await getCompanies(currentPage);
-    };
-    fetchCompanies();
-  }, [currentPage]);
+    const fetchTimeout = setTimeout(() => {
+      if (initialRef.current === 0) {
+        initialRef.current = 1;
+        return;
+      }
+      const fetchCompanies = async () => {
+        return await getCompanies(currentPage);
+      };
+      fetchCompanies();
+    }, 500);
+    return () => clearTimeout(fetchTimeout);
+  }, [currentPage, searchParam]);
 
   // Display range for jobs on the current page
   const startCompanyIndex = (currentPage - 1) * companiesPerPage;
@@ -76,7 +81,12 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
             </p>
 
             <div className="flex border border-black rounded-md items-center w-full sm:w-[300px] bg-white overflow-hidden gap-2 flex-shrink-0 mb-3">
-              <input placeholder={`search company`} className={`h-10 px-1 flex-1 bg-transparent outline-none`} />
+              <input
+                placeholder={`search company`}
+                className={`h-10 px-1 flex-1 bg-transparent outline-none`}
+                value={searchParam}
+                onChange={(e) => setSearchParam(e.target.value)}
+              />
               <button className={`h-10 aspect-square bg-primary text-white flex items-center justify-center flex-shrink-0`}>
                 <Search />
               </button>
@@ -85,9 +95,8 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
           <hr className="mb-5" />
 
           {isLoading ? (
-            <div className="h-[60vh] flex flex-col items-center justify-center">
-              <LoaderCircle className="w-[10vw] h-[10vh] animate-spin" />
-              <p className="text-xl">Loading...</p>
+            <div className="min-h-screen flex flex-col items-center w-full">
+              <CompaniesSkeleton amount={15} />
             </div>
           ) : null}
           {companies.length === 0 && (
@@ -112,6 +121,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
             dataTotal={totalCompanies}
             startIndex={startCompanyIndex}
             endIndex={endCompnayIndex}
+            scrollToTop
           />
         </section>
       </section>

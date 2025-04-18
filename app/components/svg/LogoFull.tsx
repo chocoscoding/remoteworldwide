@@ -1,12 +1,6 @@
-import { SVGProps } from "react"
+import { SVGProps } from "react";
 const LogoFull = (props: SVGProps<SVGSVGElement>) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    id="Layer_2"
-    data-name="Layer 2"
-    viewBox="0 0 206.65 22.68"
-    {...props}
-  >
+  <svg xmlns="http://www.w3.org/2000/svg" id="Layer_2" data-name="Layer 2" viewBox="0 0 206.65 22.68" {...props}>
     <defs>
       <style>
         {
@@ -27,26 +21,20 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
         d="M18.45 16.86A9.488 9.488 0 0 1 17 18.45c-.17.14-.33.28-.51.41a10.1 10.1 0 0 1-12.65-.3c-.14-.11-.28-.23-.41-.36-.07-.06-.14-.13-.2-.2a9.64 9.64 0 0 1-1.46-1.82c1.73-1.97 4.82-3.24 8.3-3.16 3.65.09 6.81 1.64 8.38 3.84Z"
         className="cls-2"
       />
-      <path
-        d="M16.49 18.86a10.1 10.1 0 0 1-12.65-.3c1.67-1 3.84-1.6 6.19-1.58 2.49.02 4.76.73 6.46 1.88Z"
-        className="cls-3"
-      />
+      <path d="M16.49 18.86a10.1 10.1 0 0 1-12.65-.3c1.67-1 3.84-1.6 6.19-1.58 2.49.02 4.76.73 6.46 1.88Z" className="cls-3" />
       <text
         style={{
           fill: "#231f20",
-          fontFamily: "Geist-Medium,Geist",
           fontSize: 21,
-          fontWeight: 500,
+          fontWeight: 900,
         }}
-        transform="translate(24.21 17.96)"
-      >
+        transform="translate(24.21 17.96)">
         <tspan
           x={0}
           y={0}
           style={{
             letterSpacing: "-.03em",
-          }}
-        >
+          }}>
           {"R"}
         </tspan>
         <tspan
@@ -54,8 +42,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.02em",
-          }}
-        >
+          }}>
           {"e"}
         </tspan>
         <tspan
@@ -63,8 +50,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.03em",
-          }}
-        >
+          }}>
           {"m"}
         </tspan>
         <tspan
@@ -72,8 +58,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.05em",
-          }}
-        >
+          }}>
           {"o"}
         </tspan>
         <tspan
@@ -81,8 +66,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.03em",
-          }}
-        >
+          }}>
           {"t"}
         </tspan>
         <tspan
@@ -90,8 +74,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.02em",
-          }}
-        >
+          }}>
           {"e "}
         </tspan>
         <tspan
@@ -99,8 +82,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.07em",
-          }}
-        >
+          }}>
           {"W"}
         </tspan>
         <tspan
@@ -108,8 +90,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.02em",
-          }}
-        >
+          }}>
           {"o"}
         </tspan>
         <tspan x={109.56} y={0} className="cls-12">
@@ -120,8 +101,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.03em",
-          }}
-        >
+          }}>
           {"l"}
         </tspan>
         <tspan x={123.25} y={0} className="cls-12">
@@ -132,8 +112,7 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.02em",
-          }}
-        >
+          }}>
           {"id"}
         </tspan>
         <tspan
@@ -141,12 +120,11 @@ const LogoFull = (props: SVGProps<SVGSVGElement>) => (
           y={0}
           style={{
             letterSpacing: "-.02em",
-          }}
-        >
+          }}>
           {"e"}
         </tspan>
       </text>
     </g>
   </svg>
-)
-export default LogoFull
+);
+export default LogoFull;

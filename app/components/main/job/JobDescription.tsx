@@ -57,25 +57,25 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
   };
   return (
     <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black p-3 sm:p-5 md:p-8 overflow-hidden">
-      <p className="text-gray-500 text-sm">Job Description</p>
+      <text className="text-gray-500 text-sm">Job Description</text>
 
       <section className="mt-5 flex w-full flex-wrap xs:flex-row flex-col">
         <div className="w-full flex-1">
-          <p className="font-semibold text-2xl md:text-3xl mb-1 sm:mb-3 w-full break-words text-pretty">{title}</p>
-          <p className="text-gray-500 mb-1.5">Posted: {new Date(createdAt).toLocaleDateString("en-GB")}</p>
+          <h1 className="font-semibold text-2xl md:text-3xl mb-1 sm:mb-3 w-full break-words text-pretty">{title}</h1>
+          <text className="text-gray-500 mb-1.5">Posted: {new Date(createdAt).toLocaleDateString("en-GB")}</text>
           <div className="w-full flex flex-wrap gap-3 md:gap-5 mb-3">
-            <p className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
+            <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
               <MapPinned className="w-3 md:w-4 text-gray-400" />
               <span>Remote, {region}</span>
-            </p>
-            <p className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
+            </h2>
+            <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
               <Calendar className="w-3 md:w-4 text-gray-400" />
               <span>{jobType}</span>
-            </p>
-            <p className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
+            </h2>
+            <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
               <ChartNoAxesColumnIncreasing className="w-3 md:w-4 text-gray-400" />
               <span>{seniority}</span>
-            </p>
+            </h2>
           </div>
         </div>
         <div className="flex justify-end gap-3 flex-shrink-0 w-fit ">

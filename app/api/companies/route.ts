@@ -7,10 +7,16 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const query = searchParams.get("page");
+    const companySearchParam = searchParams.get("find") || "";
 
     const skipAmount = SKIP_AMNT * (query ? parseInt(query) : 1);
     const [companies, companiesCount] = await Promise.all([
       prisma.company.findMany({
+        where: {
+          name: {
+            contains: companySearchParam,
+          },
+        },
         orderBy: {
           name: "asc",
         },

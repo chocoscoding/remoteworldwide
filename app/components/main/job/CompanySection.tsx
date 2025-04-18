@@ -1,9 +1,9 @@
 import { CompanyWithJobsCount } from "@/types/main";
-import { LinkIcon, MoveUpRight } from "lucide-react";
+import { MoveUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
-import { FaXTwitter, FaFacebookF, FaLinkedin } from "react-icons/fa6";
+import { FaXTwitter, FaFacebookF, FaLinkedin, FaLink } from "react-icons/fa6";
 const CompanySection: FC<{
   showFullDetails?: boolean;
   name?: string;
@@ -14,7 +14,7 @@ const CompanySection: FC<{
     { href: companyDetails.twitter ?? "#", Icon: FaXTwitter },
     { href: companyDetails.facebook ?? "#", Icon: FaFacebookF },
     { href: companyDetails.linkedin ?? "#", Icon: FaLinkedin },
-    { href: companyDetails.website ?? "#", Icon: LinkIcon },
+    { href: companyDetails.website ?? "#", Icon: FaLink },
   ];
   return (
     <div
@@ -30,12 +30,12 @@ const CompanySection: FC<{
         <p className="text-gray-500">Job By</p>
         {showFullDetails ? (
           <div className="flex items-center gap-2">
-            <p className="text-primary font-bold text-xl">{companyDetails.name}</p>
+            <h2 className="text-primary font-bold text-xl">{companyDetails.name}</h2>
           </div>
         ) : (
           <Link href={`${forAdmin ? "/heroshima" : ""}/companies/${companyDetails.name}`} passHref>
             <div className="flex items-center gap-2 cursor-pointer">
-              <p className="text-primary font-bold text-xl">{companyDetails.name}</p>
+              <h2 className="text-primary font-bold text-xl">{companyDetails.name}</h2>
               <MoveUpRight className="w-4" />
             </div>
           </Link>
