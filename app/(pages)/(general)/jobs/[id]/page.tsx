@@ -70,6 +70,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: `${JOB.title} - Remoteworldwide`,
     description: `Remoteworldwide - ${JOB.title}`,
+    alternates: {
+      canonical: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${JOB.slug}`,
+    },
     openGraph: {
       images: imageUrl,
       title: `${JOB.title} - Remoteworldwide`,

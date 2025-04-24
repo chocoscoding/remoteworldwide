@@ -15,9 +15,12 @@ const font = Manrope({
 
 export const metadata: Metadata = {
   title: "Remote Worldwide",
-  description: "Get worldwide remote jobs and get hired in no time!",
+  description: "Get worldwide remote jobs and get hired in no time! - With Remote Worldwide",
   icons: "/favicon.ico",
   metadataBase: new URL("https://www.remoteworldwide.net"),
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     url: "https://www.remoteworldwide.net",
     title: "Remote Worldwide",
