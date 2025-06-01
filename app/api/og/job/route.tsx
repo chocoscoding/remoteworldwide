@@ -61,7 +61,7 @@ export async function GET(request: Request) {
           <LogoFull2
             style={{
               width: "250px",
-              height: "32px",
+              height: "30.4px",
             }}
           />
         </div>

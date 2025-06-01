@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -45,6 +45,12 @@ const menuItemsForAdmin = [
       { label: "Blogs", path: "/blogs" },
       { label: "Authors", path: "/authors" },
     ],
+  },
+  {
+    name: "Automation",
+    icon: BotIcon,
+    path: "/automation",
+    section: "automation",
   },
 ];
 const menuItemsForAuthor = [
