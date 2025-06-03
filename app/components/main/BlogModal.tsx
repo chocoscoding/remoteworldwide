@@ -16,7 +16,7 @@ const BlogModal: FC<BlogModalProps> = ({ blog }) => {
           {/* title */}
           <p className="mb-1 text-xl font-medium text-gray-800 line-clamp-3">{blog.title}</p>
           {/* description */}
-          <p className="text-md font-light text-gray-400 line-clamp-2">{blog.description}</p>
+          <p className="text-md font-light text-gray-400 overflow-ellipsis line-clamp-3 mb-2">{blog.description.substring(0, 200)}</p>
           {/* link to author */}
           <Link href={"/authors/" + blog.author.slug} className="text-md font-medium text-indigo-500 mt-1">
             By {blog.author.name}

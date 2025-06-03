@@ -105,13 +105,13 @@ export default blogWithPagination;
 
 function BlogTile({ blog }: { blog: BlogListWithAuthor }) {
   return (
-    <Link href={`/heroshima/blogs/${blog.slug}`} className="p-4 bg-white shadow rounded-lg flex flex-col h-[400px]">
-      <div className="w-full h-[70%]">
+    <Link href={`/heroshima/blogs/${blog.slug}`} className="p-2 bg-white shadow rounded-lg flex flex-col h-[400px]">
+      <div className="w-full h-[60%]">
         <Image src={blog.coverImage} alt={blog.title} width={1080} height={720} className="rounded-lg object-cover h-full aspect-square" />
       </div>
       <div className="w-full mt-4">
         <h2 className="text-xl font-semibold">{blog.title}</h2>
-        <p className="mt-2">{blog.description}</p>
+        <p className="text-md font-light text-gray-400 overflow-ellipsis line-clamp-2 my-2">{blog.description.substring(0, 200)}</p>{" "}
         <p className="text-gray-600">
           {blog.author.name} - {new Date(blog.createdAt).toLocaleDateString("en-GB")}
         </p>

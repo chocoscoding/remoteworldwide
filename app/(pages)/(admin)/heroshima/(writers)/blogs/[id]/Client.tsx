@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { deleteBlog as deleteBlogQuery } from "@/libs/query";
+import dynamic from "next/dynamic";
 
 interface Blog {
   id: string;
@@ -25,6 +26,7 @@ interface Blog {
 interface BlogProps {
   blogId: string;
 }
+const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
 const BlogPage: FC<{ blog: Blog }> = ({ blog }) => {
   const [loading, setLoading] = useState(false);
@@ -56,63 +58,43 @@ const BlogPage: FC<{ blog: Blog }> = ({ blog }) => {
 
   return (
     <div className="w-full min-h-screen">
-      <div className="h-fit block">
-        <div className="relative w-full min-h-[30rem] overflow-hidden flex flex-col justify-end">
-          <div className="absolute w-full bg-black h-[30rem] z-0"></div>
-          <div className="font-extrabold w-full text-center px-10 tracking-tight text-gray-100 lg:text-5xl sm:text-4xl text-2xl z-10 relative">
-            {blog.title}
+      <div className="relative w-full h-[260px] sm:h-[320px] md:h-[400px] flex items-end justify-center overflow-hidden">
+        <Image src={blog.coverImage} alt={blog.title} fill className="object-cover object-center brightness-[.55]" priority />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-10" />
+        <div className="relative z-20 w-full max-w-3xl px-4 py-8 text-center">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white drop-shadow-lg mb-4">{blog.title}</h1>
+          <p className="text-lg sm:text-xl text-gray-100 font-medium drop-shadow mb-6">{blog.description}</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
+            <div className="flex items-center gap-2">
+              <Image
+                src={blog.author.profileImage}
+                alt={blog.author.name}
+                width={40}
+                height={40}
+                className="rounded-full border-2 border-white shadow"
+              />
+              <span className="text-base font-semibold text-white">{blog.author.name}</span>
+            </div>
+            <span className="hidden sm:block text-white text-xl">·</span>
+            <span className="text-sm text-gray-200 font-light">Published {new Date(blog.createdAt).toLocaleDateString()}</span>
           </div>
-          <div className="max-w-3xl mx-auto text-xl leading-8 text-center text-gray-200 sm:mt-1 z-10 relative">{blog.description}</div>
-          <div className="flex items-center justify-center mt-1 z-10 relative">
-            <Image
-              loading="eager"
-              className="rounded-full border-2 border-gray-300 h-10 w-10"
-              src={blog.author.profileImage}
-              alt={blog.author.name}
-              width={50}
-              height={50}
-            />
-            <p className="ml-2 text-gray-300">{blog.author.name}</p>
-          </div>
-          <div className="sm:flex items-center justify-center space-x-2 text-sm text-gray-300 z-10 relative mt-2 mb-4">
-            <p className="">
-              <span className="text-slate-200">Created at:</span> {blog.createdAt}
-            </p>
-            {blog.createdAt !== blog.updatedAt && (
-              <>
-                <span className="sm:block hidden">•</span>
-                <span className="0">Published {new Date(blog.updatedAt).toLocaleDateString("en-GB")}</span>
-              </>
-            )}
-          </div>
-          <Image
-            className="rounded-lg w-screen border absolute opacity-50 top-0"
-            src={blog.coverImage}
-            placeholder="blur"
-            blurDataURL={blog.coverImage}
-            layout="intrinsic"
-            width={1080}
-            height={720}
-            alt={"article cover"}
-            priority
-          />
         </div>
       </div>
 
-      <div className="mx-auto mt-5 max-w-screen-md space-y-12 px-4 py-10 text-lg tracking-wide text-gray-700">
-        <div dangerouslySetInnerHTML={{ __html: blog.content }} />
+      <div className="mx-auto mt-5 max-w-screen-lg space-y-12 bg-white rounded-md">
+        <ReactQuill value={blog.content} readOnly modules={{ toolbar: false }} theme="bubble" className="!text-xl" />
       </div>
 
       <div className="flex gap-4 items-center mt-4 justify-center">
         <Link
           href={`/heroshima/blogs/${blog.slug}/edit`}
-          className="bg-blue-500 drop-shadow-secondary2-hover flex items-center transition-all text-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md">
+          className="bg-blue-500 drop-shadow-secondary2-hover flex items-center transition-all text-white text-base border-2 border-primary font-bold rounded p-3 hover:rounded-md">
           Edit blog
         </Link>
         <button
           onClick={deleteBlog}
           disabled={loading}
-          className="bg-red-500 drop-shadow-secondary2-hover flex items-center transition-all text-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md">
+          className="bg-red-500 drop-shadow-secondary2-hover flex items-center transition-all text-white text-base border-2 border-primary font-bold rounded p-3 hover:rounded-md">
           {loading ? "Deleting..." : "Delete blog"}
         </button>
       </div>

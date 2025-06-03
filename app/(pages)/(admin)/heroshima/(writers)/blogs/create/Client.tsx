@@ -11,7 +11,7 @@ import { toast } from "react-toastify";
 import { createBlog } from "@/libs/query";
 import { useRouter } from "next/navigation";
 import { TagsInput } from "react-tag-input-component";
-
+import { quillToolbarOptions } from "@/libs/quillconfig";
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
 const CreateBlogClient: FC<{ authors: Option[] }> = ({ authors }) => {
@@ -166,7 +166,13 @@ const CreateBlogClient: FC<{ authors: Option[] }> = ({ authors }) => {
         </div>
         <div>
           <label className="block text-sm font-medium text-primary">Text Editor</label>
-          <ReactQuill value={text} onChange={setText} placeholder="Enter blog content" className="mt-1" />
+          <ReactQuill
+            value={text}
+            onChange={setText}
+            modules={{ toolbar: quillToolbarOptions }}
+            placeholder="Enter blog content"
+            className="mt-1"
+          />
         </div>
         <div className="flex justify-center">
           <button

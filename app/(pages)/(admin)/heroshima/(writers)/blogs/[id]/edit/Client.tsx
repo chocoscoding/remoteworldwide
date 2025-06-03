@@ -12,6 +12,7 @@ import { editBlog } from "@/libs/query";
 import { useRouter } from "next/navigation";
 import { TagsInput } from "react-tag-input-component";
 import { Blog } from "@prisma/client";
+import { quillToolbarOptions } from "@/libs/quillconfig";
 
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
@@ -166,7 +167,14 @@ const EditBlogClient: FC<{ authors: Option[]; blog: Blog & { author: { name: str
         </div>
         <div>
           <label className="block text-sm font-medium text-primary">Text Editor</label>
-          <ReactQuill value={text} onChange={setText} placeholder="Enter blog content" className="mt-1" />
+          <ReactQuill
+            value={text}
+            theme="snow"
+            onChange={setText}
+            modules={{ toolbar: quillToolbarOptions }}
+            placeholder="Enter blog content"
+            className="mt-1"
+          />
         </div>
         <div className="flex justify-center">
           <button
