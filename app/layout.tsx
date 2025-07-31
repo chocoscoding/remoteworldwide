@@ -54,6 +54,16 @@ export default function RootLayout({
 
   gtag('config', '${process.env.GOOGLE_ANALYTICS_TOKEN}');`}
         </Script>
+        <Script strategy="afterInteractive">
+    {`(function(h,o,t,j,a,r){
+        h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+        h._hjSettings={hjid:6481023,hjsv:6};
+        a=o.getElementsByTagName('head')[0];
+        r=o.createElement('script');r.async=1;
+        r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+        a.appendChild(r);
+    })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');`}
+</Script>
       </head>
       <body className={`${font.className} antialiased`}>
         <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
