@@ -54,7 +54,7 @@ export default function RootLayout({
 
   gtag('config', '${process.env.GOOGLE_ANALYTICS_TOKEN}');`}
         </Script>
-        <Script strategy="afterInteractive">
+        <Script strategy="afterInteractive" id="hotjar">
     {`(function(h,o,t,j,a,r){
         h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
         h._hjSettings={hjid:6481023,hjsv:6};
