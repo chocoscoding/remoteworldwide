@@ -20,6 +20,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
             description: true,
           },
         },
+        _count: {
+          select: {
+            blogs: true,
+          },
+        },
       },
     });
     if (author) {

@@ -120,6 +120,9 @@ export type BlogSummaryForAuthorList = {
 };
 export interface AuthorWithBlog extends Author {
   blogs: BlogSummaryForAuthorList[];
+  _count?: {
+    blogs: number;
+  };
 }
 
 export type FormStateAuthor_Client = {
