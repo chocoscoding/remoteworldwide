@@ -50,12 +50,16 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
   const jobCount = companyData._count?.jobs;
   const title = `${companyData.name} - Remote Jobs`;
   const description = companyData.about
-    ? `${companyData.about.substring(0, 100)}... Explore ${jobCount ?? "several"} remote ${jobCount === 1 ? "job" : "jobs"} at ${companyData.name}. Find your next remote opportunity.`
-    : `Explore ${jobCount ?? "several"} remote ${jobCount === 1 ? "job" : "jobs"} at ${companyData.name}. Find your next remote opportunity.`;
+    ? `${companyData.about.substring(0, 100)}... Explore ${jobCount ?? "several"} remote ${jobCount === 1 ? "job" : "jobs"} at ${
+        companyData.name
+      }. Find your next remote opportunity.`
+    : `Explore ${jobCount ?? "several"} remote ${jobCount === 1 ? "job" : "jobs"} at ${
+        companyData.name
+      }. Find your next remote opportunity.`;
 
-  const ogImageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/company?name=${encodeURIComponent(
-    companyData.name
-  )}${companyData.logo ? `&logo=${encodeURIComponent(companyData.logo)}` : ""}${jobCount ? `&jobs=${jobCount}` : ""}`;
+  const ogImageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/company?name=${encodeURIComponent(companyData.name)}${
+    companyData.logo ? `&logo=${encodeURIComponent(companyData.logo)}` : ""
+  }${jobCount ? `&jobs=${jobCount}` : ""}`;
 
   return {
     title,
