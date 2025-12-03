@@ -5,6 +5,7 @@ import { CompanyWithJobsCount } from "@/types/main";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import React from "react";
+import { Metadata } from "next";
 
 interface PageProps {
   companyDetails: {
@@ -23,7 +24,7 @@ interface PageProps {
 }
 const fetchCompany = async (name: string): Promise<CompanyWithJobsCount | null> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/${name}`, { cache: "no-cache" });
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/${name}`);
     if (!response.ok) {
       return null;
     }
@@ -34,6 +35,54 @@ const fetchCompany = async (name: string): Promise<CompanyWithJobsCount | null> 
     return null;
   }
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ name: string }> }): Promise<Metadata> {
+  const companyName = decodeURIComponent((await params).name);
+  const companyData = await fetchCompany(companyName);
+
+  if (!companyData) {
+    return {
+      title: "Company Not Found",
+      description: "The requested company could not be found.",
+    };
+  }
+
+  const jobCount = companyData._count?.jobs;
+  const title = `${companyData.name} - Remote Jobs`;
+  const description = companyData.about
+    ? `${companyData.about.substring(0, 100)}... Explore ${jobCount ?? "several"} remote ${jobCount === 1 ? "job" : "jobs"} at ${companyData.name}. Find your next remote opportunity.`
+    : `Explore ${jobCount ?? "several"} remote ${jobCount === 1 ? "job" : "jobs"} at ${companyData.name}. Find your next remote opportunity.`;
+
+  const ogImageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/company?name=${encodeURIComponent(
+    companyData.name
+  )}${companyData.logo ? `&logo=${encodeURIComponent(companyData.logo)}` : ""}${jobCount ? `&jobs=${jobCount}` : ""}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `${process.env.NEXT_PUBLIC_SITE_URL}/companies/${encodeURIComponent(companyData.name)}`,
+      siteName: "Remote Worldwide",
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${companyData.name} - Remote Jobs`,
+        },
+      ],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImageUrl],
+    },
+  };
+}
 const Page = async ({ params }: { params: Promise<{ name: string }> }) => {
   const companyName = decodeURIComponent((await params).name);
   const companyData = await fetchCompany(companyName);
