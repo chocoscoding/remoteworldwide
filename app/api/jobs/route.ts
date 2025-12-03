@@ -46,7 +46,6 @@ export async function GET(req: NextRequest) {
     if (searchByTitle) {
       filters.title = { contains: searchByTitle, mode: "insensitive" };
     }
-    console.log(filters);
 
     // Execute query using Prisma's filtering and pagination
     const [jobs, jobsCount] = await Promise.all([
@@ -106,7 +105,7 @@ export async function POST(req: NextRequest) {
     BODY_VALUES.slug = createSlug(title);
 
     const createJob = await prisma.job.create({
-      data: BODY_VALUES,
+      data: { ...BODY_VALUES },
     });
     return NextResponse.json({ data: createJob }, { status: 200, statusText: "success" });
   } catch (error: any) {
