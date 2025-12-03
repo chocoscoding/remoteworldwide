@@ -21,7 +21,7 @@ const fetchJobMetaData_Jobs = async () => {
       },
     });
     return job;
-  } catch () {
+  } catch {
     return [];
   }
 };
@@ -34,7 +34,7 @@ const fetchJobMetaData_Blogs = async () => {
       },
     });
     return job;
-  } catch () {
+  } catch {
     return [];
   }
 };
@@ -47,7 +47,7 @@ const fetchJobMetaData_Authors = async () => {
       },
     });
     return authors;
-  } catch () {
+  } catch {
     return [];
   }
 };
