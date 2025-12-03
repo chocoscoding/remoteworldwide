@@ -42,7 +42,7 @@ const fetchJobMetaData_Blogs = async () => {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const routes: MetadataRoute.Sitemap = [
     {
-      url: "",
+      url: "/",
       changeFrequency: "monthly",
       priority: 1,
     },
@@ -53,8 +53,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: "/jobs",
-      changeFrequency: "weekly",
-      priority: 0.8,
+      changeFrequency: "daily",
+      priority: 0.7,
     },
     {
       url: "/companies",
@@ -77,7 +77,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     routes.push({
       url: "/jobs/" + job.slug,
       changeFrequency: "daily",
-      priority: 0.7,
+      priority: 0.6,
     });
   });
 

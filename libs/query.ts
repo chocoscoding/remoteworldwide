@@ -60,7 +60,7 @@ export const toggleJobActiveState = async (id: string, state: boolean) => {
   }
 };
 
-export const updateOneJob = async (id: string, jobDetails: Omit<Job, "createdAt" | "updatedAt" | "isActive" | "id">) => {
+export const updateOneJob = async (id: string, jobDetails: Omit<Job, "createdAt" | "updatedAt" | "isActive" | "id" | "jobType">) => {
   try {
     const data = await prisma.job.update({
       where: {

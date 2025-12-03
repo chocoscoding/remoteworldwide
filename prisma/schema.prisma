@@ -108,7 +108,7 @@ model Job {
   company        Company   @relation(fields: [companyId], references: [id])
   category       String
   region      String
-  jobType     String   
+  jobType     String? @default("Remote")   
   seniority   String
 
   Bookmark Bookmark[]
