@@ -1,7 +1,6 @@
 import { Author, Blog, Company, Job } from "@prisma/client";
 
 export interface FilterData {
-  job_type: FilterType[];
   category: FilterType[];
   seniority: FilterType[];
   region: FilterType[];
@@ -51,7 +50,6 @@ interface FormValues {
   link: string;
   category: Option | null;
   region: Option | null;
-  job_type: Option | null;
   seniority: Option | null;
   body: string;
 }
@@ -86,7 +84,6 @@ export interface JobTileType {
   slug: string;
   category: string;
   region: string;
-  jobType: string;
   seniority: string;
   createdAt: Date;
 }
@@ -100,7 +97,6 @@ interface OneJobListType {
   slug: string;
   category: string;
   region: string;
-  jobType: string;
   seniority: string;
   isActive: boolean;
 }
@@ -147,7 +143,6 @@ export interface BlogListWithAuthor extends Blog {
 export interface OneBookmarkType {
   job: {
     region: string;
-    jobType: string;
     seniority: string;
     company: {
       name: string;

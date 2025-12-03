@@ -1,5 +1,5 @@
 import { OneBookmarkType } from "@/types/main";
-import { Bookmark, Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
+import { Bookmark, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
@@ -29,10 +29,6 @@ const BookmarkTile: FC<{ job: OneBookmarkType["job"]; removeBookmark: (id: strin
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <MapPinned className="w-4 text-gray-400" />
               <span>Remote, {job.region}</span>
-            </p>
-            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
-              <Calendar className="w-4 text-gray-400" />
-              <span>{job.jobType}</span>
             </p>
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />

@@ -7,7 +7,6 @@ export async function GET(request: Request) {
   const author = searchParams.get("author");
   const description = searchParams.get("description");
   const blogImage = searchParams.get("image");
-
   if (!title || !author || !description || !blogImage) {
     return new ImageResponse(
       (
@@ -50,19 +49,21 @@ export async function GET(request: Request) {
           justifyContent: "center",
           letterSpacing: "-.02em",
           fontWeight: 700,
-          background: "white",
+          background: "#4f4f4f",
+          position: "relative",
         }}>
         <img
           src={blogImage}
           alt="Blog Image"
+          width="1200"
+          height="630"
           style={{
             zIndex: 1,
             filter: "brightness(0.7)",
             width: "100%",
             height: "100%",
             position: "absolute",
-            borderRadius: "5px",
-            boxShadow: "3.5px 3.5px #e1f073",
+            objectFit: "cover",
           }}
         />
         <div
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
           }}>
           <LogoFull2
             style={{
-              width: 24,
+              width: 240,
               height: 24,
             }}
           />
@@ -90,27 +91,26 @@ export async function GET(request: Request) {
             justifyContent: "flex-end",
             width: "100%",
             height: "100%",
-            padding: "10px",
-            zIndex: 1,
+            padding: "40px",
+            zIndex: 10,
             position: "relative",
           }}>
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
-              justifyContent: "center",
-              padding: "15px",
-              borderRadius: "5px",
-              boxShadow: "3.5px 3.5px #e1f073",
+              justifyContent: "flex-start",
+              padding: "20px 30px",
+              borderRadius: "8px",
+              boxShadow: "4px 4px #e1f073",
               margin: "5px 0px",
-              fontSize: 30,
+              fontSize: 40,
               width: "auto",
-              maxWidth: 700,
-              textAlign: "center",
-              border: "2px solid black",
-              backgroundColor: "transparent",
+              maxWidth: "90%",
+              textAlign: "left",
+              backgroundColor: "black",
               color: "white",
-              lineHeight: 1.4,
+              lineHeight: 1.3,
             }}>
             {title}
           </div>
@@ -118,33 +118,32 @@ export async function GET(request: Request) {
             style={{
               display: "flex",
               flexWrap: "wrap",
-              justifyContent: "center",
-              padding: "10px",
-              borderRadius: "4px",
-              fontSize: 20,
+              justifyContent: "flex-start",
+              padding: "10px 0px",
+              fontSize: 24,
               width: "auto",
-              maxWidth: 550,
-              textAlign: "center",
+              maxWidth: "90%",
+              textAlign: "left",
               fontWeight: 400,
               color: "white",
-              marginTop: -8,
+              marginTop: 8,
             }}>
-            {description}
+            {description.length > 150 ? `${description.substring(0, 150)}...` : description}
           </div>
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
-              justifyContent: "center",
-              padding: "10px",
-              borderRadius: "4px",
-              fontSize: 20,
+              justifyContent: "flex-start",
+              padding: "8px 16px",
+              borderRadius: "20px",
+              fontSize: 18,
               width: "auto",
-              margin: "2px 0px",
               maxWidth: 600,
-              textAlign: "center",
+              textAlign: "left",
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
               color: "#e1f073",
-              marginTop: -8,
+              marginTop: 12,
             }}>
             By {author}
           </div>
@@ -152,8 +151,8 @@ export async function GET(request: Request) {
       </div>
     ),
     {
-      width: 800,
-      height: 400,
+      width: 1200,
+      height: 630,
     }
   );
 }

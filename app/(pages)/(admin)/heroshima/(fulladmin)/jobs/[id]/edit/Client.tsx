@@ -27,7 +27,6 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
     link: job.applicationUrl,
     category: { label: job.category, value: job.category },
     region: { label: job.region, value: job.region },
-    job_type: { label: job.jobType, value: job.jobType },
     seniority: { label: job.seniority, value: job.seniority },
     body: job.description,
   });
@@ -56,7 +55,6 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
       applicationUrl: formValues.link,
       category: formValues.category!.label,
       region: formValues.region!.label,
-      jobType: formValues.job_type!.label,
       seniority: formValues.seniority!.label,
       slug: job.slug,
     };
@@ -140,15 +138,6 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
             options={[GenerateNewOption("Region", "/heroshima/filters"), ...filters.region]}
             onChange={(value) => handleSelectChange("region", value)}
             placeholder="Select region"
-            required
-          />
-
-          <SelectField
-            label="Job Type"
-            value={formValues.job_type}
-            options={[GenerateNewOption("Job Type", "/heroshima/filters"), ...filters.job_type]}
-            onChange={(value) => handleSelectChange("job_type", value)}
-            placeholder="Select job type"
             required
           />
 

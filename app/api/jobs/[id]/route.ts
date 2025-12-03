@@ -29,7 +29,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         },
         category: true,
         region: true,
-        jobType: true,
         seniority: true,
       },
     });
@@ -55,7 +54,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ message: "Job ID is required" }, { status: 400 });
     }
 
-    const { title, description, isActive, companyId, applicationUrl, category, region, jobType, seniority } = await req.json();
+    const { title, description, isActive, companyId, applicationUrl, category, region, seniority } = await req.json();
 
     const updatedJob = await prisma.job.update({
       where: { id: id },
@@ -67,7 +66,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         applicationUrl,
         category,
         region,
-        jobType,
         seniority,
       },
     });

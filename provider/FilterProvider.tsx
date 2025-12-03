@@ -3,23 +3,20 @@
 import { FilterData, FilterType } from "@/types/main";
 import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-const ShowType = { roles: false, seniority: false, jobType: false, region: false };
+const ShowType = { roles: false, seniority: false, region: false };
 interface FilterContextType {
   rolesOptions: FilterType[];
   seniorityOptions: FilterType[];
-  jobTypeOptions: FilterType[];
   regionOptions: FilterType[];
   showSection: typeof ShowType;
   showOnMobile: boolean;
   selectedRoles: string[];
   selectedSeniority: string[];
-  selectedJobTypes: string[];
   selectedRegions: string[];
   activeFilterCount: number;
   setSelectedRegions: Dispatch<SetStateAction<string[]>>;
   setSelectedRoles: Dispatch<SetStateAction<string[]>>;
   setSelectedSeniority: Dispatch<SetStateAction<string[]>>;
-  setSelectedJobTypes: Dispatch<SetStateAction<string[]>>;
   handleSelectOption: (setSelectedOption: Dispatch<SetStateAction<string[]>>, option: string) => void;
   toggleShowType: (type: keyof typeof ShowType) => void;
   toggleMobileFilter: () => void;
@@ -32,7 +29,6 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
   const router = useRouter();
   const rolesOptions = filterData.category;
   const seniorityOptions = filterData.seniority;
-  const jobTypeOptions = filterData.job_type;
   const regionOptions = filterData.region;
 
   const [showSection, setShowSection] = useState<typeof ShowType>(ShowType);
@@ -41,11 +37,10 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>([]);
-  const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [isInitialized, setIsInitialized] = useState(false); // Flag to track initial load
   const activeFilterCount = useMemo(() => {
-    return selectedRoles.length + selectedRegions.length + selectedSeniority.length + selectedJobTypes.length;
-  }, [selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes]);
+    return selectedRoles.length + selectedRegions.length + selectedSeniority.length;
+  }, [selectedRoles, selectedRegions, selectedSeniority]);
   // Function to handle selecting and disselecting an option
   const handleSelectOption = (setSelectedOption: Dispatch<SetStateAction<string[]>>, option: string) => {
     setSelectedOption((prev) => (prev.includes(option) ? prev.filter((item) => item !== option) : [...prev, option]));
@@ -59,12 +54,10 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
       const roles = params.get("roles")?.split("_") || [];
       const regions = params.get("regions")?.split("_") || [];
       const seniority = params.get("seniority")?.split("_") || [];
-      const jobTypes = params.get("jobTypes")?.split("_") || [];
 
       setSelectedRoles(roles);
       setSelectedRegions(regions);
       setSelectedSeniority(seniority);
-      setSelectedJobTypes(jobTypes);
 
       setIsInitialized(true); // Mark initialization as complete
     } else {
@@ -72,7 +65,6 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
       params.delete("roles");
       params.delete("regions");
       params.delete("seniority");
-      params.delete("jobTypes");
 
       if (selectedRoles.length > 0) {
         params.append("roles", selectedRoles.join("_"));
@@ -89,15 +81,10 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
         params.delete("page");
         params.append("page", `1`);
       }
-      if (selectedJobTypes.length > 0) {
-        params.append("jobTypes", selectedJobTypes.join("_"));
-        params.delete("page");
-        params.append("page", `1`);
-      }
 
       router.push(pathname + "?" + params.toString());
     }
-  }, [searchParams, selectedRoles, selectedRegions, selectedSeniority, selectedJobTypes, isInitialized]);
+  }, [searchParams, selectedRoles, selectedRegions, selectedSeniority, isInitialized]);
 
   //to toggle the showing each filter category
   const toggleShowType = (type: keyof typeof ShowType) => {
@@ -111,16 +98,13 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
   const finalValues = {
     rolesOptions,
     seniorityOptions,
-    jobTypeOptions,
     showOnMobile,
     selectedRoles,
     selectedSeniority,
-    selectedJobTypes,
     selectedRegions,
     setSelectedRoles,
     setSelectedRegions,
     setSelectedSeniority,
-    setSelectedJobTypes,
     handleSelectOption,
     toggleShowType,
     toggleMobileFilter,

@@ -34,7 +34,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
   showBookmark = true,
   hasUserBookmarked,
 }) => {
-  const { title, description, region, createdAt, jobType, seniority, applicationUrl } = data;
+  const { title, description, region, createdAt, seniority, applicationUrl } = data;
 
   const copyJobLink = () => {
     navigator.clipboard
@@ -70,7 +70,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
             </h2>
             <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
               <Calendar className="w-3 md:w-4 text-gray-400" />
-              <span>{jobType}</span>
+              <span>Remote</span>
             </h2>
             <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
               <ChartNoAxesColumnIncreasing className="w-3 md:w-4 text-gray-400" />

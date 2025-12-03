@@ -11,7 +11,6 @@ const getFilters: () => Promise<FilterData> = async () => {
     const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters?=" + randomUUID(), { cache: "no-cache" });
     if (!res.ok) {
       return {
-        job_type: [],
         category: [],
         seniority: [],
         region: [],

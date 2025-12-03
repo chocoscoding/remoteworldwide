@@ -18,11 +18,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           name,
         },
       }),
-      job_type: prisma.jobType.create({
-        data: {
-          name,
-        },
-      }),
       seniority: prisma.seniority.create({
         data: {
           name,
@@ -63,11 +58,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     const filters = {
       region: prisma.region.delete({
-        where: {
-          id,
-        },
-      }),
-      job_type: prisma.jobType.delete({
         where: {
           id,
         },

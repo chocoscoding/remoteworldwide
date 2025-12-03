@@ -21,7 +21,7 @@ const fetchJobMetaData_Jobs = async () => {
       },
     });
     return job;
-  } catch (error) {
+  } catch () {
     return [];
   }
 };
@@ -34,7 +34,20 @@ const fetchJobMetaData_Blogs = async () => {
       },
     });
     return job;
-  } catch (error) {
+  } catch () {
+    return [];
+  }
+};
+const fetchJobMetaData_Authors = async () => {
+  try {
+    const authors = await prisma.author.findMany({
+      select: {
+        slug: true,
+        name: true,
+      },
+    });
+    return authors;
+  } catch () {
     return [];
   }
 };
@@ -65,6 +78,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const blogs = await fetchJobMetaData_Blogs();
   const jobs = await fetchJobMetaData_Jobs();
+  const authors = await fetchJobMetaData_Authors();
 
   blogs.forEach((blog) => {
     routes.push({
@@ -78,6 +92,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: "/jobs/" + job.slug,
       changeFrequency: "daily",
       priority: 0.6,
+    });
+  });
+  authors.forEach((author) => {
+    routes.push({
+      url: "/author/" + author.slug,
+      changeFrequency: "weekly",
+      priority: 0.5,
     });
   });
 

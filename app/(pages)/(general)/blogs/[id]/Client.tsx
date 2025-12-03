@@ -3,6 +3,9 @@ import { FC } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { Facebook, Instagram, Twitter, Linkedin, Globe } from "lucide-react";
+import "react-quill/dist/quill.bubble.css";
+import { usePathname } from "next/navigation";
 
 interface Blog {
   id: string;
@@ -14,6 +17,11 @@ interface Blog {
     name: string;
     profileImage: string;
     slug: string;
+    about: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+    website?: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -24,37 +32,156 @@ interface Blog {
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
 const BlogPage: FC<{ blog: Blog }> = ({ blog }) => {
+  const pathname = usePathname();
+  const shareUrl = `${process.env.NEXT_PUBLIC_SITE_URL}${pathname}`;
+
   return (
-    <div className="w-full min-h-screen">
-      {/* Improved Header */}
-      <div className="relative w-full h-[260px] sm:h-[320px] md:h-[400px] flex items-end justify-center overflow-hidden">
-        <Image src={blog.coverImage} alt={blog.title} fill className="object-cover object-center brightness-[.55]" priority />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-10" />
-        <div className="relative z-20 w-full max-w-3xl px-4 py-8 text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white drop-shadow-lg mb-4">{blog.title}</h1>
-          <p className="text-lg sm:text-xl text-gray-100 font-medium drop-shadow mb-6">{blog.description}</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
-            <Link href={`/author/${blog.author.slug}`} className="flex items-center gap-2">
+    <div className="blog w-full min-h-screen border-t border-gray-200">
+      <div className="container max-w-[1400px] mx-auto md:pt-20 pt-10 px-4">
+        <div className="blog-content flex justify-between max-lg:flex-col gap-y-10">
+          {/* Main Content */}
+          <div className="main xl:w-3/4 lg:w-2/3 lg:pr-[15px]">
+            <div className="bg-secondary py-1 px-2.5 rounded-full text-sm font-semibold text-black uppercase inline-block">
+              {blog.tags[0] || "Blog"}
+            </div>
+            <h1 className="text-4xl font-bold mt-2">{blog.title}</h1>
+            <div className="author flex items-center gap-2 mt-2.5">
+              <div className="avatar w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                <Image src={blog.author.profileImage} width={200} height={200} alt="avatar" className="w-full h-full object-cover" />
+              </div>
+              <div className="flex items-center gap-2 font-medium">
+                <div className="text-sm text-gray-600">by {blog.author.name}</div>
+                <div className="w-5 h-px bg-gray-400"></div>
+                <div className="text-sm text-gray-600">
+                  {new Date(blog.updatedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="bg-img py-6">
               <Image
-                src={blog.author.profileImage}
-                alt={blog.author.name}
-                width={40}
-                height={40}
-                className="rounded-full border-2 border-white shadow"
+                src={blog.coverImage}
+                width={5000}
+                height={4000}
+                alt={blog.title}
+                className="w-full object-cover rounded-3xl"
+                priority
               />
-              <span className="text-base font-semibold text-white">{blog.author.name}</span>
-            </Link>
-            <span className="hidden sm:block text-white text-xl">·</span>
-            <span className="text-sm text-gray-200 font-light">Published {new Date(blog.updatedAt).toLocaleDateString()}</span>
+            </div>
+
+            {/* Blog Content with Custom Quill Styles */}
+            <div className="content">
+              <ReactQuill value={blog.content} className="rwwQuill" readOnly modules={{ toolbar: false }} theme="bubble" />
+            </div>
+
+            {/* Tags and Share */}
+            <div className="action flex items-center justify-between flex-wrap gap-5 md:mt-8 mt-5">
+              <div className="left flex items-center gap-3 flex-wrap">
+                <p className="font-medium">Tag:</p>
+                <div className="list flex items-center gap-3 flex-wrap">
+                  {blog.tags.map((tag, index) => (
+                    <div
+                      key={index}
+                      className="bg-gray-100 py-1.5 px-4 rounded-full text-xs uppercase cursor-pointer duration-300 hover:bg-black hover:text-white">
+                      {tag}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="right flex items-center gap-3 flex-wrap">
+                <p className="font-medium">Share:</p>
+                <div className="list flex items-center gap-3 flex-wrap">
+                  <Link
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
+                    target="_blank"
+                    className="bg-gray-100 w-10 h-10 flex items-center justify-center rounded-full duration-300 hover:bg-black hover:text-white">
+                    <Facebook className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(blog.title)}`}
+                    target="_blank"
+                    className="bg-gray-100 w-10 h-10 flex items-center justify-center rounded-full duration-300 hover:bg-black hover:text-white">
+                    <Twitter className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`}
+                    target="_blank"
+                    className="bg-gray-100 w-10 h-10 flex items-center justify-center rounded-full duration-300 hover:bg-black hover:text-white">
+                    <Linkedin className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="right xl:w-1/4 lg:w-1/3 lg:pl-[25px]">
+            <div className="about-author">
+              <div className="heading flex gap-5">
+                <div className="avatar w-[100px] h-[100px] rounded-full overflow-hidden flex-shrink-0">
+                  <Image
+                    src={blog.author.profileImage}
+                    width={500}
+                    height={500}
+                    alt="avatar"
+                    priority={true}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Author</div>
+                  <Link href={`/author/${blog.author.slug}`} className="text-xl font-semibold mt-1 hover:underline block">
+                    {blog.author.name}
+                  </Link>
+                </div>
+              </div>
+              <div className="text-gray-600 mt-5">{blog.author.about}</div>
+              <div className="list-social mt-4 flex items-center gap-4 flex-wrap">
+                {blog.author.website && (
+                  <Link href={blog.author.website} target="_blank" className="text-gray-600 hover:text-black transition-colors">
+                    <Globe className="w-5 h-5" />
+                  </Link>
+                )}
+                {blog.author.instagram && (
+                  <Link href={blog.author.instagram} target="_blank" className="text-gray-600 hover:text-black transition-colors">
+                    <Instagram className="w-5 h-5" />
+                  </Link>
+                )}
+                {blog.author.twitter && (
+                  <Link href={blog.author.twitter} target="_blank" className="text-gray-600 hover:text-black transition-colors">
+                    <Twitter className="w-5 h-5" />
+                  </Link>
+                )}
+                {blog.author.linkedin && (
+                  <Link href={blog.author.linkedin} target="_blank" className="text-gray-600 hover:text-black transition-colors">
+                    <Linkedin className="w-5 h-5" />
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            <div className="md:mt-10 mt-6 bg-white border shadow-md p-3.5 rounded-[20px]">
+              <div className="text-center text-xl font-semibold">Subscribe For Daily Newsletter</div>
+              <form className="mt-5">
+                <input
+                  className="text-center h-[44px] w-full px-4 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary"
+                  type="email"
+                  placeholder="Your email address"
+                />
+                <button
+                  type="submit"
+                  className="bg-black text-white w-full h-[44px] rounded-md mt-2 font-semibold shadow-[5px_5px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073] transition-all">
+                  Sign Up
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-
-      <div className="mx-auto mt-5 max-w-screen-lg space-y-12 bg-white rounded-md">
-        <ReactQuill value={blog.content} readOnly modules={{ toolbar: false }} theme="bubble" className="!text-xl" />
-      </div>
-
-      <br />
+      <div className="lg:pb-20 md:pb-14 pb-10"></div>
     </div>
   );
 };

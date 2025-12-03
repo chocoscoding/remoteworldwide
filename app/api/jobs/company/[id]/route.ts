@@ -35,7 +35,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           },
           category: true,
           region: true,
-          jobType: true,
           seniority: true,
         },
       }),

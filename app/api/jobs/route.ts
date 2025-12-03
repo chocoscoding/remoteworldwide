@@ -29,14 +29,12 @@ export async function GET(req: NextRequest) {
     const rolesParam = searchParams.get("roles");
     const regionsParam = searchParams.get("regions");
     const seniorityParam = searchParams.get("seniority");
-    const jobTypesParam = searchParams.get("jobTypes");
     const searchByTitle = searchParams.get("search");
 
     // Parse and split parameters into arrays
     const roles = rolesParam ? rolesParam.split("_") : undefined;
     const regions = regionsParam ? regionsParam.split("_") : undefined;
     const seniority = seniorityParam ? seniorityParam.split("_") : undefined;
-    const jobTypes = jobTypesParam ? jobTypesParam.split("_") : undefined;
 
     const skipAmount = SKIP_AMNT * (page - 1);
 
@@ -45,7 +43,6 @@ export async function GET(req: NextRequest) {
     if (roles) filters.category = { in: roles };
     if (regions) filters.region = { in: regions };
     if (seniority) filters.seniority = { in: seniority };
-    if (jobTypes) filters.jobType = { in: jobTypes };
     if (searchByTitle) {
       filters.title = { contains: searchByTitle, mode: "insensitive" };
     }
@@ -76,7 +73,6 @@ export async function GET(req: NextRequest) {
           },
           category: true,
           region: true,
-          jobType: true,
           seniority: true,
         },
       }),
@@ -97,8 +93,8 @@ export async function POST(req: NextRequest) {
     const session = await auth();
 
     if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    const { title, description, companyId, applicationUrl, category, region, jobType, seniority } = await req.json();
-    const BODY_VALUES = { title, description, companyId, applicationUrl, category, region, jobType, seniority, slug: "0" };
+    const { title, description, companyId, applicationUrl, category, region, seniority } = await req.json();
+    const BODY_VALUES = { title, description, companyId, applicationUrl, category, region, seniority, slug: "0" };
 
     const missingValue = Object.entries(BODY_VALUES).filter(([key, value]) => !value);
 

@@ -1,5 +1,5 @@
 "use client";
-import { Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
+import { ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
@@ -31,10 +31,6 @@ const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <MapPinned className="w-4 text-gray-400" />
               <span>Remote, {jobDetail.region}</span>
-            </p>
-            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
-              <Calendar className="w-4 text-gray-400" />
-              <span>{jobDetail.jobType}</span>
             </p>
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />

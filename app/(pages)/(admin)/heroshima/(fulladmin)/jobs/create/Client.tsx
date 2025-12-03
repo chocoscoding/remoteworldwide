@@ -22,7 +22,6 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     link: "",
     category: null,
     region: null,
-    job_type: filters.job_type[0],
     seniority: null,
     body: "",
   });
@@ -51,7 +50,6 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       applicationUrl: formValues.link,
       category: formValues.category?.label,
       region: formValues.region?.label,
-      jobType: formValues.job_type?.label,
       seniority: formValues.seniority?.label,
     };
     const checkAllValues = Object.entries(finalValue).filter(([key, value]) => !value);
@@ -141,15 +139,6 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             options={[GenerateNewOption("Region", "/heroshima/filters"), ...filters.region]}
             onChange={(value) => handleSelectChange("region", value)}
             placeholder="Select region"
-            required
-          />
-
-          <SelectField
-            label="Job Type"
-            value={formValues.job_type}
-            options={[GenerateNewOption("Job Type", "/heroshima/filters"), ...filters.job_type]}
-            onChange={(value) => handleSelectChange("job_type", value)}
-            placeholder="Select job type"
             required
           />
 

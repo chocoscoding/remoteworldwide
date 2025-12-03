@@ -41,7 +41,6 @@ export async function GET(req: NextRequest) {
           },
           category: true,
           region: true,
-          jobType: true,
           seniority: true,
         },
       }),

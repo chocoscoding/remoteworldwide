@@ -58,11 +58,11 @@ const BlogPage = () => {
 
   return (
     <main>
-      <section className="bg-primary flex flex-col items-center justify-center h-[30vh] w-full">
-        <h1 className="font-extrabold text-white text-[4rem]">Blogs</h1>
-        <h1 className="font-medium text-secondary text-[1rem]">Get the latest information and news about the job market</h1>
+      <section className="bg-white flex flex-col items-center justify-center h-[30vh] w-full">
+        <h1 className="font-extrabold text-primary text-[4rem]">Blogs</h1>
+        <h1 className="font-medium text-neutral-500 text-[1rem]">Get the latest information and news about the job market</h1>
       </section>
-      <section className="p-2 w-full max-w-[1400px] m-auto mt-10 min-h-screen">
+      <section className="p-2 w-full max-w-[1400px] m-auto mt-10">
         {isLoading ? (
           <div className="h-[60vh] flex flex-col items-center justify-center">
             <LoaderCircle className="w-[10vw] h-[10vh] animate-spin" />
@@ -75,7 +75,10 @@ const BlogPage = () => {
           </div>
         )}
         {isLoading ? null : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
+          md:gap-[42px] gap-8
+          ">
             {blogs.map((blog, index) => (
               <div key={index}>
                 <BlogModal blog={blog} />

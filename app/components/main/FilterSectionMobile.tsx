@@ -9,17 +9,14 @@ const FilterSectionMobile: FC<{ className?: string; isMobile?: boolean }> = ({ c
   const {
     rolesOptions,
     seniorityOptions,
-    jobTypeOptions,
     showSection,
     showOnMobile,
     selectedRoles,
     selectedSeniority,
-    selectedJobTypes,
     selectedRegions,
     setSelectedRegions,
     setSelectedRoles,
     setSelectedSeniority,
-    setSelectedJobTypes,
     handleSelectOption,
     toggleShowType,
     toggleMobileFilter,
@@ -60,16 +57,6 @@ const FilterSectionMobile: FC<{ className?: string; isMobile?: boolean }> = ({ c
         options={seniorityOptions}
         selectedOptions={selectedSeniority}
         handleSelectOption={(option) => handleSelectOption(setSelectedSeniority, option)}
-      />
-      <hr />
-      {/* Job Type Filter */}
-      <FilterCategory
-        title="Job Type"
-        isOpen={showSection.jobType}
-        toggle={() => toggleShowType("jobType")}
-        options={jobTypeOptions}
-        selectedOptions={selectedJobTypes}
-        handleSelectOption={(option) => handleSelectOption(setSelectedJobTypes, option)}
       />
       <hr />
       {/* Region Filter */}

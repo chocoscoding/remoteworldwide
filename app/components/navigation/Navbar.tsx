@@ -4,10 +4,12 @@ import Link from "next/link"; // Use Next.js' Link for navigation
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import { LoaderCircle, Menu, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
+import { cn } from "@/app/lib/utils";
 const Navbar = () => {
+  const pathname = usePathname();
   const { status, data } = useSession();
   const { isOpen, toggleNavbar, closeNavbar, isOpen2, toggleNavbar2, closeNavbar2 } = useNavbar();
   const { replace } = useRouter();
@@ -69,8 +71,17 @@ const Navbar = () => {
       ) : null}
     </>
   );
+  const colorToShow = (() => {
+    const currentPathname = pathname;
+    switch (currentPathname) {
+      case "/blogs":
+        return "bg-white border-white";
+      default:
+        return "bg-white border-gray-200";
+    }
+  })();
   return (
-    <nav className="bg-white border-b border-gray-200 sticky z-20 top-0">
+    <nav className={cn("border-b sticky z-20 top-0", colorToShow)}>
       <div className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
