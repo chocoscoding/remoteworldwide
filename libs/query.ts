@@ -180,7 +180,7 @@ export const findCompanyJobs = async (companyId: string, page: number) => {
 export const getAdminDashboardInfo = async () => {
   try {
     const [latestJob, jobsCount, companiesCount, blogsCount] = await Promise.all([
-      prisma.job.findFirst({
+      prisma.job.findMany({
         where: {
           isActive: true,
         },
@@ -196,13 +196,14 @@ export const getAdminDashboardInfo = async () => {
               name: true,
             },
           },
+          createdAt: true,
           isActive: true,
           slug: true,
           category: true,
           region: true,
           seniority: true,
         },
-        take: 1,
+        take: 14,
       }),
       prisma.job.count(),
       prisma.company.count(),

@@ -99,6 +99,7 @@ interface OneJobListType {
   region: string;
   seniority: string;
   isActive: boolean;
+  createdAt?: Date;
 }
 
 export type AuthorListChildType = {

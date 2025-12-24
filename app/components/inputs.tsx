@@ -1,5 +1,5 @@
 import { Option } from "@/types/main";
-import { FC } from "react";
+import { FC, forwardRef } from "react";
 import Select from "react-select";
 
 interface SelectFieldProps {
@@ -12,10 +12,11 @@ interface SelectFieldProps {
   theme?: any;
 }
 
-export const SelectField: FC<SelectFieldProps> = ({ label, value, options, onChange, placeholder, required, theme }) => (
+export const SelectField = forwardRef<any, SelectFieldProps>(({ label, value, options, onChange, placeholder, required, theme }, ref) => (
   <div>
     <label className="block text-sm font-medium text-primary">{label}</label>
     <Select
+      ref={ref}
       value={value}
       options={options}
       onChange={onChange}
@@ -25,7 +26,9 @@ export const SelectField: FC<SelectFieldProps> = ({ label, value, options, onCha
       required={required}
     />
   </div>
-);
+));
+
+SelectField.displayName = "SelectField";
 
 interface TextFieldProps {
   label: string;

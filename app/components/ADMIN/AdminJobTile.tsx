@@ -5,6 +5,7 @@ import Link from "next/link";
 import React, { FC } from "react";
 import JobStatus from "./JobStatus";
 import { OneJobListType } from "@/types/main";
+import TimeAgo from "timeago-react";
 
 const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {
   return (
@@ -37,6 +38,14 @@ const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {
               <span>{jobDetail.seniority}</span>
             </p>
           </div>
+          {jobDetail.createdAt && (
+            <p className="text-gray-500 mt-2 text-sm">
+              Created:
+              <span className="text-gray-600 ml-1">
+                <TimeAgo datetime={jobDetail.createdAt} />
+              </span>
+            </p>
+          )}
         </div>
       </div>
 
