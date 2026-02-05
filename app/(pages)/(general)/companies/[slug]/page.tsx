@@ -22,9 +22,9 @@ interface PageProps {
     facebook: string;
   };
 }
-const fetchCompany = async (name: string): Promise<CompanyWithJobsCount | null> => {
+const fetchCompany = async (slug: string): Promise<CompanyWithJobsCount | null> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/${name}`);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/slug/${slug}`);
     if (!response.ok) {
       return null;
     }
@@ -36,9 +36,9 @@ const fetchCompany = async (name: string): Promise<CompanyWithJobsCount | null> 
   }
 };
 
-export async function generateMetadata({ params }: { params: Promise<{ name: string }> }): Promise<Metadata> {
-  const companyName = decodeURIComponent((await params).name);
-  const companyData = await fetchCompany(companyName);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const companySlug = decodeURIComponent((await params).slug);
+  const companyData = await fetchCompany(companySlug);
 
   if (!companyData) {
     return {
@@ -67,7 +67,7 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
     openGraph: {
       title,
       description,
-      url: `${process.env.NEXT_PUBLIC_SITE_URL}/companies/${encodeURIComponent(companyData.name)}`,
+      url: `${process.env.NEXT_PUBLIC_SITE_URL}/companies/${encodeURIComponent(companyData.slug)}`,
       siteName: "Remote Worldwide",
       images: [
         {
@@ -87,9 +87,9 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
     },
   };
 }
-const Page = async ({ params }: { params: Promise<{ name: string }> }) => {
-  const companyName = decodeURIComponent((await params).name);
-  const companyData = await fetchCompany(companyName);
+const Page = async ({ params }: { params: Promise<{ slug: string }> }) => {
+  const companySlug = decodeURIComponent((await params).slug);
+  const companyData = await fetchCompany(companySlug);
 
   if (!companyData) return <NotFound buttonType="back" title="Company" />;
   return (

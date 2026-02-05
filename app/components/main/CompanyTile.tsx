@@ -8,7 +8,7 @@ const CompanyTile: FC<{ forCompany?: boolean; companyData: CompanyList }> = ({ f
   const jobCount = companyData._count.jobs;
   return (
     //:TODO
-    <Link href={forCompany ? `/heroshima/companies/${companyData.name}` : `/companies/${companyData.name}`}>
+    <Link href={forCompany ? `/heroshima/companies/${companyData.slug}` : `/companies/${companyData.slug}`}>
       <div className="flex flex-col gap-3 bg-white p-2 rounded-lg group transition-all ">
         <div className="flex w-full items-center">
           <div className="border-2 rounded-full p-1 w-fit h-fit aspect-square object-center flex-shrink-0 flex justify-center items-center">

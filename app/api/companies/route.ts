@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import slugify from "slugify";
 const SKIP_AMNT = 50;
 //get all companies
 export async function GET(req: NextRequest) {
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
         take: SKIP_AMNT,
         skip: skipAmount - SKIP_AMNT,
         select: {
+          slug: true,
           name: true,
           about: true,
           logo: true,
@@ -44,8 +46,13 @@ export async function POST(req: NextRequest) {
     if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const { name, about, logo, website, linkedin, twitter, facebook } = await req.json();
+    const slug = slugify(name, {
+      lower: true,
+      strict: true,
+      trim: true,
+    });
     const REQUIRED_BODY_VALUES = { name, about, logo, website };
-    const BODY_VALUES = { name, about, logo, website, linkedin, twitter, facebook };
+    const BODY_VALUES = { name, about, logo, website, linkedin, twitter, facebook, slug };
 
     const missingValue = Object.entries(REQUIRED_BODY_VALUES).filter(([key, value]) => !value);
 

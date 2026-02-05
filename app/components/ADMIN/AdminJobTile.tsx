@@ -22,7 +22,7 @@ const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {
           </div>
         </div>
         <div className="flex-1">
-          <Link href={`/heroshima/companies/${jobDetail.company.name}`} className="w-full text-gray-500 font-medium text-base">
+          <Link href={`/heroshima/companies/${jobDetail.company.slug}`} className="w-full text-gray-500 font-medium text-base">
             {jobDetail.company.name}
           </Link>
           <Link href={`/heroshima/jobs/${jobDetail.slug}`}>

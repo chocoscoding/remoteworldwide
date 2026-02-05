@@ -90,6 +90,7 @@ export const findJobsAdmin = async (page: number, active: boolean) => {
           select: {
             logo: true,
             name: true,
+            slug: true,
           },
         },
         isActive: true,
@@ -113,11 +114,11 @@ export const findJobsAdmin = async (page: number, active: boolean) => {
   }
 };
 
-export const findCompany = async (name: string) => {
+export const findCompany = async (slug: string) => {
   try {
     const company = await prisma.company.findUnique({
       where: {
-        name,
+        slug,
       },
       include: {
         _count: {
@@ -156,6 +157,7 @@ export const findCompanyJobs = async (companyId: string, page: number) => {
           select: {
             name: true,
             logo: true,
+            slug: true,
           },
         },
         category: true,
@@ -530,6 +532,7 @@ export const fetchLatestJobs = async (amount: number) => {
           select: {
             logo: true,
             name: true,
+            slug: true,
           },
         },
         slug: true,

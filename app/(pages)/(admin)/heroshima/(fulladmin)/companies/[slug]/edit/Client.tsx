@@ -63,7 +63,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
         progress: undefined,
         theme: "dark",
       });
-      push("/heroshima/companies/" + data.data.name + "/edit");
+      push("/heroshima/companies/" + data.data.slug + "/edit");
     } catch (error: any) {
       toast.error(`Failed to create company: ${error.message}`);
     } finally {
@@ -205,7 +205,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
             Update Company info
           </button>
           <button
-            onClick={() => push(`/heroshima/companies/${pathname.name}`)}
+            onClick={() => push(`/heroshima/companies/${pathname.slug}`)}
             disabled={isLoading}
             type="button"
             className="drop-shadow-primary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 disabled:opacity-50">

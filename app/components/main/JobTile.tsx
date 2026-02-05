@@ -23,7 +23,7 @@ const JobTile: FC<JobTileType> = (props) => {
           </div>
         </div>
         <div className="flex-1">
-          <Link href={"/companies/" + company.name}>
+          <Link href={"/companies/" + company.slug}>
             <p className="w-full text-gray-500 font-medium text-base">{company.name}</p>
           </Link>
 
@@ -33,7 +33,7 @@ const JobTile: FC<JobTileType> = (props) => {
           <div className="w-full flex flex-wrap gap-4">
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <MapPinned className="w-4 text-gray-400" />
-              <span>Remote, {region}</span>
+              <span>{region}</span>
             </p>
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <Calendar className="w-4 text-gray-400" />

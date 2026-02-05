@@ -60,7 +60,7 @@ export default function CreateCompany() {
         progress: undefined,
         theme: "dark",
       });
-      push("/heroshima/companies/" + data.data.name);
+      push("/heroshima/companies/" + data.data.slug);
     } catch (error: any) {
       toast.error(`Failed to create company: ${error.message}`);
     } finally {

@@ -2,9 +2,9 @@ import NotFound from "@/app/components/NotFound";
 import EditCompanyClient from "./Client";
 import { Company } from "@prisma/client";
 
-const fetchCompany = async (name: string): Promise<Company | null> => {
+const fetchCompany = async (slug: string): Promise<Company | null> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/${name}`, { cache: "reload" });
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/${slug}`, { cache: "reload" });
     if (!response.ok) {
       return null;
     }
@@ -15,9 +15,9 @@ const fetchCompany = async (name: string): Promise<Company | null> => {
     return null;
   }
 };
-export default async function Page({ params }: { params: Promise<{ name: string }> }) {
-  const companyId = decodeURIComponent((await params).name);
-  const companyData = await fetchCompany(companyId);
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const companySlug = decodeURIComponent((await params).slug);
+  const companyData = await fetchCompany(companySlug);
   if (!companyData) return <NotFound buttonType="link" title="Company" link="/hesroshima/companies/create" />;
   return <EditCompanyClient companyData={companyData} />;
 }

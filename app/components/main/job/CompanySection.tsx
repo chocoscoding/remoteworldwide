@@ -33,7 +33,7 @@ const CompanySection: FC<{
             <h2 className="text-primary font-bold text-xl">{companyDetails.name}</h2>
           </div>
         ) : (
-          <Link href={`${forAdmin ? "/heroshima" : ""}/companies/${companyDetails.name}`} passHref>
+          <Link href={`${forAdmin ? "/heroshima" : ""}/companies/${companyDetails.slug}`} passHref>
             <div className="flex items-center gap-2 cursor-pointer">
               <h2 className="text-primary font-bold text-xl">{companyDetails.name}</h2>
               <MoveUpRight className="w-4" />

@@ -71,7 +71,7 @@ const CompanyClient: FC<{ companyData: Company; initialJobs: OneJobListType[]; i
           <CompanySection showFullDetails companyDetails={companyData} />
           <div className="w-[3rem] flex-shrink-0">
             <Link
-              href={`/heroshima/companies/${companyData.name}/edit`}
+              href={`/heroshima/companies/${companyData.slug}/edit`}
               className="drop-shadow-secondary2-hover transition-all rounded-md w-full aspect-square border border-primary mb-3 grid place-items-center">
               <PencilIcon />
             </Link>

@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             select: {
               name: true,
               logo: true,
+              slug: true,
             },
           },
           category: true,

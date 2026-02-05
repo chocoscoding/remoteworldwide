@@ -5,10 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 //get one company
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const companySlug = (await params).id;
+    const slug = (await params).id;
     const oneCompany = await prisma.company.findUnique({
       where: {
-        slug: companySlug,
+        slug: slug,
       },
       include: {
         _count: {

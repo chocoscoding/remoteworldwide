@@ -23,7 +23,7 @@ export interface FilterData2 {
   regions: Option[];
 }
 
-export interface CompanyList extends Pick<Company, "name" | "about" | "logo"> {
+export interface CompanyList extends Pick<Company, "slug" | "name" | "about" | "logo"> {
   _count: {
     jobs: number;
   };
@@ -80,6 +80,7 @@ export interface JobTileType {
   company: {
     logo: string;
     name: string;
+    slug: string;
   };
   slug: string;
   category: string;
@@ -93,6 +94,7 @@ interface OneJobListType {
   company: {
     logo: string;
     name: string;
+    slug: string;
   };
   slug: string;
   category: string;
