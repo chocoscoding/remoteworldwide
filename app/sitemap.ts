@@ -61,8 +61,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: "/blogs",
-      changeFrequency: "weekly",
-      priority: 0.5,
+      changeFrequency: "daily",
+      priority: 0.7,
     },
     {
       url: "/jobs",
@@ -71,8 +71,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: "/companies",
-      changeFrequency: "weekly",
-      priority: 0.8,
+      changeFrequency: "daily",
+      priority: 0.7,
     },
   ];
 
