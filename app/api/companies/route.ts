@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
         where: {
           name: {
             contains: companySearchParam,
+            mode: "insensitive",
           },
         },
         orderBy: {
@@ -31,7 +32,14 @@ export async function GET(req: NextRequest) {
           _count: true,
         },
       }),
-      prisma.company.count(),
+      prisma.company.count({
+        where: {
+          name: {
+            contains: companySearchParam,
+            mode: "insensitive",
+          },
+        },
+      }),
     ]);
     return NextResponse.json({ data: companies, count: companiesCount }, { status: 200, statusText: "success" });
   } catch (error: any) {

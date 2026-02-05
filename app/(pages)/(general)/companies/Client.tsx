@@ -9,10 +9,11 @@ import CompaniesSkeleton from "@/app/components/skeleton/CompaniesSkeleton";
 
 const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; forCompany?: boolean }> = ({
   initialData,
-  totalCompanies,
+  totalCompanies: props_totalCompanies,
   forCompany = false,
 }) => {
   const companiesPerPage = 50;
+  const [totalCompanies, setTotalCompanies] = useState(props_totalCompanies);
   const totalPages = Math.ceil(totalCompanies / companiesPerPage);
   const [companies, setCompanies] = useState<CompanyList[]>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -44,6 +45,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; fo
       }
       const companies = await response.json();
       setCompanies(companies.data);
+      setTotalCompanies(companies.count);
     } catch (error) {
       console.error("Error fetching companies:", error);
       setCompanies([]);

@@ -6,8 +6,12 @@ import CompanyTile from "@/app/components/main/CompanyTile";
 import { CompanyList } from "@/types/main";
 import PaginationControl from "@/app/components/main/PaginationControl";
 
-const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> = ({ initialData, totalCompanies }) => {
+const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> = ({
+  initialData,
+  totalCompanies: props_totalCompanies,
+}) => {
   const companiesPerPage = 50;
+  const [totalCompanies, setTotalCompanies] = useState(props_totalCompanies);
   const totalPages = Math.ceil(totalCompanies / companiesPerPage);
   const [companies, setCompanies] = useState<CompanyList[]>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -38,6 +42,7 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number }> 
       }
       const companies = await response.json();
       setCompanies(companies.data);
+      setTotalCompanies(companies.count);
     } catch (error) {
       console.error("Error fetching companies:", error);
       setCompanies([]);

@@ -379,7 +379,7 @@ export const editBlog = async (
     tags?: string[];
     authorId?: string;
     coverImage?: string;
-  }
+  },
 ) => {
   try {
     const blog = await prisma.blog.update({

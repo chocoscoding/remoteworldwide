@@ -50,7 +50,7 @@ const CompanySection: FC<{
                 <Link key={index} href={href} target="_blank" rel="noopener noreferrer">
                   <Icon className="text-gray-400 w-4" />
                 </Link>
-              )
+              ),
           )}
         </div>
       ) : null}

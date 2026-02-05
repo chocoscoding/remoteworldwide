@@ -30,7 +30,8 @@
     "remoteworldwide": "file:",
     "slugify": "^1.6.6",
     "tailwind-merge": "^2.5.4",
-    "timeago-react": "^3.0.6"
+    "timeago-react": "^3.0.6",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/next-auth": "^3.13.0",
