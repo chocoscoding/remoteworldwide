@@ -16,7 +16,7 @@
     "cobe": "^0.6.3",
     "hexoid": "^2.0.0",
     "lucide-react": "^0.453.0",
-    "next": "14.2.15",
+    "next": "14.2.35",
     "next-auth": "^5.0.0-beta.30",
     "next-cloudinary": "^6.16.0",
     "nextjs-toploader": "^3.7.15",

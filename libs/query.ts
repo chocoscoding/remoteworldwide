@@ -194,6 +194,7 @@ export const getAdminDashboardInfo = async () => {
           title: true,
           company: {
             select: {
+              slug: true,
               logo: true,
               name: true,
             },
