@@ -44,7 +44,7 @@ export default async function Home() {
       </section>
 
       <div className="w-full justify-center items-center p-2 my-10 mt-30">
-        <h3 className="w-full text-xl font-bold text-neutral-600 relative top-10">Testimonials</h3>
+        <h3 className="w-full text-xl font-bold text-neutral-600 relative top-10 left-5">Testimonials</h3>
         <StaggerTestimonials />
       </div>
       <br />

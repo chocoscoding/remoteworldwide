@@ -55,9 +55,24 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Individual setters that update combined state
-  const setSelectedRoles = (roles: string[]) => setSelectedFilters((prev) => ({ ...prev, roles }));
-  const setSelectedRegions = (regions: string[]) => setSelectedFilters((prev) => ({ ...prev, regions }));
-  const setSelectedSeniority = (seniority: string[]) => setSelectedFilters((prev) => ({ ...prev, seniority }));
+  const setSelectedRoles = (roles: SetStateAction<string[]>) => {
+    setSelectedFilters((prev) => ({
+      ...prev,
+      roles: typeof roles === 'function' ? roles(prev.roles) : roles,
+    }));
+  };
+  const setSelectedRegions = (regions: SetStateAction<string[]>) => {
+    setSelectedFilters((prev) => ({
+      ...prev,
+      regions: typeof regions === 'function' ? regions(prev.regions) : regions,
+    }));
+  };
+  const setSelectedSeniority = (seniority: SetStateAction<string[]>) => {
+    setSelectedFilters((prev) => ({
+      ...prev,
+      seniority: typeof seniority === 'function' ? seniority(prev.seniority) : seniority,
+    }));
+  };
 
   const activeFilterCount = useMemo(() => {
     return selectedFilters.roles.length + selectedFilters.regions.length + selectedFilters.seniority.length;

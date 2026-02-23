@@ -73,60 +73,6 @@ const testimonials = [
     by: "Pete, Sales Director at RevenueRockets",
     imgSrc: "https://i.pravatar.cc/150?img=11",
   },
-  {
-    tempId: 11,
-    testimonial: "It's so simple and intuitive, we got the team up to speed in 10 minutes.",
-    by: "Marina, HR Manager at TalentForge",
-    imgSrc: "https://i.pravatar.cc/150?img=12",
-  },
-  {
-    tempId: 12,
-    testimonial: "COMPANY's customer support is unparalleled. They're always there when we need them.",
-    by: "Olivia, Customer Success Manager at ClientCare",
-    imgSrc: "https://i.pravatar.cc/150?img=13",
-  },
-  {
-    tempId: 13,
-    testimonial: "The efficiency gains we've seen since implementing COMPANY are off the charts!",
-    by: "Raj, Operations Manager at StreamlineSolutions",
-    imgSrc: "https://i.pravatar.cc/150?img=14",
-  },
-  {
-    tempId: 14,
-    testimonial: "COMPANY has revolutionized how we handle our workflow. It's a game-changer!",
-    by: "Lila, Workflow Specialist at ProcessPro",
-    imgSrc: "https://i.pravatar.cc/150?img=15",
-  },
-  {
-    tempId: 15,
-    testimonial: "The scalability of COMPANY's solution is impressive. It grows with our business seamlessly.",
-    by: "Trevor, Scaling Officer at GrowthGurus",
-    imgSrc: "https://i.pravatar.cc/150?img=16",
-  },
-  {
-    tempId: 16,
-    testimonial: "I appreciate how COMPANY continually innovates. They're always one step ahead.",
-    by: "Naomi, Innovation Lead at FutureTech",
-    imgSrc: "https://i.pravatar.cc/150?img=17",
-  },
-  {
-    tempId: 17,
-    testimonial: "The ROI we've seen with COMPANY is incredible. It's paid for itself many times over.",
-    by: "Victor, Finance Analyst at ProfitPeak",
-    imgSrc: "https://i.pravatar.cc/150?img=18",
-  },
-  {
-    tempId: 18,
-    testimonial: "COMPANY's platform is so robust, yet easy to use. It's the perfect balance.",
-    by: "Yuki, Tech Lead at BalancedTech",
-    imgSrc: "https://i.pravatar.cc/150?img=19",
-  },
-  {
-    tempId: 19,
-    testimonial: "We've tried many solutions, but COMPANY stands out in terms of reliability and performance.",
-    by: "Zoe, Performance Manager at ReliableSystems",
-    imgSrc: "https://i.pravatar.cc/150?img=20",
-  },
 ];
 
 interface TestimonialCardProps {
