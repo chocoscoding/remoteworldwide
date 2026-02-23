@@ -51,7 +51,7 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
     regions: [],
     seniority: [],
   });
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => getDefaultRange());
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Individual setters that update combined state
@@ -101,11 +101,10 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
       const dateToParam = params.get("dateTo");
       const parsedFrom = parseDateParam(dateFromParam);
       const parsedTo = parseDateParam(dateToParam);
-      const defaultRange = getDefaultRange();
-      const initialRange = normalizeDateRange({
-        from: parsedFrom ?? defaultRange.from,
-        to: parsedTo ?? defaultRange.to,
-      });
+      const initialRange = parsedFrom && parsedTo ? normalizeDateRange({
+        from: parsedFrom,
+        to: parsedTo,
+      }) : undefined;
 
       setSelectedFilters({ roles, regions, seniority });
       setDateRange(initialRange);

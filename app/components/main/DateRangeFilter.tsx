@@ -37,14 +37,10 @@ const DateRangeFilter = ({ isOpen, toggle }: DateRangeFilterProps) => {
             <PopoverTrigger asChild>
               <Button variant="brutalist" className="w-full justify-start gap-2 px-2.5 font-normal">
                 <CalendarIcon className="h-4 w-4" />
-                {from ? (
-                  to ? (
-                    <>
-                      {format(to, "LLL dd, y")} - {format(from, "LLL dd, y")}
-                    </>
-                  ) : (
-                    format(from, "LLL dd, y")
-                  )
+                {from && to ? (
+                  <>
+                    {format(from, "LLL dd, y")} - {format(to, "LLL dd, y")}
+                  </>
                 ) : (
                   <span>Pick a date</span>
                 )}
