@@ -54,9 +54,9 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jo
 
   return (
     <div
-      className={`${
-        isBookmarked ? "border-primary/30" : ""
-      } flex-0 flex-shrink-0 flex border h-8 w-8 rounded-md items-center justify-center cursor-pointer hover:bg-gray-50`}
+      className={` flex-0 flex-shrink-0 flex border h-8 w-8 rounded-md items-center justify-center cursor-pointer  ${
+        isBookmarked ? "border-primary/30 bg-black" : "hover:bg-gray-50"
+      }`}
       onClick={toggleBookmark}>
       <Bookmark
         fill={isBookmarked ? "#daec54" : "#ffffff"}

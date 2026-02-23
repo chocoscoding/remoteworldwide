@@ -1,11 +1,12 @@
 "use client";
-import React, { FC, Suspense } from "react";
-import { Calendar, ChartNoAxesColumnIncreasing, Link as LinkIcon, MapPinned, Zap } from "lucide-react";
+import React, { FC, Suspense, useRef } from "react";
+import { Calendar, ChartNoAxesColumnIncreasing, MapPinned, Zap } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import BookmarkStatus from "../BookmarkStatus";
 import { Job } from "@prisma/client";
 import { toast } from "react-toastify";
+import { LinkIcon, type LinkIconHandle } from "@/components/ui/link-icon";
 
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false, loading: () => <JobDescriptionSkeleton /> });
 
@@ -35,6 +36,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
   hasUserBookmarked,
 }) => {
   const { title, description, region, createdAt, seniority, applicationUrl } = data;
+  const refEye = useRef<LinkIconHandle>(null);
 
   const copyJobLink = () => {
     navigator.clipboard
@@ -54,6 +56,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       .catch((err) => {
         console.error("Failed to copy: ", err);
       });
+    refEye.current?.startAnimation();
   };
   return (
     <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black overflow-hidden">
@@ -96,9 +99,12 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
               </h2>
             </div>
           </div>
-          <div className="flex justify-end gap-3 flex-shrink-0 w-fit ">
-            <button className="h-8 w-8 rounded-lg border hover:bg-gray-50 flex items-center justify-center" onClick={copyJobLink}>
-              <LinkIcon className="text-gray-500 w-[1.2rem]" />
+          <div className="flex justify-end gap-3 flex-shrink-0 w-fit">
+            <button
+              className="h-8 w-8 rounded-lg border hover:bg-gray-50 flex items-center justify-center cursor-pointer text-gray-500 hover:text-black"
+              onMouseLeave={() => refEye.current?.stopAnimation()}
+              onClick={copyJobLink}>
+              <LinkIcon ref={refEye} className="w-[1.2rem]" />
             </button>
             {showBookmark && <BookmarkStatus hasUserBookmarked={hasUserBookmarked} jobId={data.id} />}
           </div>

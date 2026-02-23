@@ -29,7 +29,7 @@ const BookmarkTile: FC<{ job: OneBookmarkType["job"]; removeBookmark: (id: strin
           <div className="w-full flex flex-wrap gap-6">
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <MapPinned className="w-4 text-gray-400" />
-              <span>Remote, {regionLabel}</span>
+              <span>{regionLabel}</span>
             </p>
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />
