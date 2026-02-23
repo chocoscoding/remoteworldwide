@@ -2,6 +2,7 @@ import Header from "@/app/components/Header";
 import JobListSection from "./JobListSection";
 import Link from "next/link";
 import { fetchLatestJobs, getAllActiveJobsCount } from "@/libs/query";
+import { StaggerTestimonials } from "@/components/ui/stagger-testimonials";
 // import { revalidatePath } from "next/cache";
 export const revalidate = 3600 * 24;
 const getLatestJobs = async () => {
@@ -41,6 +42,11 @@ export default async function Home() {
           </Link>
         </div>
       </section>
+
+      <div className="w-full justify-center items-center p-2 my-10 mt-30">
+        <h3 className="w-full text-xl font-bold text-neutral-600 relative top-10">Testimonials</h3>
+        <StaggerTestimonials />
+      </div>
       <br />
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 import React, { FC } from "react";
 import FilterCategory from "./FilterCategory";
+import DateRangeFilter from "./DateRangeFilter";
 import { cn } from "../../lib/utils";
 import { X } from "lucide-react";
 import { useFilter } from "@/provider/FilterProvider";
@@ -29,7 +30,7 @@ const FilterSectionMobile: FC<{ className?: string; isMobile?: boolean }> = ({ c
     <section
       className={cn(
         "border border-primary/10 col-span-4 xl:col-span-3 w-full sm:max-w-[300px] overflow-y-auto sm:rounded-xl fixed z-50 sm:sticky sm:bg-transparent bg-white left-0 top-[65px] h-[calc(100vh-64px)] p-3",
-        className
+        className,
       )}>
       <div className="sm:hidden flex items-center justify-center">
         <button
@@ -40,6 +41,8 @@ const FilterSectionMobile: FC<{ className?: string; isMobile?: boolean }> = ({ c
         </button>
       </div>
 
+      <DateRangeFilter isOpen={showSection.dateRange} toggle={() => toggleShowType("dateRange")} />
+      <hr />
       <FilterCategory
         title="Roles"
         isOpen={showSection.roles}

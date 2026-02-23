@@ -3,6 +3,26 @@ import { prisma } from "@/prisma";
 import { hexoid } from "hexoid";
 import { NextRequest, NextResponse } from "next/server";
 const SKIP_AMNT = 50;
+const DEFAULT_START_DATE = { year: 2023, month: 12, day: 31 };
+
+function parseDateParam(value: string | null) {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+}
+
+function startOfDay({ year, month, day }: { year: number; month: number; day: number }) {
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+function endOfDay({ year, month, day }: { year: number; month: number; day: number }) {
+  return new Date(year, month - 1, day, 23, 59, 59, 999);
+}
 
 //create a slug for job
 function createSlug(input: string) {
@@ -30,11 +50,21 @@ export async function GET(req: NextRequest) {
     const regionsParam = searchParams.get("regions");
     const seniorityParam = searchParams.get("seniority");
     const searchByTitle = searchParams.get("search");
+    const dateFromParam = searchParams.get("dateFrom");
+    const dateToParam = searchParams.get("dateTo");
 
     // Parse and split parameters into arrays
     const roles = rolesParam ? rolesParam.split("_") : undefined;
     const regions = regionsParam ? regionsParam.split("_") : undefined;
     const seniority = seniorityParam ? seniorityParam.split("_") : undefined;
+    const parsedDateFrom = parseDateParam(dateFromParam);
+    const parsedDateTo = parseDateParam(dateToParam);
+    const dateFrom = parsedDateFrom ?? DEFAULT_START_DATE;
+    const dateTo = parsedDateTo ?? {
+      year: new Date().getFullYear(),
+      month: new Date().getMonth() + 1,
+      day: new Date().getDate(),
+    };
 
     const skipAmount = SKIP_AMNT * (page - 1);
 
@@ -43,6 +73,10 @@ export async function GET(req: NextRequest) {
     if (roles) filters.category = { in: roles };
     if (regions) filters.region = { in: regions };
     if (seniority) filters.seniority = { in: seniority };
+    filters.updatedAt = {
+      gte: startOfDay(dateFrom),
+      lte: endOfDay(dateTo),
+    };
     if (searchByTitle) {
       filters.title = { contains: searchByTitle, mode: "insensitive" };
     }

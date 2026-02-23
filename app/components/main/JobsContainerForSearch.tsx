@@ -1,11 +1,12 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import JobTile from "./JobTile";
 import { AlertCircle } from "lucide-react";
 import JobTileSkeleton from "./JobTileSkeleton";
 import { JobTileType } from "@/types/main";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import PaginationControl from "./PaginationControl";
+import PaginationControlNew from "./PaginationControlNew";
+// import PaginationControl from "./PaginationControl";
 
 const JobsContainerForSearch = () => {
   const jobsPerPage = 50;
@@ -18,10 +19,10 @@ const JobsContainerForSearch = () => {
   const pathname = usePathname();
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(() => {
-    const page = params.get("page") || 1;
-    return ~~page;
-  });
+  const currentPage = useMemo(() => {
+    const page = searchParams.get("page");
+    return page ? ~~page : 1;
+  }, [searchParams]);
 
   // Loading and error state
   const [loading, setLoading] = useState(true);
@@ -33,7 +34,7 @@ const JobsContainerForSearch = () => {
       params.delete("page");
       params.append("page", `${currentPage - 1}`);
       router.replace(pathname + "?" + params.toString());
-      setCurrentPage((prevPage) => prevPage - 1);
+      // setCurrentPage((prevPage) => prevPage - 1);
     }
   };
 
@@ -42,8 +43,14 @@ const JobsContainerForSearch = () => {
       params.delete("page");
       params.append("page", `${currentPage + 1}`);
       router.replace(pathname + "?" + params.toString());
-      setCurrentPage((prevPage) => prevPage + 1);
+      // setCurrentPage((prevPage) => prevPage + 1);
     }
+  };
+  const handlePageChange = (page: number) => {
+    params.delete("page");
+    params.append("page", `${page}`);
+    router.replace(pathname + "?" + params.toString());
+    // setCurrentPage(page);
   };
 
   // Simulate fetching data
@@ -66,13 +73,10 @@ const JobsContainerForSearch = () => {
   };
   useEffect(() => {
     const timeout = setTimeout(() => {
-      const fetchJobs = async () => {
-        return await getJobs();
-      };
-      fetchJobs();
+      getJobs();
     }, 500);
     return () => clearTimeout(timeout);
-  }, [currentPage, searchParams]);
+  }, [searchParams]);
 
   // Display range for jobs on the current page
   const startJobIndex = (currentPage - 1) * jobsPerPage;
@@ -115,9 +119,10 @@ const JobsContainerForSearch = () => {
       ))}
 
       {/* pagination */}
-      <PaginationControl
+      <PaginationControlNew
         handlePrevious={handlePrevious}
         handleNext={handleNext}
+        onPageChange={handlePageChange}
         currentPage={currentPage}
         totalPages={totalPages}
         dataTotal={totalJobs}

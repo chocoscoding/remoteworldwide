@@ -503,10 +503,15 @@ export const checkBookmarkForUser = async (userId: string, jobId: string) => {
 };
 
 export const getAllActiveJobsCount = async () => {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
   try {
     const count = await prisma.job.count({
       where: {
         isActive: true,
+        createdAt: {
+          gte: thirtyDaysAgo,
+        },
       },
     });
     return { count };

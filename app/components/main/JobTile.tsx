@@ -8,7 +8,7 @@ import TimeAgo from "timeago-react";
 const JobTile: FC<JobTileType> = (props) => {
   const { title, slug, company, region, createdAt, seniority } = props;
   return (
-    <div className="flex p-4 mb-5 rounded-md gap-2 md:gap-3 shadow-sm transition-all bg-white">
+    <div className="flex p-4 mb-5 rounded-md gap-2 md:gap-3 shadow-sm transition-all duration-4000 ease-in bg-white border border-gray-200 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
       {/* logo
     main info */}
       <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-3">

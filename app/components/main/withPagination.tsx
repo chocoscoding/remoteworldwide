@@ -2,7 +2,7 @@ import { FetchDataFunction, OneJobListType, WithPaginationProps } from "@/types/
 import React, { useState, useEffect } from "react";
 import JobTileSkeletonList from "./JobTileSkeletonList";
 import AdminJobTile from "../ADMIN/AdminJobTile";
-import PaginationControl from "./PaginationControl";
+import PaginationControlNew from "./PaginationControlNew";
 
 // Higher-Order Component to handle pagination with loading state
 const withPagination = (
@@ -10,7 +10,7 @@ const withPagination = (
   fetchDataFunction: FetchDataFunction<OneJobListType>,
   jobsPerPage: number = 50,
   initialJobs: OneJobListType[] = [],
-  initialTotalJobs: number = 0
+  initialTotalJobs: number = 0,
 ) => {
   return function WithPagination(props: any) {
     const [jobs, setJobs] = useState<OneJobListType[]>(initialJobs);
@@ -40,6 +40,10 @@ const withPagination = (
 
     // Pagination logic
     const totalPages = Math.ceil(totalJobs / jobsPerPage);
+
+    const handlePageChange = (page: number) => {
+      setCurrentPage(page);
+    };
     const handlePrevious = () => {
       if (currentPage > 1) {
         setCurrentPage((prevPage) => prevPage - 1);
@@ -90,9 +94,10 @@ const withPagination = (
           </>
         )}
         {/* pagination */}
-        <PaginationControl
+        <PaginationControlNew
           handlePrevious={handlePrevious}
           handleNext={handleNext}
+          onPageChange={handlePageChange}
           currentPage={currentPage}
           totalPages={totalPages}
           dataTotal={totalJobs}

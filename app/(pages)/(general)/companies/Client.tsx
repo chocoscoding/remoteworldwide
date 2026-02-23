@@ -4,8 +4,8 @@ import { FC, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import CompanyTile from "@/app/components/main/CompanyTile";
 import { CompanyList } from "@/types/main";
-import PaginationControl from "@/app/components/main/PaginationControl";
 import CompaniesSkeleton from "@/app/components/skeleton/CompaniesSkeleton";
+import PaginationControlNew from "@/app/components/main/PaginationControlNew";
 
 const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; forCompany?: boolean }> = ({
   initialData,
@@ -24,6 +24,9 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; fo
   const [currentPage, setCurrentPage] = useState(1);
 
   // Handlers for pagination buttons
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
   const handlePrevious = () => {
     if (currentPage > 1) {
       setCurrentPage((prevPage) => prevPage - 1);
@@ -64,8 +67,9 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; fo
       };
       fetchCompanies();
     }, 500);
+    setCurrentPage(1);
     return () => clearTimeout(fetchTimeout);
-  }, [currentPage, searchParam]);
+  }, [searchParam]);
 
   // Display range for jobs on the current page
   const startCompanyIndex = (currentPage - 1) * companiesPerPage;
@@ -119,7 +123,8 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; fo
           )}
 
           {/* pagination */}
-          <PaginationControl
+          <PaginationControlNew
+            onPageChange={handlePageChange}
             handlePrevious={handlePrevious}
             handleNext={handleNext}
             currentPage={currentPage}

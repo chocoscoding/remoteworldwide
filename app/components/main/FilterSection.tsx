@@ -1,6 +1,7 @@
 "use client";
 import { FC } from "react";
 import FilterCategory from "./FilterCategory";
+import DateRangeFilter from "./DateRangeFilter";
 import { cn } from "../../lib/utils";
 import { X } from "lucide-react";
 import { useFilter } from "@/provider/FilterProvider";
@@ -19,14 +20,15 @@ const FilterSection: FC<{ className?: string; isMobile?: boolean }> = ({ classNa
     handleSelectOption,
     toggleShowType,
     regionOptions,
+    clearFilters,
   } = useFilter();
 
   // if (isMobile === true) return null;
   return (
     <section
       className={cn(
-        "border border-primary/10 col-span-4 xl:col-span-3 w-full sm:max-w-[300px] max-h-[700px] overflow-y-auto sm:rounded-xl fixed sm:sticky sm:bg-transparent bg-white left-0 top-[65px] h-screen p-3",
-        className
+        "border border-primary/10 col-span-4 xl:col-span-3 w-full sm:max-w-[360px] max-h-[700px] overflow-y-auto sm:rounded-xl fixed sm:sticky sm:bg-transparent bg-white left-0 top-[65px] h-screen p-3",
+        className,
       )}>
       <div className="sm:hidden flex items-center justify-center">
         <button
@@ -38,9 +40,13 @@ const FilterSection: FC<{ className?: string; isMobile?: boolean }> = ({ classNa
       </div>
       <header className="flex justify-between">
         <h1 className="font-bold text-xl flex items-center">Filters</h1>
-        <button className="text-gray-500 text-sm">Clear</button>
+        <button className="text-gray-500 text-sm" onClick={clearFilters}>
+          Clear
+        </button>
       </header>
       <br />
+      <DateRangeFilter isOpen={showSection.dateRange} toggle={() => toggleShowType("dateRange")} />
+      <hr />
       <FilterCategory
         title="Roles"
         isOpen={showSection.roles}
