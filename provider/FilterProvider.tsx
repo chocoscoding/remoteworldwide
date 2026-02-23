@@ -58,19 +58,19 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
   const setSelectedRoles = (roles: SetStateAction<string[]>) => {
     setSelectedFilters((prev) => ({
       ...prev,
-      roles: typeof roles === 'function' ? roles(prev.roles) : roles,
+      roles: typeof roles === "function" ? roles(prev.roles) : roles,
     }));
   };
   const setSelectedRegions = (regions: SetStateAction<string[]>) => {
     setSelectedFilters((prev) => ({
       ...prev,
-      regions: typeof regions === 'function' ? regions(prev.regions) : regions,
+      regions: typeof regions === "function" ? regions(prev.regions) : regions,
     }));
   };
   const setSelectedSeniority = (seniority: SetStateAction<string[]>) => {
     setSelectedFilters((prev) => ({
       ...prev,
-      seniority: typeof seniority === 'function' ? seniority(prev.seniority) : seniority,
+      seniority: typeof seniority === "function" ? seniority(prev.seniority) : seniority,
     }));
   };
 

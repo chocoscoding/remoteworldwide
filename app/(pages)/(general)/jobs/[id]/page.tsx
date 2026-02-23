@@ -62,8 +62,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   // fetch data
+  const regionLabel = JOB.region?.length ? JOB.region.join(", ") : "Anywhere in the world";
   const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(JOB.title)}&type=${encodeURIComponent(
-    JOB.region
+    regionLabel
   )}&company=${encodeURIComponent(JOB.company.name)}`;
 
   const keywordText = JOB.slug.split("-").slice(0, -1);

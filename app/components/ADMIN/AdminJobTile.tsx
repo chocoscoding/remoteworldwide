@@ -8,6 +8,7 @@ import { OneJobListType } from "@/types/main";
 import TimeAgo from "timeago-react";
 
 const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {
+  const regionLabel = jobDetail.region.length > 0 ? jobDetail.region.join(", ") : "Anywhere in the world";
   return (
     <div className="flex p-4 mb-5 rounded-xl gap-2 md:gap-3 shadow-sm transition-all bg-white">
       {/* logo
@@ -31,7 +32,7 @@ const AdminJobTile: FC<{ jobDetail: OneJobListType }> = ({ jobDetail }) => {
           <div className="w-full flex flex-wrap gap-6">
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <MapPinned className="w-4 text-gray-400" />
-              <span>Remote, {jobDetail.region}</span>
+              <span>Remote, {regionLabel}</span>
             </p>
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-2">
               <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />

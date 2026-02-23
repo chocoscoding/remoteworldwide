@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SelectField, TextField } from "@/app/components/inputs";
-import { FilterData, FilterType, FormValues } from "@/types/main";
+import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
 import { Job } from "@prisma/client";
 import { updateOneJob } from "@/libs/query";
@@ -20,13 +20,22 @@ const GenerateNewOption = (title: string, href: string) => ({
   href,
 });
 
+const hasHref = (option: Option) => Boolean(option.href);
+
+const dedupeByLabel = (options: Option[]) => Array.from(new Map(options.map((item) => [item.label, item])).values());
+
+const getRegionOptions = (regions: Option[], selected: Option[]) => [
+  GenerateNewOption("Region", "/heroshima/filters"),
+  ...regions.filter((region) => !selected.some((s) => s.label === region.label)),
+];
+
 const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
   const [formValues, setFormValues] = useState<FormValues>({
     title: job.title,
     company: { label: job.company.name, value: job.companyId },
     link: job.applicationUrl,
     category: { label: job.category, value: job.category },
-    region: { label: job.region, value: job.region },
+    region: job.region.map((value) => ({ label: value, value })),
     seniority: { label: job.seniority, value: job.seniority },
     body: job.description,
   });
@@ -34,12 +43,27 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
 
   const { push } = useRouter();
 
-  const handleSelectChange = (field: keyof FormValues, value: { value: string; label: string; href?: string }) => {
+  const handleSingleSelectChange = (field: "company" | "category" | "seniority", value: Option | null) => {
     if (value?.href) {
       push(value.href);
     } else {
       setFormValues((prev) => ({ ...prev, [field]: value }));
     }
+  };
+
+  const handleRegionChange = (value: Option[] | null) => {
+    if (!value) {
+      setFormValues((prev) => ({ ...prev, region: [] }));
+      return;
+    }
+
+    const hrefOption = value.find(hasHref);
+    if (hrefOption?.href) {
+      push(hrefOption.href);
+    }
+
+    const filtered = value.filter((option) => !option.href);
+    setFormValues((prev) => ({ ...prev, region: dedupeByLabel(filtered) }));
   };
 
   const handleInputChange = (field: keyof FormValues) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -54,14 +78,26 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
       companyId: formValues.company!.value,
       applicationUrl: formValues.link,
       category: formValues.category!.label,
-      region: formValues.region!.label,
+      region: formValues.region.map((option) => option.label),
       seniority: formValues.seniority!.label,
       slug: job.slug,
     };
-    const checkAllValues = Object.entries(finalValue).filter(([key, value]) => !value);
+    const regionValues = new Set(finalValue.region);
+    const hasDuplicateRegions = regionValues.size !== finalValue.region.length;
+
+    const checkAllValues = [
+      !finalValue.title && "title",
+      !finalValue.description && "description",
+      !finalValue.companyId && "companyId",
+      !finalValue.applicationUrl && "applicationUrl",
+      !finalValue.category && "category",
+      finalValue.region.length === 0 && "region",
+      !finalValue.seniority && "seniority",
+      hasDuplicateRegions && "duplicate regions",
+    ].filter(Boolean) as string[];
     if (isLoading) return;
-    if (checkAllValues.length > 1) {
-      toast.error(`fill all required details: ${checkAllValues.map(([key, val]) => key).join(", ")}`);
+    if (checkAllValues.length > 0) {
+      toast.error(`fill all required details: ${checkAllValues.join(", ")}`);
     } else {
       setIsLoading(true);
       toast.info("Creating new Job...", { autoClose: 300 });
@@ -118,7 +154,7 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
             label="Company"
             value={formValues.company}
             options={[GenerateNewOption("Company", "/heroshima/companies/create"), ...allCompanies]}
-            onChange={(value) => handleSelectChange("company", value)}
+            onChange={(value) => handleSingleSelectChange("company", value as Option | null)}
             placeholder="Select company"
             required
           />
@@ -127,7 +163,7 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
             label="Category"
             value={formValues.category}
             options={[GenerateNewOption("Category", "/heroshima/filters"), ...filters.category]}
-            onChange={(value) => handleSelectChange("category", value)}
+            onChange={(value) => handleSingleSelectChange("category", value as Option | null)}
             placeholder="Select category"
             required
           />
@@ -135,17 +171,18 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
           <SelectField
             label="Region"
             value={formValues.region}
-            options={[GenerateNewOption("Region", "/heroshima/filters"), ...filters.region]}
-            onChange={(value) => handleSelectChange("region", value)}
-            placeholder="Select region"
+            options={getRegionOptions(filters.region, formValues.region)}
+            onChange={(value) => handleRegionChange(value as Option[] | null)}
+            placeholder="Select region(s)"
             required
+            isMulti
           />
 
           <SelectField
             label="Seniority"
             value={formValues.seniority}
             options={[GenerateNewOption("Seniority", "/heroshima/filters"), ...filters.seniority]}
-            onChange={(value) => handleSelectChange("seniority", value)}
+            onChange={(value) => handleSingleSelectChange("seniority", value as Option | null)}
             placeholder="Select seniority"
             required
           />

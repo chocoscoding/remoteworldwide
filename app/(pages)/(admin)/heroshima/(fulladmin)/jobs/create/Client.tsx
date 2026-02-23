@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SelectField, TextField } from "@/app/components/inputs";
-import { FilterData, FilterType, FormValues } from "@/types/main";
+import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
 import AIJobParser from "./AIJobParser";
 
@@ -16,6 +16,15 @@ const GenerateNewOption = (title: string, href: string) => ({
   href,
 });
 
+const hasHref = (option: Option) => Boolean(option.href);
+
+const dedupeByLabel = (options: Option[]) => Array.from(new Map(options.map((item) => [item.label, item])).values());
+
+const getRegionOptions = (regions: Option[], selected: Option[]) => [
+  GenerateNewOption("Region", "/heroshima/filters"),
+  ...regions.filter((region) => !selected.some((s) => s.label === region.label)),
+];
+
 interface SelectRef {
   inputRef?: HTMLInputElement;
 }
@@ -26,7 +35,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     company: null,
     link: "",
     category: null,
-    region: null,
+    region: [],
     seniority: null,
     body: "",
   });
@@ -39,12 +48,27 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
 
   const { push } = useRouter();
 
-  const handleSelectChange = (field: keyof FormValues, value: { value: string; label: string; href?: string }) => {
+  const handleSingleSelectChange = (field: "company" | "category" | "seniority", value: Option | null) => {
     if (value?.href) {
       push(value.href);
     } else {
       setFormValues((prev) => ({ ...prev, [field]: value }));
     }
+  };
+
+  const handleRegionChange = (value: Option[] | null) => {
+    if (!value) {
+      setFormValues((prev) => ({ ...prev, region: [] }));
+      return;
+    }
+
+    const hrefOption = value.find(hasHref);
+    if (hrefOption?.href) {
+      push(hrefOption.href);
+    }
+
+    const filtered = value.filter((option) => !option.href);
+    setFormValues((prev) => ({ ...prev, region: dedupeByLabel(filtered) }));
   };
 
   const handleInputChange = (field: keyof FormValues) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -73,10 +97,10 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     jobDescription: string;
     companyName: string;
     category: string;
-    region: string;
+    regions: string[];
     seniorityLevel: string;
   }) => {
-    const { jobTitle, companyName, jobDescription, seniorityLevel, category, region, jobLink } = parsedData;
+    const { jobTitle, companyName, jobDescription, seniorityLevel, category, regions, jobLink } = parsedData;
 
     setFormValues((prev) => ({
       ...prev,
@@ -96,10 +120,10 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       }
     }
 
-    if (region) {
-      const matchingRegion = filters.region.find((r) => r.label === region);
-      if (matchingRegion) {
-        setFormValues((prev) => ({ ...prev, region: matchingRegion }));
+    if (regions?.length) {
+      const matchingRegions = filters.region.filter((r) => regions.includes(r.label));
+      if (matchingRegions.length > 0) {
+        setFormValues((prev) => ({ ...prev, region: matchingRegions }));
       }
     }
 
@@ -119,13 +143,25 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       companyId: formValues.company?.value,
       applicationUrl: formValues.link,
       category: formValues.category?.label,
-      region: formValues.region?.label,
+      region: formValues.region.map((option) => option.label),
       seniority: formValues.seniority?.label,
     };
-    const checkAllValues = Object.entries(finalValue).filter(([key, value]) => !value);
+    const regionValues = new Set(finalValue.region);
+    const hasDuplicateRegions = regionValues.size !== finalValue.region.length;
+
+    const checkAllValues = [
+      !finalValue.title && "title",
+      !finalValue.description && "description",
+      !finalValue.companyId && "companyId",
+      !finalValue.applicationUrl && "applicationUrl",
+      !finalValue.category && "category",
+      finalValue.region.length === 0 && "region",
+      !finalValue.seniority && "seniority",
+      hasDuplicateRegions && "duplicate regions",
+    ].filter(Boolean) as string[];
     if (isLoading) return;
-    if (checkAllValues.length > 1) {
-      toast.error(`fill all required details: ${checkAllValues.map(([key, val]) => key).join(", ")}`);
+    if (checkAllValues.length > 0) {
+      toast.error(`fill all required details: ${checkAllValues.join(", ")}`);
     } else {
       setIsLoading(true);
       toast.info("Creating new Job...", { autoClose: 300 });
@@ -202,7 +238,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             label="Company"
             value={formValues.company}
             options={[GenerateNewOption("Company", "/heroshima/companies/create"), ...allCompanies]}
-            onChange={(value) => handleSelectChange("company", value)}
+            onChange={(value) => handleSingleSelectChange("company", value as Option | null)}
             placeholder="Select company"
             required
           />
@@ -212,7 +248,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             label="Category"
             value={formValues.category}
             options={[GenerateNewOption("Category", "/heroshima/filters"), ...filters.category]}
-            onChange={(value) => handleSelectChange("category", value)}
+            onChange={(value) => handleSingleSelectChange("category", value as Option | null)}
             placeholder="Select category"
             required
           />
@@ -221,10 +257,11 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             ref={regionRef}
             label="Region"
             value={formValues.region}
-            options={[GenerateNewOption("Region", "/heroshima/filters"), ...filters.region]}
-            onChange={(value) => handleSelectChange("region", value)}
-            placeholder="Select region"
+            options={getRegionOptions(filters.region, formValues.region)}
+            onChange={(value) => handleRegionChange(value as Option[] | null)}
+            placeholder="Select region(s)"
             required
+            isMulti
           />
 
           <SelectField
@@ -232,7 +269,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             label="Seniority"
             value={formValues.seniority}
             options={[GenerateNewOption("Seniority", "/heroshima/filters"), ...filters.seniority]}
-            onChange={(value) => handleSelectChange("seniority", value)}
+            onChange={(value) => handleSingleSelectChange("seniority", value as Option | null)}
             placeholder="Select seniority"
             required
           />

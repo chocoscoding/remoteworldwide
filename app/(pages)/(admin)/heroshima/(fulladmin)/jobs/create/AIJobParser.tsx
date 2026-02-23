@@ -18,7 +18,7 @@ interface AIJobParserProps {
     jobDescription: string;
     companyName: string;
     category: string;
-    region: string;
+    regions: string[];
     seniorityLevel: string;
   }) => void;
 }
@@ -52,7 +52,8 @@ const AIJobParser: FC<AIJobParserProps> = ({ filters, allCompanies, onParseCompl
         throw new Error(data.error || data.message || "Failed to parse job");
       }
 
-      const { jobTitle, companyName, jobDescription, seniorityLevel, category, region } = data.data;
+      const { jobTitle, companyName, jobDescription, seniorityLevel, category, regions, region } = data.data;
+      const normalizedRegions = Array.isArray(regions) ? regions : region ? [region] : [];
 
       // Pass the parsed data back to parent component
       onParseComplete({
@@ -61,7 +62,7 @@ const AIJobParser: FC<AIJobParserProps> = ({ filters, allCompanies, onParseCompl
         jobDescription: jobDescription || "",
         companyName: companyName || "",
         category: category || "",
-        region: region || "",
+        regions: normalizedRegions,
         seniorityLevel: seniorityLevel || "",
       });
 

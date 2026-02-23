@@ -99,6 +99,9 @@ export const findJobsAdmin = async (page: number, active: boolean) => {
         region: true,
         seniority: true,
       },
+      orderBy: {
+        createdAt: "desc",
+      },
       skip: (page - 1) * 50,
       take: 50,
     });

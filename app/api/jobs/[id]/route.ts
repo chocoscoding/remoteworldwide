@@ -56,6 +56,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const { title, description, isActive, companyId, applicationUrl, category, region, seniority } = await req.json();
+    const normalizedRegion = Array.isArray(region) ? region : region ? [region] : [];
 
     const updatedJob = await prisma.job.update({
       where: { id: id },
@@ -66,7 +67,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         companyId,
         applicationUrl,
         category,
-        region,
+        region: normalizedRegion,
         seniority,
       },
     });

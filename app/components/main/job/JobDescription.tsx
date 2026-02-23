@@ -75,7 +75,16 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
             <div className="w-full flex flex-col flex-wrap gap-1 my-1">
               <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
                 <MapPinned className="w-3 md:w-4 text-gray-400" />
-                <span>{region}</span>
+                <span>
+                  {region.length > 0
+                    ? region.map((loc, index) => (
+                        <React.Fragment key={index}>
+                          <span>{loc}</span>
+                          {index < region.length - 1 && <span className="mx-0.5 font-bold text-black">, </span>}
+                        </React.Fragment>
+                      ))
+                    : "Anywhere in the world"}
+                </span>
               </h2>
               <h2 className="text-gray-500 text-sm md:text-lg flex flex-shrink-0 items-center gap-1 md:gap-1.5">
                 <Calendar className="w-3 md:w-4 text-gray-400" />

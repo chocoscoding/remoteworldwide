@@ -49,7 +49,7 @@ interface FormValues {
   company: Option | null;
   link: string;
   category: Option | null;
-  region: Option | null;
+  region: Option[];
   seniority: Option | null;
   body: string;
 }
@@ -84,7 +84,7 @@ export interface JobTileType {
   };
   slug: string;
   category: string;
-  region: string;
+  region: string[];
   seniority: string;
   createdAt: Date;
 }
@@ -98,7 +98,7 @@ interface OneJobListType {
   };
   slug: string;
   category: string;
-  region: string;
+  region: string[];
   seniority: string;
   isActive: boolean;
   createdAt?: Date;
@@ -148,7 +148,7 @@ export interface BlogListWithAuthor extends Blog {
 
 export interface OneBookmarkType {
   job: {
-    region: string;
+    region: string[];
     seniority: string;
     company: {
       name: string;

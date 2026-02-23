@@ -4,29 +4,35 @@ import Select from "react-select";
 
 interface SelectFieldProps {
   label: string;
-  value: Option | null;
+  value: Option | Option[] | null;
   options: { value: string; label: string; href?: string }[];
-  onChange: (value: any) => void;
+  onChange: (value: Option | Option[] | null) => void;
   placeholder: string;
   required?: boolean;
+  isMulti?: boolean;
   theme?: any;
+  isOptionDisabled?: (option: any, selectValue: any) => boolean;
 }
 
-export const SelectField = forwardRef<any, SelectFieldProps>(({ label, value, options, onChange, placeholder, required, theme }, ref) => (
-  <div>
-    <label className="block text-sm font-medium text-primary">{label}</label>
-    <Select
-      ref={ref}
-      value={value}
-      options={options}
-      onChange={onChange}
-      placeholder={placeholder}
-      theme={theme || ((theme) => ({ ...theme, borderRadius: 6, colors: { ...theme.colors, primary25: "#e5e5e5", primary: "black" } }))}
-      className="mt-1"
-      required={required}
-    />
-  </div>
-));
+export const SelectField = forwardRef<any, SelectFieldProps>(
+  ({ label, value, options, onChange, placeholder, required, isMulti, theme, isOptionDisabled }, ref) => (
+    <div>
+      <label className="block text-sm font-medium text-primary">{label}</label>
+      <Select
+        ref={ref}
+        value={value}
+        options={options}
+        onChange={onChange}
+        placeholder={placeholder}
+        theme={theme || ((theme) => ({ ...theme, borderRadius: 6, colors: { ...theme.colors, primary25: "#e5e5e5", primary: "black" } }))}
+        className="mt-1"
+        required={required}
+        isMulti={isMulti}
+        isOptionDisabled={isOptionDisabled}
+      />
+    </div>
+  ),
+);
 
 SelectField.displayName = "SelectField";
 

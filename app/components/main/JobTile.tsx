@@ -7,6 +7,7 @@ import TimeAgo from "timeago-react";
 
 const JobTile: FC<JobTileType> = (props) => {
   const { title, slug, company, region, createdAt, seniority } = props;
+  const regionLabel = region.length > 0 ? region.join(", ") : "Anywhere in the world";
   return (
     <div className="flex p-4 mb-5 rounded-md gap-2 md:gap-3 shadow-sm transition-all duration-4000 ease-in bg-white border border-gray-200 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
       {/* logo
@@ -33,7 +34,7 @@ const JobTile: FC<JobTileType> = (props) => {
           <div className="w-full flex flex-wrap gap-4">
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <MapPinned className="w-4 text-gray-400" />
-              <span>{region}</span>
+              <span>{regionLabel}</span>
             </p>
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <Calendar className="w-4 text-gray-400" />

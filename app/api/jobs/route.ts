@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     // Construct dynamic filter object
     const filters: any = {};
     if (roles) filters.category = { in: roles };
-    if (regions) filters.region = { in: regions };
+    if (regions) filters.region = { hasSome: regions };
     if (seniority) filters.seniority = { in: seniority };
     filters.updatedAt = {
       gte: startOfDay(dateFrom),
@@ -128,11 +128,20 @@ export async function POST(req: NextRequest) {
 
     if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const { title, description, companyId, applicationUrl, category, region, seniority } = await req.json();
-    const BODY_VALUES = { title, description, companyId, applicationUrl, category, region, seniority, slug: "0" };
+    const normalizedRegion = Array.isArray(region) ? region : region ? [region] : [];
+    const BODY_VALUES = { title, description, companyId, applicationUrl, category, region: normalizedRegion, seniority, slug: "0" };
 
-    const missingValue = Object.entries(BODY_VALUES).filter(([key, value]) => !value);
+    const missingValue = [
+      !BODY_VALUES.title && "title",
+      !BODY_VALUES.description && "description",
+      !BODY_VALUES.companyId && "companyId",
+      !BODY_VALUES.applicationUrl && "applicationUrl",
+      !BODY_VALUES.category && "category",
+      BODY_VALUES.region.length === 0 && "region",
+      !BODY_VALUES.seniority && "seniority",
+    ].filter(Boolean) as string[];
 
-    const errorMessage = missingValue.length ? `Missing values: ${missingValue.map(([key]) => key).join(", ")}` : null;
+    const errorMessage = missingValue.length ? `Missing values: ${missingValue.join(", ")}` : null;
 
     if (errorMessage) {
       return NextResponse.json({ message: errorMessage }, { status: 400, statusText: "Bad Request" });
