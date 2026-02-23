@@ -124,7 +124,7 @@ const TestimonialCard: React.FC<TestimonialCardProps> = ({ position, testimonial
         }}
       />
       <h3 className={cn("text-base sm:text-xl font-medium", isCenter ? "text-primary-foreground" : "text-foreground")}>
-        "{testimonial.testimonial}"
+        {`"${testimonial.testimonial}"`}
       </h3>
       <p
         className={cn(

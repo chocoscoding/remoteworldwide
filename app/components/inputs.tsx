@@ -1,12 +1,11 @@
 import { Option } from "@/types/main";
 import { FC, forwardRef } from "react";
-import Select from "react-select";
-
+import Select, { ActionMeta, MultiValue, SingleValue } from "react-select";
 interface SelectFieldProps {
   label: string;
   value: Option | Option[] | null;
   options: { value: string; label: string; href?: string }[];
-  onChange: (value: Option | Option[] | null) => void;
+  onChange: (value: MultiValue<Option> | SingleValue<Option>, actionMeta: ActionMeta<Option>) => void;
   placeholder: string;
   required?: boolean;
   isMulti?: boolean;
