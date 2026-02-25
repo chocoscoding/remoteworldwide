@@ -34,7 +34,8 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
     if (searchValue) {
       params.append("search", searchValue);
     }
-    push(pathname + "?" + params.toString());
+    const targetPath = activeSearch ? pathname : "/jobs";
+    push(targetPath + "?" + params.toString());
   };
 
   const clearSearch = () => {
@@ -49,7 +50,7 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
       onSubmit={onSubmit}
       className="w-full h-[3.5rem] md:h-[4.5rem] outline outline-2 outline-black rounded-md bg-white drop-shadow-primary2 p-1.5 md:p-3 flex">
       <div className="flex flex-1 items-center gap-4 px-3">
-        <Search className="text-primary hidden md:block" />
+        {searchValue.length <= 0 && <Search className="text-primary hidden md:block" />}
         <input
           className="h-full w-full outline-none border-none text-sm md:text-xl"
           type="text"

@@ -57,8 +57,7 @@ const JobsContainerForSearch = () => {
   const getJobs = async (): Promise<void> => {
     try {
       setLoading(true);
-      const pageParams = params.get("page");
-      const response = await fetch(`/api/jobs?${!pageParams ? `page=1` : searchParams.toString()}`);
+      const response = await fetch(`/api/jobs?${searchParams.toString()}`);
       if (!response.ok) {
         throw new Error("Failed to fetch jobs");
       }

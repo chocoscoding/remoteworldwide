@@ -101,10 +101,13 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
       const dateToParam = params.get("dateTo");
       const parsedFrom = parseDateParam(dateFromParam);
       const parsedTo = parseDateParam(dateToParam);
-      const initialRange = parsedFrom && parsedTo ? normalizeDateRange({
-        from: parsedFrom,
-        to: parsedTo,
-      }) : undefined;
+      const initialRange =
+        parsedFrom && parsedTo
+          ? normalizeDateRange({
+              from: parsedFrom,
+              to: parsedTo,
+            })
+          : undefined;
 
       setSelectedFilters({ roles, regions, seniority });
       setDateRange(initialRange);
@@ -170,7 +173,7 @@ export const FilterProvider = ({ filterData, children }: { filterData: FilterDat
 
   const clearFilters = () => {
     setSelectedFilters({ roles: [], regions: [], seniority: [] });
-    setDateRange(getDefaultRange());
+    setDateRange(undefined);
   };
 
   const finalValues = {
