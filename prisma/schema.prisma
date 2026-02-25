@@ -100,7 +100,7 @@ model Job {
   slug          String  @unique
   title          String
   description    String
-  isActive       Boolean   @default(false)
+  isActive       Boolean   @default(true)
   companyId      String    @db.ObjectId
   applicationUrl String
   createdAt      DateTime  @default(now())
