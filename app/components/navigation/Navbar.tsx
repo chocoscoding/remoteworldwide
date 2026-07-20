@@ -1,7 +1,9 @@
 "use client"; // Since we are using React state
 import { useNavbar } from "@/provider/NavbarContext";
+import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
 import Link from "next/link"; // Use Next.js' Link for navigation
-import { signIn, signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { signOut } from "@/app/lib/authClient";
 import Image from "next/image";
 import { LoaderCircle, Menu, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -12,15 +14,14 @@ const Navbar = () => {
   const pathname = usePathname();
   const { status, data } = useSession();
   const { isOpen, toggleNavbar, closeNavbar, isOpen2, toggleNavbar2, closeNavbar2 } = useNavbar();
+  const { openAuthModal } = useAuthModal();
   const { replace } = useRouter();
   const User = () => (
     <>
       {status === "unauthenticated" ? (
         <button
-          className="p-1.5 px-6 gap-2 transition-all rounded-md bg-primary text-white flex items-center"
-          onClick={() => {
-            signIn("google");
-          }}>
+          onClick={() => openAuthModal("login")}
+          className="p-1.5 px-6 gap-2 transition-all rounded-md bg-primary text-white flex items-center">
           <span>Sign In</span>
         </button>
       ) : null}
@@ -41,6 +42,9 @@ const Navbar = () => {
             <div className="fixed right-2 mt-2 top-16 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
               <Link href="/bookmarks" onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
                 Bookmarks
+              </Link>
+              <Link href="/sessions" onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
+                Sessions
               </Link>
               {data.user?.role === "AUTHOR" ? (
                 <Link href="/heroshima/blogs">

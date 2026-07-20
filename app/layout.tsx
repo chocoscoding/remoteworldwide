@@ -5,6 +5,7 @@ import "react-quill/dist/quill.bubble.css";
 import { Manrope } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { SessionProvider } from "next-auth/react";
+import AuthSessionLogger from "./components/AuthSessionLogger";
 import { ToastContainer, Slide } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Script from "next/script";
@@ -81,7 +82,10 @@ export default function RootLayout({
           theme="dark"
           transition={Slide}
         />
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <AuthSessionLogger />
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );
