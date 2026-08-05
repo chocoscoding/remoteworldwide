@@ -499,7 +499,10 @@ compiler API chokes on this setup; `tsx` is also what the Auth.js docs use):
 AUTH_SECRET=<the-exact-secret-your-nextauth-app-used>
 
 # Public auth base AS THE BROWSER SEES IT — the FRONTEND origin + /api/auth,
-# because the browser reaches auth through the proxy.
+# because the browser reaches auth through the proxy. Load-bearing beyond the
+# basePath: Step 8 pins Host/X-Forwarded-* for /api/auth to THIS origin, so
+# this value (not whatever the proxy chain says) determines the OAuth
+# redirect_uri. (@auth/express itself only reads the basePath out of it.)
 AUTH_URL=http://localhost:3000/api/auth        # prod: https://myapp.com/api/auth
 
 # Moved from the frontend — the backend performs the token exchange now.
@@ -1163,17 +1166,26 @@ const authLimiter = rateLimit({
 });
 app.use("/api/auth", authLimiter);
 
-// (5) Host-restore shim. @auth/express builds absolute URLs (redirects,
-// cookies) from the Host header; some proxies (e.g. Vercel rewrites) replace
-// Host with the backend's host and carry the original in X-Forwarded-Host.
-// Without this, production generates URLs pointing at the internal backend:
-// cookies on the wrong domain, redirects to nowhere. Locally it's a no-op —
-// the classic "works locally, breaks deployed" bug, defused in five lines.
+// (5) Host-pinning shim. @auth/express builds absolute URLs — including the
+// OAuth redirect_uri it sends to Google — from the request's Host and
+// X-Forwarded-* headers. It does NOT take the origin from AUTH_URL; it only
+// reads the basePath out of it (the `env-url-basepath-redundant` warning in
+// the logs is the tell that AUTH_URL is set yet not used for the origin).
+// Every proxy hop rewrites these headers: Vercel-style rewrites replace Host,
+// and a hosting platform's ingress may overwrite X-Forwarded-Host with the
+// BACKEND's own hostname. An earlier version of this shim restored Host from
+// X-Forwarded-Host — which faithfully restored the ingress's wrong value: the
+// redirect_uri pointed at the backend domain, Google returned the browser
+// there, and since the PKCE cookie lives on the FRONTEND origin every OAuth
+// login failed with "InvalidCheck: pkceCodeVerifier value could not be
+// parsed" (Part 8). AUTH_URL is the single source of truth for the public
+// auth origin, so pin the headers to it instead of trusting whatever
+// survived the proxy chain. Correct in dev and prod by construction.
+const authPublicUrl = new URL(config.authUrl);
 app.use("/api/auth", (req, _res, next) => {
-  const forwardedHost = req.headers["x-forwarded-host"];
-  if (typeof forwardedHost === "string" && forwardedHost.length > 0) {
-    req.headers.host = forwardedHost;
-  }
+  req.headers.host = authPublicUrl.host;
+  req.headers["x-forwarded-host"] = authPublicUrl.host;
+  req.headers["x-forwarded-proto"] = authPublicUrl.protocol.replace(":", "");
   next();
 });
 
@@ -1748,9 +1760,9 @@ matters. Every other flow is this picture with a different path/method.
 │ Browser │ ───────────────────────►│ Next.js      │ ────────────────────►│ Express      │
 │         │ GET /api/auth/session   │ :3000        │ GET /api/auth/session│ :4000        │
 │         │ Host: localhost:3000    │              │ Host: localhost:3000 │              │
-│         │ Cookie: authjs.session- │ rewrite rule │ (Vercel: Host is re- │ ③ shim: X-  │
-│         │         token=eyJhb…    │ matches      │  placed; original in │ Forwarded-  │
-│         │                         │ /api/auth/*  │  X-Forwarded-Host)   │ Host → Host │
+│         │ Cookie: authjs.session- │ rewrite rule │ (any proxy hop may   │ ③ shim: pin │
+│         │         token=eyJhb…    │ matches      │  rewrite Host and X- │ Host to the │
+│         │                         │ /api/auth/*  │  Forwarded-Host)     │ AUTH_URL    │
 │         │                         │              │ Cookie: (forwarded   │ ④ Auth.js:  │
 │         │                         │              │          unchanged)  │ decrypt JWT, │
 │         │                         │              │                      │ jwt+session  │
@@ -1771,10 +1783,13 @@ Step by step:
 2. **Next.js → Express.** The rewrite forwards method, path, query, headers
    (including `Cookie`), and body. It is not a redirect — the browser never
    sees the backend URL.
-3. **The Host shim.** Auth.js derives absolute URLs from `Host`. The dev proxy
-   keeps the original; Vercel replaces it and stashes the original in
-   `X-Forwarded-Host`, which the shim restores. `trust proxy` +
-   `trustHost: true` make Express and Auth.js believe these forwarded headers.
+3. **The Host shim.** Auth.js derives absolute URLs — including the OAuth
+   `redirect_uri` — from `Host`/`X-Forwarded-*`, *not* from `AUTH_URL` (it
+   only reads the basePath out of that). Any hop may rewrite those headers
+   (Vercel replaces `Host`; a platform ingress can overwrite
+   `X-Forwarded-Host` with the backend's own hostname), so the shim pins them
+   to the origin parsed from `AUTH_URL`. `trust proxy` + `trustHost: true`
+   make Express and Auth.js believe the pinned headers.
 4. **Auth.js does its work.** Decrypts the session cookie with `AUTH_SECRET`,
    runs the `jwt` callback (revocation check against the registry — Part 6),
    then the `session` callback (shapes the JSON).
@@ -2501,7 +2516,8 @@ Every entry below was hit for real during this migration.
 | `CredentialsSignin` | Someone typed a wrong email/password. Normal | Nothing — but log it as a warning, not an error with a stack trace |
 | `UntrustedHost` | Auth.js got a Host it wasn't told to trust | `trustHost: true`, `trust proxy`, correct `AUTH_URL` |
 | Google `redirect_uri_mismatch` | Generated callback URL ≠ what's registered in Google console | `AUTH_URL` must be the **frontend** origin + `/api/auth`; the console entry never changes |
-| Works locally, breaks deployed | Proxy rewrote the `Host` header (Vercel does) | The `X-Forwarded-Host → Host` shim from Step 8 |
+| `InvalidCheck: pkceCodeVerifier value could not be parsed` on every OAuth callback (hit in prod 2026-07-20) | `redirect_uri` was built from the request's `Host`/`X-Forwarded-Host` — which the platform ingress had overwritten with the **backend's own hostname** — so Google returned the browser to the backend domain, where it holds none of the auth cookies (they live on the frontend origin). Setting `AUTH_URL` alone does **not** fix this: `@auth/express` only reads the basePath from it (the `env-url-basepath-redundant` warning proves it's seen but unused for the origin) | The Step 8 shim pinning `Host`/`X-Forwarded-*` to `AUTH_URL`'s origin. Verify without logging in: fetch `/api/auth/csrf`, form-POST `/api/auth/signin/google` with the csrf token + cookie jar, and check `redirect_uri` in the 302 `Location` is the frontend origin |
+| Works locally, breaks deployed | A proxy hop rewrote `Host`/`X-Forwarded-Host` (Vercel rewrites and platform ingresses both do) | The `AUTH_URL` header-pinning shim from Step 8 |
 | Build fails on pages using `auth()` | `headers()` moved inside a try/catch, swallowing Next's dynamic-route marker | Keep `headers()` outside the try/catch (Step 11) |
 | Users randomly logged out under load | Session polling ate the shared rate-limit budget | Separate, generous limiter for `/api/auth` (Step 8) |
 | Server crashes on startup loading `@auth/express` | Node < 20.19 can't `require()` ESM | Upgrade Node; keep `tsx` as the dev runner |
