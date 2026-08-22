@@ -2,6 +2,8 @@ import CompaniesList from "./Client";
 import { CompanyList } from "@/types/main";
 import { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Remote Companies Hiring - Remote Worldwide",
   description:
