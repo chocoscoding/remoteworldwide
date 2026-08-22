@@ -4,7 +4,7 @@ import { FilterData, FilterType } from "@/types/main";
 import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { getDefaultRange, normalizeDateRange, formatDateParam, parseDateParam, isDefaultRange } from "@/lib/dateFilterUtils";
+import { normalizeDateRange, formatDateParam, parseDateParam, isDefaultRange } from "@/lib/dateFilterUtils";
 
 const ShowType = { roles: false, seniority: false, region: false, dateRange: false };
 

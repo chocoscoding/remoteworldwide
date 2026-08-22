@@ -10,7 +10,7 @@ import { Job } from "@prisma/client";
 import { updateOneJob } from "@/libs/query";
 import OverlayLoader from "@/app/components/OverlayLoader";
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 type UpdateJobType = { job: Job & { company: { name: string } }; allCompanies: FilterType[]; filters: FilterData };
 

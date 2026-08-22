@@ -1,22 +1,10 @@
 import NotFound from "@/app/components/NotFound";
 import BlogPageClient from "./Client";
-import { revalidatePath } from "next/cache";
-
-const getBlogBySlug = async (slug: string) => {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/blog/${slug}`, { cache: "no-cache" });
-  const data = await res.json();
-  if (!res.ok) {
-    if (data.message === "Blog not found") {
-      return null;
-    }
-    throw new Error("Failed to fetch blog");
-  }
-  return data.data;
-};
+import { getBlogBySlug } from "@/libs/query";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const blogSlug = decodeURIComponent((await params).id);
-  const BLOG = await getBlogBySlug(blogSlug);
+  const { data: BLOG } = await getBlogBySlug(blogSlug);
 
   if (!BLOG) {
     return {
@@ -50,15 +38,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
-  revalidatePath("./");
   const blogSlug = decodeURIComponent((await params).id);
-  const BLOG = await getBlogBySlug(blogSlug);
+  const { data: BLOG } = await getBlogBySlug(blogSlug);
 
   if (!BLOG) {
     return <NotFound title="Blog" buttonType="back" />;
   }
 
-  return <BlogPageClient blog={BLOG} />;
+  return <BlogPageClient blog={{ ...BLOG, createdAt: BLOG.createdAt.toISOString(), updatedAt: BLOG.updatedAt.toISOString() }} />;
 };
 
 export default Page;

@@ -1,24 +1,8 @@
-import { revalidatePath } from "next/cache";
 import FiltersClient from "./Client";
-import { FilterData } from "@/types/main";
-import { randomUUID } from "crypto";
-
-const getFilters: () => Promise<FilterData> = async () => {
-  const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters?="+randomUUID(), { cache: "no-store" });
-  if (!res.ok) {
-    return {
-      category: [],
-      seniority: [],
-      region: [],
-    } as FilterData;
-  }
-  const data: Promise<{ data: FilterData }> = await res.json();
-  return (await data).data;
-};
+import { getFilters } from "@/libs/query";
 
 export default async function CategoriesPage() {
-  revalidatePath("./");
-  const data = await getFilters();
+  const { data } = await getFilters();
   return (
     <>
       <FiltersClient initialData={data} />

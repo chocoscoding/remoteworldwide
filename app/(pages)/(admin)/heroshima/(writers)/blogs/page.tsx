@@ -1,7 +1,6 @@
 import { BlogListWithAuthor } from "@/types/main";
 import React from "react";
 import AllBlogsClient from "./Client";
-import { revalidatePath } from "next/cache";
 
 const getInitialBlogs = async (): Promise<{ data: BlogListWithAuthor[]; count: number }> => {
   try {
@@ -17,7 +16,6 @@ const getInitialBlogs = async (): Promise<{ data: BlogListWithAuthor[]; count: n
   }
 };
 const Page = async () => {
-  revalidatePath("/");
   const BLOGS = await getInitialBlogs();
   return <AllBlogsClient initialData={BLOGS.data} initialCount={BLOGS.count} />;
 };

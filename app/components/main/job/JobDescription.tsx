@@ -8,7 +8,7 @@ import { Job } from "@prisma/client";
 import { toast } from "react-toastify";
 import { LinkIcon, type LinkIconHandle } from "@/components/ui/link-icon";
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false, loading: () => <JobDescriptionSkeleton /> });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => <JobDescriptionSkeleton /> });
 
 const JobDescriptionSkeleton: FC = () => {
   return (

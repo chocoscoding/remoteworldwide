@@ -6,7 +6,6 @@ import { prisma } from "@/prisma";
 import { JobAndCompany } from "@/types/main";
 import { Job } from "@prisma/client";
 import React from "react";
-import { revalidatePath } from "next/cache";
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
   try {
     const job = await prisma.job.findUnique({
@@ -24,8 +23,6 @@ const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
 };
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  revalidatePath("./");
-
   const jobSlug = decodeURIComponent((await params).id);
   const JOB = await fetchJob(jobSlug);
   if (!JOB) return <NotFound buttonType="link" title="Job" link="/heroshima/companies/create" />;

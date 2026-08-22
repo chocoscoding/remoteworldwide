@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/prisma";
 import { hexoid } from "hexoid";
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 const SKIP_AMNT = 50;
 const DEFAULT_START_DATE = { year: 2023, month: 12, day: 31 };
 
@@ -151,6 +152,7 @@ export async function POST(req: NextRequest) {
     const createJob = await prisma.job.create({
       data: { ...BODY_VALUES },
     });
+    revalidatePath("/");
     return NextResponse.json({ data: createJob }, { status: 200, statusText: "success" });
   } catch (error: any) {
     return NextResponse.json({ message: "something went wrong" }, { status: 404 });

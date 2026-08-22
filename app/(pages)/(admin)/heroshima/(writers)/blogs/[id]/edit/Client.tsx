@@ -14,7 +14,7 @@ import { TagsInput } from "react-tag-input-component";
 import { Blog } from "@prisma/client";
 import { quillToolbarOptions } from "@/libs/quillconfig";
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 const EditBlogClient: FC<{ authors: Option[]; blog: Blog & { author: { name: string } } }> = ({ authors, blog }) => {
   const [title, setTitle] = useState(blog.title);

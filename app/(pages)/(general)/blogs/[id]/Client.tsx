@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Facebook, Instagram, Twitter, Linkedin, Globe } from "lucide-react";
-import "react-quill/dist/quill.bubble.css";
+import "react-quill-new/dist/quill.bubble.css";
 import { usePathname } from "next/navigation";
 
 interface Blog {
@@ -18,10 +18,10 @@ interface Blog {
     profileImage: string;
     slug: string;
     about: string;
-    instagram?: string;
-    twitter?: string;
-    linkedin?: string;
-    website?: string;
+    instagram?: string | null;
+    twitter?: string | null;
+    linkedin?: string | null;
+    website?: string | null;
   };
   createdAt: string;
   updatedAt: string;
@@ -29,7 +29,7 @@ interface Blog {
   coverImage: string;
 }
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 const BlogPage: FC<{ blog: Blog }> = ({ blog }) => {
   const pathname = usePathname();

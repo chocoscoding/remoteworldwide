@@ -3,6 +3,7 @@
 import { prisma } from "@/prisma";
 import { Author, Job } from "@prisma/client";
 import { hexoid } from "hexoid";
+import { revalidatePath } from "next/cache";
 
 function createSlugStatic(input: string) {
   return input
@@ -32,6 +33,7 @@ export const deleteOneJob = async (id: string) => {
         id,
       },
     });
+    revalidatePath("/");
     return { status: "deleted job successfully" };
   } catch (error: any) {
     if (error.message.includes("Record to delete does not exist")) {
@@ -51,6 +53,7 @@ export const toggleJobActiveState = async (id: string, state: boolean) => {
         isActive: state,
       },
     });
+    revalidatePath("/");
     return { status: "updated job successfully" };
   } catch (error: any) {
     if (error.message.includes("Record to update does not exist")) {
@@ -68,6 +71,7 @@ export const updateOneJob = async (id: string, jobDetails: Omit<Job, "createdAt"
       },
       data: jobDetails,
     });
+    revalidatePath("/");
     return { data };
   } catch (error: any) {
     if (error.message.includes("Record to update does not exist")) {
@@ -361,6 +365,13 @@ export const getBlogBySlug = async (slug: string) => {
         author: {
           select: {
             name: true,
+            profileImage: true,
+            slug: true,
+            about: true,
+            instagram: true,
+            twitter: true,
+            linkedin: true,
+            website: true,
           },
         },
         createdAt: true,
@@ -521,6 +532,25 @@ export const getAllActiveJobsCount = async () => {
   } catch (error: any) {
     // throw new Error(error.message ?? "something went wrong");
     return { count: null };
+  }
+};
+
+export const getFilters = async () => {
+  try {
+    const [category, seniority, region] = await Promise.all([
+      prisma.category
+        .findMany({ select: { id: true, name: true } })
+        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
+      prisma.seniority
+        .findMany({ select: { id: true, name: true } })
+        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
+      prisma.region
+        .findMany({ select: { id: true, name: true } })
+        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
+    ]);
+    return { data: { category, seniority, region } };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
   }
 };
 

@@ -69,10 +69,9 @@ export default function LoginForm({
       setSubmitting(false);
     }
   };
-  console.log(idPrefix);
 
   return (
-    <Card className={cn(brutalistCard, !embedded && brutalistCardFrame)}>
+    <Card className={cn(brutalistCard, embedded && brutalistCardFrame)}>
       <CardHeader className="flex flex-col items-center space-y-3 px-8 pt-8 pb-4 text-center">
         <div className={brutalistLogoTile}>
           <AuthLogo aria-hidden={true} className="h-9 w-9 text-primary" />

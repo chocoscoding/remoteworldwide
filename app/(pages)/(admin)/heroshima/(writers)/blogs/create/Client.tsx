@@ -12,7 +12,7 @@ import { createBlog } from "@/libs/query";
 import { useRouter } from "next/navigation";
 import { TagsInput } from "react-tag-input-component";
 import { quillToolbarOptions } from "@/libs/quillconfig";
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 const CreateBlogClient: FC<{ authors: Option[] }> = ({ authors }) => {
   const [title, setTitle] = useState("");

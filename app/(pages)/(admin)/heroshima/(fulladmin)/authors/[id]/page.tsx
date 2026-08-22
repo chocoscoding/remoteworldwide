@@ -15,8 +15,9 @@ const getOneAuthor = async (id: string): Promise<AuthorWithBlog | null> => {
       }
     }
     return (await data).data;
-  } catch {
-    throw new Error("Failed to fetch author.");
+  } catch (error) {
+    console.error("Failed to fetch author:", error);
+    return null;
   }
 };
 

@@ -6,7 +6,7 @@ import { JobAndCompany } from "@/types/main";
 import { Job } from "@prisma/client";
 import OneJobClient from "./Client";
 
-export const revalidate = 3600 * 12;
+export const revalidate = 43200; // 3600 * 12
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
   try {
     const job = await prisma.job.findUnique({

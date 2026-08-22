@@ -26,7 +26,7 @@ interface Blog {
 interface BlogProps {
   blogId: string;
 }
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 const BlogPage: FC<{ blog: Blog }> = ({ blog }) => {
   const [loading, setLoading] = useState(false);

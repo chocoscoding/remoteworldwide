@@ -1,7 +1,6 @@
 import { prisma } from "@/prisma";
 import CreateJob from "./Client";
 import { FilterData, FilterType } from "@/types/main";
-import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 
 const getAllFilters = async (): Promise<FilterData> => {
@@ -41,7 +40,6 @@ const getAllCompanies = async () => {
   }
 };
 const Page = async () => {
-  revalidatePath("./");
   const allCompanies = await getAllCompanies();
   const filters = await getAllFilters();
 

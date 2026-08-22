@@ -8,7 +8,7 @@ import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
 import AIJobParser from "./AIJobParser";
 
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
 const GenerateNewOption = (title: string, href: string) => ({
   value: "add new",
@@ -84,7 +84,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     }
   };
 
-  const simulateTyping = (selectRef: React.RefObject<SelectRef>, value: string) => {
+  const simulateTyping = (selectRef: React.RefObject<SelectRef | null>, value: string) => {
     if (selectRef.current?.inputRef) {
       const input = selectRef.current.inputRef;
       setReactInputValue(input, value);

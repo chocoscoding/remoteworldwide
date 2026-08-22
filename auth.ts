@@ -14,7 +14,7 @@ export const auth = async (): Promise<Session | null> => {
   // Outside the try/catch on purpose: during prerendering headers() throws a
   // DynamicServerError that Next.js uses to mark the route dynamic (the same
   // behavior the previous NextAuth auth() had) — it must not be swallowed.
-  const cookie = headers().get("cookie");
+  const cookie = (await headers()).get("cookie");
   if (!cookie) {
     console.debug("[auth] no cookies on request — treating as signed out");
     return null;
