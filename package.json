@@ -47,7 +47,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
-    "timeago-react": "^3.0.6",
+    "timeago-react": "^3.0.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
