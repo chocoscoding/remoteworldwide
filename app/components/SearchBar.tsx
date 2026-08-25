@@ -48,7 +48,7 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full h-[3.5rem] md:h-[4.5rem] outline outline-2 outline-black rounded-md bg-white drop-shadow-primary2 p-1.5 md:p-3 flex">
+      className="w-full h-[3.5rem] md:h-[4.1rem] outline outline-2 outline-black rounded-md bg-white p-1.5 md:p-2.5 flex transition-shadow duration-150 ease-out focus-within:shadow-[5px_5px_0_0_#e1f073]">
       <div className="flex flex-1 items-center gap-4 px-3">
         {searchValue.length <= 0 && <Search className="text-primary hidden md:block" />}
         <input
@@ -68,12 +68,12 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
         {!activeSearch ? (
           <Link
             href={`/jobs${searchValue ? `?search=${encodeURIComponent(searchValue)}` : ""}`}
-            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md transition-all flex items-center justify-center gap-3">
+            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md shadow-[2px_2px_0_0_#e1f073] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none flex items-center justify-center gap-3">
             <InnerContent />
           </Link>
         ) : (
           <button
-            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md transition-all items-center flex justify-center gap-3"
+            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md shadow-[2px_2px_0_0_#e1f073] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none flex items-center justify-center gap-3"
             type="submit">
             <InnerContent />
           </button>
