@@ -5,7 +5,7 @@ export const brutalistCardFrame = "outline outline-2 outline-black drop-shadow-p
 export const brutalistInput =
   "h-10 rounded-md border-2 border-black bg-white shadow-none transition-all placeholder:text-gray-500 focus-visible:shadow-[3px_3px_0_0_#e1f073] focus-visible:ring-0";
 export const brutalistCheckbox =
-  "rounded-[4px] border-2 border-black shadow-none data-[state=checked]:bg-secondary data-[state=checked]:text-primary";
+  "rounded-[3px] border-2 border-black shadow-[2px_2px_0_0_#222325] data-[state=checked]:bg-secondary data-[state=checked]:text-primary";
 export const brutalistLink = "font-medium text-primary underline decoration-1 underline-offset-2 transition-colors hover:bg-secondary";
 export const brutalistLogoTile = " bg-white p-2";
 // Title/subtitle/footer render under Card* on pages and Dialog* in the modal, so

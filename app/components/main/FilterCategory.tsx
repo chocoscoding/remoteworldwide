@@ -1,5 +1,5 @@
 "use client";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import React, { FC } from "react";
 
 interface FilterCategoryType {
@@ -27,16 +27,25 @@ const FilterCategory: FC<FilterCategoryType> = ({ title, isOpen, toggle, options
     <div className={`transition-all relative ${isOpen ? "h-auto" : "h-0 overflow-hidden"}`}>
       <ul className="h-fit max-h-[320px] overflow-y-auto pt-2 mt-3 pb-2">
         {options.map((option, index) => (
-          <li className="flex items-start gap-[3%] mb-3" key={index}>
-            <input
-              id={`${title}-${index}`}
-              type="checkbox"
-              className="accent-gray-600 w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded"
-              checked={selectedOptions.includes(option.label)}
-              onChange={() => handleSelectOption(option.label)}
-            />
-            <label htmlFor={`${title}-${index}`} className="text-black font-medium relative -top-0.5">
-              {option.label} {option.count && <span className="text-sm shrink-0 text-gray-700 font-thin">{`(${option.count})`}</span>}
+          <li className="mb-3" key={index}>
+            {/* The real input stays in the tree (sr-only) so the control keeps
+                native checkbox semantics, keyboard support and label
+                association; the span beside it is the neobrutalist skin,
+                driven off `peer-checked`. */}
+            <label htmlFor={`${title}-${index}`} className="group flex items-start gap-[3%] cursor-pointer">
+              <input
+                id={`${title}-${index}`}
+                type="checkbox"
+                className="peer sr-only"
+                checked={selectedOptions.includes(option.label)}
+                onChange={() => handleSelectOption(option.label)}
+              />
+              <span className="mt-0.5 h-5 w-5 flex-none inline-flex items-center justify-center rounded-[3px] border-2 border-[#222325] bg-white text-[#222325] shadow-[2px_2px_0_0_#222325] transition-all group-hover:-translate-x-px group-hover:-translate-y-px group-hover:shadow-[3px_3px_0_0_#222325] peer-checked:bg-secondary peer-checked:translate-x-px peer-checked:translate-y-px peer-checked:shadow-[1px_1px_0_0_#222325] peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-[#e1f073] peer-focus-visible:ring-offset-1">
+                <Check className="h-3.5 w-3.5 stroke-[3.5] opacity-0" />
+              </span>
+              <span className="text-black font-medium relative -top-0.5">
+                {option.label} {option.count && <span className="text-sm shrink-0 text-gray-700 font-thin">{`(${option.count})`}</span>}
+              </span>
             </label>
           </li>
         ))}
