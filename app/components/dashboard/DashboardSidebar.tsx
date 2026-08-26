@@ -10,6 +10,7 @@ import {
   FileText,
   Mail,
   ScanSearch,
+  Settings,
   MessageCircle,
   HelpCircle,
   Mic,
@@ -167,17 +168,27 @@ const DashboardSidebar: FC = () => {
           </div>
         )}
 
-        <div className={cn("flex items-center mt-3", collapsed ? "justify-center" : "gap-2.5 px-1")} title={collapsed ? "Amara Okafor · Lagos · GMT+1" : undefined}>
+        {/* The profile block is the way into settings — clicking your own
+            name is where people look for it first. */}
+        <Link
+          href="/dashboard/settings/profile"
+          title={collapsed ? "Amara Okafor · Settings" : "Profile and settings"}
+          className={cn(
+            "flex items-center mt-3 rounded-lg py-1.5 transition-colors cursor-pointer",
+            collapsed ? "justify-center px-1" : "gap-2.5 px-1",
+            isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]"
+          )}>
           <div className="h-8 w-8 flex-none rounded-full bg-[#222325] text-[#e1f073] font-extrabold text-xs flex items-center justify-center">
             AO
           </div>
           {!collapsed && (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold text-primary truncate">Amara Okafor</p>
               <p className="text-[11px] text-black/50 truncate">Lagos · GMT+1</p>
             </div>
           )}
-        </div>
+          {!collapsed && <Settings className="h-3.5 w-3.5 flex-none text-black/35" />}
+        </Link>
       </div>
     </aside>
   );

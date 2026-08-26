@@ -2,21 +2,16 @@
 
 import { FC, useState } from "react";
 import {
-  AlignLeft,
   Check,
   ChevronDown,
   Copy,
   Download,
   FileSignature,
   Link2,
-  Palette,
-  Plus,
-  Quote,
+  Printer,
   RefreshCw,
   Send,
   Sparkles,
-  Star,
-  Type,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,6 +19,11 @@ import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import DownloadModal from "@/app/components/dashboard/modals/DownloadModal";
+import RichTextEditor from "@/app/components/dashboard/ui/RichTextEditor";
+import SplitButton from "@/app/components/dashboard/ui/SplitButton";
+import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
+import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
+import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import { COVER_LETTER, RESUME } from "@/app/lib/dashboard/mock-data";
 
 // ---------------------------------------------------------------------------
@@ -36,7 +36,6 @@ type ThemeId = "ats" | "bordered" | "warm";
 type FontId = "manrope" | "serif" | "mono";
 type SpacingId = "tight" | "normal" | "airy";
 type LetterheadId = "off" | "name" | "full";
-type ControlKey = "theme" | "font" | "spacing" | "letterhead";
 
 const TONE_OPTIONS: { id: ToneId; label: string }[] = [
   { id: "warm", label: "Warm & direct" },
@@ -68,6 +67,84 @@ const LETTERHEAD_OPTIONS: { id: LetterheadId; label: string }[] = [
   { id: "name", label: "Name only" },
   { id: "full", label: "Full contact" },
 ];
+
+/**
+ * Tone genuinely rewrites the letter — same facts, different register and
+ * length. Previously these chips only moved a highlight, which made the
+ * control a lie: picking "Short" left a four-paragraph letter on screen.
+ */
+const TONE_LETTERS: Record<ToneId, { greeting: string; paragraphs: string[] }> = {
+  warm: {
+    greeting: "Hi Deel team,",
+    paragraphs: [
+      "I've spent the last three years designing payment and compliance flows for merchants across 30+ countries at Paystack — work that only exists because someone has to make cross-border money movement feel simple, which is exactly the problem Deel is solving for global teams.",
+      "Most recently I led a checkout redesign that cut failed-payment support tickets by 31%, and I built the internal design-system documentation that 40+ engineers now rely on weekly. Both projects meant translating regulatory and technical constraints into interfaces regular people trust with their money — the same tension I imagine shows up constantly in global payroll.",
+      "I work async by default, across a four-hour overlap with most US teams, and I'd love to bring that discipline to Deel's design team.",
+    ],
+  },
+  formal: {
+    greeting: "Dear Hiring Manager,",
+    paragraphs: [
+      "I am writing to apply for the Senior Designer position at Deel. For the past three years I have designed payment and compliance flows serving merchants in more than 30 countries at Paystack, work closely aligned with the cross-border challenges Deel addresses for distributed organisations.",
+      "In my current role I led a checkout redesign that reduced failed-payment support tickets by 31%, and I established the internal design-system documentation now used weekly by over 40 engineers. Both required translating regulatory and technical constraints into interfaces that customers trust with their money.",
+      "I work asynchronously across a four-hour overlap with US-based teams and would welcome the opportunity to discuss how that experience could serve Deel's design function.",
+      "Thank you for your consideration.",
+    ],
+  },
+  story: {
+    greeting: "Hi Deel team,",
+    paragraphs: [
+      "A merchant in Accra once told me she'd stopped trusting her own checkout page. She couldn't tell which payments had failed, or why. That conversation reshaped three years of my work at Paystack.",
+      "I rebuilt that flow end to end. Failed-payment support tickets dropped 31%, and the pattern became the reference other teams copied — which is how I ended up writing the design-system documentation 40+ engineers now open every week.",
+      "What stayed with me is that the hard part was never the interface. It was carrying regulatory and technical constraints without passing the confusion on to the person holding the money. That's the tension I see in global payroll, and it's why Deel is the team I want to do this next to.",
+      "I work async by default, across a four-hour overlap with most US teams.",
+    ],
+  },
+  short: {
+    greeting: "Hi Deel team,",
+    paragraphs: [
+      "Three years designing payment and compliance flows at Paystack, for merchants across 30+ countries — the same cross-border problem Deel solves for global teams.",
+      "I led a checkout redesign that cut failed-payment tickets 31%, and wrote the design-system docs 40+ engineers use weekly. I work async across a four-hour US overlap.",
+      "I'd welcome a conversation.",
+    ],
+  },
+};
+
+const STRONG_TITLE = "Your strongest line: a decision, a number and an outcome";
+const SUGG_TITLE = "Consider a plainer connector than the em dash";
+
+/**
+ * Inline markers, the way Grammarly draws them: the strongest line gets a
+ * lime highlight, and em-dash constructions get a green underline with the
+ * suggestion on hover. Baked into the seeded HTML so the marks live inside
+ * the editable text and survive editing around them.
+ */
+function decorateParagraph(p: string): string {
+  return p
+    .split(/(?<=[.!?])\s+/)
+    .map((sent) => {
+      let out = sent.replace(/(\S+ — \S+)/g, `<span class="sugg" title="${SUGG_TITLE}">$1</span>`);
+      if (sent.includes("31%")) out = `<mark title="${STRONG_TITLE}">${out}</mark>`;
+      return out;
+    })
+    .join(" ");
+}
+
+/**
+ * The tone letters are authored against Deel; swap the company (and, in the
+ * formal letter, the role title) for whichever job is linked so the draft
+ * reads coherently. The surrounding facts stay Amara's — a real generator is
+ * the seam this stands in for.
+ */
+function personalize(text: string, company: string, role: string): string {
+  return text.replace(/Deel/g, company).replace("Senior Designer position", `${role} position`);
+}
+
+/** Paragraphs -> the HTML the editor loads. */
+function lettersToHtml(greeting: string, paragraphs: string[], signOff: string): string {
+  const body = paragraphs.filter((p) => p.trim()).map((p) => `<p>${decorateParagraph(p)}</p>`).join("");
+  return `<p>${greeting}</p>${body}<p><strong>${signOff}</strong></p>`;
+}
 
 interface ProfileJdPull {
   id: string;
@@ -103,9 +180,6 @@ const PROFILE_JD_PULLS: ProfileJdPull[] = [
   },
 ];
 
-const ALT_OPENING =
-  "Deel is solving, at global scale, the exact problem I've spent three years living inside at Paystack — making cross-border money move simply for people who never see the complexity behind it.";
-
 // A brand-new, blank draft that isn't tied to any job — used when the user
 // starts "+ New cover letter" instead of tailoring the linked one.
 const BLANK_LETTER: typeof COVER_LETTER = {
@@ -136,10 +210,31 @@ const THEME_CANVAS_CLASS: Record<ThemeId, string> = {
   warm: "bg-[#fbfbf7] border border-black/10",
 };
 
+/** Compact labelled select for the editor toolbar — every style control in
+ *  one bar directly above the letter, not a separate card. */
+const ToolbarSelect: FC<{
+  label: string;
+  value: string;
+  options: { id: string; label: string }[];
+  onChange: (v: string) => void;
+}> = ({ label, value, options, onChange }) => (
+  <label className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.06em] text-black/40">
+    {label}
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="cursor-pointer rounded-md border border-black/12 bg-white px-1.5 py-1 text-[11px] font-bold normal-case tracking-normal text-primary outline-none focus:border-black/30">
+      {options.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  </label>
+);
+
 const CoverClient: FC = () => {
   // JD link row
-  const [jdLinked, setJdLinked] = useState(true);
-  const [jdDraft, setJdDraft] = useState("");
   const [tailoring, setTailoring] = useState(false);
   const [justTailored, setJustTailored] = useState(false);
 
@@ -156,12 +251,8 @@ const CoverClient: FC = () => {
   const [font, setFont] = useState<FontId>("manrope");
   const [spacing, setSpacing] = useState<SpacingId>("normal");
   const [letterhead, setLetterhead] = useState<LetterheadId>("off");
-  const [openControl, setOpenControl] = useState<ControlKey | null>(null);
 
   // Letter canvas interactions
-  const [usingAltOpening, setUsingAltOpening] = useState(false);
-  const [altOpen, setAltOpen] = useState(false);
-  const [markOpen, setMarkOpen] = useState(false);
 
   // Footer
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -172,8 +263,36 @@ const CoverClient: FC = () => {
   // Download modal
   const [downloadOpen, setDownloadOpen] = useState(false);
 
+  // The job this letter is written for. Picking one is the only way in —
+  // pasting a JD now happens inside the picker, alongside the platform's own
+  // listings, instead of behind a separate "New cover letter" button.
+  const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
+  // Nobody arrives with a letter. The default state is the choice: write
+  // your own, or create one from a job — nothing pre-linked, nothing assumed.
+  const [linkedJob, setLinkedJob] = useState<JobOption | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Live editor contents. Seeded from the tone, then owned by the user.
+  const [letterText, setLetterText] = useState("");
+
+  // Either path counts as having begun; until then the page shows the choice.
+  const started = isBlankDraft || linkedJob !== null;
+
   const activeLetter = isBlankDraft ? BLANK_LETTER : COVER_LETTER;
-  const openingParagraph = !isBlankDraft && usingAltOpening ? ALT_OPENING : activeLetter.paragraphs[0];
+  const toneLetter = TONE_LETTERS[tone];
+  // Changing tone or starting a blank draft loads new content into the editor;
+  // anything else leaves the user's typing alone.
+  const docKey = isBlankDraft ? "blank" : `${tone}-${linkedJob?.id ?? "none"}`;
+  const letterCompany = linkedJob?.company ?? COVER_LETTER.company;
+  const letterRole = linkedJob?.role ?? COVER_LETTER.role;
+  const initialHtml = isBlankDraft
+    ? lettersToHtml(BLANK_LETTER.greeting, BLANK_LETTER.paragraphs, BLANK_LETTER.signOff)
+    : lettersToHtml(
+        personalize(toneLetter.greeting, letterCompany, letterRole),
+        toneLetter.paragraphs.map((para) => personalize(para, letterCompany, letterRole)),
+        COVER_LETTER.signOff
+      );
+  const liveWordCount = letterText.trim() ? letterText.trim().split(/\s+/).length : 0;
   const spacingCfg = SPACING_CLASS[spacing];
 
   const composeLetterText = () => {
@@ -183,11 +302,11 @@ const CoverClient: FC = () => {
       if (letterhead === "full") lines.push(`${RESUME.email} · ${RESUME.portfolio} · ${RESUME.location}`);
       lines.push("");
     }
-    lines.push(activeLetter.greeting, "");
-    lines.push(openingParagraph, "");
-    lines.push(activeLetter.paragraphs[1], "");
-    lines.push(activeLetter.paragraphs[2], "");
-    lines.push(activeLetter.signOff);
+    // What's actually on the page — the editor owns the body once mounted.
+    const body = letterText.trim()
+      ? letterText
+      : [activeLetter.greeting, "", ...toneLetter.paragraphs.flatMap((para) => [para, ""]), activeLetter.signOff].join("\n");
+    lines.push(body);
     return lines.join("\n");
   };
 
@@ -212,43 +331,13 @@ const CoverClient: FC = () => {
     }, 900);
   };
 
-  const handleLinkJob = () => {
-    if (!jdDraft.trim()) return;
-    setJdLinked(true);
-    setJdDraft("");
-    setIsBlankDraft(false);
-  };
-
-  const handleNewDraft = () => {
-    // Reset to a brand-new, blank letter that isn't tied to any job — clears
-    // the JD link and every transient interaction tied to the old letter.
-    setIsBlankDraft(true);
-    setJdLinked(false);
-    setJdDraft("");
-    setUsingAltOpening(false);
-    setAltOpen(false);
-    setMarkOpen(false);
-    setBuiltOpen(false);
-    setDetailsOpen(false);
-    setOpenControl(null);
-    setAiPrompt("");
-    setAiStatus(null);
-    setCopied(false);
-    setTailoring(false);
-    setJustTailored(false);
-  };
-
   const handleAiSubmit = () => {
-    if (!aiPrompt.trim()) return;
-    setAiStatus(`Rewrite requested: "${aiPrompt.trim()}" — 1 credit used. We'll apply it to your next draft.`);
+    const prompt = aiPrompt.trim();
+    if (!prompt) return;
+    // No model behind this — acknowledge the ask honestly instead of faking a rewrite.
+    setAiStatus(`Noted: "${prompt}". AI rewriting isn't wired up in this build — edit the letter directly above.`);
     setAiPrompt("");
-    window.setTimeout(() => setAiStatus(null), 4000);
   };
-
-  const selectedTheme = THEME_OPTIONS.find((t) => t.id === theme)!;
-  const selectedFont = FONT_OPTIONS.find((f) => f.id === font)!;
-  const selectedSpacing = SPACING_OPTIONS.find((s) => s.id === spacing)!;
-  const selectedLetterhead = LETTERHEAD_OPTIONS.find((l) => l.id === letterhead)!;
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
@@ -256,89 +345,104 @@ const CoverClient: FC = () => {
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-[17px] font-bold text-primary truncate">
-            {isBlankDraft ? "Cover letter — New draft" : `Cover letter — ${COVER_LETTER.company}, ${COVER_LETTER.role}`}
+            {!started ? "Cover letters" : isBlankDraft ? "Cover letter — New draft" : `Cover letter — ${linkedJob!.company}, ${linkedJob!.role}`}
           </h1>
-          <Pill variant="neutral" className="flex-none">
-            {activeLetter.draftLabel}
-          </Pill>
+          {started && (
+            <Pill variant="neutral" className="flex-none">
+              {activeLetter.draftLabel}
+            </Pill>
+          )}
         </div>
+        {started && (
         <div className="flex items-center gap-2.5 flex-none">
-          <StickerButton variant="outline" size="md" onClick={handleCopy}>
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy text"}
-          </StickerButton>
-          <StickerButton variant="primary" size="md" onClick={() => setDownloadOpen(true)}>
-            <Download className="h-4 w-4" />
-            Download
-          </StickerButton>
+          <SplitButton
+            label={copied ? "Copied" : "Copy"}
+            icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            onClick={handleCopy}
+            items={[
+              { id: "pdf", label: "Download as PDF", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => setDownloadOpen(true) },
+              { id: "docx", label: "Download as DOCX", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => setDownloadOpen(true) },
+              { id: "print", label: "Print", icon: <Printer className="h-3.5 w-3.5" />, onSelect: () => window.print() },
+            ]}
+          />
         </div>
+        )}
       </header>
 
       <main className="px-8 py-7 pb-14 max-w-[760px] mx-auto flex flex-col gap-5">
-        {/* JD-link row */}
+        {!started ? (
+          /* The front door: two ways in, neither assumed. You don't need the
+             job to exist anywhere to write a letter. */
+          <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
+            <h2 className="text-2xl font-bold text-primary">Start a cover letter</h2>
+            <p className="mt-2 max-w-[440px] text-sm leading-relaxed text-black/50">
+              Tailor one to a specific job, or just start typing — a letter doesn&apos;t need a job attached.
+            </p>
+            <div className="mt-7 grid w-full max-w-[560px] grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="group rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-5 text-left text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#e1f073] hover:shadow-[4px_4px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
+                <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
+                  <Link2 className="h-4 w-4 text-[#e1f073]" />
+                </span>
+                <span className="mt-3 block text-sm font-bold">Create from a job</span>
+                <span className="mt-1 block text-xs leading-relaxed text-white/55">
+                  Pick a Remote Worldwide listing or paste any posting — we draft it tailored.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBlankDraft(true)}
+                className="group rounded-2xl border-[1.5px] border-black/15 bg-white p-5 text-left cursor-pointer transition-[transform,box-shadow,border-color] duration-100 ease-out hover:border-[#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
+                <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
+                  <FileSignature className="h-4 w-4 text-primary" />
+                </span>
+                <span className="mt-3 block text-sm font-bold text-primary">Write your own</span>
+                <span className="mt-1 block text-xs leading-relaxed text-black/50">
+                  A blank page, no job attached. You can link one later.
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+        {/* Linked job — one row, one way to change it. */}
         <DashCard className="p-4">
-          {jdLinked ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="h-9 w-9 flex-none rounded-full bg-[#f0f0ea] flex items-center justify-center">
-                <Link2 className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
-                <span className="text-sm text-black/50">Linked to</span>
-                <Pill variant="active">
-                  {COVER_LETTER.company} · {COVER_LETTER.role}
-                </Pill>
-                {justTailored && <span className="text-xs font-semibold text-[#6c7a1e]">Retailored ✓</span>}
-              </div>
-              <div className="flex items-center gap-2 flex-none">
-                <StickerButton variant="outline" size="sm" onClick={handleNewDraft}>
-                  <Plus className="h-3.5 w-3.5" />
-                  New cover letter
-                </StickerButton>
-                <StickerButton variant="outline" size="sm" onClick={() => setJdLinked(false)}>
-                  Replace
-                </StickerButton>
-                <StickerButton variant="primary" size="sm" onClick={handleTailor} disabled={tailoring}>
-                  <RefreshCw className={cn("h-3.5 w-3.5", tailoring && "animate-spin")} />
-                  {tailoring ? "Tailoring…" : "Tailor letter"}
-                </StickerButton>
-              </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="h-9 w-9 flex-none rounded-full bg-[#f0f0ea] flex items-center justify-center">
+              <Link2 className="h-4 w-4 text-primary" />
             </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="jd-paste" className="text-xs font-semibold text-black/50">
-                  Paste a job URL or the full description
-                </label>
-                <StickerButton variant="outline" size="sm" className="flex-none" onClick={handleNewDraft}>
-                  <Plus className="h-3.5 w-3.5" />
-                  New cover letter
-                </StickerButton>
-              </div>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <input
-                  id="jd-paste"
-                  type="text"
-                  value={jdDraft}
-                  onChange={(e) => setJdDraft(e.target.value)}
-                  placeholder="https://... or paste the job description text"
-                  className="flex-1 min-w-[220px] rounded-xl border border-black/12 bg-[#fbfbf7] px-3.5 py-2.5 text-sm text-primary placeholder:text-black/35 outline-none focus:border-black/30 transition-colors"
-                />
-                <StickerButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setJdLinked(true);
-                    setJdDraft("");
-                    setIsBlankDraft(false);
-                  }}>
-                  Cancel
-                </StickerButton>
-                <StickerButton variant="primary" size="sm" onClick={handleLinkJob} disabled={!jdDraft.trim()}>
-                  Link job
-                </StickerButton>
-              </div>
+            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+              {linkedJob && !isBlankDraft ? (
+                <>
+                  <span className="text-sm text-black/50">Written for</span>
+                  <Pill variant="active">
+                    {linkedJob.company} · {linkedJob.role}
+                  </Pill>
+                  {justTailored && <span className="text-xs font-semibold text-[#6c7a1e]">Retailored ✓</span>}
+                </>
+              ) : (
+                <span className="text-sm text-black/50">Not linked to a job — pick one to tailor this letter.</span>
+              )}
             </div>
-          )}
+            <div className="flex items-center gap-2 flex-none">
+              {!isBlankDraft && (
+                <StickerButton variant="outline" size="sm" onClick={() => { setIsBlankDraft(true); setLetterText(""); }}>
+                  <FileSignature className="h-3.5 w-3.5" />
+                  Write from scratch
+                </StickerButton>
+              )}
+              <StickerButton variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+                <Link2 className="h-3.5 w-3.5" />
+                {linkedJob && !isBlankDraft ? "Change job" : "Pick a job"}
+              </StickerButton>
+              <StickerButton variant="primary" size="sm" onClick={handleTailor} disabled={tailoring || !linkedJob || isBlankDraft}>
+                <RefreshCw className={cn("h-3.5 w-3.5", tailoring && "animate-spin")} />
+                {tailoring ? "Tailoring…" : "Tailor letter"}
+              </StickerButton>
+            </div>
+          </div>
         </DashCard>
 
         {/* Disclosure toggle + tone chips */}
@@ -355,20 +459,7 @@ const CoverClient: FC = () => {
             </button>
           )}
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {TONE_OPTIONS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTone(t.id)}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-semibold cursor-pointer transition-colors",
-                  tone === t.id ? "bg-[#222325] text-white" : "bg-[#f0f0ea] text-black/55 hover:bg-[#e7e7df]"
-                )}>
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={setTone} />
         </div>
 
         {/* Expandable disclosure panel */}
@@ -393,249 +484,54 @@ const CoverClient: FC = () => {
               </div>
             </div>
 
-            <div className="border-t border-black/8 pt-5">
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-3">Style this letter</p>
-              <div className="flex flex-wrap gap-2.5">
-                {/* Theme */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setOpenControl((v) => (v === "theme" ? null : "theme"))}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-semibold cursor-pointer transition-colors",
-                      openControl === "theme" ? "border-primary bg-[#f6f6f6]" : "border-black/12 bg-white hover:border-black/25"
-                    )}>
-                    <Palette className="h-3.5 w-3.5 text-black/50" />
-                    <span className="text-black/45">Theme:</span>
-                    <span className="text-primary">{selectedTheme.label}</span>
-                    <ChevronDown className={cn("h-3 w-3 text-black/40 transition-transform", openControl === "theme" && "rotate-180")} />
-                  </button>
-                  {openControl === "theme" && (
-                    <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-44 rounded-xl border border-black/10 bg-white shadow-lg overflow-hidden">
-                      {THEME_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            setTheme(opt.id);
-                            setOpenControl(null);
-                          }}
-                          className={cn(
-                            "w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-xs font-semibold transition-colors cursor-pointer",
-                            opt.id === theme ? "bg-[#f6f6f6] text-primary" : "text-black/60 hover:bg-[#f9f9f6]"
-                          )}>
-                          {opt.label}
-                          {opt.id === theme && <Check className="h-3.5 w-3.5 flex-none" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Font */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setOpenControl((v) => (v === "font" ? null : "font"))}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-semibold cursor-pointer transition-colors",
-                      openControl === "font" ? "border-primary bg-[#f6f6f6]" : "border-black/12 bg-white hover:border-black/25"
-                    )}>
-                    <Type className="h-3.5 w-3.5 text-black/50" />
-                    <span className="text-black/45">Font:</span>
-                    <span className="text-primary">{selectedFont.label}</span>
-                    <ChevronDown className={cn("h-3 w-3 text-black/40 transition-transform", openControl === "font" && "rotate-180")} />
-                  </button>
-                  {openControl === "font" && (
-                    <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-40 rounded-xl border border-black/10 bg-white shadow-lg overflow-hidden">
-                      {FONT_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            setFont(opt.id);
-                            setOpenControl(null);
-                          }}
-                          className={cn(
-                            "w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-xs font-semibold transition-colors cursor-pointer",
-                            opt.id === font ? "bg-[#f6f6f6] text-primary" : "text-black/60 hover:bg-[#f9f9f6]"
-                          )}>
-                          {opt.label}
-                          {opt.id === font && <Check className="h-3.5 w-3.5 flex-none" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Spacing */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setOpenControl((v) => (v === "spacing" ? null : "spacing"))}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-semibold cursor-pointer transition-colors",
-                      openControl === "spacing" ? "border-primary bg-[#f6f6f6]" : "border-black/12 bg-white hover:border-black/25"
-                    )}>
-                    <AlignLeft className="h-3.5 w-3.5 text-black/50" />
-                    <span className="text-black/45">Spacing:</span>
-                    <span className="text-primary">{selectedSpacing.label}</span>
-                    <ChevronDown className={cn("h-3 w-3 text-black/40 transition-transform", openControl === "spacing" && "rotate-180")} />
-                  </button>
-                  {openControl === "spacing" && (
-                    <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-40 rounded-xl border border-black/10 bg-white shadow-lg overflow-hidden">
-                      {SPACING_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            setSpacing(opt.id);
-                            setOpenControl(null);
-                          }}
-                          className={cn(
-                            "w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-xs font-semibold transition-colors cursor-pointer",
-                            opt.id === spacing ? "bg-[#f6f6f6] text-primary" : "text-black/60 hover:bg-[#f9f9f6]"
-                          )}>
-                          {opt.label}
-                          {opt.id === spacing && <Check className="h-3.5 w-3.5 flex-none" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Letterhead */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setOpenControl((v) => (v === "letterhead" ? null : "letterhead"))}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-semibold cursor-pointer transition-colors",
-                      openControl === "letterhead" ? "border-primary bg-[#f6f6f6]" : "border-black/12 bg-white hover:border-black/25"
-                    )}>
-                    <FileSignature className="h-3.5 w-3.5 text-black/50" />
-                    <span className="text-black/45">Letterhead:</span>
-                    <span className="text-primary">{selectedLetterhead.label}</span>
-                    <ChevronDown className={cn("h-3 w-3 text-black/40 transition-transform", openControl === "letterhead" && "rotate-180")} />
-                  </button>
-                  {openControl === "letterhead" && (
-                    <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-44 rounded-xl border border-black/10 bg-white shadow-lg overflow-hidden">
-                      {LETTERHEAD_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            setLetterhead(opt.id);
-                            setOpenControl(null);
-                          }}
-                          className={cn(
-                            "w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left text-xs font-semibold transition-colors cursor-pointer",
-                            opt.id === letterhead ? "bg-[#f6f6f6] text-primary" : "text-black/60 hover:bg-[#f9f9f6]"
-                          )}>
-                          {opt.label}
-                          {opt.id === letterhead && <Check className="h-3.5 w-3.5 flex-none" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
           </DashCard>
         </div>
 
-        {/* Letter canvas */}
-        <div className={cn("relative rounded-2xl p-8 sm:p-10", THEME_CANVAS_CLASS[theme])}>
-          {theme === "warm" && <div aria-hidden className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl bg-[#f0c86a]" />}
-
-          <div className={cn("flex flex-col", spacingCfg.gap, FONT_CLASS[font])}>
-            {letterhead !== "off" && (
-              <div className="mb-1">
-                <p className="text-base font-bold text-primary">{RESUME.name}</p>
+        {/* The letter itself. Formatting lives in the editor's own toolbar,
+            with the letterhead toggle sitting beside it — one bar directly
+            above the page, rather than controls scattered around it. */}
+        <RichTextEditor
+          docKey={docKey}
+          initialHtml={initialHtml}
+          onChange={({ text }) => setLetterText(text)}
+          ariaLabel="Cover letter body"
+          toolbarLeading={
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => setTheme(v as ThemeId)} />
+              <ToolbarSelect label="Font" value={font} options={FONT_OPTIONS} onChange={(v) => setFont(v as FontId)} />
+              <ToolbarSelect label="Spacing" value={spacing} options={SPACING_OPTIONS} onChange={(v) => setSpacing(v as SpacingId)} />
+              <ToolbarSelect label="Letterhead" value={letterhead} options={LETTERHEAD_OPTIONS} onChange={(v) => setLetterhead(v as LetterheadId)} />
+            </div>
+          }
+          pageHeader={
+            letterhead !== "off" ? (
+              <div className="border-b border-black/10 px-8 pb-5 pt-7">
+                <p className={cn("text-lg font-bold text-primary", FONT_CLASS[font])}>{RESUME.name}</p>
                 {letterhead === "full" && (
-                  <p className="text-xs text-black/45 mt-0.5">
+                  <p className="mt-0.5 text-xs text-black/45">
                     {RESUME.email} · {RESUME.portfolio} · {RESUME.location}
                   </p>
                 )}
               </div>
-            )}
-
-            <p contentEditable suppressContentEditableWarning className={cn("text-primary outline-none", spacingCfg.text)}>
-              {activeLetter.greeting}
-            </p>
-
-            {/* Opening paragraph — hover popover with "alt phrasing" (only relevant once a job is linked) */}
-            <div className="relative" onMouseEnter={() => setAltOpen(true)} onMouseLeave={() => setAltOpen(false)}>
-              <p contentEditable suppressContentEditableWarning className={cn("text-black/80 outline-none", spacingCfg.text)}>
-                {openingParagraph}
-              </p>
-
-              {altOpen && !isBlankDraft && (
-                <div className="absolute left-0 top-full mt-2 z-20 w-72 rounded-xl border border-black/10 bg-white shadow-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Quote className="h-3.5 w-3.5 text-black/40" />
-                    <p className="text-xs font-bold text-primary">Try a different opening</p>
-                  </div>
-                  <p className="text-xs text-black/55 leading-relaxed mb-3">
-                    {usingAltOpening
-                      ? "You're using the alt phrasing. Swap back to the original opening line."
-                      : "A tighter version that leads with Deel's problem instead of your résumé."}
-                  </p>
-                  <StickerButton
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      setUsingAltOpening((v) => !v);
-                      setAltOpen(false);
-                    }}>
-                    Swap opening line
-                  </StickerButton>
-                </div>
-              )}
-            </div>
-
-            {/* Second paragraph — margin "strongest line" marker (only relevant once a job is linked) */}
-            <div className="relative pr-8">
-              <p contentEditable suppressContentEditableWarning className={cn("text-black/80 outline-none", spacingCfg.text)}>
-                {activeLetter.paragraphs[1]}
-              </p>
-
-              {!isBlankDraft && (
-                <button
-                  type="button"
-                  onMouseEnter={() => setMarkOpen(true)}
-                  onMouseLeave={() => setMarkOpen(false)}
-                  className="absolute right-0 top-0 h-6 w-6 rounded-full bg-secondary text-primary flex items-center justify-center cursor-default">
-                  <Star className="h-3.5 w-3.5" fill="currentColor" />
-                </button>
-              )}
-
-              {markOpen && !isBlankDraft && (
-                <div className="absolute right-0 top-7 z-20 w-56 rounded-xl border border-black/10 bg-white shadow-lg p-3.5">
-                  <p className="text-xs font-bold text-primary mb-1">Your strongest line</p>
-                  <p className="text-xs text-black/55 leading-relaxed">
-                    Leads with a hard number reviewers can verify — this is the sentence most likely to get a second read.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <p contentEditable suppressContentEditableWarning className={cn("text-black/80 outline-none", spacingCfg.text)}>
-              {activeLetter.paragraphs[2]}
-            </p>
-
-            <p contentEditable suppressContentEditableWarning className={cn("text-primary font-semibold outline-none", spacingCfg.text)}>
-              {activeLetter.signOff}
-            </p>
-          </div>
-        </div>
+            ) : undefined
+          }
+          surfaceClassName={THEME_CANVAS_CLASS[theme]}
+          contentClassName={cn(
+            FONT_CLASS[font],
+            spacingCfg.text,
+            "text-primary [&>p]:mb-4 last:[&>p]:mb-0",
+            // Inline markers, Grammarly-style: highlight for the strongest
+            // line, green underline for a suggested change.
+            "[&_mark]:bg-[#e1f073]/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_mark]:cursor-help",
+            "[&_.sugg]:underline [&_.sugg]:decoration-[#3fa66a] [&_.sugg]:decoration-2 [&_.sugg]:underline-offset-4 [&_.sugg]:cursor-help"
+          )}
+        />
 
         {/* Footer: word count, details, AI rewrite */}
         <DashCard className="p-5 flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-black/45">{activeLetter.wordCount} words</span>
+              <span className="text-xs font-semibold text-black/45 tabular-nums">{liveWordCount} words</span>
               <button
                 type="button"
                 onClick={() => setDetailsOpen((v) => !v)}
@@ -696,7 +592,27 @@ const CoverClient: FC = () => {
             )}
           </div>
         </DashCard>
+          </>
+        )}
       </main>
+
+      <JobPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        jobs={jobs}
+        onPick={(j) => {
+          setLinkedJob(j);
+          setIsBlankDraft(false);
+          setPickerOpen(false);
+        }}
+        onCreate={(input) => {
+          const created = createPastedJob(input);
+          setJobs((prev) => [created, ...prev]);
+          setLinkedJob(created);
+          setIsBlankDraft(false);
+          setPickerOpen(false);
+        }}
+      />
 
       <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="cover letter" fileName="Amara-Okafor-Cover-Letter" />
     </div>

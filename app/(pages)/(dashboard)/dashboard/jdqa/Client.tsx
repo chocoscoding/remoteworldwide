@@ -2,13 +2,15 @@
 
 import { FC, ReactNode, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, ClipboardPaste, SendHorizontal, X } from "lucide-react";
+import { AlertTriangle, Check, FileSearch, Repeat2, SendHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Pill from "@/app/components/dashboard/ui/Pill";
-import { JD_CONTENT, JD_QA_EXCHANGES, JD_QUICK_QUESTIONS } from "@/app/lib/dashboard/mock-data";
+import { JD_QA_EXCHANGES, JD_QUICK_QUESTIONS } from "@/app/lib/dashboard/mock-data";
 import type { JdQaAnswer } from "@/app/lib/dashboard/types";
+import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
+import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 
 // ---------------------------------------------------------------------------
 // Chat entry shape + helpers — the transcript is a flat list of alternating
@@ -61,12 +63,39 @@ function renderHighlightedJd(text: string, highlight: string): ReactNode {
 const INITIAL_ANSWER = JD_QA_EXCHANGES.find((e) => e.id === "fit") ?? JD_QA_EXCHANGES[0];
 
 const JdqaClient: FC = () => {
-  const [pasteOpen, setPasteOpen] = useState(false);
-  const [pasteValue, setPasteValue] = useState("");
-  const [askedIds, setAskedIds] = useState<Set<string>>(new Set(["fit"]));
-  const [messages, setMessages] = useState<ChatEntry[]>(() => buildExchange(INITIAL_ANSWER, "seed"));
+  // No job, no questions — this screen has nothing to say until one is picked,
+  // so the picker is the default state rather than a job being assumed.
+  const [job, setJob] = useState<JobOption | null>(null);
+  const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const [askedIds, setAskedIds] = useState<Set<string>>(new Set());
+  const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [composerValue, setComposerValue] = useState("");
   const nextCustomId = useRef(0);
+
+  function selectJob(next: JobOption) {
+    setJob(next);
+    setPickerOpen(false);
+    // Every job starts its own conversation — carrying answers about a
+    // different posting across would be worse than useless.
+    setMessages(buildExchange(INITIAL_ANSWER, `seed-${next.id}`));
+    setAskedIds(new Set(["fit"]));
+    setComposerValue("");
+  }
+
+  function createJob(input: { company: string; role: string; jdText?: string; url?: string }) {
+    const created = createPastedJob(input);
+    setJobs((prev) => [created, ...prev]);
+    selectJob(created);
+  }
+
+  function clearJob() {
+    setJob(null);
+    setMessages([]);
+    setAskedIds(new Set());
+    setComposerValue("");
+  }
 
   const askQuick = (id: string) => {
     if (askedIds.has(id)) return;
@@ -102,74 +131,59 @@ const JdqaClient: FC = () => {
             A straight read on any job description before you apply
           </span>
         </div>
-        <StickerButton variant="outline" size="md" onClick={() => setPasteOpen((v) => !v)}>
-          <ClipboardPaste className="h-4 w-4" />
-          Paste another job
-        </StickerButton>
+        {job && (
+          <div className="flex flex-none items-center gap-2">
+            <StickerButton variant="outline" size="md" onClick={() => setPickerOpen(true)}>
+              <Repeat2 className="h-4 w-4" />
+              Change job
+            </StickerButton>
+            <button
+              type="button"
+              onClick={clearJob}
+              aria-label="Clear this job"
+              title="Clear this job"
+              className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="px-8 py-7 pb-14 max-w-[1240px] mx-auto">
-        {/* Paste-another-job expandable panel */}
-        <div
-          className={cn(
-            "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
-            pasteOpen ? "max-h-[320px] opacity-100 mb-5" : "max-h-0 opacity-0"
-          )}>
-          <DashCard className="p-5 bg-[#fbfbf7]">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-primary">Paste a new job description</p>
-              <button
-                type="button"
-                onClick={() => setPasteOpen(false)}
-                className="text-black/35 hover:text-black/60 cursor-pointer">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <textarea
-              value={pasteValue}
-              onChange={(e) => setPasteValue(e.target.value)}
-              placeholder="Paste a job URL or the full description text…"
-              rows={4}
-              className="w-full resize-none rounded-xl border border-black/12 bg-white px-3.5 py-3 text-sm text-primary placeholder:text-black/35 focus:outline-none focus:border-primary/40"
-            />
-            <div className="flex items-center justify-between gap-4 mt-3">
-              <p className="text-xs text-black/40">
-                We&apos;ll keep chatting about {JD_CONTENT.company} · {JD_CONTENT.role} until you swap it in.
-              </p>
-              <div className="flex-none flex gap-2">
-                <StickerButton
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setPasteOpen(false);
-                    setPasteValue("");
-                  }}>
-                  Cancel
-                </StickerButton>
-                <StickerButton variant="primary" size="sm" onClick={() => setPasteOpen(false)}>
-                  Use this job
-                </StickerButton>
-              </div>
-            </div>
-          </DashCard>
-        </div>
-
+        {!job ? (
+          <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f0f0ea]">
+              <FileSearch className="h-5 w-5 text-black/40" />
+            </span>
+            <h2 className="mt-5 text-xl font-bold text-primary">Which job are we reading?</h2>
+            <p className="mt-2 max-w-[420px] text-sm leading-relaxed text-black/50">
+              Pick a role from Remote Worldwide, or paste one in. Whatever you paste is saved to your jobs, so you can come back
+              to it later.
+            </p>
+            <StickerButton variant="primary" size="md" className="mt-6" onClick={() => setPickerOpen(true)}>
+              <FileSearch className="h-4 w-4" />
+              Choose a job
+            </StickerButton>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-5 items-start">
           {/* Left: pasted job card */}
           <DashCard className="p-6 lg:sticky lg:top-24">
             <Pill variant="neutral" className="mb-4">
-              Pasted job
+              {job.source === "pasted" ? "Pasted job" : "On Remote Worldwide"}
             </Pill>
-            <p className="text-lg font-bold text-primary leading-snug">{JD_CONTENT.role}</p>
-            <p className="text-sm text-black/50 font-medium mb-4">{JD_CONTENT.company}</p>
-            <Pill variant="positive" className="mb-5">
-              {JD_CONTENT.salary}
-            </Pill>
+            <p className="text-lg font-bold text-primary leading-snug">{job.role}</p>
+            <p className="text-sm text-black/50 font-medium mb-4">{job.company}</p>
+            {job.salary && (
+              <Pill variant="positive" className="mb-5">
+                {job.salary}
+              </Pill>
+            )}
             <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2">
               Full description
             </p>
             <p className="text-sm text-black/70 leading-relaxed">
-              {renderHighlightedJd(JD_CONTENT.jdText, JD_CONTENT.highlight)}
+              {job.highlight ? renderHighlightedJd(job.jdText, job.highlight) : job.jdText}
             </p>
           </DashCard>
 
@@ -283,7 +297,16 @@ const JdqaClient: FC = () => {
             </div>
           </DashCard>
         </div>
+        )}
       </main>
+
+      <JobPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        jobs={jobs}
+        onPick={selectJob}
+        onCreate={createJob}
+      />
     </div>
   );
 };

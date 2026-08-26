@@ -343,7 +343,7 @@ const KanbanColumn: FC<{ column: TrackerColumn }> = ({ column }) => {
           "flex flex-col rounded-sm border border-black/15 bg-[#f0f0ea]/60 p-2.5 min-h-[140px] transition-colors",
           isOver && "border-[#222325] bg-[#e5e5d8]"
         )}>
-        <div className="flex flex-col gap-2.5 max-h-[760px] overflow-y-auto pr-0.5">
+        <div className="flex flex-col gap-2.5 max-h-[760px] overflow-y-auto  pr-0.5">
           <SortableContext items={column.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
             {column.cards.map((card) => (
               <SortableTrackerCard key={card.id} card={card} />

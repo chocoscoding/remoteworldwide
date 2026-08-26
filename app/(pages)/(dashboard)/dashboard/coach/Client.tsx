@@ -1,14 +1,16 @@
 "use client";
 
-import { FC, FormEvent, useEffect, useRef, useState } from "react";
+import { FC, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, RotateCcw, Send } from "lucide-react";
+import { ArrowRight, Loader2, Mic, Plus, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import { COACH_MESSAGES, COACH_PLAN, COACH_SESSIONS } from "@/app/lib/dashboard/mock-data";
 import type { CoachMessage, CoachPlanItem } from "@/app/lib/dashboard/types";
+import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
+import MicWaveform from "@/app/components/dashboard/voice/MicWaveform";
 
 // ---------------------------------------------------------------------------
 // Local content that isn't shared with any other screen — the canned coach
@@ -37,6 +39,19 @@ const CoachClient: FC = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [replyIndex, setReplyIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Dictated speech lands in the same draft as typing, so everything
+  // downstream of the composer stays identical either way.
+  const handleTranscript = useCallback((text: string) => {
+    setDraft((prev) => (prev ? `${prev.trimEnd()} ${text.trim()}` : text.trim()));
+  }, []);
+
+  // The coach doesn't talk back out loud — this is dictation only.
+  const { micStatus, dictationSupported, startDictation, stopDictation, onLevel } = useVoiceSession({
+    onTranscript: handleTranscript,
+    voiceEnabled: false,
+  });
+  const listening = micStatus === "listening";
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -71,10 +86,11 @@ const CoachClient: FC = () => {
     setMessages((prev) => [...prev, userMsg, reply]);
     setReplyIndex((i) => i + 1);
     setDraft("");
+    if (listening) stopDictation();
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f6f6]">
+    <div className="h-screen flex flex-col bg-[#f6f6f6] overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
@@ -86,16 +102,87 @@ const CoachClient: FC = () => {
             <p className="text-xs text-black/45 truncate">Knows your profile, applications and results</p>
           </div>
         </div>
-        <StickerButton variant="primary" size="md" onClick={handleNewSession} className="flex-none">
-          <RotateCcw className="h-4 w-4" />
-          New session
-        </StickerButton>
       </header>
 
-      <main className="px-8 py-7 pb-14 max-w-[1100px] mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
+      {/* The dashboard header is h-16; this claims the rest and never
+          scrolls the page — each column scrolls on its own instead. */}
+      <main className="flex-1 min-h-0 px-6 py-5">
+        <div className="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[264px_1fr]">
+          {/* One dark rail: sessions above, the plan below, split by a rule.
+              Proportional rather than content-sized so neither list can push
+              the other off-screen — each scrolls inside its own share. */}
+          <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-[#222325] text-white order-first">
+            {/* Sessions — the larger share, since the list grows without bound. */}
+            <div className="flex min-h-0 flex-[1_1_63%] flex-col px-3 pt-3.5">
+              <div className="mb-2 flex flex-none items-center justify-between gap-2 px-1">
+                <p className="text-sm font-bold">Sessions</p>
+                <button
+                  type="button"
+                  onClick={handleNewSession}
+                  aria-label="Start a new session"
+                  title="New session"
+                  className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#e1f073] bg-[#e1f073] text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_rgba(255,255,255,.3)] hover:shadow-[2.5px_2.5px_0_0_rgba(255,255,255,.45)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+                  <Plus className="h-4 w-4" strokeWidth={2.75} />
+                </button>
+              </div>
+
+              <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-3">
+                {COACH_SESSIONS.map((sn) => (
+                  <button
+                    key={sn.id}
+                    type="button"
+                    onClick={() => setActiveSessionId(sn.id)}
+                    title={sn.title}
+                    className={cn(
+                      "w-full flex-none rounded-lg px-2.5 py-2 text-left text-[13px] cursor-pointer",
+                      "transition-[transform,box-shadow,background-color] duration-100 ease-out",
+                      "active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+                      // Nothing at rest — a list of filled boxes reads heavier
+                      // than the conversation it's meant to sit beside.
+                      activeSessionId === sn.id
+                        ? "bg-white font-bold text-[#222325] shadow-[2px_2px_0_0_#e1f073]"
+                        : "bg-transparent font-medium text-white/70 hover:bg-white/10 hover:text-white hover:shadow-[2px_2px_0_0_#e1f073]"
+                    )}>
+                    {/* Titles run long — truncate rather than wrap, the full
+                        text is on the tooltip. */}
+                    <span className="block truncate">{sn.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <hr className="flex-none border-0 border-t border-white/12" />
+
+            {/* This month's plan — the smaller, bounded share. */}
+            <div className="flex min-h-0 flex-[1_1_37%] flex-col px-3 pb-3.5 pt-3">
+              <div className="mb-2 flex flex-none items-baseline justify-between gap-2 px-1">
+                <p className="text-sm font-bold">This month&apos;s plan</p>
+                <span className="text-xs font-medium text-white/40 tabular-nums">
+                  {planDone}/{planItems.length}
+                </span>
+              </div>
+
+              <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+                {planItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => togglePlanItem(item.id)}
+                    className="group flex flex-none items-start gap-2.5 rounded-lg px-2.5 py-2 text-left cursor-pointer transition-colors hover:bg-white/10">
+                    <span className="mt-0.5 flex-none">
+                      <NeoCheckbox checked={item.done} size="sm" dark />
+                    </span>
+                    <span className={cn("text-[13px] leading-snug", item.done ? "text-white/35 line-through" : "font-medium text-white/85")}>
+                      {item.text}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
+
           {/* Chat column */}
-          <DashCard className="p-0 flex flex-col overflow-hidden h-[calc(100vh-200px)] min-h-[480px]">
+          <DashCard className="flex min-h-0 h-full flex-col overflow-hidden p-0">
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-5">
               {messages.map((m) => (
                 <div key={m.id} className={cn("flex gap-2.5 items-start", m.from === "user" && "justify-end")}>
@@ -134,66 +221,68 @@ const CoachClient: FC = () => {
             </div>
 
             {/* Sticky bottom composer */}
-            <form onSubmit={handleSend} className="flex-none border-t border-black/10 p-4 flex items-center gap-3 bg-white">
-              <input
-                type="text"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Ask your coach anything…"
-                className="flex-1 h-11 rounded-lg border border-black/12 bg-[#f6f6f6] px-4 text-sm text-primary placeholder:text-black/40 focus:outline-none focus:border-black/30 transition-colors"
-              />
-              <StickerButton type="submit" variant="primary" size="md" className="flex-none" disabled={!draft.trim()}>
+            <form onSubmit={handleSend} className="flex-none border-t border-black/10 p-4 flex items-center gap-2.5 bg-white">
+              <div
+                className={cn(
+                  "flex-1 flex items-center gap-2 h-11 rounded-lg border bg-[#f6f6f6] pl-4 pr-2 transition-colors",
+                  listening ? "border-[#222325]" : "border-black/12 focus-within:border-black/30"
+                )}>
+                {listening ? (
+                  // While dictating the field shows the voice itself — the
+                  // words land in the input the moment they're recognised.
+                  <MicWaveform
+                    onLevel={onLevel}
+                    active
+                    bars={18}
+                    barWidth={2}
+                    gap={2}
+                    height="h-5"
+                    activeClassName="bg-[#222325]"
+                    idleClassName="bg-black/20"
+                    className="flex-none w-[92px]"
+                  />
+                ) : null}
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={listening ? "Listening…" : "Ask your coach anything…"}
+                  className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/40 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={listening ? stopDictation : startDictation}
+                  disabled={!dictationSupported || micStatus === "denied"}
+                  aria-pressed={listening}
+                  aria-label={listening ? "Stop dictating" : "Dictate your message"}
+                  title={
+                    micStatus === "denied"
+                      ? "Mic blocked — type instead"
+                      : !dictationSupported
+                        ? "Dictation needs Chrome or Edge"
+                        : listening
+                          ? "Stop dictating"
+                          : "Dictate"
+                  }
+                  className={cn(
+                    "inline-flex h-8 w-8 flex-none items-center justify-center rounded-md cursor-pointer transition-colors disabled:opacity-30 disabled:pointer-events-none",
+                    listening ? "bg-[#222325] text-[#e1f073]" : "text-black/45 hover:bg-black/5 hover:text-primary"
+                  )}>
+                  {micStatus === "requesting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!draft.trim()}
+                aria-label="Send"
+                title="Send"
+                className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-[#222325] text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:pointer-events-none">
                 <Send className="h-4 w-4" />
-                Send
-              </StickerButton>
+              </button>
             </form>
           </DashCard>
 
-          {/* Right rail */}
-          <div className="flex flex-col gap-5">
-            {/* This month's plan */}
-            <DashCard className="p-5">
-              <div className="flex items-center justify-between mb-3.5">
-                <p className="text-sm font-bold text-primary">This month&apos;s plan</p>
-                <span className="text-xs font-medium text-black/45">
-                  {planDone} of {planItems.length} done
-                </span>
-              </div>
-              <div className="flex flex-col gap-1 -mx-1.5">
-                {planItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => togglePlanItem(item.id)}
-                    className="group flex items-center gap-2.5 rounded-lg px-1.5 py-2 hover:bg-[#f6f6f6] transition-colors cursor-pointer text-left">
-                    <NeoCheckbox checked={item.done} />
-                    <span className={cn("text-sm", item.done ? "text-black/40 line-through" : "text-primary font-medium")}>
-                      {item.text}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </DashCard>
-
-            {/* Past sessions */}
-            <DashCard className="p-5">
-              <p className="text-sm font-bold text-primary mb-3.5">Past sessions</p>
-              <div className="flex flex-col gap-1 -mx-1.5">
-                {COACH_SESSIONS.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setActiveSessionId(s.id)}
-                    className={cn(
-                      "text-left rounded-lg px-2.5 py-2.5 text-sm transition-colors cursor-pointer",
-                      activeSessionId === s.id ? "bg-[#222325] text-white font-semibold" : "text-black/70 font-medium hover:bg-[#f6f6f6]"
-                    )}>
-                    {s.title}
-                  </button>
-                ))}
-              </div>
-            </DashCard>
-          </div>
         </div>
       </main>
     </div>
