@@ -1,179 +1,137 @@
 "use client";
 
-import { FC, useState } from "react";
+// My documents — every file the platform knows about, in one list.
+//
+// The documents themselves live in DocumentsProvider (app-wide) so the ATS
+// scorer reads the same list; this screen owns only how they're browsed:
+// tab, search, sort, pagination.
+
+import { FC, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, File, FileText, Linkedin, Paperclip, Pencil, Plus, X } from "lucide-react";
+import { FolderOpen, Linkedin, Monitor, Plus, Search, SearchX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
-import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
+import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
-import Pill from "@/app/components/dashboard/ui/Pill";
-import { ATS_RESUMES } from "@/app/lib/dashboard/mock-data";
+import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
+import SplitButton from "@/app/components/dashboard/ui/SplitButton";
+import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { useDocuments, type DocKind, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
+import DocRow, { KIND_LABELS } from "./_components/DocRow";
+import DropZone from "./_components/DropZone";
+import LinkedInImportDialog from "./_components/LinkedInImportDialog";
 
-// ---------------------------------------------------------------------------
-// Local content — only used on this screen, so kept here rather than in
-// mock-data.ts (mirrors the convention already used by the Home screen's
-// DEFAULT_HABITS / NEXT_ACTIONS).
-// ---------------------------------------------------------------------------
+type VaultTab = "all" | "resumes" | "other" | "archived";
+type SortKey = "recent" | "name" | "size";
 
-interface FactRow {
-  id: string;
-  label: string;
-  value: string;
-  hint: string;
-}
-
-const INITIAL_FACTS: FactRow[] = [
-  {
-    id: "work-history",
-    label: "Work history",
-    value: "4 roles",
-    hint: "Feeds the Experience section on every resume you generate.",
-  },
-  {
-    id: "achievements",
-    label: "Achievements",
-    value: "11 saved",
-    hint: "Quantified bullets you can drop into any resume or cover letter.",
-  },
-  {
-    id: "work-preferences",
-    label: "Work preferences",
-    value: "Remote worldwide · GMT+1 · $70–95k · full-time",
-    hint: "Used to auto-answer salary and availability screening questions.",
-  },
-  {
-    id: "certifications",
-    label: "Certifications",
-    value: "",
-    hint: "Nothing saved yet — adding one strengthens ATS keyword match.",
-  },
+const SORT_OPTIONS: { id: SortKey; label: string }[] = [
+  { id: "recent", label: "Recent" },
+  { id: "name", label: "Name" },
+  { id: "size", label: "Size" },
 ];
 
-const MISSING_PROFILE_ITEMS = ["Add a certification", "Verify your phone number", "Link a second portfolio sample"];
-
-// Resume accent-color swatches from the design spec, mapped per resume id.
-// Written as literal `bg-[#hex]` Tailwind classes (not inline styles) so
-// they're picked up by Tailwind's static build-time scan.
-const RESUME_ACCENT_CLASSES: Record<string, string> = {
-  "res-master": "bg-[#222325]",
-  "res-linear": "bg-[#3a4a7a]",
-  "res-deel": "bg-[#2f5d50]",
-};
-
-const RESUME_DESCRIPTIONS: Record<string, string> = {
-  "res-master": "Your default, general-purpose resume.",
-  "res-linear": "Tailored for Linear — Senior Product Designer.",
-  "res-deel": "Tailored for Deel — Senior Designer.",
-};
-
-// Master resume / Linear / Deel — the archived "2023 resume (imported)" row
-// doesn't belong in this grid.
-const VAULT_RESUMES = ATS_RESUMES.filter((r) => !r.archived);
-
-// ---------------------------------------------------------------------------
-// Generic documents — anything that isn't a tailored resume (IDs, portfolio
-// files, certificates, ...). Deliberately untyped/mock: local state only, no
-// upload plumbing. Kept distinct from the Resumes grid above both in data
-// shape and in card styling (neutral icon tile vs. the resumes' colored
-// accent squares).
-// ---------------------------------------------------------------------------
-
-type DocumentKind = "pdf" | "doc" | "other";
-
-interface VaultDocument {
-  id: string;
-  name: string;
-  kind: DocumentKind;
-}
-
-const DOCUMENT_ICONS: Record<DocumentKind, typeof FileText> = {
-  pdf: FileText,
-  doc: File,
-  other: Paperclip,
-};
-
-const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
-  pdf: "PDF",
-  doc: "Document",
-  other: "Attachment",
-};
-
-const INITIAL_DOCUMENTS: VaultDocument[] = [
-  { id: "doc-passport", name: "Passport scan.pdf", kind: "pdf" },
-  { id: "doc-portfolio", name: "Portfolio one-pager.doc", kind: "doc" },
+// The kit an application can ask for — the readiness strip is coverage of
+// these, derived from what's actually saved, not a hardcoded percentage.
+const KIT: { kind: DocKind; label: string; href?: string }[] = [
+  { kind: "resume", label: "Resume", href: "/dashboard/resume" },
+  { kind: "cover-letter", label: "Cover letter", href: "/dashboard/cover" },
+  { kind: "portfolio", label: "Portfolio" },
+  { kind: "certificate", label: "Certificate" },
+  { kind: "id", label: "ID document" },
 ];
+
+const clampPage = (page: number, total: number) => Math.min(Math.max(page, 1), Math.max(total, 1));
+
+function inTab(doc: VaultDoc, tab: VaultTab): boolean {
+  if (tab === "archived") return !!doc.archived;
+  if (doc.archived) return false;
+  if (tab === "resumes") return doc.kind === "resume";
+  if (tab === "other") return doc.kind !== "resume";
+  return true;
+}
 
 const VaultClient: FC = () => {
-  const [facts, setFacts] = useState<FactRow[]>(INITIAL_FACTS);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const [profileOpen, setProfileOpen] = useState(false);
+  const { docs, addUploads } = useDocuments();
 
-  const [documents, setDocuments] = useState<VaultDocument[]>(INITIAL_DOCUMENTS);
-  const [editingDocId, setEditingDocId] = useState<string | null>(null);
-  const [docDraft, setDocDraft] = useState("");
+  const [tab, setTab] = useState<VaultTab>("all");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("recent");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [linkedInOpen, setLinkedInOpen] = useState(false);
 
-  const startEdit = (row: FactRow) => {
-    setEditingId(row.id);
-    setDraft(row.value);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const q = query.trim().toLowerCase();
+
+  const filtered = useMemo(() => {
+    const matches = docs.filter((d) => {
+      if (!inTab(d, tab)) return false;
+      if (!q) return true;
+      return `${d.name} ${KIND_LABELS[d.kind]} ${d.ext ?? ""}`.toLowerCase().includes(q);
+    });
+    const sorted = [...matches];
+    if (sort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sort === "size") sorted.sort((a, b) => (b.size ?? -1) - (a.size ?? -1));
+    else sorted.sort((a, b) => b.addedAt - a.addedAt);
+    return sorted;
+  }, [docs, tab, q, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = clampPage(page, totalPages);
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const active = docs.filter((d) => !d.archived);
+  const counts: Record<VaultTab, number> = {
+    all: active.length,
+    resumes: active.filter((d) => d.kind === "resume").length,
+    other: active.filter((d) => d.kind !== "resume").length,
+    archived: docs.length - active.length,
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setDraft("");
-  };
+  // Application kit coverage — derived, so it moves when documents do.
+  const presentKinds = new Set(active.map((d) => d.kind));
+  const covered = KIT.filter((k) => presentKinds.has(k.kind));
+  const missing = KIT.filter((k) => !presentKinds.has(k.kind));
+  const kitPct = Math.round((covered.length / KIT.length) * 100);
+  const totalBytes = active.reduce((sum, d) => sum + (d.size ?? 0), 0);
 
-  const saveEdit = (id: string) => {
-    setFacts((prev) => prev.map((f) => (f.id === id ? { ...f, value: draft.trim() } : f)));
-    setEditingId(null);
-    setDraft("");
-  };
+  /** A tab change abandons browsing state — page and any in-flight rename. */
+  function changeTab(next: VaultTab) {
+    setTab(next);
+    setPage(1);
+    setRenamingId(null);
+  }
 
-  const startDocEdit = (doc: VaultDocument) => {
-    setEditingDocId(doc.id);
-    setDocDraft(doc.name);
-  };
+  function handlePicked(list: FileList | null) {
+    if (list && list.length > 0) addUploads(list);
+    if (fileRef.current) fileRef.current.value = "";
+  }
 
-  const cancelDocEdit = () => {
-    setEditingDocId(null);
-    setDocDraft("");
-  };
-
-  const saveDocEdit = (id: string) => {
-    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, name: docDraft.trim() || d.name } : d)));
-    setEditingDocId(null);
-    setDocDraft("");
-  };
-
-  const removeDocument = (id: string) => {
-    setDocuments((prev) => prev.filter((d) => d.id !== id));
-    if (editingDocId === id) cancelDocEdit();
-  };
-
-  // Mock "add/import a document" action — generic, unlike the resume-specific
-  // "New resume" / "Import from LinkedIn" actions in the header. Appends a
-  // placeholder entry and drops straight into rename mode so the user can
-  // name it immediately.
-  const addDocument = () => {
-    const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setDocuments((prev) => [...prev, { id, name: "Untitled document", kind: "other" }]);
-    setEditingDocId(id);
-    setDocDraft("Untitled document");
-  };
+  const emptyTitle =
+    tab === "archived" ? "Nothing archived" : tab === "resumes" ? "No resumes yet" : tab === "other" ? "No other files yet" : "No documents yet";
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
-      {/* Header */}
-      <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
-        <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">My documents</h1>
-        <div className="flex items-center gap-3 flex-none">
-          <StickerButton variant="outline" size="md" onClick={() => {}}>
-            <Linkedin className="h-4 w-4" />
-            Import from LinkedIn
-          </StickerButton>
+      <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
+        <div className="flex min-w-0 items-center gap-3">
+          <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">My documents</h1>
+          <span className="hidden truncate text-sm text-black/45 sm:inline">Everything you apply with, in one place</span>
+        </div>
+        <div className="flex flex-none items-center gap-2.5">
+          <SplitButton
+            label="Import"
+            icon={<Plus className="h-3.5 w-3.5" />}
+            onClick={() => fileRef.current?.click()}
+            items={[
+              { id: "computer", label: "From your computer", icon: <Monitor className="h-3.5 w-3.5" />, onSelect: () => fileRef.current?.click() },
+              { id: "linkedin", label: "From LinkedIn", icon: <Linkedin className="h-3.5 w-3.5" />, onSelect: () => setLinkedInOpen(true) },
+            ]}
+          />
           <Link href="/dashboard/resume">
-            <StickerButton variant="primary" size="md">
+            <StickerButton variant="primary" size="md" type="button">
               <Plus className="h-4 w-4" />
               New resume
             </StickerButton>
@@ -181,249 +139,161 @@ const VaultClient: FC = () => {
         </div>
       </header>
 
-      <main className="px-8 py-7 pb-14 max-w-[1100px] mx-auto">
-        {/* Profile-completeness banner */}
-        <DashCard className="p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <p className="text-[15px] font-bold text-primary">Your profile is 82% complete</p>
-                <Pill variant="neutral">82%</Pill>
+      {/* One input serves the split button, its menu item and nothing else —
+          drag-and-drop hands files to the same addUploads. */}
+      <input
+        ref={fileRef}
+        type="file"
+        multiple
+        accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.webp"
+        className="sr-only"
+        aria-label="Upload documents"
+        onChange={(e) => handlePicked(e.target.files)}
+      />
+
+      <main className="mx-auto max-w-[1100px] px-8 py-7 pb-14">
+        <DropZone onFiles={(files) => addUploads(files)}>
+          {/* Application kit — derived coverage, not a hardcoded percentage. */}
+          <DashCard className="mb-6 p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                  <p className="text-[15px] font-bold text-primary">
+                    Application kit: {covered.length} of {KIT.length} covered
+                  </p>
+                  <span className="text-xs text-black/55">
+                    {counts.resumes} resume{counts.resumes === 1 ? "" : "s"} · {counts.other} other file{counts.other === 1 ? "" : "s"}
+                    {totalBytes > 0 && ` · ${totalBytes >= 1_048_576 ? `${(totalBytes / 1_048_576).toFixed(1)} MB` : `${Math.round(totalBytes / 1024)} KB`}`}
+                  </span>
+                </div>
+                <ProgressBar value={kitPct} className="max-w-md" />
+                {missing.length > 0 ? (
+                  <p className="mt-2.5 text-xs text-black/55">
+                    Missing:{" "}
+                    {missing.map((m, i) => (
+                      <span key={m.kind}>
+                        {i > 0 && ", "}
+                        {m.href ? (
+                          <Link href={m.href} className="font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                            {m.label}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-black/70">{m.label}</span>
+                        )}
+                      </span>
+                    ))}
+                    {" — "}anything here can also just be dropped onto this page.
+                  </p>
+                ) : (
+                  <p className="mt-2.5 text-xs text-black/55">Everything an application might ask for is on hand.</p>
+                )}
               </div>
-              <p className="text-xs text-black/45 mb-3">
-                A complete profile auto-fills more of every application and scores higher against the ATS.
-              </p>
-              <ProgressBar value={82} className="max-w-md" />
             </div>
-            <StickerButton variant="outline" size="md" className="flex-none" onClick={() => setProfileOpen((v) => !v)}>
-              {profileOpen ? "Hide" : "Finish profile"}
-            </StickerButton>
+          </DashCard>
+
+          <div className="relative mb-5">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by name or type…"
+              className="h-11 w-full rounded-xl border border-black/10 bg-white pl-10 pr-4 text-sm text-primary outline-none transition-colors placeholder:text-black/35 focus:border-[#222325]"
+            />
           </div>
 
-          <div
-            className={cn(
-              "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
-              profileOpen ? "max-h-60 opacity-100 mt-5 pt-5 border-t border-black/8" : "max-h-0 opacity-0"
-            )}>
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2.5">
-              {MISSING_PROFILE_ITEMS.length} things left
-            </p>
-            <div className="flex flex-col gap-1">
-              {MISSING_PROFILE_ITEMS.map((item) => (
-                <div key={item} className="flex items-center gap-2.5 px-1 py-1.5">
-                  <span className="h-4 w-4 flex-none rounded-full border border-black/25" />
-                  <span className="text-sm text-black/65">{item}</span>
-                </div>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <SlidingTabs
+              value={tab}
+              onChange={changeTab}
+              options={[
+                { id: "all", label: "All", count: counts.all },
+                { id: "resumes", label: "Resumes", count: counts.resumes },
+                { id: "other", label: "Other", count: counts.other },
+                { id: "archived", label: "Archived", count: counts.archived },
+              ]}
+            />
+
+            {/* Lime accent, not the tabs' ink — a refinement, not a peer nav. */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-black/55">Sort</span>
+              {SORT_OPTIONS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-pressed={sort === s.id}
+                  onClick={() => {
+                    setSort(s.id);
+                    setPage(1);
+                  }}
+                  className={cn(
+                    "cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                    sort === s.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary"
+                  )}>
+                  {s.label}
+                </button>
               ))}
             </div>
           </div>
-        </DashCard>
 
-        {/* Resumes grid */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-3.5">
-            <h2 className="text-[15px] font-bold text-primary">Resumes</h2>
-            <span className="text-xs text-black/45">{VAULT_RESUMES.length} saved</span>
-          </div>
+          {filtered.length === 0 ? (
+            q ? (
+              <DashEmptyState
+                icon={SearchX}
+                title={`Nothing matches “${query.trim()}”`}
+                body="Try a shorter search, or clear it to see everything saved here."
+                ctaLabel="Clear search"
+                onCta={() => setQuery("")}
+              />
+            ) : (
+              <DashEmptyState
+                icon={FolderOpen}
+                title={emptyTitle}
+                body={
+                  tab === "archived"
+                    ? "Archive a document and it moves here — out of your pickers, never deleted."
+                    : "Import from your computer or LinkedIn, or drop files anywhere on this page."
+                }
+                ctaLabel={tab === "archived" ? "Show all documents" : "Import files"}
+                onCta={tab === "archived" ? () => changeTab("all") : () => fileRef.current?.click()}
+              />
+            )
+          ) : (
+            <DashCard className="overflow-hidden p-0">
+              <div className="flex flex-col divide-y divide-black/8">
+                {paged.map((doc) => (
+                  <DocRow
+                    key={doc.id}
+                    doc={doc}
+                    renaming={renamingId === doc.id}
+                    onStartRename={() => setRenamingId(doc.id)}
+                    onDoneRename={() => setRenamingId(null)}
+                  />
+                ))}
+              </div>
+            </DashCard>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {VAULT_RESUMES.map((r) => {
-              const accentClass = RESUME_ACCENT_CLASSES[r.id] ?? "bg-[#222325]";
-              const description = RESUME_DESCRIPTIONS[r.id] ?? "";
-              const showScore = r.jdScore != null;
-
-              return (
-                <Link
-                  key={r.id}
-                  href="/dashboard/resume"
-                  className="group flex flex-col bg-white rounded-2xl border border-black/10 p-5 min-h-[168px] transition-all hover:-translate-x-px hover:-translate-y-px hover:shadow-[4px_4px_0_0_#e1f073] cursor-pointer">
-                  <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center mb-4", accentClass)}>
-                    <FileText className="h-4 w-4 text-white" />
-                  </div>
-
-                  <p className="text-sm font-bold text-primary mb-1">{r.name}</p>
-                  <p className="text-xs text-black/45 leading-relaxed flex-1">{description}</p>
-
-                  <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-black/8">
-                    {showScore ? (
-                      <Pill variant="positive">Score {r.jdScore}</Pill>
-                    ) : (
-                      <span className="text-xs text-black/40">General score {r.generalScore}</span>
-                    )}
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                      Open
-                      <ArrowRight className="h-3 w-3" />
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-
-            {/* Add-tile */}
-            <Link
-              href="/dashboard/apply"
-              className="group flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-black/15 p-5 min-h-[168px] text-black/40 hover:border-black/35 hover:text-black/60 transition-colors cursor-pointer">
-              <span className="h-9 w-9 rounded-lg border-2 border-dashed border-black/20 flex items-center justify-center group-hover:border-black/35 transition-colors">
-                <Plus className="h-4 w-4" />
-              </span>
-              <span className="text-sm font-semibold text-center">Tailor to a new job</span>
-            </Link>
-          </div>
-        </section>
-
-        {/* Generic documents — anything beyond a tailored resume */}
-        <section className="mb-8">
-          <div className="mb-3.5">
-            <h2 className="text-[15px] font-bold text-primary">Your documents</h2>
-            <p className="text-xs text-black/45 mt-1">
-              IDs, portfolios, certificates — anything else you want on hand when applying.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {documents.map((doc) => {
-              const Icon = DOCUMENT_ICONS[doc.kind];
-              const isEditing = editingDocId === doc.id;
-
-              return (
-                <div
-                  key={doc.id}
-                  className="flex flex-col bg-[#fbfbf9] rounded-xl border border-black/10 p-5 min-h-[168px]">
-                  <div className="h-9 w-9 rounded-lg bg-black/6 flex items-center justify-center mb-4">
-                    <Icon className="h-4 w-4 text-black/55" />
-                  </div>
-
-                  {isEditing ? (
-                    <div className="flex flex-col gap-2.5 flex-1">
-                      <input
-                        value={docDraft}
-                        onChange={(e) => setDocDraft(e.target.value)}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") saveDocEdit(doc.id);
-                          if (e.key === "Escape") cancelDocEdit();
-                        }}
-                        placeholder="Name this document…"
-                        className="w-full h-9 rounded-lg border border-black/15 bg-white px-3 text-sm text-primary placeholder:text-black/35 focus:outline-none focus:border-black/35 transition-colors"
-                      />
-                      <div className="flex items-center gap-2">
-                        <StickerButton variant="primary" size="sm" onClick={() => saveDocEdit(doc.id)}>
-                          <Check className="h-3.5 w-3.5" />
-                          Save
-                        </StickerButton>
-                        <StickerButton variant="outline" size="sm" onClick={cancelDocEdit}>
-                          <X className="h-3.5 w-3.5" />
-                          Cancel
-                        </StickerButton>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-sm font-bold text-primary mb-1 truncate">{doc.name}</p>
-                      <p className="text-xs text-black/45 flex-1">{DOCUMENT_KIND_LABELS[doc.kind]}</p>
-                      <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-black/8">
-                        <button
-                          type="button"
-                          onClick={() => startDocEdit(doc)}
-                          className="text-xs font-semibold text-black/45 hover:text-primary transition-colors cursor-pointer">
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeDocument(doc.id)}
-                          className="text-xs font-semibold text-black/45 hover:text-red-600 transition-colors cursor-pointer">
-                          Remove
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Add-tile — generic "add/import a document" action, distinct from
-               the resume-specific actions in the header above. */}
-            <button
-              type="button"
-              onClick={addDocument}
-              className="group flex flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed border-black/15 p-5 min-h-[168px] text-black/40 hover:border-black/35 hover:text-black/60 transition-colors cursor-pointer">
-              <span className="h-9 w-9 rounded-lg border-2 border-dashed border-black/20 flex items-center justify-center group-hover:border-black/35 transition-colors">
-                <Plus className="h-4 w-4" />
-              </span>
-              <span className="text-sm font-semibold text-center">Add a document</span>
-            </button>
-          </div>
-        </section>
-
-        {/* "Your facts, reused everywhere" table */}
-        <section>
-          <div className="mb-3.5">
-            <h2 className="text-[15px] font-bold text-primary">Your facts, reused everywhere</h2>
-            <p className="text-xs text-black/45 mt-1">
-              Saved once, then reused across every resume, cover letter and application answer.
-            </p>
-          </div>
-
-          <DashCard className="p-0 overflow-hidden">
-            <div className="flex flex-col divide-y divide-black/8">
-              {facts.map((row) => {
-                const isEditing = editingId === row.id;
-                const action = row.value ? "Edit" : "Add";
-
-                return (
-                  <div key={row.id} className="px-6 py-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-primary">{row.label}</p>
-                        {!isEditing &&
-                          (row.value ? (
-                            <p className="text-sm text-black/60 mt-0.5">{row.value}</p>
-                          ) : (
-                            <p className="text-sm text-black/35 italic mt-0.5">Nothing saved yet</p>
-                          ))}
-                        {!isEditing && <p className="text-xs text-black/40 mt-1.5">{row.hint}</p>}
-                      </div>
-
-                      {!isEditing && (
-                        <StickerButton variant="outline" size="sm" className="flex-none" onClick={() => startEdit(row)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          {action}
-                        </StickerButton>
-                      )}
-                    </div>
-
-                    {isEditing && (
-                      <div className="mt-3.5 flex flex-col gap-2.5">
-                        <div className="inline-flex items-center gap-1.5 self-start text-xs font-semibold text-[#6c7a1e]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#6c7a1e] animate-pulse" />
-                          Editing…
-                        </div>
-                        <input
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          autoFocus
-                          placeholder={`Add ${row.label.toLowerCase()}…`}
-                          className="w-full h-10 rounded-lg border border-black/15 bg-[#fbfbf7] px-3.5 text-sm text-primary placeholder:text-black/35 focus:outline-none focus:border-black/35 transition-colors"
-                        />
-                        <div className="flex items-center gap-2">
-                          <StickerButton variant="primary" size="sm" onClick={() => saveEdit(row.id)}>
-                            <Check className="h-3.5 w-3.5" />
-                            Save
-                          </StickerButton>
-                          <StickerButton variant="outline" size="sm" onClick={cancelEdit}>
-                            <X className="h-3.5 w-3.5" />
-                            Cancel
-                          </StickerButton>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </DashCard>
-        </section>
+          <DashPagination
+            page={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            itemNoun="documents"
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              const firstVisible = (currentPage - 1) * pageSize;
+              setPageSize(next);
+              setPage(Math.floor(firstVisible / next) + 1);
+            }}
+          />
+        </DropZone>
       </main>
+
+      <LinkedInImportDialog open={linkedInOpen} onOpenChange={setLinkedInOpen} />
     </div>
   );
 };

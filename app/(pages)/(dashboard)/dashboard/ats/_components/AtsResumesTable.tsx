@@ -7,22 +7,23 @@ import DashCard from "@/app/components/dashboard/ui/DashCard";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
+import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { ResumeEntry } from "../Client";
 
 /**
  * Every resume, scored live — the same scoreApplication() the results view
  * uses, so this table can never disagree with a scan. Actions thread into the
- * real flow rather than jumping to a view about a different resume.
+ * real flow rather than jumping to a view about a different resume. Archive
+ * state lives on the shared document itself, so My documents agrees.
  */
 export interface AtsResumesTableProps {
   resumes: ResumeEntry[];
-  archivedIds: Set<string>;
   onToggleArchive: (id: string) => void;
   onGeneral: (id: string) => void;
   onVsJob: (id: string) => void;
 }
 
-const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, archivedIds, onToggleArchive, onGeneral, onVsJob }) => (
+const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, onToggleArchive, onGeneral, onVsJob }) => (
   <DashCard className="p-0 overflow-hidden">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 px-6 py-4">
       <p className="text-[15px] font-bold text-primary">All your resumes, scored</p>
@@ -37,7 +38,8 @@ const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, archivedIds, onTog
     </div>
 
     {resumes.map((r) => {
-      const archived = archivedIds.has(r.id);
+      const archived = !!r.archived;
+      const badge = sourceBadgeLabel(r.source);
       const general = scoreApplication(r.id, undefined).score;
       return (
         <div
@@ -46,8 +48,8 @@ const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, archivedIds, onTog
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <p className="truncate text-sm font-bold text-primary">{r.name}</p>
-              {r.source === "uploaded" && (
-                <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/50">Uploaded</span>
+              {badge && (
+                <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55">{badge}</span>
               )}
             </div>
             <p className="truncate text-xs text-black/45">{r.updatedLabel}</p>

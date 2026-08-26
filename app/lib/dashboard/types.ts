@@ -220,6 +220,38 @@ export interface AtsResumeRow {
 }
 
 // ---------------------------------------------------------------------------
+// My documents (the vault)
+// ---------------------------------------------------------------------------
+
+export type DocKind = "resume" | "cover-letter" | "portfolio" | "certificate" | "id" | "other";
+export type DocSource = "created" | "uploaded" | "linkedin";
+
+/**
+ * One document, whether it was built in the app (a resume from the builder),
+ * uploaded from disk, or pulled in by an import. The single shape shared by
+ * My documents and the ATS scorer — the two screens used to keep separate
+ * lists and disagree about which resumes existed.
+ */
+export interface VaultDoc {
+  id: string;
+  name: string;
+  kind: DocKind;
+  source: DocSource;
+  /** Real bytes off the File object — absent on in-app-created docs. */
+  size?: number;
+  ext?: string;
+  /** Epoch ms. Seeds use fixed constants; uploads stamp in the event handler. */
+  addedAt: number;
+  updatedLabel: string;
+  archived?: boolean;
+  /** A stored match score + which job it was against, where mock data has one. */
+  jdScore?: number | null;
+  jdLabel?: string;
+  /** Uploads only — a live object URL, which is what makes Download real. */
+  blobUrl?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Career coach
 // ---------------------------------------------------------------------------
 

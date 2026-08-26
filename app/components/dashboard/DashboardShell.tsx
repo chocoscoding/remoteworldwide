@@ -14,6 +14,8 @@ import { Toaster } from "@/components/ui/sonner";
 import DashboardSidebar from "./DashboardSidebar";
 import { SidebarCollapseProvider } from "./SidebarCollapseContext";
 import { ActivityProvider } from "./activity/ActivityProvider";
+import { AnswersProvider } from "./answers/AnswersProvider";
+import { DocumentsProvider } from "./documents/DocumentsProvider";
 import StreakMilestoneModal from "./streak/StreakMilestoneModal";
 import LogApplicationDialog from "./log/LogApplicationDialog";
 import CreditStore from "./credits/CreditStore";
@@ -22,6 +24,8 @@ import RepairStreakPanel from "./streak/RepairStreakPanel";
 const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
   <SidebarCollapseProvider>
     <ActivityProvider>
+      <AnswersProvider>
+      <DocumentsProvider>
       <div className="w-full flex">
         <DashboardSidebar />
         <div className="flex-1 min-w-0">{children}</div>
@@ -31,6 +35,8 @@ const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
       <RepairStreakPanel />
       <StreakMilestoneModal />
       <Toaster />
+      </DocumentsProvider>
+      </AnswersProvider>
     </ActivityProvider>
   </SidebarCollapseProvider>
 );

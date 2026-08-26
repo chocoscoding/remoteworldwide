@@ -7,52 +7,28 @@
 // modes with a hardcoded 79 in both; they're now outcomes of the same scan,
 // computed live by scoreApplication() — the seam a real scorer replaces.
 
-import { FC, useRef, useState } from "react";
+import { FC, useState } from "react";
 import { FilePlus2 } from "lucide-react";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
-import { ATS_RESUMES } from "@/app/lib/dashboard/mock-data";
+import { useDocuments, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 import AtsLanding from "./_components/AtsLanding";
 import AtsResults from "./_components/AtsResults";
 import AtsResumesTable from "./_components/AtsResumesTable";
 
 type AtsView = "score" | "resumes";
 
-export interface ResumeEntry {
-  id: string;
-  name: string;
-  updatedLabel: string;
-  source: "created" | "uploaded";
-  archived?: boolean;
-  /** A stored match score + which job it was against, where mock data has one. */
-  jdScore?: number | null;
-  jdLabel?: string;
-}
-
-const UPDATED_LABELS: Record<string, string> = {
-  "res-master": "Updated 2 days ago",
-  "res-linear": "Tailored today",
-  "res-deel": "Updated 6 days ago",
-  "res-2023": "Not maintained",
-};
-
-const JD_LABELS: Record<string, string> = { "res-linear": "Linear", "res-deel": "Deel" };
-
-const SEED_RESUMES: ResumeEntry[] = ATS_RESUMES.map((r) => ({
-  id: r.id,
-  name: r.name,
-  updatedLabel: UPDATED_LABELS[r.id] ?? "Updated recently",
-  source: "created",
-  archived: r.archived,
-  jdScore: r.jdScore,
-  jdLabel: JD_LABELS[r.id],
-}));
+// Resumes live in DocumentsProvider now — upload here and My documents sees
+// it, archive there and this screen's pickers drop it. The alias keeps the
+// _components' imports (`ResumeEntry from "../Client"`) compiling unchanged.
+export type ResumeEntry = VaultDoc;
 
 const AtsClient: FC = () => {
+  const { docs, addUploads, toggleArchive } = useDocuments();
+
   const [view, setView] = useState<AtsView>("score");
-  const [resumes, setResumes] = useState<ResumeEntry[]>(SEED_RESUMES);
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [job, setJob] = useState<JobOption | null>(null);
   const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
@@ -62,9 +38,9 @@ const AtsClient: FC = () => {
   const [pendingResumeId, setPendingResumeId] = useState<string | null>(null);
   const [fixedIds, setFixedIds] = useState<Set<string>>(new Set());
   const [queuedKeywordIds, setQueuedKeywordIds] = useState<Set<string>>(new Set());
-  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set(SEED_RESUMES.filter((r) => r.archived).map((r) => r.id)));
 
-  const uploadSeq = useRef(0);
+  const resumes = docs.filter((d) => d.kind === "resume");
+  const activeResumes = resumes.filter((r) => !r.archived);
 
   // A new resume or a new job is a new scan — applied fixes belong to the old report.
   function resetReport() {
@@ -93,16 +69,10 @@ const AtsClient: FC = () => {
     setView("score");
   }
 
-  /** The file's contents are not parsed — this registers the upload as a
-   *  scoreable entry, named from the filename. A real parser is the seam. */
+  /** Uploads land in the shared documents store (forced kind "resume", since
+   *  this screen only scores resumes) — so My documents shows them too. */
   function handleUpload(file: File): ResumeEntry {
-    const entry: ResumeEntry = {
-      id: `res-upload-${++uploadSeq.current}`,
-      name: file.name.replace(/\.(pdf|docx?|txt|md)$/i, ""),
-      updatedLabel: "Uploaded just now",
-      source: "uploaded",
-    };
-    setResumes((prev) => [...prev, entry]);
+    const [entry] = addUploads([file], { kind: "resume" });
     return entry;
   }
 
@@ -117,15 +87,6 @@ const AtsClient: FC = () => {
 
   function toggleKeyword(id: string) {
     setQueuedKeywordIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleArchive(id: string) {
-    setArchivedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -171,17 +132,16 @@ const AtsClient: FC = () => {
         {view === "resumes" ? (
           <AtsResumesTable
             resumes={resumes}
-            archivedIds={archivedIds}
             onToggleArchive={toggleArchive}
             onGeneral={scoreGeneral}
             onVsJob={scoreVsJob}
           />
         ) : !activeResume ? (
-          <AtsLanding resumes={resumes.filter((r) => !archivedIds.has(r.id))} onUpload={handleUpload} onScoreGeneral={scoreGeneral} onScoreVsJob={scoreVsJob} />
+          <AtsLanding resumes={activeResumes} onUpload={handleUpload} onScoreGeneral={scoreGeneral} onScoreVsJob={scoreVsJob} />
         ) : (
           <AtsResults
             resume={activeResume}
-            resumes={resumes.filter((r) => !archivedIds.has(r.id))}
+            resumes={activeResumes}
             job={job}
             fixedIds={fixedIds}
             queuedKeywordIds={queuedKeywordIds}

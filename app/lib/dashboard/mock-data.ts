@@ -29,6 +29,7 @@ import type {
   ResumeContent,
   TrackerColumn,
   ApplyStepConfig,
+  VaultDoc,
   WeeklyGoal,
 } from "./types";
 
@@ -159,6 +160,15 @@ export const QA: QaItem[] = [
     cat: "screening",
   },
   {
+    // Uses the {company} token — the extension swaps it for whoever the
+    // application is for, so one answer covers every employer.
+    id: "qa-why-company",
+    q: "Why do you want to work here?",
+    a: "I've been building on developer-facing products for six years, and {company} is solving the part I keep running into myself — the gap between a powerful platform and an interface people can actually move money or ship work through. I'd rather design for a team that already takes that seriously than convince one it matters.",
+    kind: "ai",
+    cat: "screening",
+  },
+  {
     id: "qa-18",
     q: "How did you hear about us?",
     a: "Referred by a Remote Worldwide pod member; also follow the team's product updates.",
@@ -199,6 +209,12 @@ export const APPS: Application[] = [
     meta: "Supabase · Applied 5 days ago",
     qs: [
       { q: "Have you worked with open-source developer tools before?", a: "I contributed design and docs to two open-source component libraries and maintain my own design-tokens plugin." },
+      // Same text as the `qa-why-company` library answer: shows a saved answer
+      // reaching an application with the token resolved to the real company.
+      {
+        q: "Why do you want to work here?",
+        a: "I've been building on developer-facing products for six years, and {company} is solving the part I keep running into myself — the gap between a powerful platform and an interface people can actually move money or ship work through. I'd rather design for a team that already takes that seriously than convince one it matters.",
+      },
     ],
   },
   {
@@ -608,6 +624,36 @@ export const ATS_RESUMES: AtsResumeRow[] = [
   { id: "res-linear", name: "Linear — Senior PD", generalScore: 81, jdScore: 89, action: "Open" },
   { id: "res-deel", name: "Deel — Senior Designer", generalScore: 72, jdScore: 76, action: "Open" },
   { id: "res-2023", name: "2023 resume (imported)", generalScore: 58, jdScore: null, action: "Archive", archived: true },
+];
+
+// ---------------------------------------------------------------------------
+// My documents — the non-resume seed files. Resumes are seeded from
+// ATS_RESUMES by DocumentsProvider so the two never drift. `addedAt` values
+// are fixed epochs (Date.UTC is deterministic), never Date.now() at module
+// scope. Seeds carry no blobUrl — only real uploads can offer Download.
+// ---------------------------------------------------------------------------
+
+export const VAULT_DOCS: VaultDoc[] = [
+  {
+    id: "doc-passport",
+    name: "Passport scan",
+    kind: "id",
+    source: "uploaded",
+    size: 1_884_160, // ~1.8 MB
+    ext: "pdf",
+    addedAt: Date.UTC(2026, 6, 3),
+    updatedLabel: "Added 3 Jul",
+  },
+  {
+    id: "doc-portfolio",
+    name: "Portfolio one-pager",
+    kind: "portfolio",
+    source: "uploaded",
+    size: 245_760, // ~240 KB
+    ext: "pdf",
+    addedAt: Date.UTC(2026, 7, 9),
+    updatedLabel: "Added 9 Aug",
+  },
 ];
 
 // ---------------------------------------------------------------------------

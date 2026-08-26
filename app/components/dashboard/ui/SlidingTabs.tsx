@@ -49,7 +49,13 @@ export default function SlidingTabs<T extends string>({ value, options, onChange
               active ? "text-white" : "text-black/55 hover:text-[#222325]"
             )}>
             {o.label}
-            {o.count ? <span className={cn("ml-1 tabular-nums", active ? "text-white/50" : "text-black/35")}>{o.count}</span> : null}
+            {/* Subordinate by weight, not by lightness: against the #f0f0ea
+                track nothing below ~black/54 clears 4.5:1 for small text, so
+                the old black/35 (2.4:1) had no legible tone to fall back to.
+                font-normal under the tab's font-bold label carries it instead. */}
+            {o.count ? (
+              <span className={cn("ml-1 font-normal tabular-nums", active ? "text-white/60" : "text-black/55")}>{o.count}</span>
+            ) : null}
           </button>
         );
       })}

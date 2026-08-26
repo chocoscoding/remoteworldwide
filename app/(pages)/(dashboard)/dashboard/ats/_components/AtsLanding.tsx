@@ -4,6 +4,7 @@ import { FC, useRef, useState } from "react";
 import { FileText, Link2, ScanSearch, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
+import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { ResumeEntry } from "../Client";
 
 /**
@@ -40,6 +41,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
       <div className="mt-7 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
         {resumes.map((r) => {
           const selected = r.id === selectedId;
+          const badge = sourceBadgeLabel(r.source);
           const general = scoreApplication(r.id, undefined).score;
           return (
             <button
@@ -57,8 +59,8 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-bold text-primary">{r.name}</span>
-                  {r.source === "uploaded" && (
-                    <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/50">Uploaded</span>
+                  {badge && (
+                    <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55">{badge}</span>
                   )}
                 </span>
                 <span className="block truncate text-xs text-black/45">{r.updatedLabel}</span>

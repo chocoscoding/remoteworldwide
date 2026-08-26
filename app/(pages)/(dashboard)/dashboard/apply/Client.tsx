@@ -3,6 +3,7 @@
 import { FC, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowRight,
   Check,
   TrendingUp,
   Clock,
@@ -29,13 +30,13 @@ import StartApplication, { type StartedJob } from "./StartApplication";
 import {
   APPLY_STEPS,
   APPS,
-  QA,
   JD_CONTENT,
   REFERRAL_CONTACTS,
   ATS_KEYWORDS,
   ATS_FIX_ITEMS,
   RESUME,
 } from "@/app/lib/dashboard/mock-data";
+import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
 
 type ApplyStepNum = 1 | 2 | 3 | 4 | 5;
 
@@ -67,6 +68,7 @@ const CARRY_ITEMS = [
 ];
 
 const ApplyClient: FC = () => {
+  const { items: answers, resolveReview } = useAnswers();
   // The wizard used to open straight onto one hardcoded job. It now waits for
   // a job to be chosen, so "apply to a job" means any job.
   const [job, setJob] = useState<StartedJob | null>(null);
@@ -103,10 +105,13 @@ const ApplyClient: FC = () => {
   const fixKeywordItem = ATS_FIX_ITEMS.find((f) => f.id === "fix-keyword");
 
   const whyVercelAnswer = appVercel?.qs.find((q) => q.q === "Why Vercel?")?.a ?? "";
-  const salaryAnswer = QA.find((q) => q.id === "qa-1")?.a ?? "";
-  const reviewItem = QA.find((q) => q.id === "qa-11");
-  const workAuthAnswer = QA.find((q) => q.id === "qa-2")?.a ?? "";
-  const noticeAnswer = QA.find((q) => q.id === "qa-5")?.a ?? "";
+  // Read through the shared library, not the raw module constant — resolving
+  // a review here or on /dashboard/questions has to update both screens.
+  const salaryAnswer = answers.find((q) => q.id === "qa-1")?.a ?? "";
+  const reviewItem = answers.find((q) => q.id === "qa-11" && q.kind === "review");
+  const resolvedReviewItem = answers.find((q) => q.id === "qa-11");
+  const workAuthAnswer = answers.find((q) => q.id === "qa-2")?.a ?? "";
+  const noticeAnswer = answers.find((q) => q.id === "qa-5")?.a ?? "";
 
   const bundleItems = [
     { label: "Work authorisation", answer: workAuthAnswer, icon: ShieldCheck },
@@ -452,7 +457,10 @@ const ApplyClient: FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setReviewDecision("saved")}
+                  onClick={() => {
+                    setReviewDecision("saved");
+                    resolveReview("qa-11", "mine");
+                  }}
                   className={cn(
                     "text-left rounded-xl border p-3.5 transition-colors cursor-pointer",
                     reviewDecision === "saved" ? "border-primary bg-[#f6f6f6]" : "border-black/10 hover:border-black/25"
@@ -465,7 +473,10 @@ const ApplyClient: FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setReviewDecision("draft")}
+                  onClick={() => {
+                    setReviewDecision("draft");
+                    resolveReview("qa-11", "draft");
+                  }}
                   className={cn(
                     "text-left rounded-xl border p-3.5 transition-colors cursor-pointer",
                     reviewDecision === "draft" ? "border-primary bg-[#f6f6f6]" : "border-black/10 hover:border-black/25"
@@ -480,6 +491,18 @@ const ApplyClient: FC = () => {
                   <p className="text-xs text-black/65 leading-relaxed">{reviewItem.draft}</p>
                 </button>
               </div>
+            </div>
+          )}
+
+          {!reviewItem && resolvedReviewItem && (
+            <div className="py-4 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-primary">{resolvedReviewItem.q}</p>
+                <p className="text-xs text-black/55 mt-1 leading-relaxed">{resolvedReviewItem.a}</p>
+              </div>
+              <Pill variant="neutral" className="flex-none">
+                Saved
+              </Pill>
             </div>
           )}
 
@@ -502,6 +525,13 @@ const ApplyClient: FC = () => {
             </div>
           </div>
         </div>
+
+        <Link
+          href="/dashboard/questions"
+          className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-black/50 transition-colors hover:text-primary">
+          Manage all your answers
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </DashCard>
 
       <div className="rounded-2xl bg-[#222325] text-white p-6">

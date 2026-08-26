@@ -153,7 +153,11 @@ const PreferencesClient: FC = () => {
       </SettingsSection>
 
       <p className="px-1 text-xs text-black/45">
-        Your resume and saved answers live in{" "}
+        Your saved answers live in{" "}
+        <Link href="/dashboard/questions" className="font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+          Application answers
+        </Link>
+        ; your resume and files are in{" "}
         <Link href="/dashboard/vault" className="font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
           My documents
         </Link>
