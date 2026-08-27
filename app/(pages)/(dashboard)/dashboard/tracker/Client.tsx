@@ -1,7 +1,8 @@
 "use client";
 
-import { FC, useMemo, useState } from "react";
+import { FC, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   Award,
   Calendar as CalendarIcon,
@@ -65,8 +66,14 @@ import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import type { PillProps } from "@/app/components/dashboard/ui/Pill";
 import LogoMini from "@/app/components/svg/LogoMini";
+import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
+import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
+import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import { TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
 import type { TrackerCard as TrackerCardData, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
+import JobTimelineDialog from "./_components/JobTimelineDialog";
+import StatusMenu from "./_components/StatusMenu";
+import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "./_components/tracker-meta";
 
 // ---------------------------------------------------------------------------
 // Local screen state types + config — not shared with any other screen.
@@ -79,15 +86,6 @@ const VIEWS: { id: TrackerView; label: string; icon: LucideIcon }[] = [
   { id: "table", label: "Table", icon: TableIcon },
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
 ];
-
-/** Small header accent color per column — subtle, not a full background recolor. */
-const COLUMN_ACCENT: Record<TrackerColumnId, string> = {
-  saved: "bg-slate-400",
-  applied: "bg-blue-500",
-  conversation: "bg-[#cddd54]",
-  interviewing: "bg-[#e1f073]",
-  offer: "bg-amber-400",
-};
 
 function daysAgoLabel(n?: number): string | null {
   if (n === undefined) return null;
@@ -103,9 +101,6 @@ function chipMeta(chip: string): { variant: NonNullable<PillProps["variant"]>; i
   if (chip.includes("Recruiter opened")) return { variant: "positive", icon: Eye };
   return { variant: "neutral", icon: Clock };
 }
-
-/** Order columns appear in on the board — reused for the Table view's Status sort. */
-const STATUS_ORDER: TrackerColumnId[] = ["saved", "applied", "conversation", "interviewing", "offer"];
 
 // ---------------------------------------------------------------------------
 // Calendar event derivation — the mock cards only carry relative "days ago"
@@ -131,9 +126,9 @@ interface TrackerEvent {
 }
 
 const EVENT_TYPE_META: Record<TrackerEventType, { label: string; dot: string }> = {
-  saved: { label: "Saved", dot: COLUMN_ACCENT.saved },
-  applied: { label: "Applied", dot: COLUMN_ACCENT.applied },
-  interview: { label: "Interview", dot: COLUMN_ACCENT.interviewing },
+  saved: { label: "Saved", dot: COLUMN_META.saved.dot },
+  applied: { label: "Applied", dot: COLUMN_META.applied.dot },
+  interview: { label: "Interview", dot: COLUMN_META.interviewing.dot },
   deadline: { label: "Deadline", dot: "bg-orange-500" },
 };
 
@@ -215,7 +210,7 @@ function buildTrackerEvents(cols: TrackerColumn[], today: Date): TrackerEvent[] 
 // One Kanban card
 // ---------------------------------------------------------------------------
 
-const TrackerCardItem: FC<{ card: TrackerCardData }> = ({ card }) => {
+const TrackerCardItem: FC<{ card: TrackerCardData; columnId?: TrackerColumnId }> = ({ card, columnId }) => {
   const daysLabel = daysAgoLabel(card.daysAgo);
 
   if (card.highlighted) {
@@ -245,7 +240,8 @@ const TrackerCardItem: FC<{ card: TrackerCardData }> = ({ card }) => {
           </div>
         )}
 
-        <Link href="/dashboard/prep" className="block">
+        {/* Routes to prep, never into the timeline dialog behind it. */}
+        <Link href="/dashboard/prep" className="block" onClick={(e) => e.stopPropagation()}>
           <StickerButton variant="primary" size="sm" className="w-full">
             <Mic className="h-3.5 w-3.5" />
             Prep for this
@@ -265,7 +261,12 @@ const TrackerCardItem: FC<{ card: TrackerCardData }> = ({ card }) => {
   const [chipLabel, chipTime] = (card.statusChip ?? "").split(" · ");
 
   return (
-    <div className="rounded-sm border border-black/25 bg-white p-3.5 transition-all hover:border-[#222325] hover:shadow-[3px_3px_0_0_#e1f073]">
+    // Border carries the column's color, so a card says its stage at a glance.
+    <div
+      className={cn(
+        "rounded-sm border bg-white p-3.5 transition-all hover:border-[#222325] hover:shadow-[3px_3px_0_0_#e1f073]",
+        columnId ? COLUMN_META[columnId].cardBorder : "border-black/25"
+      )}>
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
@@ -306,7 +307,11 @@ const TrackerCardItem: FC<{ card: TrackerCardData }> = ({ card }) => {
  * `style` — dnd-kit computes a per-pixel drag offset at runtime, which has
  * no static Tailwind-class equivalent. Every other style here is a Tailwind
  * utility class. */
-const SortableTrackerCard: FC<{ card: TrackerCardData }> = ({ card }) => {
+const SortableTrackerCard: FC<{ card: TrackerCardData; columnId: TrackerColumnId; onOpen: (cardId: string) => void }> = ({
+  card,
+  columnId,
+  onOpen,
+}) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   return (
@@ -315,24 +320,24 @@ const SortableTrackerCard: FC<{ card: TrackerCardData }> = ({ card }) => {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}
       {...listeners}
+      onClick={() => onOpen(card.id)}
       className={cn("touch-none cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}>
-      <TrackerCardItem card={card} />
+      <TrackerCardItem card={card} columnId={columnId} />
     </div>
   );
 };
 
 /** One Kanban column — a dnd-kit droppable region wrapping a `SortableContext`
- * of its cards. Card list scrolls internally past ~8-10 cards instead of
- * growing the column forever; the old static "+N more" label is now a
- * fade-out + caption scroll affordance. */
-const KanbanColumn: FC<{ column: TrackerColumn }> = ({ column }) => {
+ * of its cards. The column grows with its cards and the page scrolls — no
+ * per-column scroll track. */
+const KanbanColumn: FC<{ column: TrackerColumn; onOpen: (cardId: string) => void }> = ({ column, onOpen }) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const extra = column.count - column.cards.length;
 
   return (
-    <div className="min-w-[200px] flex-1 flex flex-col">
+    <div className="min-w-[240px] flex-1 flex flex-col">
       <div className="flex items-center gap-2 mb-3 px-0.5">
-        <span className={cn("h-2 w-2 rounded-full flex-none", COLUMN_ACCENT[column.id])} aria-hidden />
+        <span className={cn("h-2 w-2 rounded-full flex-none", COLUMN_META[column.id].dot)} aria-hidden />
         <span className="text-sm font-bold text-primary whitespace-nowrap">{column.label}</span>
         <span className="text-xs font-semibold text-black/40 ml-auto flex-none">{column.count}</span>
       </div>
@@ -340,13 +345,13 @@ const KanbanColumn: FC<{ column: TrackerColumn }> = ({ column }) => {
       <div
         ref={setNodeRef}
         className={cn(
-          "flex flex-col rounded-sm border border-black/15 bg-[#f0f0ea]/60 p-2.5 min-h-[140px] transition-colors",
+          "flex flex-col rounded-sm border border-black/15 bg-[#f0f0ea]/60 p-1.5 min-h-[140px] transition-colors",
           isOver && "border-[#222325] bg-[#e5e5d8]"
         )}>
-        <div className="flex flex-col gap-2.5 max-h-[760px] overflow-y-auto  pr-0.5">
+        <div className="flex flex-col gap-2">
           <SortableContext items={column.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
             {column.cards.map((card) => (
-              <SortableTrackerCard key={card.id} card={card} />
+              <SortableTrackerCard key={card.id} card={card} columnId={column.id} onOpen={onOpen} />
             ))}
           </SortableContext>
 
@@ -427,11 +432,17 @@ const SortableHeader: FC<{
   );
 };
 
-const TrackerTableView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
+const TrackerTableView: FC<{
+  columns: TrackerColumn[];
+  onMove: (cardId: string, to: TrackerColumnId) => void;
+  onOpen: (cardId: string) => void;
+}> = ({ columns, onMove, onOpen }) => {
   const [sort, setSort] = useState<TableSort | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
 
   const rows = useMemo(() => {
-    const flat = columns.flatMap((col) => col.cards.map((card) => ({ card, columnId: col.id, columnLabel: col.label })));
+    const flat = columns.flatMap((col) => col.cards.map((card) => ({ card, columnId: col.id })));
     if (!sort) return flat;
     const dir = sort.direction === "asc" ? 1 : -1;
     return [...flat].sort((a, b) => {
@@ -450,11 +461,17 @@ const TrackerTableView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
     });
   }, [columns, sort]);
 
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const pagedRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   function toggleSort(key: TableSortKey) {
     setSort((prev) => (!prev || prev.key !== key ? { key, direction: "asc" } : { key, direction: prev.direction === "asc" ? "desc" : "asc" }));
+    setPage(1);
   }
 
   return (
+    <>
     <DashCard className="border-2 border-[#222325] p-0 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm border-collapse">
@@ -468,8 +485,11 @@ const TrackerTableView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ card, columnId, columnLabel }) => (
-              <tr key={card.id} className="border-b border-black/6 last:border-b-0 hover:bg-[#f6f6f6]/70 transition-colors">
+            {pagedRows.map(({ card, columnId }) => (
+              <tr
+                key={card.id}
+                onClick={() => onOpen(card.id)}
+                className="border-b border-black/6 last:border-b-0 hover:bg-[#f6f6f6]/70 transition-colors cursor-pointer">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5 min-w-0">
                     {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
@@ -480,10 +500,9 @@ const TrackerTableView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
                   <span className="text-xs font-medium text-primary">{card.title}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    <span className={cn("h-2 w-2 rounded-full flex-none", COLUMN_ACCENT[columnId])} aria-hidden />
-                    <span className="text-xs font-semibold text-black/70">{columnLabel}</span>
-                  </span>
+                  {/* The pill is the control — StatusMenu stops propagation
+                      itself so the row click never fires underneath it. */}
+                  <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} />
                 </td>
                 <td className="px-4 py-3">
                   <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "—"}</span>
@@ -494,7 +513,7 @@ const TrackerTableView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
               </tr>
             ))}
 
-            {rows.length === 0 && (
+            {pagedRows.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-xs font-medium text-black/40">
                   No applications yet.
@@ -505,6 +524,21 @@ const TrackerTableView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
         </table>
       </div>
     </DashCard>
+
+    <DashPagination
+      page={currentPage}
+      totalPages={totalPages}
+      pageSize={pageSize}
+      totalItems={rows.length}
+      itemNoun="applications"
+      onPageChange={setPage}
+      onPageSizeChange={(next) => {
+        const firstVisible = (currentPage - 1) * pageSize;
+        setPageSize(next);
+        setPage(Math.floor(firstVisible / next) + 1);
+      }}
+    />
+    </>
   );
 };
 
@@ -514,7 +548,11 @@ const TrackerTableView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
 // its events in the side panel.
 // ---------------------------------------------------------------------------
 
-const TrackerCalendarView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
+const TrackerCalendarView: FC<{
+  columns: TrackerColumn[];
+  onMove: (cardId: string, to: TrackerColumnId) => void;
+  onOpen: (cardId: string) => void;
+}> = ({ columns, onMove, onOpen }) => {
   const today = useMemo(() => new Date(), []);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(today));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -635,19 +673,29 @@ const TrackerCalendarView: FC<{ columns: TrackerColumn[] }> = ({ columns }) => {
         ) : (
           <div className="flex flex-col gap-2.5">
             {selectedDayEvents.map((ev) => (
-              <div key={ev.id} className="rounded-xl border border-black/10 p-3">
+              // A door into the job, not a read-only note: the row opens the
+              // timeline, the pill changes the status right here.
+              <div
+                key={ev.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpen(ev.cardId)}
+                onKeyDown={(e) => e.key === "Enter" && onOpen(ev.cardId)}
+                className="cursor-pointer rounded-xl border border-black/10 p-3 transition-colors hover:border-[#222325]">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-1.5 min-w-0">
                     {ev.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
                     <span className="text-xs font-semibold text-black/60 truncate">{ev.company}</span>
                   </div>
-                  <span className={cn("h-2 w-2 rounded-full flex-none", EVENT_TYPE_META[ev.type].dot)} aria-hidden />
                 </div>
-                <p className="text-sm font-semibold text-primary leading-snug mb-1">{ev.title}</p>
-                <p className="text-[11px] font-medium text-black/45">
-                  {EVENT_TYPE_META[ev.type].label}
-                  {ev.detail ? ` · ${ev.detail}` : ""}
-                </p>
+                <p className="text-sm font-semibold text-primary leading-snug mb-1.5">{ev.title}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusMenu value={ev.columnId} onChange={(to) => onMove(ev.cardId, to)} />
+                  <span className="min-w-0 truncate text-[11px] font-medium text-black/55">
+                    {EVENT_TYPE_META[ev.type].label}
+                    {ev.detail ? ` · ${ev.detail}` : ""}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -671,7 +719,7 @@ const TrackerClient: FC = () => {
   // state so drag-and-drop keeps working, and newly logged applications are
   // folded in during render using React's "adjust state when input changes"
   // pattern — an effect would paint the stale board first, then correct it.
-  const { applications, openLog } = useActivity();
+  const { applications, recordAction } = useActivity();
   const [mergedIds, setMergedIds] = useState<string[]>([]);
   const pending = applications.filter((a) => !mergedIds.includes(a.id));
   if (pending.length > 0) {
@@ -701,6 +749,18 @@ const TrackerClient: FC = () => {
     );
   }
 
+  // Timeline dialog target — an id, resolved against live columns each render
+  // so a status change made inside the dialog is reflected immediately.
+  const [openCardId, setOpenCardId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
+  const addSeq = useRef(0);
+  // A completed drag fires a click on the source card as the pointer lifts —
+  // this latch swallows exactly that one click so a drop never opens the
+  // timeline dialog. Plain clicks (< the 6px activation distance) never start
+  // a drag, so the latch stays untouched for them.
+  const dragHappened = useRef(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -710,8 +770,74 @@ const TrackerClient: FC = () => {
     return cols.find((c) => c.cards.some((card) => card.id === cardId))?.id ?? null;
   }
 
+  const openEntry = (() => {
+    if (!openCardId) return null;
+    for (const col of columns) {
+      const card = col.cards.find((c) => c.id === openCardId);
+      if (card) return { card, columnId: col.id };
+    }
+    return null;
+  })();
+
+  function openTimeline(cardId: string) {
+    if (dragHappened.current) {
+      dragHappened.current = false;
+      return;
+    }
+    setOpenCardId(cardId);
+  }
+
+  /** The one mover — drag-drop, the status pills and the timeline dialog all
+   *  land here, so every view agrees. Both `count` and `cards` shift, per the
+   *  count-is-the-real-total contract. */
+  function moveCard(cardId: string, to: TrackerColumnId) {
+    const from = findColumnIdForCard(cardId, columns);
+    if (!from || from === to) return;
+    const card = columns.find((c) => c.id === from)!.cards.find((c) => c.id === cardId);
+    if (!card) return;
+
+    setColumns((prev) =>
+      prev.map((c) => {
+        if (c.id === from) return { ...c, cards: c.cards.filter((x) => x.id !== cardId), count: Math.max(0, c.count - 1) };
+        if (c.id === to) return { ...c, cards: [card, ...c.cards], count: c.count + 1 };
+        return c;
+      })
+    );
+    // Keeping the board honest is a qualifying action — the "status-change"
+    // kind existed for exactly this and had no caller until now.
+    recordAction("status-change", cardId, `${card.company} → ${COLUMN_LABELS[to]}`);
+  }
+
+  /** "Add job" — dedupe against the board; new jobs land in Saved. */
+  function addJob(job: JobOption) {
+    setAddOpen(false);
+    const existing = columns
+      .flatMap((c) => c.cards)
+      .find(
+        (c) =>
+          c.company.trim().toLowerCase() === job.company.trim().toLowerCase() &&
+          c.title.trim().toLowerCase() === job.role.trim().toLowerCase()
+      );
+    if (existing) {
+      toast("Already on your board", { description: `${job.company} — ${job.role}` });
+      setOpenCardId(existing.id);
+      return;
+    }
+
+    const card: TrackerCardData = {
+      id: `trk-added-${++addSeq.current}`,
+      title: job.role,
+      company: job.company,
+      daysAgo: 0,
+      rww: job.source === "platform",
+    };
+    setColumns((prev) => prev.map((c) => (c.id === "saved" ? { ...c, cards: [card, ...c.cards], count: c.count + 1 } : c)));
+    toast.success("Added to Saved", { description: `${job.company} — ${job.role}` });
+  }
+
   function handleDragStart(event: DragStartEvent) {
     const id = String(event.active.id);
+    dragHappened.current = true;
     setActiveCard(columns.flatMap((c) => c.cards).find((c) => c.id === id) ?? null);
   }
 
@@ -743,6 +869,16 @@ const TrackerClient: FC = () => {
     const activeId = String(active.id);
     const overId = String(over.id);
     if (activeId === overId) return;
+
+    // Record the status change outside the updater (state updaters must stay
+    // pure). Computed against the pre-drop state, which the drop hasn't
+    // changed yet — commits happen only here, on drop.
+    const preSource = findColumnIdForCard(activeId, columns);
+    const preTarget = columns.some((c) => c.id === overId) ? (overId as TrackerColumnId) : findColumnIdForCard(overId, columns);
+    if (preSource && preTarget && preSource !== preTarget) {
+      const moved = columns.find((c) => c.id === preSource)?.cards.find((c) => c.id === activeId);
+      if (moved) recordAction("status-change", activeId, `${moved.company} → ${COLUMN_LABELS[preTarget]}`);
+    }
 
     setColumns((prev) => {
       const sourceColId = findColumnIdForCard(activeId, prev);
@@ -807,9 +943,11 @@ const TrackerClient: FC = () => {
             ))}
           </div>
 
-          <StickerButton variant="primary" size="md" onClick={() => openLog()}>
-            <Plus className="h-4 w-4" />
-            Log an application
+          {/* sm to sit level with the view switcher; opens the shared
+              structured Add-job dialog, not the one-field log flow. */}
+          <StickerButton variant="primary" size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            Add job
           </StickerButton>
         </div>
       </header>
@@ -843,28 +981,49 @@ const TrackerClient: FC = () => {
               sensors={sensors}
               collisionDetection={closestCorners}
               onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}>
+              onDragEnd={handleDragEnd}
+              // Escape mid-drag never reaches onDragEnd — without this the
+              // overlay card sticks around after a cancelled drag.
+              onDragCancel={() => setActiveCard(null)}>
               <div className="flex gap-4 overflow-x-auto pb-2 items-start">
                 {columns.map((col) => (
-                  <KanbanColumn key={col.id} column={col} />
+                  <KanbanColumn key={col.id} column={col} onOpen={openTimeline} />
                 ))}
               </div>
 
               <DragOverlay>
                 {activeCard ? (
                   <div className="w-[240px] rotate-2 cursor-grabbing">
-                    <TrackerCardItem card={activeCard} />
+                    <TrackerCardItem card={activeCard} columnId={findColumnIdForCard(activeCard.id, columns) ?? undefined} />
                   </div>
                 ) : null}
               </DragOverlay>
             </DndContext>
           </>
         ) : view === "table" ? (
-          <TrackerTableView columns={columns} />
+          <TrackerTableView columns={columns} onMove={moveCard} onOpen={openTimeline} />
         ) : (
-          <TrackerCalendarView columns={columns} />
+          <TrackerCalendarView columns={columns} onMove={moveCard} onOpen={openTimeline} />
         )}
       </main>
+
+      <JobTimelineDialog
+        card={openEntry?.card ?? null}
+        columnId={openEntry?.columnId ?? null}
+        onOpenChange={(v) => !v && setOpenCardId(null)}
+        onMove={moveCard}
+      />
+      <JobPickerDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        jobs={jobs}
+        onPick={addJob}
+        onCreate={(input) => {
+          const created = createPastedJob(input);
+          setJobs((prev) => [created, ...prev]);
+          addJob(created);
+        }}
+      />
     </div>
   );
 };
