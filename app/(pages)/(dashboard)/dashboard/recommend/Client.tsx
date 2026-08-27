@@ -1,324 +1,209 @@
 "use client";
 
-import { FC, Fragment, useState } from "react";
+// Recommendations — reviewer-picked, answer-and-connect.
+//
+// Our reviewers pick one or two people and put them straight in front of a
+// company, skipping the funnel. The company asks a question or two, you
+// answer, you talk. That is the whole model, and it's why there is no
+// messaging UI here and no "ask for an intro" button: you don't choose to be
+// recommended, and answering the questions IS the conversation.
+//
+// Fit scores are computed from your preferences (lib/dashboard/fit.ts), not
+// stored — change a preference and every number on this screen moves.
+
+import { FC, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Check, Info, Users } from "lucide-react";
+import { BadgeCheck, Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
-import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
+import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import Pill from "@/app/components/dashboard/ui/Pill";
-import type { PillProps } from "@/app/components/dashboard/ui/Pill";
-import { RECOMMENDATION_CARDS } from "@/app/lib/dashboard/mock-data";
-
-// ---------------------------------------------------------------------------
-// Local content — this screen's mock data isn't shared with any other
-// screen, so it's kept here rather than in mock-data.ts.
-// ---------------------------------------------------------------------------
-
-const INTRO_STAGES = ["We reviewed you", "Intro sent", "They replied", "Conversation", "Offer"];
+import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
+import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
+import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
+import { useSettings } from "../settings/SettingsProvider";
+import FitCard from "./_components/FitCard";
+import PipelineCard from "./_components/PipelineCard";
 
 const WHAT_WE_LOOK_FOR = [
-  "Role scope match — your last two or three roles line up with what they're actually hiring for.",
-  "Above the quality bar — your resume and portfolio would pass their first screen today, not \"after some more work.\"",
-  "Real timezone overlap — enough working-hours overlap for a live conversation to actually happen.",
-  "A warm path exists — someone in the Remote Worldwide network can make a real introduction, not a cold application.",
-  "You're currently open — your availability toggle below is switched on.",
+  "A portfolio that shows decisions, not just screens.",
+  "Evidence you've shipped with engineers, not thrown work over a wall.",
+  "Written communication — most of these teams are async by default.",
+  "A resume that survives a 20-second skim.",
+  "Fit against what you told us you want, scored live from your preferences.",
 ];
 
-/** Horizontal 5-stage tracker used by the highlighted Linear intro card. */
-const IntroStageTracker: FC<{ currentIndex: number }> = ({ currentIndex }) => {
-  return (
-    <div className="flex items-start">
-      {INTRO_STAGES.map((label, i) => (
-        <Fragment key={label}>
-          {i > 0 && (
-            <div className={cn("h-[2px] flex-1 mt-[13px] rounded-full", i <= currentIndex ? "bg-secondary" : "bg-black/10")} />
-          )}
-          <div className="flex flex-col items-center gap-2 flex-none w-[84px]">
-            <div
-              className={cn(
-                "h-7 w-7 flex-none rounded-full flex items-center justify-center text-xs font-bold",
-                i < currentIndex
-                  ? "bg-secondary text-primary"
-                  : i === currentIndex
-                    ? "bg-primary text-secondary ring-4 ring-secondary/25"
-                    : "bg-[#f0f0ea] text-black/35"
-              )}>
-              {i < currentIndex ? <Check className="h-3.5 w-3.5" /> : i + 1}
-            </div>
-            <span
-              className={cn(
-                "text-[11px] text-center leading-tight",
-                i <= currentIndex ? "font-semibold text-primary" : "font-medium text-black/35"
-              )}>
-              {label}
-            </span>
-          </div>
-        </Fragment>
-      ))}
-    </div>
-  );
-};
-
-/** Maps a fit percentage to a Pill tone — higher confidence reads more solid. */
-const fitPillVariant = (pct: number): NonNullable<PillProps["variant"]> => {
-  if (pct >= 85) return "positive";
-  if (pct >= 65) return "neutral";
-  return "outline-dashed";
-};
-
 const RecommendClient: FC = () => {
-  const [lookForOpen, setLookForOpen] = useState(false);
-  const [available, setAvailable] = useState(true);
-  const [askReviewed, setAskReviewed] = useState(false);
-  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
+  const { pipeline, targets } = useNetwork();
+  const { goals, pausedDaysLeft, resumeSearch } = useActivity();
+  const { preferences, profile } = useSettings();
 
-  const markRequested = (id: string) => {
-    setRequestedIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
+  const [lookForOpen, setLookForOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
+
+  const paused = goals.paused;
+  const awaitingYou = pipeline.filter((e) => e.questions?.some((q) => !q.answer)).length;
+  const pipelineTargetIds = new Set(pipeline.map((e) => e.targetId));
+  const watching = targets.filter((t) => !t.onHold && !pipelineTargetIds.has(t.id)).length;
+
+  const prefs = {
+    targetRoles: preferences.targetRoles,
+    minSalary: preferences.minSalary,
+    remotePolicy: preferences.remotePolicy,
   };
+  const fitProfile = { skills: profile.skills, timezone: profile.timezone };
+
+  const STATS: { value: number; label: string; note: string }[] = [
+    { value: pipeline.length, label: "Put forward", note: "companies our reviewers chose you for" },
+    { value: awaitingYou, label: "Waiting on you", note: awaitingYou === 1 ? "answer their questions" : "nothing to answer" },
+    { value: watching, label: "Being watched", note: "on your list for the next round" },
+  ];
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
-      {/* Header */}
-      <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
+        <div className="flex min-w-0 items-center gap-3">
           <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Recommendations</h1>
-          <Pill variant="neutral" className="gap-1.5 flex-none hidden sm:inline-flex">
-            <Users className="h-3 w-3" />
-            Made by humans at Remote Worldwide
+          <Pill variant="neutral" className="hidden sm:inline-flex">
+            Picked by humans at Remote Worldwide
           </Pill>
         </div>
-        <StickerButton variant="outline" size="md" onClick={() => setLookForOpen((v) => !v)}>
-          <Info className="h-4 w-4" />
+        <button
+          type="button"
+          onClick={() => setLookForOpen((v) => !v)}
+          className="inline-flex flex-none cursor-pointer items-center gap-1 text-xs font-semibold text-primary hover:underline">
           What we look for
-        </StickerButton>
+          {lookForOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
       </header>
 
-      <main className="px-8 py-7 pb-14 max-w-[1180px] mx-auto">
-        {/* Expandable "What we look for" panel */}
+      <main className="mx-auto max-w-[1100px] px-8 py-7 pb-14">
         <div
           className={cn(
             "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
-            lookForOpen ? "max-h-[500px] opacity-100 mb-5" : "max-h-0 opacity-0"
+            lookForOpen ? "mb-6 max-h-[420px] opacity-100" : "max-h-0 opacity-0"
           )}>
-          <div className="rounded-2xl border border-black/10 bg-white shadow-[4px_4px_0_0_#e1f073] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[15px] font-bold text-primary">What our reviewers look for</p>
-              <button
-                type="button"
-                onClick={() => setLookForOpen(false)}
-                className="text-xs font-semibold text-black/40 hover:text-black/60 cursor-pointer">
-                Close
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
+          <DashCard className="bg-[#fbfbf7] p-6">
+            <p className="mb-3 text-sm font-bold text-primary">What our reviewers look for</p>
+            <ul className="flex flex-col gap-2">
               {WHAT_WE_LOOK_FOR.map((line) => (
-                <div key={line} className="flex items-start gap-2.5">
-                  <span className="h-5 w-5 flex-none rounded-md bg-secondary/40 flex items-center justify-center mt-0.5">
-                    <Check className="h-3 w-3 text-[#5a6516]" />
+                <li key={line} className="flex items-start gap-2.5">
+                  <span className="mt-0.5 grid h-4 w-4 flex-none place-content-center rounded bg-[#e1f073]">
+                    <Check className="h-2.5 w-2.5 text-[#222325]" strokeWidth={3.5} />
                   </span>
-                  <p className="text-sm text-black/70 leading-relaxed">{line}</p>
-                </div>
+                  <span className="text-sm leading-relaxed text-black/60">{line}</span>
+                </li>
               ))}
-            </div>
+            </ul>
+          </DashCard>
+        </div>
+
+        {/* How it actually works — no self-serve step to imply. */}
+        <div className="mb-6 overflow-hidden rounded-2xl bg-[#222325] p-7">
+          <div className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.09em] text-[#e1f073]">
+            <Sparkles className="h-3.5 w-3.5" />
+            How recommendations work
+          </div>
+          <p className="mt-3 max-w-2xl text-[22px] font-bold leading-snug text-white">
+            We pick one or two people a week and put them straight in front of a company — no application, no queue.
+          </p>
+          <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-white/60">
+            A reviewer here reads your work and decides. If a company wants to go further, they send a question or two; you
+            answer them below, and you&apos;re talking to their hiring team directly. You can&apos;t request this — keeping your
+            profile sharp is what puts you in the running.
+          </p>
+
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {STATS.map((s) => (
+              <div key={s.label} className="rounded-xl bg-white/[0.06] px-4 py-3.5">
+                <p className="text-2xl font-bold text-[#e1f073] tabular-nums">{s.value}</p>
+                <p className="mt-0.5 text-xs font-bold text-white">{s.label}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-white/45">{s.note}</p>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Dark hero — how the human-curated warm-intro model works */}
-        <div className="relative overflow-hidden rounded-[18px] bg-[#222325] text-white p-7">
-          <div aria-hidden className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-secondary/25 blur-3xl pointer-events-none" />
-
-          <div className="relative">
-            <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-secondary mb-3">How recommendations work</p>
-            <h2 className="text-2xl font-bold mb-1.5 max-w-[560px]">
-              A real person reads your profile and makes the introduction themselves.
-            </h2>
-            <p className="text-sm text-white/70 leading-relaxed mb-6 max-w-[560px]">
-              No bulk-blasted applications. A human reviewer on the Remote Worldwide team matches you against companies
-              we already have a relationship with, then reaches out on your behalf with a warm intro instead of a
-              resume dropped into a pile of 300.
-            </p>
-
-            <div className="flex flex-wrap gap-3">
-              <div className="rounded-xl bg-white/10 px-4 py-3 min-w-[140px]">
-                <p className="text-2xl font-bold leading-none">2</p>
-                <p className="text-xs text-white/55 mt-1.5">Live intros</p>
-              </div>
-              <div className="rounded-xl bg-white/10 px-4 py-3 min-w-[140px]">
-                <p className="text-2xl font-bold leading-none">5</p>
-                <p className="text-xs text-white/55 mt-1.5">Companies watching</p>
-              </div>
+        {/* Eligibility — reads the real paused state, not a local flag. */}
+        <DashCard className="mb-8 flex flex-wrap items-center justify-between gap-4 bg-[#fbfbf7] p-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#e1f073]">
+              <BadgeCheck className="h-4 w-4 text-[#222325]" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-primary">
+                {paused ? "Recommendations are paused" : "You're in the running"}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-black/55">
+                {paused
+                  ? `Paused${pausedDaysLeft !== null ? ` — ${pausedDaysLeft} day${pausedDaysLeft === 1 ? "" : "s"} left` : ""}. Reviewers will skip you until you resume.`
+                  : `Reviewers are matching you against ${watching} ${watching === 1 ? "company" : "companies"} this week.`}
+              </p>
             </div>
           </div>
-        </div>
-
-        {/* Eligibility banner */}
-        <DashCard className="mt-5 p-5 flex flex-wrap items-center gap-4 bg-[#fbfbf7]">
-          <span className="h-10 w-10 flex-none rounded-full bg-secondary text-primary flex items-center justify-center">
-            <BadgeCheck className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-primary">
-              {available ? "You're eligible for recommendations" : "Recommendations are paused"}
-            </p>
-            <p className="text-xs text-black/45">
-              {available
-                ? "Reviewers are actively matching you against 5 companies this week."
-                : "You won't be matched against new companies until you resume."}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-none">
-            <StickerButton variant="outline" size="sm" onClick={() => {}}>
-              Update availability
-            </StickerButton>
-            <StickerButton
-              variant={available ? "outline" : "secondary"}
-              size="sm"
-              onClick={() => setAvailable((v) => !v)}>
-              {available ? "Pause" : "Resume"}
-            </StickerButton>
-          </div>
-        </DashCard>
-
-        {/* In progress */}
-        <div className="flex items-center justify-between mt-8 mb-3">
-          <h2 className="text-[15px] font-bold text-primary">In progress</h2>
-          <span className="text-xs text-black/45">2 active</span>
-        </div>
-
-        {/* Highlighted Linear intro card */}
-        <div className="rounded-2xl border border-primary bg-white shadow-[4px_4px_0_0_#e1f073] p-6">
-          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="h-10 w-10 flex-none rounded-xl bg-[#f0f0ea] text-primary font-extrabold text-sm flex items-center justify-center">
-                L
-              </span>
-              <div className="min-w-0">
-                <p className="text-[15px] font-bold text-primary">Linear</p>
-                <p className="text-xs text-black/45">Senior Product Designer · intro sent 6 days ago</p>
-              </div>
-            </div>
-            <Pill variant="active" className="flex-none">
-              Highlighted
-            </Pill>
-          </div>
-
-          <IntroStageTracker currentIndex={2} />
-
-          <div className="mt-6 rounded-xl bg-[#fbfbf7] border border-black/8 p-4">
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-1.5">What they asked for</p>
-            <p className="text-sm text-black/70 leading-relaxed">
-              Maria Kowalski, Linear&apos;s design manager, replied asking for two portfolio case studies that show
-              systems thinking before she sets up a call.
-            </p>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            {askReviewed ? (
-              <StickerButton variant="outline" size="md" disabled>
-                <Check className="h-4 w-4" />
-                Reviewed
-              </StickerButton>
-            ) : (
-              <StickerButton variant="primary" size="md" onClick={() => setAskReviewed(true)}>
-                Review the ask
-              </StickerButton>
-            )}
-            <Link href="/dashboard/referrals">
-              <StickerButton variant="outline" size="md">
-                Message Maria
+          <div className="flex flex-none items-center gap-2">
+            <Link href="/dashboard/settings/preferences">
+              <StickerButton variant="outline" size="sm" type="button">
+                Update preferences
               </StickerButton>
             </Link>
+            {paused ? (
+              <StickerButton variant="primary" size="sm" onClick={resumeSearch}>
+                Resume
+              </StickerButton>
+            ) : (
+              <StickerButton variant="outline" size="sm" onClick={() => setPauseOpen(true)}>
+                Pause
+              </StickerButton>
+            )}
           </div>
-        </div>
-
-        {/* Smaller Cron card — intro sent, waiting */}
-        <DashCard className="mt-4 p-5">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="h-10 w-10 flex-none rounded-xl bg-[#f0f0ea] text-primary font-extrabold text-sm flex items-center justify-center">
-                C
-              </span>
-              <div className="min-w-0">
-                <p className="text-[15px] font-bold text-primary">Cron</p>
-                <p className="text-xs text-black/45">Product Designer · intro sent 2 days ago</p>
-              </div>
-            </div>
-            <Pill variant="neutral" className="flex-none">
-              Waiting on reply
-            </Pill>
-          </div>
-          <ProgressBar value={40} height="h-1.5" className="mt-4" />
-          <p className="text-xs text-black/45 mt-2">
-            Reviewers typically hear back within 5–7 days — we&apos;ll notify you the moment Cron replies.
-          </p>
         </DashCard>
 
-        {/* Companies we think you fit */}
-        <div className="flex items-center justify-between mt-8 mb-3">
-          <h2 className="text-[15px] font-bold text-primary">Companies we think you fit</h2>
-          <span className="text-xs text-black/45">Updated weekly by our reviewers</span>
-        </div>
+        <section className="mb-8">
+          <div className="mb-3.5 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[15px] font-bold text-primary">Companies you&apos;re in front of</h2>
+            {awaitingYou > 0 && (
+              <span className="text-xs font-semibold text-[#6c7a1e]">
+                {awaitingYou} waiting on your answer{awaitingYou === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {RECOMMENDATION_CARDS.map((card) => {
-            const initials = card.company.slice(0, 1);
-            const requested = requestedIds.has(card.id);
+          {pipeline.length === 0 ? (
+            <DashEmptyState
+              icon={Sparkles}
+              title="Nobody's put you forward yet"
+              body="Reviewers pick weekly. A sharp resume and clear preferences are what get you looked at."
+              ctaLabel="Update your preferences"
+              ctaHref="/dashboard/settings/preferences"
+            />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {pipeline.map((entry) => (
+                <PipelineCard key={entry.id} entry={entry} />
+              ))}
+            </div>
+          )}
+        </section>
 
-            return (
-              <DashCard key={card.id} className="p-6 flex flex-col">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="h-10 w-10 flex-none rounded-xl bg-[#f0f0ea] text-primary font-extrabold text-sm flex items-center justify-center">
-                    {initials}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-bold text-primary truncate">{card.company}</p>
-                    <Pill variant={fitPillVariant(card.fitPct)} className="mt-1">
-                      {card.fitLabel}
-                    </Pill>
-                  </div>
-                </div>
+        <section>
+          <div className="mb-3.5">
+            <h2 className="text-[15px] font-bold text-primary">Companies we think you fit</h2>
+            <p className="mt-1 text-xs text-black/55">
+              Scored live against your preferences — reviewers use this as one input when they pick.
+            </p>
+          </div>
 
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-2xl font-bold text-primary">{card.fitPct}%</span>
-                  <span className="text-xs text-black/45">fit score</span>
-                </div>
-                <ProgressBar value={card.fitPct} fillColor={card.fitPct >= 80 ? "#e1f073" : "#cddd54"} className="mb-5" />
-
-                <div className="mt-auto">
-                  {card.status ? (
-                    <div className="rounded-lg bg-[#f0f0ea] px-3.5 py-2.5">
-                      <p className="text-xs font-bold text-primary">{card.status}</p>
-                      <p className="text-xs text-black/50 mt-0.5">{card.action}</p>
-                    </div>
-                  ) : card.id === "rec-raycast" ? (
-                    <Link href="/dashboard/resume" className="block">
-                      <StickerButton variant="outline" size="md" className="w-full">
-                        {card.action}
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </StickerButton>
-                    </Link>
-                  ) : requested ? (
-                    <StickerButton variant="outline" size="md" className="w-full" disabled>
-                      <Check className="h-4 w-4" />
-                      Requested
-                    </StickerButton>
-                  ) : (
-                    <StickerButton variant="primary" size="md" className="w-full" onClick={() => markRequested(card.id)}>
-                      {card.action}
-                    </StickerButton>
-                  )}
-                </div>
-              </DashCard>
-            );
-          })}
-        </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {targets.map((t) => (
+              <FitCard key={t.id} target={t} prefs={prefs} profile={fitProfile} />
+            ))}
+          </div>
+        </section>
       </main>
+
+      <PauseSearchDialog open={pauseOpen} onOpenChange={setPauseOpen} />
     </div>
   );
 };

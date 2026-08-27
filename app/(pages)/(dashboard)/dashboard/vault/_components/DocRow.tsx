@@ -21,21 +21,15 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { formatSize, sourceBadgeLabel, useDocuments, type DocKind, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { downloadDoc, formatSize, KIND_LABELS, sourceBadgeLabel, useDocuments, type DocKind, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
+
+// Re-exported so the screen's search keeps one import site for row concerns.
+export { KIND_LABELS };
 
 /** Quiet inline control — weight is reserved for the page's real actions. */
 const GHOST_BTN =
   "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-black/55 cursor-pointer transition-colors hover:bg-black/[0.05] hover:text-primary";
-
-export const KIND_LABELS: Record<DocKind, string> = {
-  resume: "Resume",
-  "cover-letter": "Cover letter",
-  portfolio: "Portfolio",
-  certificate: "Certificate",
-  id: "ID document",
-  other: "File",
-};
 
 const KIND_ICONS: Record<DocKind, LucideIcon> = {
   resume: FileText,
@@ -44,15 +38,6 @@ const KIND_ICONS: Record<DocKind, LucideIcon> = {
   certificate: Award,
   id: ShieldCheck,
   other: Paperclip,
-};
-
-// Resume accent squares from the design spec — literal classes for the
-// build-time Tailwind scan. Resumes keep their colour identity in the row
-// list; everything else gets the neutral tile.
-const RESUME_ACCENT_CLASSES: Record<string, string> = {
-  "res-master": "bg-[#222325]",
-  "res-linear": "bg-[#3a4a7a]",
-  "res-deel": "bg-[#2f5d50]",
 };
 
 /**
@@ -115,8 +100,10 @@ const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename })
 
   return (
     <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4", doc.archived && "opacity-55")}>
+      {/* One ink tile for every resume — per-resume accent colours read as
+          three different file types rather than one. */}
       {isResume ? (
-        <span className={cn("grid h-9 w-9 flex-none place-content-center rounded-lg", RESUME_ACCENT_CLASSES[doc.id] ?? "bg-[#222325]")}>
+        <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
           <FileText className="h-4 w-4 text-white" />
         </span>
       ) : (
@@ -157,13 +144,12 @@ const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename })
                 Open
               </Link>
             )}
-            {doc.blobUrl && (
-              // A real download — the object URL points at the uploaded bytes.
-              <a href={doc.blobUrl} download={doc.ext ? `${doc.name}.${doc.ext}` : doc.name} className={GHOST_BTN}>
-                <Download className="h-3.5 w-3.5" />
-                Download
-              </a>
-            )}
+            {/* Uploads hand back their original bytes; anything else gets a
+                generated summary PDF — the button always delivers a file. */}
+            <button type="button" className={GHOST_BTN} onClick={() => downloadDoc(doc)}>
+              <Download className="h-3.5 w-3.5" />
+              Download
+            </button>
             <button type="button" className={GHOST_BTN} onClick={onStartRename}>
               <Pencil className="h-3.5 w-3.5" />
               Rename

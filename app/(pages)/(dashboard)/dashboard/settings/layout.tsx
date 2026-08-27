@@ -1,13 +1,14 @@
-import { SettingsProvider } from "./SettingsProvider";
 import SettingsNav from "./_components/SettingsNav";
 
 /**
- * Shared shell for /dashboard/settings/**: one header, a section nav, and the
- * provider that keeps edits alive while moving between sections.
+ * Shared shell for /dashboard/settings/**: one header and a section nav.
+ * `SettingsProvider` used to wrap this layout; it now mounts app-wide in
+ * DashboardShell because the recommend screen computes fit from the same
+ * preferences. Re-wrapping here would shadow that with a second copy.
  */
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SettingsProvider>
+    <>
       <div className="min-h-screen bg-[#f6f6f6]">
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
           <h1 className="text-[17px] font-bold text-primary">Settings</h1>
@@ -23,6 +24,6 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
           </div>
         </main>
       </div>
-    </SettingsProvider>
+    </>
   );
 }

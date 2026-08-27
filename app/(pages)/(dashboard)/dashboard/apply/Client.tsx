@@ -32,6 +32,7 @@ import {
   APPS,
   JD_CONTENT,
   REFERRAL_CONTACTS,
+  TIE_META,
   ATS_KEYWORDS,
   ATS_FIX_ITEMS,
   RESUME,
@@ -360,7 +361,7 @@ const ApplyClient: FC = () => {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
               <p className="text-[15px] font-bold text-primary">{tunde?.name}</p>
-              <Pill variant="positive">{tunde?.tie}</Pill>
+              {tunde && <Pill variant={TIE_META[tunde.tie].pillVariant}>{TIE_META[tunde.tie].label}</Pill>}
             </div>
             <p className="text-xs text-black/45 mb-2">
               {tunde?.role} at {tunde?.company}

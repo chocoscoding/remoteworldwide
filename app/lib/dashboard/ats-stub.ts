@@ -22,7 +22,7 @@ export interface ApplicationScore {
 }
 
 /** Deterministic 0-1 from a string, so the same JD always scores the same. */
-function hash01(s: string): number {
+export function hash01(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   const x = Math.sin(h) * 43758.5453;

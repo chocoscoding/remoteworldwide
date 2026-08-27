@@ -311,11 +311,13 @@ export interface JdQaAnswer {
 // Referrals
 // ---------------------------------------------------------------------------
 
+/** Closed union so warmth can be sorted and filtered, not just printed. */
+export type TieKind = "strong" | "second" | "alumni";
+
 export interface ReferralContact {
   id: string;
   name: string;
-  /** e.g. "Strong tie", "2nd degree", "Alumni" */
-  tie: string;
+  tie: TieKind;
   role: string;
   company: string;
   targetRole: string;
@@ -323,6 +325,12 @@ export interface ReferralContact {
   /** Present for 2nd-degree contacts — the mutual connection's name. */
   via?: string;
   bio?: string;
+  /** "GMT+1" — feeds the same-timezone filter. */
+  timezone: string;
+  /** The two reach channels the referral flow is actually built around. */
+  email: string;
+  linkedinUrl: string;
+  lastInteraction?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -339,13 +347,50 @@ export interface ChecklistItem {
 // Recommendations
 // ---------------------------------------------------------------------------
 
-export interface RecommendationCard {
+/**
+ * A company our reviewers watch. Carries real facts (role, salary, timezone,
+ * skills) so fit can be computed against your preferences rather than stored
+ * as a literal percentage.
+ */
+export interface RecommendationTarget {
   id: string;
   company: string;
-  fitLabel: string;
-  fitPct: number;
-  action: string;
-  status?: string;
+  role: string;
+  /** Display string, e.g. "$140k–$180k + equity". */
+  salaryText?: string;
+  /** Midpoint in USD — what the fit engine compares against minSalary. */
+  salaryUsd?: number;
+  /** Hours from GMT for the company's hub. */
+  timezoneOffset: number;
+  skills: string[];
+  /** The reviewer's one-liner on why this company is on your list. */
+  note?: string;
+  onHold?: boolean;
+}
+
+/** One of the one or two things a company asks before they'll book time. */
+export interface IntroQuestion {
+  id: string;
+  question: string;
+  answer?: string;
+}
+
+/**
+ * A company our reviewers put you in front of. There is no messaging thread:
+ * they ask a question or two, you answer, and you're connected — which is why
+ * this carries `questions` rather than a message list.
+ */
+export interface IntroPipelineEntry {
+  id: string;
+  targetId: string;
+  company: string;
+  role: string;
+  /** Index into INTRO_STAGES. */
+  stageIndex: number;
+  putForwardAgoDays: number;
+  questions?: IntroQuestion[];
+  /** A warm contact at this company, when you have one. */
+  contactId?: string;
 }
 
 // ---------------------------------------------------------------------------

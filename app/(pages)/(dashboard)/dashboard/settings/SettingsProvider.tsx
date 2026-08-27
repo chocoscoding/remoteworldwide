@@ -1,10 +1,13 @@
 "use client";
 
-// Settings — route-scoped state.
+// Settings — app-wide state.
 //
-// Mounted by settings/layout.tsx so edits survive moving between sections
-// (Profile -> Billing -> back) without being lifted to DashboardShell, since
-// nothing outside /dashboard/settings reads it.
+// Mounted in DashboardShell. It began route-scoped (edits surviving a move
+// from Profile -> Billing -> back was the only requirement), but the
+// preferences screen's own promise — "drives your recommendations, referral
+// matches and resume scoring" — needed the recommend screen to read the same
+// object. `targetRoles`, `minSalary` and `remotePolicy` are now inputs to
+// lib/dashboard/fit.ts, so changing one moves every fit score on that screen.
 //
 // Anything the dashboard already owns for real — credits, weekly target,
 // hunt hour, paused state — is NOT duplicated here. Those come from
