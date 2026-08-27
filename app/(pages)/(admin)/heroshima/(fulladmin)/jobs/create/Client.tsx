@@ -56,9 +56,9 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
 
   const handleSingleSelectChange = (field: "company" | "category" | "seniority", value: Option | null) => {
     if (value?.href) {
-      // "Add new Company" opens the popup rather than navigating away, so
-      // everything already typed into this job stays put.
       if (field === "company") {
+        // "Add new Company" opens the popup rather than navigating away, so
+        // everything already typed into this job stays put.
         setIsCompanyModalOpen(true);
         return;
       }
@@ -224,7 +224,11 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       <main className="p-4 mb-3">
         <h1 className="text-2xl font-bold mb-4">Create New Job</h1>
 
-        <AIJobParser filters={filters} allCompanies={companies} onParseComplete={handleParseComplete} />
+        <AIJobParser
+          filters={filters}
+          allCompanies={companies}
+          onParseComplete={handleParseComplete}
+        />
 
         {/* Divider */}
         <div className="flex items-center gap-4 my-6">
@@ -234,7 +238,9 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
         </div>
 
         {/* Manual Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4">
           <TextField
             label="Job Title"
             value={formValues.title}
@@ -315,7 +321,11 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
         </form>
       </main>
 
-      <CreateCompanyModal open={isCompanyModalOpen} onOpenChange={setIsCompanyModalOpen} onCreated={handleCompanyCreated} />
+      <CreateCompanyModal
+        open={isCompanyModalOpen}
+        onOpenChange={setIsCompanyModalOpen}
+        onCreated={handleCompanyCreated}
+      />
     </div>
   );
 };
