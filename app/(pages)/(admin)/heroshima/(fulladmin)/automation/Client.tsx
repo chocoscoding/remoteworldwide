@@ -17,9 +17,9 @@ export async function getAdminToken(password: string) {
   }
 }
 
-export async function triggerJobPosting(token: string) {
+export async function triggerJobPosting(token: string, channels: Channel[]) {
   try {
-    const res = await fetch(`${BASE_URL}/trigger`, {
+    const res = await fetch(`${BASE_URL}/trigger?channels=${channels.join(",")}`, {
       headers: { "x-admin-token": token },
     });
     const response = await res.json();
@@ -30,12 +30,42 @@ export async function triggerJobPosting(token: string) {
 }
 
 const COOLDOWN_KEY = "automation_cooldown_until";
+const CHANNELS_KEY = "automation_channels";
+
+type Channel = "twitter" | "linkedin" | "telegram";
+
+/**
+ * The channels a run can post to. X is wired end-to-end on the bot (OAuth 1.0a,
+ * tokens that don't expire) but is switched off here for now — flip `disabled`
+ * to false to bring it back; nothing else needs changing.
+ */
+const CHANNEL_OPTIONS: { id: Channel; label: string; disabled?: boolean; note?: string }[] = [
+  { id: "twitter", label: "X (Twitter)", disabled: true, note: "Temporarily disabled" },
+  { id: "linkedin", label: "LinkedIn" },
+  { id: "telegram", label: "Telegram" },
+];
+
+const DEFAULT_CHANNELS: Channel[] = ["linkedin", "telegram"];
 
 const AutomationClient = () => {
   const [cooldownUntil, setCooldownUntil] = useState(() => {
     if (typeof window === "undefined") return 0;
     const stored = localStorage.getItem(COOLDOWN_KEY);
     return stored ? parseInt(stored, 10) : 0;
+  });
+  const [channels, setChannels] = useState<Channel[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_CHANNELS;
+    try {
+      const stored = localStorage.getItem(CHANNELS_KEY);
+      if (!stored) return DEFAULT_CHANNELS;
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return DEFAULT_CHANNELS;
+      // Never restore a channel that's currently switched off.
+      const enabled = CHANNEL_OPTIONS.filter((c) => !c.disabled).map((c) => c.id);
+      return parsed.filter((c: Channel) => enabled.includes(c));
+    } catch {
+      return DEFAULT_CHANNELS;
+    }
   });
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(false);
@@ -57,7 +87,16 @@ const AutomationClient = () => {
     }
   }, [cooldownUntil, now]);
 
+  const toggleChannel = (id: Channel) => {
+    setChannels((prev) => {
+      const next = prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id];
+      localStorage.setItem(CHANNELS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const handleTrigger = async () => {
+    if (channels.length === 0) return;
     setLoading(true);
     const toast1 = toast.info("Triggering automation...");
 
@@ -71,7 +110,7 @@ const AutomationClient = () => {
         setLoading(false);
         return;
       }
-      const res = await triggerJobPosting(token);
+      const res = await triggerJobPosting(token, channels);
       if (res.success) {
         toast.success("Jobs posted successfully!", {
           updateId: toast1,
@@ -87,9 +126,6 @@ const AutomationClient = () => {
         const until = Date.now() + 60 * 1000;
         setCooldownUntil(until);
         localStorage.setItem(COOLDOWN_KEY, until.toString());
-      } else if (res.loginUrl) {
-        const url = res.loginUrl.startsWith("http") ? res.loginUrl : BASE_URL + res.loginUrl;
-        window.open(url, "_blank");
       } else {
         toast.error(res.message || "Failed.", { updateId: toast1, autoClose: 3500 });
       }
@@ -143,10 +179,34 @@ const AutomationClient = () => {
             handleTrigger();
           }}
           className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-primary mb-2">Post to</label>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              {CHANNEL_OPTIONS.map((option) => (
+                <label
+                  key={option.id}
+                  className={`inline-flex items-center gap-2 text-sm ${
+                    option.disabled ? "text-gray-400 cursor-not-allowed" : "text-gray-800 cursor-pointer"
+                  }`}>
+                  <input
+                    type="checkbox"
+                    checked={channels.includes(option.id)}
+                    disabled={option.disabled}
+                    onChange={() => toggleChannel(option.id)}
+                    className="h-4 w-4 rounded border-gray-300 accent-black disabled:cursor-not-allowed"
+                  />
+                  {option.label}
+                  {option.note && <span className="text-xs text-gray-400">({option.note})</span>}
+                </label>
+              ))}
+            </div>
+            {channels.length === 0 && <p className="text-sm text-red-500 mt-2">Pick at least one channel.</p>}
+          </div>
+
           <div className="flex flex-col gap-2 items-stretch">
             <button
               type="submit"
-              disabled={loading || isCooldown}
+              disabled={loading || isCooldown || channels.length === 0}
               className="drop-shadow-primary2-hover flex items-center justify-center transition-all bg-transparent hover:bg-transparent text-black text-center border-2 border-primary font-bold h-12 rounded px-4 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed w-full">
               Trigger Automation
             </button>
