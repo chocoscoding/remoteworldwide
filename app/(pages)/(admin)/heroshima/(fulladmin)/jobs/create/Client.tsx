@@ -7,6 +7,8 @@ import { SelectField, TextField } from "@/app/components/inputs";
 import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
 import AIJobParser from "./AIJobParser";
+import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
+import type { Company } from "@prisma/client";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
@@ -40,6 +42,10 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     body: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  // Seeded from the server, then kept in sync client-side so a company created
+  // from the popup shows up in the select without a reload.
+  const [companies, setCompanies] = useState<FilterType[]>(allCompanies);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
 
   const companyRef = useRef<SelectRef>(null);
   const categoryRef = useRef<SelectRef>(null);
@@ -50,10 +56,23 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
 
   const handleSingleSelectChange = (field: "company" | "category" | "seniority", value: Option | null) => {
     if (value?.href) {
+      // "Add new Company" opens the popup rather than navigating away, so
+      // everything already typed into this job stays put.
+      if (field === "company") {
+        setIsCompanyModalOpen(true);
+        return;
+      }
       push(value.href);
     } else {
       setFormValues((prev) => ({ ...prev, [field]: value }));
     }
+  };
+
+  const handleCompanyCreated = (company: Company) => {
+    const option = { value: company.id, label: company.name };
+    setCompanies((prev) => (prev.some((c) => c.value === option.value) ? prev : [option, ...prev]));
+    setFormValues((prev) => ({ ...prev, company: option }));
+    setIsCompanyModalOpen(false);
   };
 
   const handleRegionChange = (value: Option[] | null) => {
@@ -205,7 +224,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       <main className="p-4 mb-3">
         <h1 className="text-2xl font-bold mb-4">Create New Job</h1>
 
-        <AIJobParser filters={filters} allCompanies={allCompanies} onParseComplete={handleParseComplete} />
+        <AIJobParser filters={filters} allCompanies={companies} onParseComplete={handleParseComplete} />
 
         {/* Divider */}
         <div className="flex items-center gap-4 my-6">
@@ -237,7 +256,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             ref={companyRef}
             label="Company"
             value={formValues.company}
-            options={[GenerateNewOption("Company", "/heroshima/companies/create"), ...allCompanies]}
+            options={[GenerateNewOption("Company", "/heroshima/companies/create"), ...companies]}
             onChange={(value) => handleSingleSelectChange("company", value as Option | null)}
             placeholder="Select company"
             required
@@ -295,6 +314,8 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
           </div>
         </form>
       </main>
+
+      <CreateCompanyModal open={isCompanyModalOpen} onOpenChange={setIsCompanyModalOpen} onCreated={handleCompanyCreated} />
     </div>
   );
 };

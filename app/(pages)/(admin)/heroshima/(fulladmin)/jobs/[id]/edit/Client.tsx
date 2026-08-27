@@ -9,6 +9,8 @@ import { toast } from "react-toastify";
 import { Job } from "@prisma/client";
 import { updateOneJob } from "@/libs/query";
 import OverlayLoader from "@/app/components/OverlayLoader";
+import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
+import type { Company } from "@prisma/client";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
@@ -40,15 +42,32 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
     body: job.description,
   });
   const [isLoading, setIsLoading] = useState(false);
+  // Seeded from the server, then kept in sync client-side so a company created
+  // from the popup shows up in the select without a reload.
+  const [companies, setCompanies] = useState<FilterType[]>(allCompanies);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
 
   const { push } = useRouter();
 
   const handleSingleSelectChange = (field: "company" | "category" | "seniority", value: Option | null) => {
     if (value?.href) {
+      // "Add new Company" opens the popup rather than navigating away, so the
+      // edits already made to this job stay put.
+      if (field === "company") {
+        setIsCompanyModalOpen(true);
+        return;
+      }
       push(value.href);
     } else {
       setFormValues((prev) => ({ ...prev, [field]: value }));
     }
+  };
+
+  const handleCompanyCreated = (company: Company) => {
+    const option = { value: company.id, label: company.name };
+    setCompanies((prev) => (prev.some((c) => c.value === option.value) ? prev : [option, ...prev]));
+    setFormValues((prev) => ({ ...prev, company: option }));
+    setIsCompanyModalOpen(false);
   };
 
   const handleRegionChange = (value: Option[] | null) => {
@@ -153,7 +172,7 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
           <SelectField
             label="Company"
             value={formValues.company}
-            options={[GenerateNewOption("Company", "/heroshima/companies/create"), ...allCompanies]}
+            options={[GenerateNewOption("Company", "/heroshima/companies/create"), ...companies]}
             onChange={(value) => handleSingleSelectChange("company", value as Option | null)}
             placeholder="Select company"
             required
@@ -207,6 +226,8 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
           </div>
         </form>
       </main>
+
+      <CreateCompanyModal open={isCompanyModalOpen} onOpenChange={setIsCompanyModalOpen} onCreated={handleCompanyCreated} />
     </div>
   );
 };

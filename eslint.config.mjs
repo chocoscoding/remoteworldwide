@@ -26,7 +26,6 @@ export default defineConfig([{
         "app/(pages)/(admin)/heroshima/(fulladmin)/automation/Client.tsx",
         "app/(pages)/(admin)/heroshima/(fulladmin)/companies/*/Client.tsx",
         "app/(pages)/(admin)/heroshima/(fulladmin)/companies/*/edit/Client.tsx",
-        "app/(pages)/(admin)/heroshima/(fulladmin)/companies/create/page.tsx",
         "app/(pages)/(admin)/heroshima/(fulladmin)/jobs/Client.tsx",
         "app/(pages)/(admin)/heroshima/(fulladmin)/jobs/inactive/Client.tsx",
         "app/(pages)/(admin)/heroshima/(writers)/blogs/Client.tsx",
