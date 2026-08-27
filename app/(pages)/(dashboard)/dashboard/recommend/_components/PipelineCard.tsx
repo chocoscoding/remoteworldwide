@@ -31,8 +31,9 @@ const PipelineCard: FC<PipelineCardProps> = ({ entry }) => {
     <DashCard
       className={cn(
         "p-6",
-        // The one accent on this screen: something is waiting on you.
-        awaitingYou && "border-[#222325] shadow-[4px_4px_0_0_#e1f073]"
+        // The one accent on this screen: something is waiting on you. Same
+        // tier as the referrals direct-paths card.
+        awaitingYou && "border-[1.5px] border-[#222325] shadow-[4px_4px_0_0_#e1f073]"
       )}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">

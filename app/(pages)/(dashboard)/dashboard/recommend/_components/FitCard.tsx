@@ -48,7 +48,7 @@ const FitCard: FC<FitCardProps> = ({ target, prefs, profile }) => {
             <p className="mt-0.5 truncate text-xs text-black/55">{target.role}</p>
           </div>
         </div>
-        <ScoreRing value={fit.score} size={64} />
+        <ScoreRing value={fit.score} size={56} />
       </div>
 
       <div className="mt-3.5 flex flex-wrap items-center gap-2">

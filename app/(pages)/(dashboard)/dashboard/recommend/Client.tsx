@@ -142,14 +142,16 @@ const RecommendClient: FC = () => {
               </p>
             </div>
           </div>
-          <div className="flex flex-none items-center gap-2">
-            <Link href="/dashboard/settings/preferences">
-              <StickerButton variant="outline" size="sm" type="button">
-                Update preferences
-              </StickerButton>
+          {/* No ink here — the page's one primary is "Send answers" on the
+              awaiting card. Resume gets the lime active tier instead. */}
+          <div className="flex flex-none items-center gap-2.5">
+            <Link
+              href="/dashboard/settings/preferences"
+              className="cursor-pointer rounded-lg px-2 py-1.5 text-xs font-semibold text-black/55 transition-colors hover:bg-black/[0.05] hover:text-primary">
+              Update preferences
             </Link>
             {paused ? (
-              <StickerButton variant="primary" size="sm" onClick={resumeSearch}>
+              <StickerButton variant="secondary" size="sm" onClick={resumeSearch}>
                 Resume
               </StickerButton>
             ) : (
@@ -189,7 +191,9 @@ const RecommendClient: FC = () => {
 
         <section>
           <div className="mb-3.5">
-            <h2 className="text-[15px] font-bold text-primary">Companies we think you fit</h2>
+            {/* Quiet tier on purpose: this list is context for the reviewers'
+                next pick, not a peer of the pipeline above it. */}
+            <h2 className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55">Companies we think you fit</h2>
             <p className="mt-1 text-xs text-black/55">
               Scored live against your preferences — reviewers use this as one input when they pick.
             </p>

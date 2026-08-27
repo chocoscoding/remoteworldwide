@@ -56,11 +56,20 @@ export const PLATFORM_JOBS: JobOption[] = [
 
 let seq = 0;
 
-export function createPastedJob(input: { company: string; role: string; jdText?: string; url?: string }): JobOption {
+export interface PastedJobInput {
+  company: string;
+  role: string;
+  jdText?: string;
+  salary?: string;
+  url?: string;
+}
+
+export function createPastedJob(input: PastedJobInput): JobOption {
   return {
     id: `job-pasted-${++seq}`,
     company: input.company.trim() || "Untitled company",
     role: input.role.trim() || "Untitled role",
+    salary: input.salary?.trim() || undefined,
     jdText: input.jdText?.trim() || genericJd(input.company, input.role),
     source: "pasted",
   };
