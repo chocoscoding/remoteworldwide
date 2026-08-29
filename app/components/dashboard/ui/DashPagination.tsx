@@ -1,7 +1,7 @@
 "use client";
 
 import { FC } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "./StickerButton";
 
@@ -80,23 +80,19 @@ const DashPagination: FC<DashPaginationProps> = ({
       </p>
 
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-black/55">Show</span>
-          <div className="inline-flex items-center gap-0.5 rounded-lg bg-[#f0f0ea] p-1">
+        <div className="relative inline-flex items-center">
+          <select
+            aria-label="Rows per page"
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value) as PageSize)}
+            className="cursor-pointer appearance-none rounded-lg border border-black/15 bg-white py-1.5 pl-2 pr-6 text-xs font-semibold text-black/70 outline-none transition-colors hover:border-[#222325] focus:border-[#222325]">
             {PAGE_SIZE_OPTIONS.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={() => onPageSizeChange(size)}
-                aria-pressed={pageSize === size}
-                className={cn(
-                  "cursor-pointer rounded-md px-2.5 py-1 text-xs font-bold tabular-nums transition-colors",
-                  pageSize === size ? "bg-[#222325] text-white" : "text-black/55 hover:text-primary"
-                )}>
+              <option key={size} value={size}>
                 {size}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 h-3.5 w-3.5 text-black/45" aria-hidden />
         </div>
 
         {totalPages > 1 && (
@@ -121,7 +117,7 @@ const DashPagination: FC<DashPaginationProps> = ({
                   aria-current={token === page ? "page" : undefined}
                   className={cn(
                     "h-8 min-w-8 cursor-pointer rounded-lg px-2 text-xs font-bold tabular-nums transition-colors",
-                    token === page ? "bg-[#222325] text-white" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary"
+                    token === page ? "bg-[#222325] text-white" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
                   )}>
                   {token}
                 </button>
@@ -131,7 +127,7 @@ const DashPagination: FC<DashPaginationProps> = ({
                 <span key={`${token}-${i}`} aria-hidden="true" className="px-1 text-xs font-bold text-black/45">
                   …
                 </span>
-              )
+              ),
             )}
 
             <StickerButton

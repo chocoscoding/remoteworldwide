@@ -16,14 +16,7 @@ import ProofOfProgress from "@/app/components/dashboard/ProofOfProgress";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { ACTION_KINDS, type ActionKind } from "@/app/lib/dashboard/activity";
-import {
-  dayKey,
-  fromDayKey,
-  addDays,
-  weekdayIndex,
-  dayVisual,
-  tierFor,
-} from "@/app/lib/dashboard/streak";
+import { dayKey, fromDayKey, addDays, weekdayIndex, dayVisual, tierFor } from "@/app/lib/dashboard/streak";
 import { clampTarget, dailyMath, TARGET_STEP, HIGH_VOLUME_THRESHOLD, TARGET_MAX, TARGET_MIN } from "@/app/lib/dashboard/goals";
 import { TRACKER_COLUMNS, WEEKLY_GOAL } from "@/app/lib/dashboard/mock-data";
 import type { TrackerColumnId } from "@/app/lib/dashboard/types";
@@ -148,7 +141,6 @@ const HomeClient: FC = () => {
         <div className="flex items-center gap-3 flex-none">
           <StreakPill />
           <StickerButton variant="primary" size="md" onClick={() => openLog()}>
-            <Plus className="h-4 w-4" />
             Log an application
           </StickerButton>
         </div>
@@ -160,7 +152,7 @@ const HomeClient: FC = () => {
         {/* Hero row: weekly goal + today */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 items-stretch">
           {/* Weekly goal card */}
-          <div className="relative overflow-hidden rounded-[18px] bg-[#222325] text-white p-7 flex flex-col">
+          <div className="relative overflow-hidden rounded-[18px] bg-[#222325] text-white p-5 flex flex-col">
             <div aria-hidden className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-secondary/25 blur-3xl pointer-events-none" />
 
             <div className="relative flex flex-col flex-1">
@@ -231,10 +223,7 @@ const HomeClient: FC = () => {
                 })}
               </div>
 
-              <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-3">
-                <StickerButton variant="secondary" size="md" shadowColor="#ffffff" onClick={() => openLog()}>
-                  Log an application
-                </StickerButton>
+              <div className="mt-auto flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setGoalsOpen((v) => !v)}
@@ -281,7 +270,12 @@ const HomeClient: FC = () => {
                     "group flex flex-none items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors",
                     h.done ? "border-black/10 bg-[#f6faea] cursor-default" : "border-black/12 hover:bg-[#f6f6f6] cursor-pointer",
                   );
-                  if (h.done) return <div key={h.id} className={cls}>{row}</div>;
+                  if (h.done)
+                    return (
+                      <div key={h.id} className={cls}>
+                        {row}
+                      </div>
+                    );
                   return spec.href ? (
                     <Link key={h.id} href={spec.href} className={cls}>
                       {row}
@@ -331,7 +325,9 @@ const HomeClient: FC = () => {
                       // detail === 0 means the button was activated by keyboard.
                       onClick={(e) => e.detail === 0 && nudgeWeeklyTarget(-TARGET_STEP)}
                       disabled={weeklyTarget <= TARGET_MIN}
-                      className={"h-9 w-9 flex-none rounded-full border-[1.5px] border-[#222325] bg-white flex items-center justify-center shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"}>
+                      className={
+                        "h-9 w-9 flex-none rounded-full border-[1.5px] border-[#222325] bg-white flex items-center justify-center shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"
+                      }>
                       <Minus className="h-4 w-4" />
                     </button>
                     {/* Typed entry as well as stepping — nobody is pressing "+" 380 times. */}
@@ -353,7 +349,9 @@ const HomeClient: FC = () => {
                       onPointerCancel={stopHold}
                       onClick={(e) => e.detail === 0 && nudgeWeeklyTarget(TARGET_STEP)}
                       disabled={weeklyTarget >= TARGET_MAX}
-                      className={"h-9 w-9 flex-none rounded-full border-[1.5px] border-[#222325] bg-white flex items-center justify-center shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"}>
+                      className={
+                        "h-9 w-9 flex-none rounded-full border-[1.5px] border-[#222325] bg-white flex items-center justify-center shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"
+                      }>
                       <Plus className="h-4 w-4" />
                     </button>
                     <span className="text-sm text-black/50">applications / week</span>

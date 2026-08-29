@@ -23,9 +23,9 @@ import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import { TIE_META } from "@/app/lib/dashboard/mock-data";
 import type { TieKind } from "@/app/lib/dashboard/types";
-import ContactRow from "./_components/ContactRow";
-import DraftPanel from "./_components/DraftPanel";
-import NetworkSourcesDialog from "./_components/NetworkSourcesDialog";
+import ContactRow from "@/app/components/dashboard/referrals/ContactRow";
+import DraftPanel from "@/app/components/dashboard/referrals/DraftPanel";
+import NetworkSourcesDialog from "@/app/components/dashboard/referrals/NetworkSourcesDialog";
 
 type Tab = "all" | "job";
 type TieFilter = "all" | TieKind;

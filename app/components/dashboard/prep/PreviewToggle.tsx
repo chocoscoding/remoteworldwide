@@ -7,7 +7,7 @@ import { SEGMENT_OFF, SEGMENT_ON, SEGMENT_SHELL } from "./prep-styles";
  * Manual state-preview switcher — lets a screen be flipped between its named
  * states (Default / Empty / Blocked / etc.) on demand, since the seed data
  * doesn't organically produce every state on every track. Purely a display
- * override in whichever `_components/Prep*.tsx` renders it; it never mutates
+ * override in whichever `Prep*.tsx` renders it; it never mutates
  * the underlying track/session data.
  */
 export interface PreviewToggleProps<T extends string> {

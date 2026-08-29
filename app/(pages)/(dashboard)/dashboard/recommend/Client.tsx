@@ -23,8 +23,8 @@ import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import { useSettings } from "../settings/SettingsProvider";
-import FitCard from "./_components/FitCard";
-import PipelineCard from "./_components/PipelineCard";
+import FitCard from "@/app/components/dashboard/recommend/FitCard";
+import PipelineCard from "@/app/components/dashboard/recommend/PipelineCard";
 
 const WHAT_WE_LOOK_FOR = [
   "A portfolio that shows decisions, not just screens.",
@@ -55,7 +55,6 @@ const RecommendClient: FC = () => {
   const fitProfile = { skills: profile.skills, timezone: profile.timezone };
 
   const STATS: { value: number; label: string; note: string }[] = [
-    { value: pipeline.length, label: "Put forward", note: "companies our reviewers chose you for" },
     { value: awaitingYou, label: "Waiting on you", note: awaitingYou === 1 ? "answer their questions" : "nothing to answer" },
     { value: watching, label: "Being watched", note: "on your list for the next round" },
   ];
@@ -114,7 +113,7 @@ const RecommendClient: FC = () => {
             profile sharp is what puts you in the running.
           </p>
 
-          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {STATS.map((s) => (
               <div key={s.label} className="rounded-xl bg-white/[0.06] px-4 py-3.5">
                 <p className="text-2xl font-bold text-[#e1f073] tabular-nums">{s.value}</p>
@@ -199,7 +198,7 @@ const RecommendClient: FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
             {targets.map((t) => (
               <FitCard key={t.id} target={t} prefs={prefs} profile={fitProfile} />
             ))}

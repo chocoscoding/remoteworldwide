@@ -4,7 +4,7 @@ import { FC } from "react";
 import { Download, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useSettings, type PrivacyState } from "../SettingsProvider";
-import { BUTTON_OUTLINE, SettingsRow, SettingsSection, Toggle } from "../_components/settings-ui";
+import { BUTTON_OUTLINE, SettingsRow, SettingsSection, Toggle } from "@/app/components/dashboard/settings/settings-ui";
 
 const ROWS: { key: keyof PrivacyState; label: string; hint: string }[] = [
   {

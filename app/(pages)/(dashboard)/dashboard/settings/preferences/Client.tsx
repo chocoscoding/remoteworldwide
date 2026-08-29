@@ -6,7 +6,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings, type Availability, type RemotePolicy } from "../SettingsProvider";
-import { BUTTON_OUTLINE, Choice, INPUT, SettingsRow, SettingsSection, TagList, Toggle } from "../_components/settings-ui";
+import { BUTTON_OUTLINE, Choice, INPUT, SettingsRow, SettingsSection, TagList, Toggle } from "@/app/components/dashboard/settings/settings-ui";
 
 const REMOTE: { id: RemotePolicy; label: string }[] = [
   { id: "anywhere", label: "Anywhere" },

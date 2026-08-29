@@ -8,7 +8,7 @@ import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
-import type { ResumeEntry } from "../Client";
+import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 
 /**
  * Every resume, scored live — the same scoreApplication() the results view
@@ -17,7 +17,7 @@ import type { ResumeEntry } from "../Client";
  * state lives on the shared document itself, so My documents agrees.
  */
 export interface AtsResumesTableProps {
-  resumes: ResumeEntry[];
+  resumes: VaultDoc[];
   onToggleArchive: (id: string) => void;
   onGeneral: (id: string) => void;
   onVsJob: (id: string) => void;

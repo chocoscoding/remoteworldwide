@@ -18,8 +18,8 @@
 // implemented one level down.
 import { useState, type FC } from "react";
 import { ResumeDesignProvider } from "@/app/components/dashboard/resume/ResumeDesignContext";
-import { INITIAL_DOCUMENTS } from "./_components/resume-document";
-import ResumeScreenBody from "./_components/ResumeScreenBody";
+import { INITIAL_DOCUMENTS } from "@/app/components/dashboard/resume/resume-document";
+import ResumeScreenBody from "@/app/components/dashboard/resume/ResumeScreenBody";
 
 const ResumeClient: FC = () => {
   const [documents, setDocuments] = useState(INITIAL_DOCUMENTS);

@@ -3,12 +3,12 @@
 import { FC, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePrep } from "../../PrepProvider";
-import PrepLive from "../../_components/PrepLive";
-import PrepPageShell from "../../_components/PrepPageShell";
-import PrepEmptyState from "../../_components/PrepEmptyState";
+import PrepLive from "@/app/components/dashboard/prep/PrepLive";
+import PrepPageShell from "@/app/components/dashboard/prep/PrepPageShell";
+import PrepEmptyState from "@/app/components/dashboard/prep/PrepEmptyState";
 import { SearchX } from "lucide-react";
 import { FORMAT_META, SESSION_LENGTHS, type SessionFormat } from "@/app/lib/dashboard/prep-data";
-import type { SessionConfig } from "../../_components/PrepSetup";
+import type { SessionConfig } from "@/app/components/dashboard/prep/PrepSetup";
 import type { SessionInput } from "@/app/lib/dashboard/prep-engine";
 
 export interface LiveClientProps {

@@ -5,7 +5,7 @@ import { Check, Plus, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
-import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagList } from "../_components/settings-ui";
+import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagList } from "@/app/components/dashboard/settings/settings-ui";
 
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
 

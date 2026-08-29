@@ -75,6 +75,19 @@ body {
   background-color: #000;
 }
 
+/* Scrolls, but shows no track or thumb — for containers where a visible bar
+   would be noise (the Kanban columns, which scroll inside a board that already
+   has one horizontal bar). The horizontal bar keeps .scrollbar-neo. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 .ql-bubble * {
   font-size: 16px;
   color: #272727;

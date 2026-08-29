@@ -5,16 +5,16 @@ import { FileText, Link2, ScanSearch, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
-import type { ResumeEntry } from "../Client";
+import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 
 /**
  * The front door: pick which resume to scan, then choose how to scan it.
  * No toolbar, no half-filled results behind it — the choice IS the screen.
  */
 export interface AtsLandingProps {
-  resumes: ResumeEntry[];
+  resumes: VaultDoc[];
   /** Registers the upload and returns the new entry so it can be selected. */
-  onUpload: (file: File) => ResumeEntry;
+  onUpload: (file: File) => VaultDoc;
   onScoreGeneral: (resumeId: string) => void;
   onScoreVsJob: (resumeId: string) => void;
 }

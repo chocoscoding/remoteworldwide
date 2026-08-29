@@ -1,4 +1,4 @@
-import SettingsNav from "./_components/SettingsNav";
+import SettingsNav from "@/app/components/dashboard/settings/SettingsNav";
 
 /**
  * Shared shell for /dashboard/settings/**: one header and a section nav.

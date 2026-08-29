@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { BUTTON_OUTLINE, BUTTON_SOLID, CARD, SettingsRow, SettingsSection } from "../_components/settings-ui";
+import { BUTTON_OUTLINE, BUTTON_SOLID, CARD, SettingsRow, SettingsSection } from "@/app/components/dashboard/settings/settings-ui";
 
 const PRO_PERKS = [
   "Unlimited resume tailoring",

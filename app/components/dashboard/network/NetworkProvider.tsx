@@ -20,7 +20,7 @@ import type { IntroPipelineEntry, RecommendationTarget, ReferralContact } from "
 import { useActivity } from "../activity/ActivityProvider";
 
 /** Index into INTRO_STAGES — answering questions lands you here. */
-const STAGE_INTERVIEW = 3;
+const STAGE_INTERVIEW = 2;
 
 export interface JobPaths {
   /** People who actually work at the company — warmth-sorted. */

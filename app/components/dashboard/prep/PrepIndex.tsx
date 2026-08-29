@@ -147,12 +147,15 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
         <div className="flex-1 min-w-0 basis-[300px] flex">
           <div className={cn(PANEL, "p-6 flex flex-col justify-center gap-5 w-full")}>
             {active.length > 0 ? (
-              <div className="flex items-center gap-4">
-                <ScoreRing value={aggregateScore} size={72} />
+              <div className="flex items-center gap-5">
+                <ScoreRing value={aggregateScore} size={104} />
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-primary mb-0.5">Preparedness</p>
-                  <p className="text-xs text-black/50 leading-relaxed">
-                    Across {active.length} active track{active.length === 1 ? "" : "s"}.
+                  <p className="text-[15px] font-bold text-primary">Preparedness</p>
+                  <p className="mt-1 text-xs leading-relaxed text-black/55">
+                    Averaged across {active.length} active track{active.length === 1 ? "" : "s"}.
+                  </p>
+                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
+                    {aggregateScore} out of 100
                   </p>
                 </div>
               </div>

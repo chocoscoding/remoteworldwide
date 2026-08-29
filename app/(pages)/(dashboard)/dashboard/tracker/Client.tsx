@@ -15,7 +15,8 @@ import {
   Eye,
   Kanban as KanbanIcon,
   Mic,
-  MessageSquare,
+  MessageSquare,
+  MoreHorizontal,
   Plus,
   Table as TableIcon,
   Users,
@@ -49,13 +50,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
@@ -71,9 +66,9 @@ import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import { TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
 import type { TrackerCard as TrackerCardData, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
-import JobTimelineDialog from "./_components/JobTimelineDialog";
-import StatusMenu from "./_components/StatusMenu";
-import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "./_components/tracker-meta";
+import JobTimelineDialog from "@/app/components/dashboard/tracker/JobTimelineDialog";
+import StatusMenu from "@/app/components/dashboard/tracker/StatusMenu";
+import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
 
 // ---------------------------------------------------------------------------
 // Local screen state types + config — not shared with any other screen.
@@ -210,8 +205,31 @@ function buildTrackerEvents(cols: TrackerColumn[], today: Date): TrackerEvent[] 
 // One Kanban card
 // ---------------------------------------------------------------------------
 
-const TrackerCardItem: FC<{ card: TrackerCardData; columnId?: TrackerColumnId }> = ({ card, columnId }) => {
+const TrackerCardItem: FC<{ card: TrackerCardData; columnId?: TrackerColumnId; onOptions?: () => void }> = ({
+  card,
+  columnId,
+  onOptions,
+}) => {
   const daysLabel = daysAgoLabel(card.daysAgo);
+
+  /**
+   * The explicit way into a card's details. It sits inside the drag listeners,
+   * so pointerdown must be stopped or dnd-kit claims the gesture and the menu
+   * never opens. Omitted on the DragOverlay clone, which takes no input.
+   */
+  const optionsButton = onOptions ? (
+    <button
+      type="button"
+      aria-label={`Options for ${card.title} at ${card.company}`}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOptions();
+      }}
+      className="grid h-6 w-6 flex-none cursor-pointer place-content-center rounded-md text-black/35 transition-colors hover:bg-black/[0.06] hover:text-primary">
+      <MoreHorizontal className="h-4 w-4" />
+    </button>
+  ) : null;
 
   if (card.highlighted) {
     const [roundLabel, timeLabel] = (card.statusChip ?? "").split(" · ");
@@ -222,7 +240,10 @@ const TrackerCardItem: FC<{ card: TrackerCardData; columnId?: TrackerColumnId }>
             {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
             <span className="text-xs font-semibold text-black/60 truncate">{card.company}</span>
           </div>
-          {daysLabel && <span className="text-[11px] font-medium text-black/35 flex-none whitespace-nowrap">{daysLabel}</span>}
+          <div className="flex flex-none items-center gap-0.5">
+            {daysLabel && <span className="text-[11px] font-medium text-black/35 whitespace-nowrap">{daysLabel}</span>}
+            {optionsButton}
+          </div>
         </div>
 
         <p className="text-sm font-bold text-primary leading-snug mb-2.5">{card.title}</p>
@@ -264,15 +285,18 @@ const TrackerCardItem: FC<{ card: TrackerCardData; columnId?: TrackerColumnId }>
     // Border carries the column's color, so a card says its stage at a glance.
     <div
       className={cn(
-        "rounded-sm border bg-white p-3.5 transition-all hover:border-[#222325] hover:shadow-[3px_3px_0_0_#e1f073]",
-        columnId ? COLUMN_META[columnId].cardBorder : "border-black/25"
+        "rounded-sm border bg-white p-3.5 transition-all hover:outline hover:outline-[#222325] hover:outline-2 ",
+        columnId ? COLUMN_META[columnId].cardBorder : "border-black/25",
       )}>
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
           <span className="text-xs font-semibold text-black/60 truncate">{card.company}</span>
         </div>
-        {daysLabel && <span className="text-[11px] font-medium text-black/35 flex-none whitespace-nowrap">{daysLabel}</span>}
+        <div className="flex flex-none items-center gap-0.5">
+          {daysLabel && <span className="text-[11px] font-medium text-black/35 whitespace-nowrap">{daysLabel}</span>}
+          {optionsButton}
+        </div>
       </div>
 
       <p className="text-sm font-semibold text-primary leading-snug">{card.title}</p>
@@ -322,7 +346,7 @@ const SortableTrackerCard: FC<{ card: TrackerCardData; columnId: TrackerColumnId
       {...listeners}
       onClick={() => onOpen(card.id)}
       className={cn("touch-none cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}>
-      <TrackerCardItem card={card} columnId={columnId} />
+      <TrackerCardItem card={card} columnId={columnId} onOptions={() => onOpen(card.id)} />
     </div>
   );
 };
@@ -335,8 +359,8 @@ const KanbanColumn: FC<{ column: TrackerColumn; onOpen: (cardId: string) => void
   const extra = column.count - column.cards.length;
 
   return (
-    <div className="min-w-[240px] flex-1 flex flex-col">
-      <div className="flex items-center gap-2 mb-3 px-0.5">
+    <div className="min-w-[240px] flex-1 flex flex-col min-h-0 px-0.5">
+      <div className="flex flex-none items-center gap-2 mb-3 px-0.5">
         <span className={cn("h-2 w-2 rounded-full flex-none", COLUMN_META[column.id].dot)} aria-hidden />
         <span className="text-sm font-bold text-primary whitespace-nowrap">{column.label}</span>
         <span className="text-xs font-semibold text-black/40 ml-auto flex-none">{column.count}</span>
@@ -344,11 +368,10 @@ const KanbanColumn: FC<{ column: TrackerColumn; onOpen: (cardId: string) => void
 
       <div
         ref={setNodeRef}
-        className={cn(
-          "flex flex-col rounded-sm border border-black/15 bg-[#f0f0ea]/60 p-1.5 min-h-[140px] transition-colors",
-          isOver && "border-[#222325] bg-[#e5e5d8]"
-        )}>
-        <div className="flex flex-col gap-2">
+        className={cn("flex flex-1 min-h-0 flex-col rounded-sm transition-colors", isOver && "border-[#222325] bg-[#e5e5d8]")}>
+        {/* The cards scroll, the column doesn't grow. No visible track here —
+            one horizontal bar on the board is enough chrome. */}
+        <div className="flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto scrollbar-none">
           <SortableContext items={column.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
             {column.cards.map((card) => (
               <SortableTrackerCard key={card.id} card={card} columnId={column.id} onOpen={onOpen} />
@@ -423,7 +446,7 @@ const SortableHeader: FC<{
         onClick={() => onSort(sortKey)}
         className={cn(
           "inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide transition-colors cursor-pointer",
-          active ? "text-primary" : "text-black/40 hover:text-primary"
+          active ? "text-primary" : "text-black/40 hover:text-primary",
         )}>
         {label}
         <Icon className={cn("h-3 w-3 flex-none", active ? "text-primary" : "text-black/30")} />
@@ -466,78 +489,80 @@ const TrackerTableView: FC<{
   const pagedRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   function toggleSort(key: TableSortKey) {
-    setSort((prev) => (!prev || prev.key !== key ? { key, direction: "asc" } : { key, direction: prev.direction === "asc" ? "desc" : "asc" }));
+    setSort((prev) =>
+      !prev || prev.key !== key ? { key, direction: "asc" } : { key, direction: prev.direction === "asc" ? "desc" : "asc" },
+    );
     setPage(1);
   }
 
   return (
     <>
-    <DashCard className="border-2 border-[#222325] p-0 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm border-collapse">
-          <thead>
-            <tr className="border-b border-black/10 bg-[#fbfbf7]">
-              <SortableHeader label="Company" sortKey="company" sort={sort} onSort={toggleSort} />
-              <SortableHeader label="Role" sortKey="role" sort={sort} onSort={toggleSort} />
-              <SortableHeader label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
-              <SortableHeader label="Days ago" sortKey="daysAgo" sort={sort} onSort={toggleSort} />
-              <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-black/40">Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedRows.map(({ card, columnId }) => (
-              <tr
-                key={card.id}
-                onClick={() => onOpen(card.id)}
-                className="border-b border-black/6 last:border-b-0 hover:bg-[#f6f6f6]/70 transition-colors cursor-pointer">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
-                    <span className="text-xs font-semibold text-black/70 truncate">{card.company}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-xs font-medium text-primary">{card.title}</span>
-                </td>
-                <td className="px-4 py-3">
-                  {/* The pill is the control — StatusMenu stops propagation
+      <DashCard className="border-2 border-[#222325] p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-black/10 bg-[#fbfbf7]">
+                <SortableHeader label="Company" sortKey="company" sort={sort} onSort={toggleSort} />
+                <SortableHeader label="Role" sortKey="role" sort={sort} onSort={toggleSort} />
+                <SortableHeader label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
+                <SortableHeader label="Days ago" sortKey="daysAgo" sort={sort} onSort={toggleSort} />
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-black/40">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedRows.map(({ card, columnId }) => (
+                <tr
+                  key={card.id}
+                  onClick={() => onOpen(card.id)}
+                  className="border-b border-black/6 last:border-b-0 hover:bg-[#f6f6f6]/70 transition-colors cursor-pointer">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
+                      <span className="text-xs font-semibold text-black/70 truncate">{card.company}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs font-medium text-primary">{card.title}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {/* The pill is the control — StatusMenu stops propagation
                       itself so the row click never fires underneath it. */}
-                  <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} />
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "—"}</span>
-                </td>
-                <td className="px-4 py-3 max-w-[240px]">
-                  {card.statusChip ? <StatusChipBadge chip={card.statusChip} /> : <span className="text-xs text-black/30">—</span>}
-                </td>
-              </tr>
-            ))}
+                    <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "—"}</span>
+                  </td>
+                  <td className="px-4 py-3 max-w-[240px]">
+                    {card.statusChip ? <StatusChipBadge chip={card.statusChip} /> : <span className="text-xs text-black/30">—</span>}
+                  </td>
+                </tr>
+              ))}
 
-            {pagedRows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-xs font-medium text-black/40">
-                  No applications yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </DashCard>
+              {pagedRows.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-xs font-medium text-black/40">
+                    No applications yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </DashCard>
 
-    <DashPagination
-      page={currentPage}
-      totalPages={totalPages}
-      pageSize={pageSize}
-      totalItems={rows.length}
-      itemNoun="applications"
-      onPageChange={setPage}
-      onPageSizeChange={(next) => {
-        const firstVisible = (currentPage - 1) * pageSize;
-        setPageSize(next);
-        setPage(Math.floor(firstVisible / next) + 1);
-      }}
-    />
+      <DashPagination
+        page={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={rows.length}
+        itemNoun="applications"
+        onPageChange={setPage}
+        onPageSizeChange={(next) => {
+          const firstVisible = (currentPage - 1) * pageSize;
+          setPageSize(next);
+          setPage(Math.floor(firstVisible / next) + 1);
+        }}
+      />
     </>
   );
 };
@@ -576,7 +601,7 @@ const TrackerCalendarView: FC<{
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [calendarMonth]);
 
-  const selectedDayEvents = selectedDate ? eventsByDate.get(format(selectedDate, "yyyy-MM-dd")) ?? [] : [];
+  const selectedDayEvents = selectedDate ? (eventsByDate.get(format(selectedDate, "yyyy-MM-dd")) ?? []) : [];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
@@ -637,7 +662,7 @@ const TrackerCalendarView: FC<{
                   inMonth ? "bg-white" : "bg-[#f6f6f6]",
                   dayEvents.length > 0 ? "border-black/15 cursor-pointer hover:border-primary/50" : "border-black/5 cursor-default",
                   selected && "ring-2 ring-primary border-primary",
-                  todayFlag && !selected && "border-[1.5px] border-primary"
+                  todayFlag && !selected && "border-[1.5px] border-primary",
                 )}>
                 <span className={cn("text-xs font-semibold", inMonth ? "text-primary" : "text-black/30")}>{format(day, "d")}</span>
                 {dayEvents.length > 0 && (
@@ -763,7 +788,7 @@ const TrackerClient: FC = () => {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   function findColumnIdForCard(cardId: string, cols: TrackerColumn[]): TrackerColumnId | null {
@@ -801,7 +826,7 @@ const TrackerClient: FC = () => {
         if (c.id === from) return { ...c, cards: c.cards.filter((x) => x.id !== cardId), count: Math.max(0, c.count - 1) };
         if (c.id === to) return { ...c, cards: [card, ...c.cards], count: c.count + 1 };
         return c;
-      })
+      }),
     );
     // Keeping the board honest is a qualifying action — the "status-change"
     // kind existed for exactly this and had no caller until now.
@@ -816,7 +841,7 @@ const TrackerClient: FC = () => {
       .find(
         (c) =>
           c.company.trim().toLowerCase() === job.company.trim().toLowerCase() &&
-          c.title.trim().toLowerCase() === job.role.trim().toLowerCase()
+          c.title.trim().toLowerCase() === job.role.trim().toLowerCase(),
       );
     if (existing) {
       toast("Already on your board", { description: `${job.company} — ${job.role}` });
@@ -921,9 +946,11 @@ const TrackerClient: FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f6f6]">
+    // The board is a fixed-height surface: the columns scroll, the page
+    // doesn't. Table and Calendar keep normal page flow.
+    <div className={cn("bg-[#f6f6f6]", view === "board" ? "h-screen flex flex-col overflow-hidden" : "min-h-screen")}>
       {/* Header */}
-      <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
+      <header className="sticky top-0 z-10 h-16 flex-none flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Application tracker</h1>
 
         <div className="flex items-center gap-3 flex-none">
@@ -935,7 +962,9 @@ const TrackerClient: FC = () => {
                 onClick={() => setView(v.id)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded font-semibold whitespace-nowrap transition-all cursor-pointer px-3.5 py-1.5 text-xs",
-                  view === v.id ? "bg-[#222325] text-white shadow-[2px_2px_0_0_#e1f073]" : "text-black/55 hover:bg-black/[0.04] hover:text-primary"
+                  view === v.id
+                    ? "bg-[#222325] text-white shadow-[2px_2px_0_0_#e1f073]"
+                    : "text-black/55 hover:bg-black/[0.04] hover:text-primary",
                 )}>
                 <v.icon className="h-3.5 w-3.5" />
                 {v.label}
@@ -952,11 +981,16 @@ const TrackerClient: FC = () => {
         </div>
       </header>
 
-      <main className={cn("px-8 py-7 pb-14 mx-auto transition-[max-width] duration-200", sidebarCollapsed ? "max-w-[1520px]" : "max-w-[1320px]")}>
+      <main
+        className={cn(
+          "px-8 py-7 mx-auto w-full transition-[max-width] duration-200",
+          sidebarCollapsed ? "max-w-[1520px]" : "max-w-[1320px]",
+          view === "board" ? "flex flex-1 min-h-0 flex-col pb-6" : "pb-14",
+        )}>
         {view === "board" ? (
           <>
             {/* RWW-badge note */}
-            <div className="mb-5 flex items-center gap-2.5 rounded-sm border border-black/20 bg-[#fbfbf7] px-4 py-3">
+            <div className="mb-5 flex flex-none items-center gap-2.5 rounded-sm border border-black/20 bg-[#fbfbf7] px-4 py-3">
               <LogoMini className="h-4 w-4 flex-none" />
               <p className="text-xs font-medium text-black/60">
                 <span className="font-bold text-primary">Applied through Remote Worldwide</span> — status updates itself.
@@ -985,7 +1019,10 @@ const TrackerClient: FC = () => {
               // Escape mid-drag never reaches onDragEnd — without this the
               // overlay card sticks around after a cancelled drag.
               onDragCancel={() => setActiveCard(null)}>
-              <div className="flex gap-4 overflow-x-auto pb-2 items-start">
+              {/* items-stretch so every column is the full height of the
+                  row and its own card list is what scrolls. The horizontal
+                  bar is the system's slim black one. */}
+              <div className="flex flex-1 min-h-0 gap-6 items-stretch overflow-x-auto overflow-y-hidden pb-2 scrollbar-neo">
                 {columns.map((col) => (
                   <KanbanColumn key={col.id} column={col} onOpen={openTimeline} />
                 ))}

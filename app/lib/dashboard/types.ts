@@ -54,13 +54,19 @@ export interface BoardRow {
   me?: boolean;
 }
 
-/** One row of the invite/referral chain. */
-export interface ChainRow {
+/**
+ * One person you invited. There is no second level: credits come from your
+ * own invites subscribing and from nothing else, so a row has no parent and
+ * no depth.
+ */
+export interface InviteRow {
   name: string;
   meta: string;
-  tag: string;
-  depth: number;
-  pending?: boolean;
+  /**
+   * `subscribed` is the only status that earns credits. `joined` signed up
+   * but hasn't subscribed; `invited` hasn't signed up at all.
+   */
+  status: "subscribed" | "joined" | "invited";
 }
 
 /** Config for one step of the 5-step Apply wizard's step tracker. */
@@ -224,7 +230,7 @@ export interface AtsResumeRow {
 // ---------------------------------------------------------------------------
 
 export type DocKind = "resume" | "cover-letter" | "portfolio" | "certificate" | "id" | "other";
-export type DocSource = "created" | "uploaded" | "linkedin";
+export type DocSource = "created" | "uploaded" | "google-drive";
 
 /**
  * One document, whether it was built in the app (a resume from the builder),
@@ -387,7 +393,7 @@ export interface IntroPipelineEntry {
   role: string;
   /** Index into INTRO_STAGES. */
   stageIndex: number;
-  putForwardAgoDays: number;
+  startedAgoDays: number;
   questions?: IntroQuestion[];
   /** A warm contact at this company, when you have one. */
   contactId?: string;

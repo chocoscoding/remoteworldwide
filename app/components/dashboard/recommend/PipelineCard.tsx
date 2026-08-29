@@ -50,7 +50,7 @@ const PipelineCard: FC<PipelineCardProps> = ({ entry }) => {
               )}
             </div>
             <p className="mt-0.5 truncate text-xs text-black/55">
-              {entry.role} · put forward {entry.putForwardAgoDays === 0 ? "today" : `${entry.putForwardAgoDays} days ago`}
+              {entry.role} · {entry.startedAgoDays === 0 ? "today" : `${entry.startedAgoDays} days ago`}
             </p>
           </div>
         </div>

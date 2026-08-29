@@ -11,7 +11,7 @@ import type {
   AtsMetric,
   AtsResumeRow,
   BoardRow,
-  ChainRow,
+  InviteRow,
   ChecklistItem,
   CoachMessage,
   CoachPlanItem,
@@ -325,15 +325,16 @@ export const POD_GOALS: PodGoal[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CHAIN — invite/referral chain (5 rows, 2 levels deep)
+// INVITES — people you invited. One level only.
 // ---------------------------------------------------------------------------
 
-export const CHAIN: ChainRow[] = [
-  { name: "Chidi Nwosu", meta: "Joined 3 weeks ago", tag: "+5 credits", depth: 1 },
-  { name: "Funmi Adeyemi", meta: "Joined 2 weeks ago", tag: "+5 credits", depth: 1 },
-  { name: "Tolu Bakare", meta: "Invited by Chidi", tag: "Pending", depth: 2, pending: true },
-  { name: "Grace Mensah", meta: "Invited by Funmi", tag: "Not yet", depth: 2 },
-  { name: "Ines Costa", meta: "Joined 5 days ago", tag: "Pending", depth: 1, pending: true },
+export const INVITES: InviteRow[] = [
+  { name: "Chidi Nwosu", meta: "Subscribed 3 weeks ago", status: "subscribed" },
+  { name: "Funmi Adeyemi", meta: "Subscribed 2 weeks ago", status: "subscribed" },
+  { name: "Dami Aluko", meta: "Subscribed 12 days ago", status: "subscribed" },
+  { name: "Ines Costa", meta: "Subscribed 5 days ago", status: "subscribed" },
+  { name: "Grace Mensah", meta: "Joined 4 days ago", status: "joined" },
+  { name: "Tolu Bakare", meta: "Invited 6 days ago", status: "invited" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -656,6 +657,92 @@ export const VAULT_DOCS: VaultDoc[] = [
     addedAt: Date.UTC(2026, 7, 9),
     updatedLabel: "Added 9 Aug",
   },
+  {
+    id: "doc-cover-vercel",
+    name: "Cover letter — Vercel",
+    kind: "cover-letter",
+    source: "created",
+    addedAt: Date.UTC(2026, 7, 26),
+    updatedLabel: "Written 26 Aug",
+  },
+  {
+    id: "doc-cover-linear",
+    name: "Cover letter — Linear",
+    kind: "cover-letter",
+    source: "created",
+    addedAt: Date.UTC(2026, 7, 18),
+    updatedLabel: "Written 18 Aug",
+  },
+  {
+    id: "doc-case-study",
+    name: "Paystack checkout case study",
+    kind: "portfolio",
+    source: "uploaded",
+    size: 4_404_019, // ~4.2 MB
+    ext: "pdf",
+    addedAt: Date.UTC(2026, 7, 14),
+    updatedLabel: "Added 14 Aug",
+  },
+  {
+    id: "doc-references",
+    name: "References",
+    kind: "other",
+    source: "uploaded",
+    size: 61_440, // 60 KB
+    ext: "docx",
+    addedAt: Date.UTC(2026, 6, 28),
+    updatedLabel: "Added 28 Jul",
+  },
+  {
+    id: "doc-cert-ux",
+    name: "NN/g UX certification",
+    kind: "certificate",
+    source: "uploaded",
+    size: 512_000, // 500 KB
+    ext: "pdf",
+    addedAt: Date.UTC(2026, 5, 11),
+    updatedLabel: "Added 11 Jun",
+  },
+  {
+    id: "doc-cert-accessibility",
+    name: "Accessibility (IAAP) certificate",
+    kind: "certificate",
+    source: "uploaded",
+    size: 398_336, // ~389 KB
+    ext: "pdf",
+    addedAt: Date.UTC(2026, 4, 2),
+    updatedLabel: "Added 2 May",
+  },
+  {
+    id: "doc-work-permit",
+    name: "Work permit",
+    kind: "id",
+    source: "uploaded",
+    size: 1_258_291, // ~1.2 MB
+    ext: "pdf",
+    addedAt: Date.UTC(2026, 3, 19),
+    updatedLabel: "Added 19 Apr",
+  },
+  {
+    id: "doc-degree",
+    name: "Degree certificate",
+    kind: "certificate",
+    source: "uploaded",
+    size: 2_097_152, // 2 MB
+    ext: "pdf",
+    addedAt: Date.UTC(2025, 10, 6),
+    updatedLabel: "Added 6 Nov",
+  },
+  {
+    id: "doc-salary-history",
+    name: "Salary history",
+    kind: "other",
+    source: "uploaded",
+    size: 33_792, // 33 KB
+    ext: "xlsx",
+    addedAt: Date.UTC(2026, 6, 15),
+    updatedLabel: "Added 15 Jul",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -950,7 +1037,7 @@ export const LANDED_CHECKLIST: ChecklistItem[] = [
  * put you in front of the company, they ask a question or two, you answer, you
  * talk. There is no "intro sent / they replied" chain to model.
  */
-export const INTRO_STAGES = ["Reviewed", "Put forward", "Their questions", "Interview"] as const;
+export const INTRO_STAGES = ["Reviewed", "Their questions", "Interview"] as const;
 
 // Companies our reviewers watch. Every field here is an input to the fit
 // engine — nothing stores a percentage, so scores move when preferences do.
@@ -1048,8 +1135,8 @@ export const INTRO_PIPELINE_SEED: IntroPipelineEntry[] = [
     targetId: "rec-linear",
     company: "Linear",
     role: "Senior Product Designer",
-    stageIndex: 2,
-    putForwardAgoDays: 6,
+    stageIndex: 1,
+    startedAgoDays: 6,
     contactId: "ref-maria",
     questions: [
       {
@@ -1067,8 +1154,8 @@ export const INTRO_PIPELINE_SEED: IntroPipelineEntry[] = [
     targetId: "rec-cron",
     company: "Cron",
     role: "Product Designer",
-    stageIndex: 1,
-    putForwardAgoDays: 2,
+    stageIndex: 0,
+    startedAgoDays: 2,
   },
 ];
 

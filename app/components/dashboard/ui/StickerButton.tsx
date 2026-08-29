@@ -20,7 +20,7 @@ const stickerButtonVariants = cva(
       },
       size: {
         sm: "h-8 px-3 text-xs hover:-translate-x-px hover:-translate-y-px",
-        md: "h-10 px-4 text-sm hover:-translate-x-px hover:-translate-y-px",
+        md: "h-10 md:h-9 px-4 text-sm hover:-translate-x-px hover:-translate-y-px",
         lg: "h-12 px-6 text-base hover:-translate-x-[2px] hover:-translate-y-[2px]",
       },
     },
@@ -28,7 +28,7 @@ const stickerButtonVariants = cva(
       variant: "primary",
       size: "md",
     },
-  }
+  },
 );
 
 /**
@@ -62,7 +62,6 @@ const STICKER_SHADOW_HOVER: Record<StickerShadowColor, Record<"sm" | "md" | "lg"
 };
 
 export interface StickerButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof stickerButtonVariants> {
-  /** Sticker-shadow color on hover. Defaults to the brand lime `#e1f073`. */
   shadowColor?: StickerShadowColor;
 }
 
@@ -77,7 +76,7 @@ const StickerButton = forwardRef<HTMLButtonElement, StickerButtonProps>(
         {...props}
       />
     );
-  }
+  },
 );
 StickerButton.displayName = "StickerButton";
 

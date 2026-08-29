@@ -66,7 +66,7 @@ export function inferDocKind(filename: string): DocKind {
 /** Badge text for where a document came from; created-in-app needs none. */
 export function sourceBadgeLabel(source: DocSource): string | null {
   if (source === "uploaded") return "Uploaded";
-  if (source === "linkedin") return "LinkedIn";
+  if (source === "google-drive") return "Google Drive";
   return null;
 }
 
@@ -79,13 +79,31 @@ export const KIND_LABELS: Record<DocKind, string> = {
   other: "File",
 };
 
+/**
+ * A file as the Google Drive picker hands it back — deliberately the small
+ * subset the vault actually stores. The real Drive API returns far more, and
+ * nothing here should start depending on fields we do not need.
+ */
+export interface DriveFile {
+  /** Drive's own file id. Stable, so it doubles as the dedupe key. */
+  id: string;
+  name: string;
+  ext?: string;
+  size?: number;
+  /** Set when the picker already knows the kind; otherwise inferred from the name. */
+  kind?: DocKind;
+}
+
+/** One place decides how a Drive file id becomes a document id. */
+export const driveDocId = (fileId: string) => `doc-drive-${fileId}`;
+
 interface DocumentsContextValue {
   docs: VaultDoc[];
   /** Registers real files (name/size/type off the File object) with a live
    *  object URL each, so Download works. Returns the new entries. */
   addUploads: (files: FileList | File[], opts?: { kind?: DocKind }) => VaultDoc[];
-  /** Adds the sample LinkedIn profile import; dedupes on a second run. */
-  importLinkedIn: () => VaultDoc;
+  /** Imports the picked Google Drive files. Anything already imported is skipped. */
+  importFromDrive: (files: DriveFile[]) => VaultDoc[];
   rename: (id: string, name: string) => void;
   /** Delete with a real Undo; the blob URL is only revoked once undo lapses. */
   remove: (id: string) => void;
@@ -126,26 +144,33 @@ export const DocumentsProvider: FC<{ children: ReactNode }> = ({ children }) => 
     return added;
   }
 
-  function importLinkedIn(): VaultDoc {
-    const existing = docs.find((d) => d.source === "linkedin");
-    if (existing) {
-      toast("Already imported", { description: `"${existing.name}" is in your documents.` });
-      return existing;
+  function importFromDrive(files: DriveFile[]): VaultDoc[] {
+    // Drive ids are stable, so re-importing the same file is a no-op rather
+    // than a duplicate row — the picker shows those as already imported.
+    const taken = new Set(docs.map((d) => d.id));
+    const fresh = files.filter((f) => !taken.has(driveDocId(f.id)));
+
+    if (fresh.length === 0) {
+      toast("Nothing new to import", { description: "Those files are already in your documents." });
+      return [];
     }
 
-    const doc: VaultDoc = {
-      id: "doc-linkedin",
-      name: "LinkedIn profile",
-      kind: "resume",
-      source: "linkedin",
-      size: 389_120, // ~380 KB
-      ext: "pdf",
+    const added = fresh.map<VaultDoc>((f) => ({
+      id: driveDocId(f.id),
+      name: f.name,
+      kind: f.kind ?? inferDocKind(f.name),
+      source: "google-drive",
+      size: f.size,
+      ext: f.ext,
       addedAt: Date.now(),
       updatedLabel: "Imported just now",
-    };
-    setDocs((prev) => [doc, ...prev]);
-    toast.success("LinkedIn profile imported", { description: "Saved as a resume — it's scoreable in the ATS too." });
-    return doc;
+    }));
+
+    setDocs((prev) => [...added, ...prev]);
+    toast.success(added.length === 1 ? "Imported from Drive" : `${added.length} files imported from Drive`, {
+      description: added.map((d) => d.name).join(" · "),
+    });
+    return added;
   }
 
   function rename(id: string, name: string) {
@@ -196,7 +221,7 @@ export const DocumentsProvider: FC<{ children: ReactNode }> = ({ children }) => 
   }
 
   return (
-    <DocumentsContext.Provider value={{ docs, addUploads, importLinkedIn, rename, remove, toggleArchive }}>
+    <DocumentsContext.Provider value={{ docs, addUploads, importFromDrive, rename, remove, toggleArchive }}>
       {children}
     </DocumentsContext.Provider>
   );
@@ -268,6 +293,39 @@ function buildPlaceholderPdf(title: string, lines: string[]): Blob {
 }
 
 /** Triggers a real download for any document. Plain function — no state. */
+/**
+ * The in-app destination for a document, if it has one. Resumes and cover
+ * letters are things you edit here; everything else is just a file.
+ */
+export function editorHrefFor(doc: VaultDoc): string | null {
+  if (doc.kind === "resume") return "/dashboard/resume";
+  if (doc.kind === "cover-letter") return "/dashboard/cover";
+  return null;
+}
+
+/**
+ * Views a file rather than saving it — same source of bytes as `downloadDoc`
+ * (the upload's own blob, or a generated summary PDF), opened in a new tab.
+ * Only for documents with no editor of their own; `editorHrefFor` covers those.
+ */
+export function openDocFile(doc: VaultDoc): void {
+  if (doc.blobUrl) {
+    window.open(doc.blobUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+  const lines = [
+    `Type: ${KIND_LABELS[doc.kind]}`,
+    doc.size != null ? `Original size: ${formatSize(doc.size)}` : `Created in Remote Worldwide`,
+    doc.updatedLabel,
+    "",
+    "Sample export - this build doesn't store the original file.",
+  ];
+  const url = URL.createObjectURL(buildPlaceholderPdf(doc.name, lines));
+  window.open(url, "_blank", "noopener,noreferrer");
+  // Long enough for the new tab to have loaded it.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export function downloadDoc(doc: VaultDoc): void {
   let url: string;
   let filename: string;

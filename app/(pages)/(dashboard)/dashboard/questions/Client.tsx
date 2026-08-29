@@ -17,10 +17,10 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
 import { APPS } from "@/app/lib/dashboard/mock-data";
 import type { QaItem } from "@/app/lib/dashboard/types";
-import AnswerRow from "./_components/AnswerRow";
-import ApplicationRow from "./_components/ApplicationRow";
-import AddAnswerDialog from "./_components/AddAnswerDialog";
-import ExtensionDialog from "./_components/ExtensionDialog";
+import AnswerRow from "@/app/components/dashboard/questions/AnswerRow";
+import ApplicationRow from "@/app/components/dashboard/questions/ApplicationRow";
+import AddAnswerDialog from "@/app/components/dashboard/questions/AddAnswerDialog";
+import ExtensionDialog from "@/app/components/dashboard/questions/ExtensionDialog";
 
 type VaultTab = "answers" | "by-application";
 type QaFilter = "all" | "review" | "saved" | "ai" | "demographics";

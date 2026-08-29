@@ -15,14 +15,21 @@ import {
   ShieldCheck,
   Trash2,
   File as FileIcon,
-  ArrowUpRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Pill from "@/app/components/dashboard/ui/Pill";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { downloadDoc, formatSize, KIND_LABELS, sourceBadgeLabel, useDocuments, type DocKind, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
-import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
+import {
+  downloadDoc,
+  editorHrefFor,
+  formatSize,
+  KIND_LABELS,
+  openDocFile,
+  sourceBadgeLabel,
+  useDocuments,
+  type DocKind,
+  type VaultDoc,
+} from "@/app/components/dashboard/documents/DocumentsProvider";
 
 // Re-exported so the screen's search keeps one import site for row concerns.
 export { KIND_LABELS };
@@ -91,59 +98,64 @@ const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename })
   const isResume = doc.kind === "resume";
   const Icon = KIND_ICONS[doc.kind];
   const badge = sourceBadgeLabel(doc.source);
-  // Same live scorer the ATS uses, so the two screens can't disagree.
-  const generalScore = isResume ? scoreApplication(doc.id, undefined).score : null;
 
   const meta = [KIND_LABELS[doc.kind], doc.ext ? doc.ext.toUpperCase() : null, doc.size != null ? formatSize(doc.size) : null, doc.updatedLabel]
     .filter(Boolean)
     .join(" · ");
 
+  // The icon and the name are one control: hovering either underlines the
+  // name, and clicking opens the document. Replaces the old "Open" action,
+  // which only ever appeared on resumes anyway.
+  const editorHref = editorHrefFor(doc);
+  const iconTile = isResume ? (
+    <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
+      <FileText className="h-4 w-4 text-white" />
+    </span>
+  ) : (
+    <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
+      <Icon className="h-4 w-4 text-black/55" />
+    </span>
+  );
+
+  const title = (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="truncate text-sm font-bold text-primary underline decoration-transparent decoration-2 underline-offset-4 transition-colors group-hover/open:decoration-[#222325]">
+        {doc.name}
+      </span>
+      {badge && <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55">{badge}</span>}
+    </span>
+  );
+
+  const OPEN_TARGET = "group/open flex min-w-0 flex-1 items-center gap-4 text-left cursor-pointer";
+
   return (
     <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4", doc.archived && "opacity-55")}>
-      {/* One ink tile for every resume — per-resume accent colours read as
-          three different file types rather than one. */}
-      {isResume ? (
-        <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
-          <FileText className="h-4 w-4 text-white" />
-        </span>
-      ) : (
-        <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
-          <Icon className="h-4 w-4 text-black/55" />
-        </span>
-      )}
-
       {renaming ? (
-        <RowRenamer doc={doc} onDone={onDoneRename} />
+        <>
+          {iconTile}
+          <RowRenamer doc={doc} onDone={onDoneRename} />
+        </>
       ) : (
         <>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-bold text-primary">{doc.name}</p>
-              {badge && <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55">{badge}</span>}
-            </div>
-            <p className="mt-0.5 truncate text-xs text-black/55">{meta}</p>
-          </div>
-
-          {isResume && (
-            <div className="flex flex-none items-center gap-2">
-              {doc.jdScore != null ? (
-                <Pill variant="positive">
-                  Match {doc.jdScore}
-                  {doc.jdLabel ? ` · ${doc.jdLabel}` : ""}
-                </Pill>
-              ) : (
-                <span className="text-xs text-black/55 tabular-nums">ATS {generalScore}</span>
-              )}
-            </div>
+          {editorHref ? (
+            <Link href={editorHref} className={OPEN_TARGET} title={`Open ${doc.name}`}>
+              {iconTile}
+              <span className="min-w-0 flex-1">
+                {title}
+                <span className="mt-0.5 block truncate text-xs text-black/55">{meta}</span>
+              </span>
+            </Link>
+          ) : (
+            <button type="button" onClick={() => openDocFile(doc)} className={OPEN_TARGET} title={`Open ${doc.name}`}>
+              {iconTile}
+              <span className="min-w-0 flex-1">
+                {title}
+                <span className="mt-0.5 block truncate text-xs text-black/55">{meta}</span>
+              </span>
+            </button>
           )}
 
           <div className="flex flex-none items-center gap-0.5">
-            {isResume && !doc.archived && (
-              <Link href="/dashboard/resume" className={GHOST_BTN}>
-                <ArrowUpRight className="h-3.5 w-3.5" />
-                Open
-              </Link>
-            )}
             {/* Uploads hand back their original bytes; anything else gets a
                 generated summary PDF — the button always delivers a file. */}
             <button type="button" className={GHOST_BTN} onClick={() => downloadDoc(doc)}>

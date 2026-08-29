@@ -28,7 +28,7 @@ import { useEffect } from "react";
  * serverless function that has no cold-sleep problem.
  */
 
-const PING_INTERVAL_MS = 50_000;
+const PING_INTERVAL_MS = 30_000;
 
 export default function BotKeepAlive() {
   useEffect(() => {

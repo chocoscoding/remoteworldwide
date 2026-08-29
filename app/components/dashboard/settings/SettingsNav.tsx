@@ -3,7 +3,7 @@
 import { FC } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CreditCard, Lock, SlidersHorizontal, User, UserCog } from "lucide-react";
+import { Bell, CreditCard, Lock, MonitorSmartphone, SlidersHorizontal, User, UserCog } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ export const SETTINGS_NAV: NavItem[] = [
   { href: "/dashboard/settings/billing", label: "Plan & billing", hint: "Credits, invoices, Pro", icon: CreditCard },
   { href: "/dashboard/settings/privacy", label: "Privacy", hint: "Who can find you", icon: Lock },
   { href: "/dashboard/settings/account", label: "Account", hint: "Email, password, sign-in", icon: UserCog },
+  { href: "/dashboard/settings/sessions", label: "Sessions", hint: "Devices signed in", icon: MonitorSmartphone },
 ];
 
 const SettingsNav: FC = () => {

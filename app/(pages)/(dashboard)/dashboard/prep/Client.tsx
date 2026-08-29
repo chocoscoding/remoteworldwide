@@ -11,7 +11,7 @@
 import { FC, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrep } from "./PrepProvider";
-import PrepIndex from "./_components/PrepIndex";
+import PrepIndex from "@/app/components/dashboard/prep/PrepIndex";
 
 const PrepClient: FC = () => {
   const router = useRouter();

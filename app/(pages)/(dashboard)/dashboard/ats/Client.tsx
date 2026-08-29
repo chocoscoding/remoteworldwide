@@ -14,15 +14,16 @@ import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import { useDocuments, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
-import AtsLanding from "./_components/AtsLanding";
-import AtsResults from "./_components/AtsResults";
-import AtsResumesTable from "./_components/AtsResumesTable";
+import AtsLanding from "@/app/components/dashboard/ats/AtsLanding";
+import AtsResults from "@/app/components/dashboard/ats/AtsResults";
+import AtsResumesTable from "@/app/components/dashboard/ats/AtsResumesTable";
 
 type AtsView = "score" | "resumes";
 
 // Resumes live in DocumentsProvider now — upload here and My documents sees
-// it, archive there and this screen's pickers drop it. The alias keeps the
-// _components' imports (`ResumeEntry from "../Client"`) compiling unchanged.
+// it, archive there and this screen's pickers drop it. The alias is local
+// shorthand; the components under app/components/dashboard/ats use VaultDoc
+// directly rather than importing a type from a route file.
 export type ResumeEntry = VaultDoc;
 
 const AtsClient: FC = () => {

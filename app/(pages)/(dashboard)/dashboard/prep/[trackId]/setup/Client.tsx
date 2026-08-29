@@ -4,9 +4,9 @@ import { FC } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
 import { usePrep } from "../../PrepProvider";
-import PrepSetup, { type SessionConfig } from "../../_components/PrepSetup";
-import PrepPageShell from "../../_components/PrepPageShell";
-import PrepEmptyState from "../../_components/PrepEmptyState";
+import PrepSetup, { type SessionConfig } from "@/app/components/dashboard/prep/PrepSetup";
+import PrepPageShell from "@/app/components/dashboard/prep/PrepPageShell";
+import PrepEmptyState from "@/app/components/dashboard/prep/PrepEmptyState";
 import { FORMAT_META, type SessionFormat } from "@/app/lib/dashboard/prep-data";
 
 export interface SetupClientProps {

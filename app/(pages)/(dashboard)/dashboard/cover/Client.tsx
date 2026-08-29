@@ -1,19 +1,7 @@
 "use client";
 
 import { FC, useState } from "react";
-import {
-  Check,
-  ChevronDown,
-  Copy,
-  Download,
-  FileSignature,
-  Link2,
-  Printer,
-  RefreshCw,
-  Send,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { Check, ChevronDown, Copy, Download, FileSignature, Link2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
@@ -25,7 +13,7 @@ import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import { COVER_LETTER, RESUME } from "@/app/lib/dashboard/mock-data";
-
+import { Lottie } from "lottie-react";
 // ---------------------------------------------------------------------------
 // Local content that isn't shared with any other screen yet — kept here
 // rather than in mock-data.ts, mirroring the pattern in dashboard/Client.tsx.
@@ -142,7 +130,10 @@ function personalize(text: string, company: string, role: string): string {
 
 /** Paragraphs -> the HTML the editor loads. */
 function lettersToHtml(greeting: string, paragraphs: string[], signOff: string): string {
-  const body = paragraphs.filter((p) => p.trim()).map((p) => `<p>${decorateParagraph(p)}</p>`).join("");
+  const body = paragraphs
+    .filter((p) => p.trim())
+    .map((p) => `<p>${decorateParagraph(p)}</p>`)
+    .join("");
   return `<p>${greeting}</p>${body}<p><strong>${signOff}</strong></p>`;
 }
 
@@ -290,7 +281,7 @@ const CoverClient: FC = () => {
     : lettersToHtml(
         personalize(toneLetter.greeting, letterCompany, letterRole),
         toneLetter.paragraphs.map((para) => personalize(para, letterCompany, letterRole)),
-        COVER_LETTER.signOff
+        COVER_LETTER.signOff,
       );
   const liveWordCount = letterText.trim() ? letterText.trim().split(/\s+/).length : 0;
   const spacingCfg = SPACING_CLASS[spacing];
@@ -345,7 +336,11 @@ const CoverClient: FC = () => {
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-[17px] font-bold text-primary truncate">
-            {!started ? "Cover letters" : isBlankDraft ? "Cover letter — New draft" : `Cover letter — ${linkedJob!.company}, ${linkedJob!.role}`}
+            {!started
+              ? "Cover letters"
+              : isBlankDraft
+                ? "Cover letter — New draft"
+                : `Cover letter — ${linkedJob!.company}, ${linkedJob!.role}`}
           </h1>
           {started && (
             <Pill variant="neutral" className="flex-none">
@@ -354,18 +349,23 @@ const CoverClient: FC = () => {
           )}
         </div>
         {started && (
-        <div className="flex items-center gap-2.5 flex-none">
-          <SplitButton
-            label={copied ? "Copied" : "Copy"}
-            icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            onClick={handleCopy}
-            items={[
-              { id: "pdf", label: "Download as PDF", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => setDownloadOpen(true) },
-              { id: "docx", label: "Download as DOCX", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => setDownloadOpen(true) },
-              { id: "print", label: "Print", icon: <Printer className="h-3.5 w-3.5" />, onSelect: () => window.print() },
-            ]}
-          />
-        </div>
+          <div className="flex items-center gap-2.5 flex-none">
+            <SplitButton
+              label={copied ? "Copied" : "Copy"}
+              icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              onClick={handleCopy}
+              items={[
+                { id: "pdf", label: "Download as PDF", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => setDownloadOpen(true) },
+                {
+                  id: "docx",
+                  label: "Download as DOCX",
+                  icon: <Download className="h-3.5 w-3.5" />,
+                  onSelect: () => setDownloadOpen(true),
+                },
+                { id: "print", label: "Print", icon: <Printer className="h-3.5 w-3.5" />, onSelect: () => window.print() },
+              ]}
+            />
+          </div>
         )}
       </header>
 
@@ -374,11 +374,19 @@ const CoverClient: FC = () => {
           /* The front door: two ways in, neither assumed. You don't need the
              job to exist anywhere to write a letter. */
           <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
-            <h2 className="text-2xl font-bold text-primary">Start a cover letter</h2>
-            <p className="mt-2 max-w-[440px] text-sm leading-relaxed text-black/50">
-              Tailor one to a specific job, or just start typing — a letter doesn&apos;t need a job attached.
+            <Lottie
+              src={`/Lottie/neobrutalism/Edit_Pencil_Note_lottie.json`}
+              autoplay
+              loop
+              className=""
+              speed={0.3}
+              style={{ width: 340, height: 340 }}
+            />
+
+            <p className="max-w-[540px] text-sm leading-relaxed relative -top-10 text-black/50">
+              Create a job specific cover letter or just start typing✨
             </p>
-            <div className="mt-7 grid w-full max-w-[560px] grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div className=" grid w-full max-w-[560px] grid-cols-1 gap-3.5 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
@@ -407,191 +415,206 @@ const CoverClient: FC = () => {
           </div>
         ) : (
           <>
-        {/* Linked job — one row, one way to change it. */}
-        <DashCard className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="h-9 w-9 flex-none rounded-full bg-[#f0f0ea] flex items-center justify-center">
-              <Link2 className="h-4 w-4 text-primary" />
-            </div>
-            <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
-              {linkedJob && !isBlankDraft ? (
-                <>
-                  <span className="text-sm text-black/50">Written for</span>
-                  <Pill variant="active">
-                    {linkedJob.company} · {linkedJob.role}
-                  </Pill>
-                  {justTailored && <span className="text-xs font-semibold text-[#6c7a1e]">Retailored ✓</span>}
-                </>
-              ) : (
-                <span className="text-sm text-black/50">Not linked to a job — pick one to tailor this letter.</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 flex-none">
-              {!isBlankDraft && (
-                <StickerButton variant="outline" size="sm" onClick={() => { setIsBlankDraft(true); setLetterText(""); }}>
-                  <FileSignature className="h-3.5 w-3.5" />
-                  Write from scratch
-                </StickerButton>
-              )}
-              <StickerButton variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
-                <Link2 className="h-3.5 w-3.5" />
-                {linkedJob && !isBlankDraft ? "Change job" : "Pick a job"}
-              </StickerButton>
-              <StickerButton variant="primary" size="sm" onClick={handleTailor} disabled={tailoring || !linkedJob || isBlankDraft}>
-                <RefreshCw className={cn("h-3.5 w-3.5", tailoring && "animate-spin")} />
-                {tailoring ? "Tailoring…" : "Tailor letter"}
-              </StickerButton>
-            </div>
-          </div>
-        </DashCard>
-
-        {/* Disclosure toggle + tone chips */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {isBlankDraft ? (
-            <span className="text-sm font-semibold text-black/35">Blank draft — not linked to a job</span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setBuiltOpen((v) => !v)}
-              className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline cursor-pointer">
-              Built from your profile + this job
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", builtOpen && "rotate-180")} />
-            </button>
-          )}
-
-          <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={setTone} />
-        </div>
-
-        {/* Expandable disclosure panel */}
-        <div
-          className={cn(
-            "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
-            builtOpen && !isBlankDraft ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0"
-          )}>
-          <DashCard className="p-6 flex flex-col gap-6">
-            <div>
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-3">
-                Pulled from your profile, matched to this JD
-              </p>
-              <div className="flex flex-col divide-y divide-black/8">
-                {PROFILE_JD_PULLS.map((pull) => (
-                  <div key={pull.id} className="grid grid-cols-1 sm:grid-cols-[120px_1fr_1fr] gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0">
-                    <p className="text-xs font-bold text-black/40 sm:pt-0.5">{pull.label}</p>
-                    <p className="text-sm text-primary">{pull.profile}</p>
-                    <p className="text-sm text-black/50">{pull.jd}</p>
-                  </div>
-                ))}
+            {/* Linked job — one row, one way to change it. */}
+            <DashCard className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="h-9 w-9 flex-none rounded-full bg-[#f0f0ea] flex items-center justify-center">
+                  <Link2 className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+                  {linkedJob && !isBlankDraft ? (
+                    <>
+                      <span className="text-sm text-black/50">Written for</span>
+                      <Pill variant="active">
+                        {linkedJob.company} · {linkedJob.role}
+                      </Pill>
+                      {justTailored && <span className="text-xs font-semibold text-[#6c7a1e]">Retailored ✓</span>}
+                    </>
+                  ) : (
+                    <span className="text-sm text-black/50">Not linked to a job — pick one to tailor this letter.</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-none">
+                  {!isBlankDraft && (
+                    <StickerButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsBlankDraft(true);
+                        setLetterText("");
+                      }}>
+                      <FileSignature className="h-3.5 w-3.5" />
+                      Write from scratch
+                    </StickerButton>
+                  )}
+                  <StickerButton variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+                    <Link2 className="h-3.5 w-3.5" />
+                    {linkedJob && !isBlankDraft ? "Change job" : "Pick a job"}
+                  </StickerButton>
+                  <StickerButton variant="primary" size="sm" onClick={handleTailor} disabled={tailoring || !linkedJob || isBlankDraft}>
+                    <RefreshCw className={cn("h-3.5 w-3.5", tailoring && "animate-spin")} />
+                    {tailoring ? "Tailoring…" : "Tailor letter"}
+                  </StickerButton>
+                </div>
               </div>
+            </DashCard>
+
+            {/* Disclosure toggle + tone chips */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {isBlankDraft ? (
+                <span className="text-sm font-semibold text-black/35">Blank draft — not linked to a job</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setBuiltOpen((v) => !v)}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline cursor-pointer">
+                  Built from your profile + this job
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", builtOpen && "rotate-180")} />
+                </button>
+              )}
+
+              <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={setTone} />
             </div>
 
-          </DashCard>
-        </div>
+            {/* Expandable disclosure panel */}
+            <div
+              className={cn(
+                "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
+                builtOpen && !isBlankDraft ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0",
+              )}>
+              <DashCard className="p-6 flex flex-col gap-6">
+                <div>
+                  <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-3">
+                    Pulled from your profile, matched to this JD
+                  </p>
+                  <div className="flex flex-col divide-y divide-black/8">
+                    {PROFILE_JD_PULLS.map((pull) => (
+                      <div
+                        key={pull.id}
+                        className="grid grid-cols-1 sm:grid-cols-[120px_1fr_1fr] gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0">
+                        <p className="text-xs font-bold text-black/40 sm:pt-0.5">{pull.label}</p>
+                        <p className="text-sm text-primary">{pull.profile}</p>
+                        <p className="text-sm text-black/50">{pull.jd}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </DashCard>
+            </div>
 
-        {/* The letter itself. Formatting lives in the editor's own toolbar,
+            {/* The letter itself. Formatting lives in the editor's own toolbar,
             with the letterhead toggle sitting beside it — one bar directly
             above the page, rather than controls scattered around it. */}
-        <RichTextEditor
-          docKey={docKey}
-          initialHtml={initialHtml}
-          onChange={({ text }) => setLetterText(text)}
-          ariaLabel="Cover letter body"
-          toolbarLeading={
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => setTheme(v as ThemeId)} />
-              <ToolbarSelect label="Font" value={font} options={FONT_OPTIONS} onChange={(v) => setFont(v as FontId)} />
-              <ToolbarSelect label="Spacing" value={spacing} options={SPACING_OPTIONS} onChange={(v) => setSpacing(v as SpacingId)} />
-              <ToolbarSelect label="Letterhead" value={letterhead} options={LETTERHEAD_OPTIONS} onChange={(v) => setLetterhead(v as LetterheadId)} />
-            </div>
-          }
-          pageHeader={
-            letterhead !== "off" ? (
-              <div className="border-b border-black/10 px-8 pb-5 pt-7">
-                <p className={cn("text-lg font-bold text-primary", FONT_CLASS[font])}>{RESUME.name}</p>
-                {letterhead === "full" && (
-                  <p className="mt-0.5 text-xs text-black/45">
-                    {RESUME.email} · {RESUME.portfolio} · {RESUME.location}
-                  </p>
+            <RichTextEditor
+              docKey={docKey}
+              initialHtml={initialHtml}
+              onChange={({ text }) => setLetterText(text)}
+              ariaLabel="Cover letter body"
+              toolbarLeading={
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => setTheme(v as ThemeId)} />
+                  <ToolbarSelect label="Font" value={font} options={FONT_OPTIONS} onChange={(v) => setFont(v as FontId)} />
+                  <ToolbarSelect label="Spacing" value={spacing} options={SPACING_OPTIONS} onChange={(v) => setSpacing(v as SpacingId)} />
+                  <ToolbarSelect
+                    label="Letterhead"
+                    value={letterhead}
+                    options={LETTERHEAD_OPTIONS}
+                    onChange={(v) => setLetterhead(v as LetterheadId)}
+                  />
+                </div>
+              }
+              pageHeader={
+                letterhead !== "off" ? (
+                  <div className="border-b border-black/10 px-8 pb-5 pt-7">
+                    <p className={cn("text-lg font-bold text-primary", FONT_CLASS[font])}>{RESUME.name}</p>
+                    {letterhead === "full" && (
+                      <p className="mt-0.5 text-xs text-black/45">
+                        {RESUME.email} · {RESUME.portfolio} · {RESUME.location}
+                      </p>
+                    )}
+                  </div>
+                ) : undefined
+              }
+              surfaceClassName={THEME_CANVAS_CLASS[theme]}
+              contentClassName={cn(
+                FONT_CLASS[font],
+                spacingCfg.text,
+                "text-primary [&>p]:mb-4 last:[&>p]:mb-0",
+                // Inline markers, Grammarly-style: highlight for the strongest
+                // line, green underline for a suggested change.
+                "[&_mark]:bg-[#e1f073]/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_mark]:cursor-help",
+                "[&_.sugg]:underline [&_.sugg]:decoration-[#3fa66a] [&_.sugg]:decoration-2 [&_.sugg]:underline-offset-4 [&_.sugg]:cursor-help",
+              )}
+            />
+
+            {/* Footer: word count, details, AI rewrite */}
+            <DashCard className="p-5 flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-black/45 tabular-nums">{liveWordCount} words</span>
+                  <button
+                    type="button"
+                    onClick={() => setDetailsOpen((v) => !v)}
+                    className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer">
+                    {detailsOpen ? "Hide details" : "Details"}
+                    <ChevronDown className={cn("h-3 w-3 transition-transform", detailsOpen && "rotate-180")} />
+                  </button>
+                </div>
+              </div>
+
+              {detailsOpen && (
+                <div className="flex flex-wrap gap-2 -mt-1">
+                  {isBlankDraft ? (
+                    <>
+                      <Pill variant="neutral">Blank draft</Pill>
+                      <Pill variant="neutral">Not linked to a job yet</Pill>
+                    </>
+                  ) : (
+                    <>
+                      <Pill variant="neutral">≈55 sec read</Pill>
+                      <Pill variant="neutral">92% match to {COVER_LETTER.company}&apos;s JD keywords</Pill>
+                      <Pill variant="neutral">Strongest line: paragraph 2, the 31% stat</Pill>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className="border-t border-black/8 pt-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex-1 flex items-center gap-2 rounded-xl border border-black/12 bg-[#fbfbf7] px-3.5 py-2.5">
+                    <Sparkles className="h-4 w-4 flex-none text-black/40" />
+                    <input
+                      type="text"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAiSubmit();
+                      }}
+                      placeholder="Make it warmer, shorter, more specific…"
+                      className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/35 outline-none"
+                    />
+                    <Pill variant="outline-dashed" className="flex-none">
+                      1 credit
+                    </Pill>
+                  </div>
+                  <StickerButton variant="primary" size="md" onClick={handleAiSubmit} disabled={!aiPrompt.trim()}>
+                    <Send className="h-4 w-4" />
+                  </StickerButton>
+                </div>
+
+                {aiStatus && (
+                  <div className="mt-3 flex items-start gap-2 rounded-xl bg-[#f0f0ea] px-3.5 py-2.5">
+                    <p className="text-xs text-black/60 leading-relaxed flex-1">{aiStatus}</p>
+                    <button
+                      type="button"
+                      onClick={() => setAiStatus(null)}
+                      className="flex-none text-black/35 hover:text-black/60 cursor-pointer">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
-            ) : undefined
-          }
-          surfaceClassName={THEME_CANVAS_CLASS[theme]}
-          contentClassName={cn(
-            FONT_CLASS[font],
-            spacingCfg.text,
-            "text-primary [&>p]:mb-4 last:[&>p]:mb-0",
-            // Inline markers, Grammarly-style: highlight for the strongest
-            // line, green underline for a suggested change.
-            "[&_mark]:bg-[#e1f073]/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_mark]:cursor-help",
-            "[&_.sugg]:underline [&_.sugg]:decoration-[#3fa66a] [&_.sugg]:decoration-2 [&_.sugg]:underline-offset-4 [&_.sugg]:cursor-help"
-          )}
-        />
-
-        {/* Footer: word count, details, AI rewrite */}
-        <DashCard className="p-5 flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold text-black/45 tabular-nums">{liveWordCount} words</span>
-              <button
-                type="button"
-                onClick={() => setDetailsOpen((v) => !v)}
-                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer">
-                {detailsOpen ? "Hide details" : "Details"}
-                <ChevronDown className={cn("h-3 w-3 transition-transform", detailsOpen && "rotate-180")} />
-              </button>
-            </div>
-          </div>
-
-          {detailsOpen && (
-            <div className="flex flex-wrap gap-2 -mt-1">
-              {isBlankDraft ? (
-                <>
-                  <Pill variant="neutral">Blank draft</Pill>
-                  <Pill variant="neutral">Not linked to a job yet</Pill>
-                </>
-              ) : (
-                <>
-                  <Pill variant="neutral">≈55 sec read</Pill>
-                  <Pill variant="neutral">92% match to {COVER_LETTER.company}&apos;s JD keywords</Pill>
-                  <Pill variant="neutral">Strongest line: paragraph 2, the 31% stat</Pill>
-                </>
-              )}
-            </div>
-          )}
-
-          <div className="border-t border-black/8 pt-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex-1 flex items-center gap-2 rounded-xl border border-black/12 bg-[#fbfbf7] px-3.5 py-2.5">
-                <Sparkles className="h-4 w-4 flex-none text-black/40" />
-                <input
-                  type="text"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAiSubmit();
-                  }}
-                  placeholder="Make it warmer, shorter, more specific…"
-                  className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/35 outline-none"
-                />
-                <Pill variant="outline-dashed" className="flex-none">
-                  1 credit
-                </Pill>
-              </div>
-              <StickerButton variant="primary" size="md" onClick={handleAiSubmit} disabled={!aiPrompt.trim()}>
-                <Send className="h-4 w-4" />
-              </StickerButton>
-            </div>
-
-            {aiStatus && (
-              <div className="mt-3 flex items-start gap-2 rounded-xl bg-[#f0f0ea] px-3.5 py-2.5">
-                <p className="text-xs text-black/60 leading-relaxed flex-1">{aiStatus}</p>
-                <button type="button" onClick={() => setAiStatus(null)} className="flex-none text-black/35 hover:text-black/60 cursor-pointer">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
-        </DashCard>
+            </DashCard>
           </>
         )}
       </main>

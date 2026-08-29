@@ -11,7 +11,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { scoreApplication, scoreTier } from "@/app/lib/dashboard/ats-stub";
 import { ATS_FIX_ITEMS, ATS_KEYWORDS } from "@/app/lib/dashboard/mock-data";
 import type { JobOption } from "@/app/lib/dashboard/job-options";
-import type { ResumeEntry } from "../Client";
+import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 
 /**
  * The scan report. The number is computed live from the picked resume and
@@ -19,8 +19,8 @@ import type { ResumeEntry } from "../Client";
  * and watching the score respond is the loop this screen exists for.
  */
 export interface AtsResultsProps {
-  resume: ResumeEntry;
-  resumes: ResumeEntry[];
+  resume: VaultDoc;
+  resumes: VaultDoc[];
   job: JobOption | null;
   fixedIds: Set<string>;
   queuedKeywordIds: Set<string>;

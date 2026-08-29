@@ -5,7 +5,7 @@ import { AlertTriangle, Check, LogOut, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
-import { BUTTON_DANGER, BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection } from "../_components/settings-ui";
+import { BUTTON_DANGER, BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection } from "@/app/components/dashboard/settings/settings-ui";
 
 const CONFIRM_WORD = "DELETE";
 

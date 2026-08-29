@@ -70,14 +70,26 @@ const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++seq
 
 const RECENCY_WEIGHTS = [0.55, 0.3, 0.15];
 
+/**
+ * How far your prep checklist alone can carry a track. Practice is what this
+ * feature is for, so finishing every action without ever running a session
+ * tops out well short of "ready" — but it must not read as zero either, which
+ * is what the original early-return did: a track with every action done still
+ * scored 0, so the ring said 0 and every track fell into "needs prep".
+ */
+const ACTIONS_ONLY_CEILING = 40;
+
 export function computePreparedness(track: PrepTrack): number {
-  if (track.sessions.length === 0) return 0;
+  const total = track.actions.length;
+  const c = total === 0 ? 0 : track.actions.filter((a) => a.done).length / total;
+
+  // No practice yet — the checklist is the only evidence there is.
+  if (track.sessions.length === 0) return Math.round(c * ACTIONS_ONLY_CEILING);
+
   const recent = track.sessions.slice(-3).reverse();
   const w = RECENCY_WEIGHTS.slice(0, recent.length);
   const wSum = w.reduce((a, b) => a + b, 0);
   const s = recent.reduce((sum, session, i) => sum + session.overallScore * (w[i] / wSum), 0);
-  const total = track.actions.length;
-  const c = total === 0 ? 0 : track.actions.filter((a) => a.done).length / total;
   return Math.round(s + (100 - s) * c);
 }
 

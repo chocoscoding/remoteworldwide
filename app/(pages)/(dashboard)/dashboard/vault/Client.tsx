@@ -8,7 +8,7 @@
 
 import { FC, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { FolderOpen, Linkedin, Monitor, Plus, Search, SearchX } from "lucide-react";
+import { FolderOpen, HardDrive, Monitor, Plus, Search, SearchX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
@@ -16,11 +16,10 @@ import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/componen
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import SplitButton from "@/app/components/dashboard/ui/SplitButton";
-import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useDocuments, type DocKind, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
-import DocRow, { KIND_LABELS } from "./_components/DocRow";
-import DropZone from "./_components/DropZone";
-import LinkedInImportDialog from "./_components/LinkedInImportDialog";
+import DocRow, { KIND_LABELS } from "@/app/components/dashboard/vault/DocRow";
+import DropZone from "@/app/components/dashboard/vault/DropZone";
+import GoogleDriveImportDialog from "@/app/components/dashboard/vault/GoogleDriveImportDialog";
 
 type VaultTab = "all" | "resumes" | "other" | "archived";
 type SortKey = "recent" | "name" | "size";
@@ -60,7 +59,7 @@ const VaultClient: FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [linkedInOpen, setLinkedInOpen] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -127,15 +126,9 @@ const VaultClient: FC = () => {
             onClick={() => fileRef.current?.click()}
             items={[
               { id: "computer", label: "From your computer", icon: <Monitor className="h-3.5 w-3.5" />, onSelect: () => fileRef.current?.click() },
-              { id: "linkedin", label: "From LinkedIn", icon: <Linkedin className="h-3.5 w-3.5" />, onSelect: () => setLinkedInOpen(true) },
+              { id: "drive", label: "From Google Drive", icon: <HardDrive className="h-3.5 w-3.5" />, onSelect: () => setDriveOpen(true) },
             ]}
           />
-          <Link href="/dashboard/resume">
-            <StickerButton variant="primary" size="md" type="button">
-              <Plus className="h-4 w-4" />
-              New resume
-            </StickerButton>
-          </Link>
         </div>
       </header>
 
@@ -255,7 +248,7 @@ const VaultClient: FC = () => {
                 body={
                   tab === "archived"
                     ? "Archive a document and it moves here — out of your pickers, never deleted."
-                    : "Import from your computer or LinkedIn, or drop files anywhere on this page."
+                    : "Import from your computer or Google Drive, or drop files anywhere on this page."
                 }
                 ctaLabel={tab === "archived" ? "Show all documents" : "Import files"}
                 onCta={tab === "archived" ? () => changeTab("all") : () => fileRef.current?.click()}
@@ -293,7 +286,7 @@ const VaultClient: FC = () => {
         </DropZone>
       </main>
 
-      <LinkedInImportDialog open={linkedInOpen} onOpenChange={setLinkedInOpen} />
+      <GoogleDriveImportDialog open={driveOpen} onOpenChange={setDriveOpen} />
     </div>
   );
 };
