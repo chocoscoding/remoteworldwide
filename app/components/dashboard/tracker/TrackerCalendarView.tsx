@@ -21,7 +21,12 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import StatusMenu from "@/app/components/dashboard/tracker/StatusMenu";
 import type { TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
-import { buildTrackerEvents, EVENT_TYPE_META, type TrackerEvent, type TrackerEventType } from "../../../(pages)/(dashboard)/dashboard/tracker/types";
+import {
+  buildTrackerEvents,
+  EVENT_TYPE_META,
+  type TrackerEvent,
+  type TrackerEventType,
+} from "../../../(pages)/(dashboard)/dashboard/tracker/types";
 
 interface TrackerCalendarViewProps {
   columns: TrackerColumn[];
