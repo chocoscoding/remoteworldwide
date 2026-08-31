@@ -94,11 +94,16 @@ export const firstNameOf = (name: string) => name.split(" ")[0] ?? name;
  * The pre-written caption. One body, small per-platform framing — the
  * platforms differ in what a composer will accept, not in what the story is.
  */
-export function winCaption(win: WinRecord, toggles: WinCardToggles): string {
+export function winCaption(win: WinRecord, toggles: WinCardToggles, utmSource?: string): string {
   const where = toggles.hideCompany ? win.facts.role : `${win.facts.role} at ${win.facts.company}`;
+  // Attribution rides the caption link, per platform, so referral signups
+  // can be traced back to the card that brought them in.
+  const link = utmSource
+    ? `https://${WIN_REFERRAL_LINK}?utm_source=${utmSource}&utm_medium=wincard&utm_campaign=placement`
+    : `https://${WIN_REFERRAL_LINK}`;
   return (
     `I got the job \u{1F389} ${where} — ${win.stats.applications} applications, ` +
     `${win.stats.interviewLoops} interview loops and a ${win.stats.streak}-day streak, tracked end to end. ` +
-    `If you're searching, this is where I did it: https://${WIN_REFERRAL_LINK}`
+    `If you're searching, this is where I did it: ${link}`
   );
 }

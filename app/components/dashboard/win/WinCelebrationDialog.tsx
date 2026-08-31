@@ -112,13 +112,16 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
 
   async function shareTo(target: ShareTarget) {
     const blob = await cardBlob();
+    // The shared caption carries per-platform UTM on the referral link; the
+    // on-screen preview stays clean.
+    const platformCaption = winCaption(win, toggles, target.id);
 
     // Mobile-first: the native sheet takes the actual image.
     if (blob && typeof navigator !== "undefined" && navigator.canShare) {
       const file = new File([blob], `win-card-${format}.png`, { type: "image/png" });
       if (navigator.canShare({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], text: caption });
+          await navigator.share({ files: [file], text: platformCaption });
           return;
         } catch {
           // Cancelled or unsupported combination — fall through to desktop.
@@ -128,8 +131,12 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
 
     // Desktop: save the image, copy the caption, open the composer.
     await download();
-    copyCaption();
-    const url = target.url(caption);
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(platformCaption).catch(() => {});
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+    const url = target.url(platformCaption);
     if (url) window.open(url, "_blank", "noopener,noreferrer");
     toast.success(`Image saved + caption copied`, {
       description:

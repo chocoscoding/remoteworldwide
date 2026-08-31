@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "./DashCard";
+import EmptyStateLottie from "./EmptyStateLottie";
 import StickerButton from "./StickerButton";
 
 /**
@@ -13,7 +14,13 @@ import StickerButton from "./StickerButton";
  * thing, so it shouldn't carry more weight than the content it stands in for.
  */
 export interface DashEmptyStateProps {
-  icon: LucideIcon;
+  /** The quiet default. Ignored when `lottieSrc` is set. */
+  icon?: LucideIcon;
+  /**
+   * Public path to a Lottie shown above the text instead of the icon circle —
+   * for the empty states worth animating, not every absence on the dashboard.
+   */
+  lottieSrc?: string;
   title: string;
   body: ReactNode;
   ctaLabel?: string;
@@ -26,12 +33,26 @@ export interface DashEmptyStateProps {
   className?: string;
 }
 
-const DashEmptyState: FC<DashEmptyStateProps> = ({ icon: Icon, title, body, ctaLabel, onCta, ctaHref, bare, className }) => {
+const DashEmptyState: FC<DashEmptyStateProps> = ({
+  icon: Icon,
+  lottieSrc,
+  title,
+  body,
+  ctaLabel,
+  onCta,
+  ctaHref,
+  bare,
+  className,
+}) => {
   const inner = (
     <>
-      <span className="grid h-12 w-12 place-content-center rounded-full bg-[#f0f0ea]">
-        <Icon className="h-5 w-5 text-black/40" />
-      </span>
+      {lottieSrc ? (
+        <EmptyStateLottie src={lottieSrc} />
+      ) : Icon ? (
+        <span className="grid h-12 w-12 place-content-center rounded-full bg-[#f0f0ea]">
+          <Icon className="h-5 w-5 text-black/40" />
+        </span>
+      ) : null}
       <div>
         <p className="mb-1 text-sm font-bold text-primary">{title}</p>
         <p className="mx-auto max-w-sm text-sm leading-relaxed text-black/50">{body}</p>
@@ -51,7 +72,11 @@ const DashEmptyState: FC<DashEmptyStateProps> = ({ icon: Icon, title, body, ctaL
     </>
   );
 
-  const layout = "flex flex-col items-center gap-3.5 px-6 py-12 text-center";
+  const layout = cn(
+    "flex flex-col items-center px-6 text-center",
+    // A 200px animation brings its own padding; the icon variant needs the room.
+    lottieSrc ? "gap-2 py-6" : "gap-3.5 py-12"
+  );
   if (bare) return <div className={cn(layout, className)}>{inner}</div>;
   return <DashCard className={cn("p-0", className)}>{<div className={layout}>{inner}</div>}</DashCard>;
 };

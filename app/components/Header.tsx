@@ -33,7 +33,7 @@ const Header = ({ count }: { count: number | null }) => {
         </h2>
         <div className="w-[98%] max-w-[1000px]">
           <Suspense>
-            <SearchBar />
+            <SearchBar alwaysActive />
           </Suspense>
         </div>
         <section className="mt-6 md:mt-8 flex flex-col justify-start">

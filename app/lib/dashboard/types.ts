@@ -397,6 +397,12 @@ export interface IntroPipelineEntry {
   questions?: IntroQuestion[];
   /** A warm contact at this company, when you have one. */
   contactId?: string;
+  /** Days left to answer, shown while questions are open. Unset = no clock. */
+  expiresInDays?: number;
+  /** Set once the rec closed without a hire. Absent = still live. */
+  outcome?: "passed" | "expired";
+  /** Days since the outcome landed — >7 moves the row into History. */
+  outcomeAgoDays?: number;
 }
 
 // ---------------------------------------------------------------------------

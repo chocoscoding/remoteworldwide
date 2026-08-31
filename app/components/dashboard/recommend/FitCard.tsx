@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
-import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import { computeFit, type FitPrefs, type FitProfile } from "@/app/lib/dashboard/fit";
 import type { RecommendationTarget } from "@/app/lib/dashboard/types";
@@ -82,7 +81,10 @@ const FitCard: FC<FitCardProps> = ({ target, prefs, profile }) => {
             {target.salaryText ?? "Band not published"}
           </p>
         </div>
-        <ScoreRing value={fit.score} size={52} trackColor="#e6e5dd" />
+        {/* No numeric score on the talent side — the label chip below is the
+            whole verdict. The number still exists internally (it drives the
+            tier and the weakest-link nudge); rendering it invites people to
+            chase a 97 instead of reading why they fit. */}
       </div>
 
       {/* Status — always exactly one row, so nothing below it can shift. */}

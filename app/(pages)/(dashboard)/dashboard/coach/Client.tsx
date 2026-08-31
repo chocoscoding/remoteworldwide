@@ -114,40 +114,52 @@ const CoachClient: FC = () => {
           <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-[#222325] text-white order-first">
             {/* Sessions — the larger share, since the list grows without bound. */}
             <div className="flex min-h-0 flex-[1_1_63%] flex-col px-3 pt-3.5">
-              <div className="mb-2 flex flex-none items-center justify-between gap-2 px-1">
-                <p className="text-sm font-bold">Sessions</p>
+              <div className="mb-1.5 flex flex-none items-center justify-between gap-2 px-2">
+                <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-white/45">Sessions</p>
                 <button
                   type="button"
                   onClick={handleNewSession}
                   aria-label="Start a new session"
                   title="New session"
-                  className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#e1f073] bg-[#e1f073] text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_rgba(255,255,255,.3)] hover:shadow-[2.5px_2.5px_0_0_rgba(255,255,255,.45)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
-                  <Plus className="h-4 w-4" strokeWidth={2.75} />
+                  className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md border-[1.5px] border-[#e1f073] bg-[#e1f073] text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_rgba(255,255,255,.3)] hover:shadow-[2.5px_2.5px_0_0_rgba(255,255,255,.45)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2.75} />
                 </button>
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-3">
-                {COACH_SESSIONS.map((sn) => (
-                  <button
-                    key={sn.id}
-                    type="button"
-                    onClick={() => setActiveSessionId(sn.id)}
-                    title={sn.title}
-                    className={cn(
-                      "w-full flex-none rounded-lg px-2.5 py-2 text-left text-[13px] cursor-pointer",
-                      "transition-[transform,box-shadow,background-color] duration-100 ease-out",
-                      "active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
-                      // Nothing at rest — a list of filled boxes reads heavier
-                      // than the conversation it's meant to sit beside.
-                      activeSessionId === sn.id
-                        ? "bg-white font-bold text-[#222325] shadow-[2px_2px_0_0_#e1f073]"
-                        : "bg-transparent font-medium text-white/70 hover:bg-white/10 hover:text-white hover:shadow-[2px_2px_0_0_#e1f073]"
-                    )}>
-                    {/* Titles run long — truncate rather than wrap, the full
-                        text is on the tooltip. */}
-                    <span className="block truncate">{sn.title}</span>
-                  </button>
-                ))}
+                {COACH_SESSIONS.map((sn) => {
+                  const active = activeSessionId === sn.id;
+                  return (
+                    <button
+                      key={sn.id}
+                      type="button"
+                      onClick={() => setActiveSessionId(sn.id)}
+                      title={sn.title}
+                      className={cn(
+                        // Fixed height, not padding — every row is the same
+                        // size no matter how long the title is.
+                        "group flex h-7 w-full flex-none items-center gap-2 rounded-md px-2 text-left text-xs cursor-pointer",
+                        "transition-[transform,box-shadow,background-color] duration-100 ease-out",
+                        "active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+                        // The hard shadow is the SELECTED state only. Putting it
+                        // on hover too made every row feel like a heavy button.
+                        active
+                          ? "bg-white font-bold text-[#222325] shadow-[2px_2px_0_0_#e1f073]"
+                          : "bg-transparent font-medium text-white/65 hover:bg-white/10 hover:text-white"
+                      )}>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "h-1.5 w-1.5 flex-none rounded-full transition-colors",
+                          active ? "bg-[#222325]" : "bg-white/25 group-hover:bg-[#e1f073]"
+                        )}
+                      />
+                      {/* Titles run long — truncate rather than wrap, the full
+                          text is on the tooltip. */}
+                      <span className="min-w-0 flex-1 truncate">{sn.title}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -155,9 +167,9 @@ const CoachClient: FC = () => {
 
             {/* This month's plan — the smaller, bounded share. */}
             <div className="flex min-h-0 flex-[1_1_37%] flex-col px-3 pb-3.5 pt-3">
-              <div className="mb-2 flex flex-none items-baseline justify-between gap-2 px-1">
-                <p className="text-sm font-bold">This month&apos;s plan</p>
-                <span className="text-xs font-medium text-white/40 tabular-nums">
+              <div className="mb-1.5 flex flex-none items-center justify-between gap-2 px-2">
+                <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-white/45">This month&apos;s plan</p>
+                <span className="text-[11px] font-medium text-white/40 tabular-nums">
                   {planDone}/{planItems.length}
                 </span>
               </div>
@@ -168,11 +180,19 @@ const CoachClient: FC = () => {
                     key={item.id}
                     type="button"
                     onClick={() => togglePlanItem(item.id)}
-                    className="group flex flex-none items-start gap-2.5 rounded-lg px-2.5 py-2 text-left cursor-pointer transition-colors hover:bg-white/10">
-                    <span className="mt-0.5 flex-none">
+                    title={item.text}
+                    // Same fixed height as a session row: a wrapped task used to
+                    // be twice the height of a short one, which made the list
+                    // read as ragged rather than as a plan.
+                    className="group flex h-7 w-full flex-none items-center gap-2 rounded-md px-2 text-left cursor-pointer transition-colors hover:bg-white/10">
+                    <span className="flex-none">
                       <NeoCheckbox checked={item.done} size="sm" dark />
                     </span>
-                    <span className={cn("text-[13px] leading-snug", item.done ? "text-white/35 line-through" : "font-medium text-white/85")}>
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-xs",
+                        item.done ? "text-white/35 line-through" : "font-medium text-white/85"
+                      )}>
                       {item.text}
                     </span>
                   </button>

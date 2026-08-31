@@ -8,7 +8,7 @@
 
 import { FC, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { FolderOpen, HardDrive, Monitor, Plus, Search, SearchX } from "lucide-react";
+import { HardDrive, Monitor, Plus, Search, SearchX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
@@ -243,7 +243,7 @@ const VaultClient: FC = () => {
               />
             ) : (
               <DashEmptyState
-                icon={FolderOpen}
+                lottieSrc="/Lottie/neobrutalism/Image_Folder_lottie.json"
                 title={emptyTitle}
                 body={
                   tab === "archived"

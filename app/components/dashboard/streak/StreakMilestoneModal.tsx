@@ -9,7 +9,7 @@
 // card), with the flame and the day count as the hero instead of a credit
 // badge.
 
-import { useMemo, type FC } from "react";
+import { useEffect, useMemo, useState, type FC } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Flame, Snowflake } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -46,15 +46,32 @@ function makeConfetti(): ConfettiPiece[] {
   }));
 }
 
+/**
+ * Breathing room between the action and the applause. A milestone earned by
+ * dropping a card used to cover the board before the card had visibly
+ * landed — the celebration now waits a beat so you see what you did first.
+ */
+const REVEAL_DELAY_MS = 1100;
+
 const StreakMilestoneModal: FC = () => {
   const { celebrating, dismissCelebration, credits, freezes, longest } = useStreak();
   const reduceMotion = useReducedMotion();
+
+  // Same derived-gate pattern as the rec detail page: the timer callback is
+  // the only state writer, and each queued milestone gets its own delay.
+  const revealKey = celebrating ? `${celebrating.days}` : null;
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!revealKey) return;
+    const timer = window.setTimeout(() => setRevealedKey(revealKey), REVEAL_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [revealKey]);
 
   // Radix unmounts DialogContent's subtree while closed, so this remounts
   // fresh (new confetti paths) each time a milestone opens it.
   const confetti = useMemo(() => makeConfetti(), []);
 
-  if (!celebrating) return null;
+  if (!celebrating || revealedKey !== revealKey) return null;
   const tier = tierFor(celebrating.days);
   const isRecord = celebrating.days >= longest;
 

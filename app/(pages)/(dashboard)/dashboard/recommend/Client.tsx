@@ -23,8 +23,9 @@ import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import { useSettings } from "../settings/SettingsProvider";
+import ClosedRecRow from "@/app/components/dashboard/recommend/ClosedRecRow";
 import FitCard from "@/app/components/dashboard/recommend/FitCard";
-import PipelineCard from "@/app/components/dashboard/recommend/PipelineCard";
+import PipelineSummaryCard from "@/app/components/dashboard/recommend/PipelineSummaryCard";
 
 const WHAT_WE_LOOK_FOR = [
   "A portfolio that shows decisions, not just screens.",
@@ -43,6 +44,15 @@ const RecommendClient: FC = () => {
   const [pauseOpen, setPauseOpen] = useState(false);
 
   const paused = goals.paused;
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Live cards, recently closed rows, and the >7-day history behind a
+  // disclosure — a pass never renders as a card and never says "rejected".
+  const activePipeline = pipeline.filter((e) => !e.outcome);
+  const closedPipeline = pipeline.filter((e) => e.outcome);
+  const recentClosed = closedPipeline.filter((e) => (e.outcomeAgoDays ?? 0) <= 7);
+  const historyClosed = closedPipeline.filter((e) => (e.outcomeAgoDays ?? 0) > 7);
+
   const awaitingYou = pipeline.filter((e) => e.questions?.some((q) => !q.answer)).length;
   const pipelineTargetIds = new Set(pipeline.map((e) => e.targetId));
   const watching = targets.filter((t) => !t.onHold && !pipelineTargetIds.has(t.id)).length;
@@ -136,7 +146,7 @@ const RecommendClient: FC = () => {
               </p>
               <p className="mt-0.5 text-xs leading-relaxed text-black/55">
                 {paused
-                  ? `Paused${pausedDaysLeft !== null ? ` — ${pausedDaysLeft} day${pausedDaysLeft === 1 ? "" : "s"} left` : ""}. Reviewers will skip you until you resume.`
+                  ? `You're hidden from reviewers — resume anytime.${pausedDaysLeft !== null ? ` ${pausedDaysLeft}d left on the pause.` : ""}`
                   : `Reviewers are matching you against ${watching} ${watching === 1 ? "company" : "companies"} this week.`}
               </p>
             </div>
@@ -171,19 +181,47 @@ const RecommendClient: FC = () => {
             )}
           </div>
 
-          {pipeline.length === 0 ? (
+          {activePipeline.length === 0 ? (
             <DashEmptyState
               icon={Sparkles}
-              title="Nobody's put you forward yet"
-              body="Reviewers pick weekly. A sharp resume and clear preferences are what get you looked at."
+              title="Nothing yet"
+              body="Reviewers are looking this week. A sharp resume and clear preferences are what get you looked at."
               ctaLabel="Update your preferences"
               ctaHref="/dashboard/settings/preferences"
             />
           ) : (
-            <div className="flex flex-col gap-4">
-              {pipeline.map((entry) => (
-                <PipelineCard key={entry.id} entry={entry} />
+            <div className="flex flex-col gap-3">
+              {activePipeline.map((entry) => (
+                <PipelineSummaryCard key={entry.id} entry={entry} />
               ))}
+            </div>
+          )}
+
+          {recentClosed.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2">
+              {recentClosed.map((entry) => (
+                <ClosedRecRow key={entry.id} entry={entry} watchlists={watching} />
+              ))}
+            </div>
+          )}
+
+          {historyClosed.length > 0 && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setHistoryOpen((v) => !v)}
+                aria-expanded={historyOpen}
+                className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-black/50 transition-colors hover:text-primary">
+                History · {historyClosed.length}
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", historyOpen && "rotate-180")} />
+              </button>
+              {historyOpen && (
+                <div className="mt-2 flex flex-col gap-2">
+                  {historyClosed.map((entry) => (
+                    <ClosedRecRow key={entry.id} entry={entry} watchlists={watching} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>

@@ -1148,6 +1148,7 @@ export const INTRO_PIPELINE_SEED: IntroPipelineEntry[] = [
     role: "Senior Product Designer",
     stageIndex: 1,
     startedAgoDays: 6,
+    expiresInDays: 3,
     contactId: "ref-maria",
     questions: [
       {
@@ -1167,6 +1168,28 @@ export const INTRO_PIPELINE_SEED: IntroPipelineEntry[] = [
     role: "Product Designer",
     stageIndex: 0,
     startedAgoDays: 2,
+  },
+  // Closed recs — a recent pass stays visible as a muted row; anything older
+  // than 7 days lives behind the History disclosure.
+  {
+    id: "intro-ramp-passed",
+    targetId: "rec-ramp-closed",
+    company: "Ramp",
+    role: "Product Designer, Growth",
+    stageIndex: 1,
+    startedAgoDays: 12,
+    outcome: "passed",
+    outcomeAgoDays: 2,
+  },
+  {
+    id: "intro-attio-expired",
+    targetId: "rec-attio-closed",
+    company: "Attio",
+    role: "Senior Product Designer",
+    stageIndex: 1,
+    startedAgoDays: 24,
+    outcome: "expired",
+    outcomeAgoDays: 11,
   },
 ];
 

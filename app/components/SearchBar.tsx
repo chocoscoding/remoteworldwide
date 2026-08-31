@@ -4,8 +4,9 @@ import { usePathname, useSearchParams } from "next/navigation";
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false }) => {
+const SearchBar: React.FC<{ activeSearch?: boolean; alwaysActive?: boolean }> = ({ activeSearch = false, alwaysActive = false }) => {
   const [searchValue, setSearchValue] = useState("");
   const searchParams = useSearchParams();
   const { push } = useRouter();
@@ -48,7 +49,10 @@ const SearchBar: React.FC<{ activeSearch?: boolean }> = ({ activeSearch = false 
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full h-[3.5rem] md:h-[4.1rem] outline outline-2 outline-black rounded-md bg-white p-1.5 md:p-2.5 flex transition-shadow duration-150 ease-out focus-within:shadow-[5px_5px_0_0_#e1f073]">
+      className={cn(
+        alwaysActive && "shadow-[5px_5px_0_0_#e1f073]",
+        "w-full h-[3.5rem] md:h-[4.1rem] outline outline-2 outline-black rounded-md bg-white p-1.5 md:p-2.5 flex transition-shadow duration-150 ease-out focus-within:shadow-[5px_5px_0_0_#e1f073]",
+      )}>
       <div className="flex flex-1 items-center gap-4 px-3">
         {searchValue.length <= 0 && <Search className="text-primary hidden md:block" />}
         <input
