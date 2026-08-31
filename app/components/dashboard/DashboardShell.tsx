@@ -17,6 +17,8 @@ import { ActivityProvider } from "./activity/ActivityProvider";
 import { AnswersProvider } from "./answers/AnswersProvider";
 import { DocumentsProvider } from "./documents/DocumentsProvider";
 import { NetworkProvider } from "./network/NetworkProvider";
+import PodProvider from "./pod/PodProvider";
+import WinProvider from "./win/WinProvider";
 import { SettingsProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import StreakMilestoneModal from "./streak/StreakMilestoneModal";
 import LogApplicationDialog from "./log/LogApplicationDialog";
@@ -34,6 +36,10 @@ const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
       <NetworkProvider>
       <AnswersProvider>
       <DocumentsProvider>
+      {/* PodProvider before WinProvider: logging a win pushes onto the pod
+          feed and its goals, so the win flow reads pod context. */}
+      <PodProvider>
+      <WinProvider>
       <div className="w-full flex">
         <DashboardSidebar />
         <div className="flex-1 min-w-0">{children}</div>
@@ -43,6 +49,8 @@ const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
       <RepairStreakPanel />
       <StreakMilestoneModal />
       <Toaster />
+      </WinProvider>
+      </PodProvider>
       </DocumentsProvider>
       </AnswersProvider>
       </NetworkProvider>

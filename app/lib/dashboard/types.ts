@@ -430,9 +430,17 @@ export interface PodGoalVote {
   choice: "for" | "against";
 }
 
+/**
+ * What kind of work a pod goal asks for. Every kind except `custom` maps to a
+ * real surface in the dashboard, so a goal can carry a "go do it" action
+ * instead of being a bare number.
+ */
+export type PodGoalKind = "job-win" | "applications" | "referrals" | "prep" | "resume" | "custom";
+
 /** One pod-wide goal, shared by every member of the pod. */
 export interface PodGoal {
   id: string;
+  kind: PodGoalKind;
   label: string;
   detail?: string;
   target: number;

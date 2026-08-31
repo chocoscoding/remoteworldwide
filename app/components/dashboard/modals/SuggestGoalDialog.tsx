@@ -8,10 +8,15 @@
 
 import { useState, type FC, type FormEvent } from "react";
 import { Target } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { GOAL_KIND_META, SUGGESTABLE_KINDS } from "@/app/components/dashboard/pod/pod-goal-meta";
+import type { PodGoalKind } from "@/app/lib/dashboard/types";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 
 export interface SuggestedGoalInput {
+  /** What kind of work this asks for — gives the goal its icon and its "go do it" action. */
+  kind: PodGoalKind;
   label: string;
   target: number;
   unit: string;
@@ -27,6 +32,7 @@ const FIELD_CLASS =
   "rounded-xl border border-black/12 bg-[#fbfbf7] px-4 py-3 text-sm text-primary placeholder:text-black/35 outline-none focus:border-black/30 transition-colors";
 
 const SuggestGoalDialog: FC<SuggestGoalDialogProps> = ({ open, onOpenChange, onSuggest }) => {
+  const [kind, setKind] = useState<PodGoalKind>("applications");
   const [label, setLabel] = useState("");
   const [target, setTarget] = useState("");
   const [unit, setUnit] = useState("");
@@ -35,6 +41,7 @@ const SuggestGoalDialog: FC<SuggestGoalDialogProps> = ({ open, onOpenChange, onS
   const canSubmit = label.trim().length > 0 && unit.trim().length > 0 && Number.isFinite(targetNum) && targetNum > 0;
 
   const resetFields = () => {
+    setKind("applications");
     setLabel("");
     setTarget("");
     setUnit("");
@@ -43,7 +50,7 @@ const SuggestGoalDialog: FC<SuggestGoalDialogProps> = ({ open, onOpenChange, onS
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    onSuggest({ label: label.trim(), target: Math.round(targetNum), unit: unit.trim() });
+    onSuggest({ kind, label: label.trim(), target: Math.round(targetNum), unit: unit.trim() });
     resetFields();
   };
 
@@ -66,6 +73,34 @@ const SuggestGoalDialog: FC<SuggestGoalDialogProps> = ({ open, onOpenChange, onS
             <p className="text-xs text-black/45 mb-5 pl-[52px]">Goes to a pod vote — majority wins.</p>
 
             <div className="flex flex-col gap-4">
+              {/* The kind decides which dashboard surface the goal points at —
+                  an applications goal links the pod to the tracker, a prep
+                  goal to Interview Prep, and so on. */}
+              <div>
+                <span className="mb-1.5 block text-xs font-semibold text-black/50">What kind of work is it?</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {SUGGESTABLE_KINDS.map((k) => {
+                    const meta = GOAL_KIND_META[k];
+                    const Icon = meta.icon;
+                    const on = kind === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setKind(k)}
+                        className={cn(
+                          "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-colors",
+                          on ? "border-[#222325] bg-[#222325] text-white" : "border-black/15 bg-white text-black/60 hover:border-black/35"
+                        )}>
+                        <Icon className="h-3 w-3" />
+                        {meta.kindLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-semibold text-black/50">Goal</span>
                 <input

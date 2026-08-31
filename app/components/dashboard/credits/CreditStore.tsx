@@ -11,12 +11,15 @@
 // reason attached, so "where did my credits go" is answerable.
 
 import { type FC } from "react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { SPEND_CATALOGUE, priceOf } from "@/app/lib/dashboard/credits";
 import { shortDateLabel } from "@/app/lib/dashboard/streak";
+import { CREDITS_PER_SUBSCRIBER, INVITE_CREDITS_EARNED, SUBSCRIBED_INVITES } from "@/app/lib/dashboard/invites";
 
 const CreditStore: FC = () => {
   const { creditsOpen, closeCredits, credits, ledger, spend, current } = useActivity();
@@ -34,7 +37,7 @@ const CreditStore: FC = () => {
               <span className="text-base text-white/55">available</span>
             </div>
             <DialogDescription className="mt-2 text-sm text-white/55">
-              Earned by keeping your streak. Spend them on the things below.
+              Earned when someone you invited subscribes. Spend them on the things below.
             </DialogDescription>
           </div>
         </div>
@@ -82,8 +85,28 @@ const CreditStore: FC = () => {
             )}
           </div>
 
-          {/* Ledger */}
+          {/* Earned + ledger. "Earned" used to be a card on the invites
+              screen; it belongs beside the balance it explains, and it reads
+              from the same derivation that screen does. */}
           <div className="min-w-0">
+            <p className="text-[15px] font-bold text-primary mb-1">Earned</p>
+            <p className="text-xs text-black/45 mb-3">Invites who subscribed.</p>
+            <div className="mb-6 rounded-lg border border-black/12 bg-[#fbfbf7] px-3.5 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm text-black/70">
+                  {SUBSCRIBED_INVITES.length} subscribed × {CREDITS_PER_SUBSCRIBER}
+                </span>
+                <span className="flex-none text-sm font-bold tabular-nums text-[#6c7a1e]">+{INVITE_CREDITS_EARNED}</span>
+              </div>
+              <Link
+                href="/dashboard/invites"
+                onClick={closeCredits}
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                Invite more people
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            </div>
+
             <p className="text-[15px] font-bold text-primary mb-1">History</p>
             <p className="text-xs text-black/45 mb-3">Every credit has a reason.</p>
             <div className="flex flex-col divide-y divide-black/[0.06]">

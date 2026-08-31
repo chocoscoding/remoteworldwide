@@ -1,734 +1,51 @@
 "use client";
 
-import { FC, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { FC, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  Award,
-  Calendar as CalendarIcon,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsUpDown,
-  ChevronUp,
-  Clock,
-  Eye,
-  Kanban as KanbanIcon,
-  Mic,
-  MessageSquare,
-  MoreHorizontal,
-  Plus,
-  Table as TableIcon,
-  Users,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import {
-  addDays,
-  addMonths,
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  isSameDay,
-  isSameMonth,
-  isToday,
-  set,
-  startOfMonth,
-  startOfWeek,
-  subDays,
-  subMonths,
-} from "date-fns";
+import { Calendar as CalendarIcon, Kanban as KanbanIcon, Plus, Table as TableIcon } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCorners,
-  useDroppable,
+  pointerWithin,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import DashCard from "@/app/components/dashboard/ui/DashCard";
+import { useWin } from "@/app/components/dashboard/win/WinProvider";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
-import Pill from "@/app/components/dashboard/ui/Pill";
-import type { PillProps } from "@/app/components/dashboard/ui/Pill";
 import LogoMini from "@/app/components/svg/LogoMini";
-import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import { TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
 import type { TrackerCard as TrackerCardData, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
 import JobTimelineDialog from "@/app/components/dashboard/tracker/JobTimelineDialog";
-import StatusMenu from "@/app/components/dashboard/tracker/StatusMenu";
-import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
+import { COLUMN_LABELS } from "@/app/components/dashboard/tracker/tracker-meta";
+
+// Component imports
+import { TrackerCardItem } from "../../../../components/dashboard/tracker/TrackerCard";
+import { KanbanColumn } from "../../../../components/dashboard/tracker/KanbanColumn";
+import { TrackerTableView } from "../../../../components/dashboard/tracker/TrackerTableView";
+import { TrackerCalendarView } from "../../../../components/dashboard/tracker/TrackerCalendarView";
+import type { TrackerView, ViewConfig } from "./types";
 
 // ---------------------------------------------------------------------------
-// Local screen state types + config — not shared with any other screen.
+// Local screen state types + config
 // ---------------------------------------------------------------------------
 
-type TrackerView = "board" | "table" | "calendar";
-
-const VIEWS: { id: TrackerView; label: string; icon: LucideIcon }[] = [
+const VIEWS: ViewConfig[] = [
   { id: "board", label: "Board", icon: KanbanIcon },
   { id: "table", label: "Table", icon: TableIcon },
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
 ];
-
-function daysAgoLabel(n?: number): string | null {
-  if (n === undefined) return null;
-  if (n === 0) return "Today";
-  return `${n} day${n === 1 ? "" : "s"} ago`;
-}
-
-/** Maps a card's free-text status chip to a Pill variant + small leading icon. */
-function chipMeta(chip: string): { variant: NonNullable<PillProps["variant"]>; icon: LucideIcon } {
-  if (chip.startsWith("Closes in")) return { variant: "urgent", icon: Clock };
-  if (chip === "Referral available") return { variant: "positive", icon: Users };
-  if (chip === "Follow up") return { variant: "neutral", icon: MessageSquare };
-  if (chip.includes("Recruiter opened")) return { variant: "positive", icon: Eye };
-  return { variant: "neutral", icon: Clock };
-}
-
-// ---------------------------------------------------------------------------
-// Calendar event derivation — the mock cards only carry relative "days ago"
-// and occasional free-text status chips ("Closes in N days", "Round 2 of 4 ·
-// Thu 14:00 GMT+1"), not real dates. These helpers turn that into concrete
-// `Date`s (relative to "today") purely for the Calendar view — nothing here
-// is persisted or sent anywhere.
-// ---------------------------------------------------------------------------
-
-type TrackerEventType = "saved" | "applied" | "interview" | "deadline";
-
-interface TrackerEvent {
-  id: string;
-  date: Date;
-  cardId: string;
-  company: string;
-  title: string;
-  type: TrackerEventType;
-  columnId: TrackerColumnId;
-  rww?: boolean;
-  /** Extra caption text for interview/deadline events, e.g. the full status chip. */
-  detail?: string;
-}
-
-const EVENT_TYPE_META: Record<TrackerEventType, { label: string; dot: string }> = {
-  saved: { label: "Saved", dot: COLUMN_META.saved.dot },
-  applied: { label: "Applied", dot: COLUMN_META.applied.dot },
-  interview: { label: "Interview", dot: COLUMN_META.interviewing.dot },
-  deadline: { label: "Deadline", dot: "bg-orange-500" },
-};
-
-const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-/** Parses a "... Thu 14:00 GMT+1" style chip into the next occurrence of that
- * weekday (today counts as a match) at that time, relative to `today`. */
-function parseInterviewDate(chip: string, today: Date): Date | null {
-  const match = chip.match(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  const targetDow = WEEKDAY_INDEX[match[1]];
-  const diff = (targetDow - today.getDay() + 7) % 7;
-  const day = addDays(today, diff);
-  return set(day, { hours: Number(match[2]), minutes: Number(match[3]), seconds: 0, milliseconds: 0 });
-}
-
-/** Parses a "Closes in N days" chip into a deadline date, relative to `today`. */
-function parseDeadlineDate(chip: string, today: Date): Date | null {
-  const match = chip.match(/^Closes in (\d+) day/);
-  return match ? addDays(today, Number(match[1])) : null;
-}
-
-/** Flattens every card across every column into calendar events: one
- * saved/applied "activity" event from `daysAgo`, plus a deadline and/or
- * interview event when the status chip carries that info. */
-function buildTrackerEvents(cols: TrackerColumn[], today: Date): TrackerEvent[] {
-  const events: TrackerEvent[] = [];
-  for (const col of cols) {
-    for (const card of col.cards) {
-      if (card.daysAgo !== undefined) {
-        events.push({
-          id: `${card.id}-activity`,
-          date: subDays(today, card.daysAgo),
-          cardId: card.id,
-          company: card.company,
-          title: card.title,
-          type: col.id === "saved" ? "saved" : "applied",
-          columnId: col.id,
-          rww: card.rww,
-        });
-      }
-      if (card.statusChip) {
-        const deadlineDate = parseDeadlineDate(card.statusChip, today);
-        if (deadlineDate) {
-          events.push({
-            id: `${card.id}-deadline`,
-            date: deadlineDate,
-            cardId: card.id,
-            company: card.company,
-            title: card.title,
-            type: "deadline",
-            columnId: col.id,
-            rww: card.rww,
-            detail: card.statusChip,
-          });
-        }
-
-        const interviewDate = parseInterviewDate(card.statusChip, today);
-        if (interviewDate) {
-          events.push({
-            id: `${card.id}-interview`,
-            date: interviewDate,
-            cardId: card.id,
-            company: card.company,
-            title: card.title,
-            type: "interview",
-            columnId: col.id,
-            rww: card.rww,
-            detail: card.statusChip,
-          });
-        }
-      }
-    }
-  }
-  return events;
-}
-
-// ---------------------------------------------------------------------------
-// One Kanban card
-// ---------------------------------------------------------------------------
-
-const TrackerCardItem: FC<{ card: TrackerCardData; columnId?: TrackerColumnId; onOptions?: () => void }> = ({
-  card,
-  columnId,
-  onOptions,
-}) => {
-  const daysLabel = daysAgoLabel(card.daysAgo);
-
-  /**
-   * The explicit way into a card's details. It sits inside the drag listeners,
-   * so pointerdown must be stopped or dnd-kit claims the gesture and the menu
-   * never opens. Omitted on the DragOverlay clone, which takes no input.
-   */
-  const optionsButton = onOptions ? (
-    <button
-      type="button"
-      aria-label={`Options for ${card.title} at ${card.company}`}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation();
-        onOptions();
-      }}
-      className="grid h-6 w-6 flex-none cursor-pointer place-content-center rounded-md text-black/35 transition-colors hover:bg-black/[0.06] hover:text-primary">
-      <MoreHorizontal className="h-4 w-4" />
-    </button>
-  ) : null;
-
-  if (card.highlighted) {
-    const [roundLabel, timeLabel] = (card.statusChip ?? "").split(" · ");
-    return (
-      <div className="rounded-sm border-[1.5px] border-primary bg-white p-3.5 shadow-[4px_4px_0_0_#e1f073]">
-        <div className="flex items-center justify-between gap-2 mb-1.5">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
-            <span className="text-xs font-semibold text-black/60 truncate">{card.company}</span>
-          </div>
-          <div className="flex flex-none items-center gap-0.5">
-            {daysLabel && <span className="text-[11px] font-medium text-black/35 whitespace-nowrap">{daysLabel}</span>}
-            {optionsButton}
-          </div>
-        </div>
-
-        <p className="text-sm font-bold text-primary leading-snug mb-2.5">{card.title}</p>
-
-        {roundLabel && (
-          <Pill variant="dark" className="max-w-full min-w-0 mb-2">
-            <span className="truncate min-w-0">{roundLabel}</span>
-          </Pill>
-        )}
-
-        {timeLabel && (
-          <div className="flex items-center gap-1.5 text-xs text-black/55 mb-3 min-w-0">
-            <Clock className="h-3.5 w-3.5 flex-none" />
-            <span className="truncate min-w-0">{timeLabel}</span>
-          </div>
-        )}
-
-        {/* Routes to prep, never into the timeline dialog behind it. */}
-        <Link href="/dashboard/prep" className="block" onClick={(e) => e.stopPropagation()}>
-          <StickerButton variant="primary" size="sm" className="w-full">
-            <Mic className="h-3.5 w-3.5" />
-            Prep for this
-          </StickerButton>
-        </Link>
-      </div>
-    );
-  }
-
-  const chip = card.statusChip ? chipMeta(card.statusChip) : null;
-  const ChipIcon = chip?.icon;
-  const showEngagementBar = card.statusChip?.includes("Recruiter opened") ?? false;
-  // Long chips (e.g. "Recruiter opened your resume · 2h ago") are split into a
-  // primary label rendered inside the pill (truncated as a safety net so it
-  // can never spill past the card edge) and a trailing timestamp rendered
-  // underneath as its own small caption, matching the highlighted-card treatment.
-  const [chipLabel, chipTime] = (card.statusChip ?? "").split(" · ");
-
-  return (
-    // Border carries the column's color, so a card says its stage at a glance.
-    <div
-      className={cn(
-        "rounded-sm border bg-white p-3.5 transition-all hover:outline hover:outline-[#222325] hover:outline-2 ",
-        columnId ? COLUMN_META[columnId].cardBorder : "border-black/25",
-      )}>
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
-          <span className="text-xs font-semibold text-black/60 truncate">{card.company}</span>
-        </div>
-        <div className="flex flex-none items-center gap-0.5">
-          {daysLabel && <span className="text-[11px] font-medium text-black/35 whitespace-nowrap">{daysLabel}</span>}
-          {optionsButton}
-        </div>
-      </div>
-
-      <p className="text-sm font-semibold text-primary leading-snug">{card.title}</p>
-
-      {card.statusChip && chip && ChipIcon && (
-        <div className="mt-2.5">
-          <Pill variant={chip.variant} className="max-w-full min-w-0 gap-1">
-            <ChipIcon className="h-3 w-3 flex-none" />
-            <span className="truncate min-w-0">{chipLabel}</span>
-          </Pill>
-          {chipTime && (
-            <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-black/40 min-w-0">
-              <Clock className="h-3 w-3 flex-none" />
-              <span className="truncate min-w-0">{chipTime}</span>
-            </div>
-          )}
-          {showEngagementBar && <ProgressBar value={65} height="h-1" className="mt-2" />}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Drag-and-drop wiring (dnd-kit) — mock-only, moves cards between the local
-// `columns` state arrays. No persistence, no backend calls.
-// ---------------------------------------------------------------------------
-
-/** Draggable/sortable wrapper around a card — adds the grab affordance and
- * the dnd-kit transform/transition needed to animate it while dragging.
- * `transform`/`transition` are the one place this file uses an inline
- * `style` — dnd-kit computes a per-pixel drag offset at runtime, which has
- * no static Tailwind-class equivalent. Every other style here is a Tailwind
- * utility class. */
-const SortableTrackerCard: FC<{ card: TrackerCardData; columnId: TrackerColumnId; onOpen: (cardId: string) => void }> = ({
-  card,
-  columnId,
-  onOpen,
-}) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      {...attributes}
-      {...listeners}
-      onClick={() => onOpen(card.id)}
-      className={cn("touch-none cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}>
-      <TrackerCardItem card={card} columnId={columnId} onOptions={() => onOpen(card.id)} />
-    </div>
-  );
-};
-
-/** One Kanban column — a dnd-kit droppable region wrapping a `SortableContext`
- * of its cards. The column grows with its cards and the page scrolls — no
- * per-column scroll track. */
-const KanbanColumn: FC<{ column: TrackerColumn; onOpen: (cardId: string) => void }> = ({ column, onOpen }) => {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id });
-  const extra = column.count - column.cards.length;
-
-  return (
-    <div className="min-w-[240px] flex-1 flex flex-col min-h-0 px-0.5">
-      <div className="flex flex-none items-center gap-2 mb-3 px-0.5">
-        <span className={cn("h-2 w-2 rounded-full flex-none", COLUMN_META[column.id].dot)} aria-hidden />
-        <span className="text-sm font-bold text-primary whitespace-nowrap">{column.label}</span>
-        <span className="text-xs font-semibold text-black/40 ml-auto flex-none">{column.count}</span>
-      </div>
-
-      <div
-        ref={setNodeRef}
-        className={cn("flex flex-1 min-h-0 flex-col rounded-sm transition-colors", isOver && "border-[#222325] bg-[#e5e5d8]")}>
-        {/* The cards scroll, the column doesn't grow. No visible track here —
-            one horizontal bar on the board is enough chrome. */}
-        <div className="flex flex-1 min-h-0 flex-col gap-2 overflow-y-auto scrollbar-none">
-          <SortableContext items={column.cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-            {column.cards.map((card) => (
-              <SortableTrackerCard key={card.id} card={card} columnId={column.id} onOpen={onOpen} />
-            ))}
-          </SortableContext>
-
-          {column.cards.length === 0 && (
-            <div className="flex flex-col items-center justify-center text-center gap-2 rounded-xl border border-dashed border-black/15 py-8 px-3">
-              <Award className="h-5 w-5 text-black/25" />
-              <p className="text-[11px] font-medium text-black/40 leading-relaxed">
-                {column.id === "offer" ? "No offers yet — this is where they'll land." : "Nothing here yet."}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {extra > 0 && (
-          <>
-            <div
-              className="pointer-events-none -mt-6 h-6 flex-none bg-gradient-to-t from-[#f0f0ea]/90 via-[#f0f0ea]/60 to-transparent"
-              aria-hidden
-            />
-            <p className="text-center text-[11px] font-medium text-black/40 pt-0.5">+{extra} more</p>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Table view — every application flattened into one sortable table. Reads
-// straight off the live `columns` state so it always matches whatever the
-// board currently shows (including cards dragged between columns).
-// ---------------------------------------------------------------------------
-
-type TableSortKey = "company" | "role" | "status" | "daysAgo";
-type SortDirection = "asc" | "desc";
-interface TableSort {
-  key: TableSortKey;
-  direction: SortDirection;
-}
-
-/** Small badge reusing the board's chip icon/variant mapping — shown in the
- * table's Detail column so status-chip context (closes-in, referral, etc.)
- * still reads at a glance. */
-const StatusChipBadge: FC<{ chip: string }> = ({ chip }) => {
-  const meta = chipMeta(chip);
-  const Icon = meta.icon;
-  const [label] = chip.split(" · ");
-  return (
-    <Pill variant={meta.variant} className="max-w-full min-w-0 gap-1">
-      <Icon className="h-3 w-3 flex-none" />
-      <span className="truncate min-w-0">{label}</span>
-    </Pill>
-  );
-};
-
-const SortableHeader: FC<{
-  label: string;
-  sortKey: TableSortKey;
-  sort: TableSort | null;
-  onSort: (key: TableSortKey) => void;
-  className?: string;
-}> = ({ label, sortKey, sort, onSort, className }) => {
-  const active = sort?.key === sortKey;
-  const Icon = active ? (sort!.direction === "asc" ? ChevronUp : ChevronDown) : ChevronsUpDown;
-  return (
-    <th className={cn("px-4 py-3 text-left", className)}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className={cn(
-          "inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide transition-colors cursor-pointer",
-          active ? "text-primary" : "text-black/40 hover:text-primary",
-        )}>
-        {label}
-        <Icon className={cn("h-3 w-3 flex-none", active ? "text-primary" : "text-black/30")} />
-      </button>
-    </th>
-  );
-};
-
-const TrackerTableView: FC<{
-  columns: TrackerColumn[];
-  onMove: (cardId: string, to: TrackerColumnId) => void;
-  onOpen: (cardId: string) => void;
-}> = ({ columns, onMove, onOpen }) => {
-  const [sort, setSort] = useState<TableSort | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
-
-  const rows = useMemo(() => {
-    const flat = columns.flatMap((col) => col.cards.map((card) => ({ card, columnId: col.id })));
-    if (!sort) return flat;
-    const dir = sort.direction === "asc" ? 1 : -1;
-    return [...flat].sort((a, b) => {
-      switch (sort.key) {
-        case "company":
-          return a.card.company.localeCompare(b.card.company) * dir;
-        case "role":
-          return a.card.title.localeCompare(b.card.title) * dir;
-        case "status":
-          return (STATUS_ORDER.indexOf(a.columnId) - STATUS_ORDER.indexOf(b.columnId)) * dir;
-        case "daysAgo":
-          return ((a.card.daysAgo ?? 0) - (b.card.daysAgo ?? 0)) * dir;
-        default:
-          return 0;
-      }
-    });
-  }, [columns, sort]);
-
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const currentPage = Math.min(Math.max(page, 1), totalPages);
-  const pagedRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function toggleSort(key: TableSortKey) {
-    setSort((prev) =>
-      !prev || prev.key !== key ? { key, direction: "asc" } : { key, direction: prev.direction === "asc" ? "desc" : "asc" },
-    );
-    setPage(1);
-  }
-
-  return (
-    <>
-      <DashCard className="border-2 border-[#222325] p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm border-collapse">
-            <thead>
-              <tr className="border-b border-black/10 bg-[#fbfbf7]">
-                <SortableHeader label="Company" sortKey="company" sort={sort} onSort={toggleSort} />
-                <SortableHeader label="Role" sortKey="role" sort={sort} onSort={toggleSort} />
-                <SortableHeader label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
-                <SortableHeader label="Days ago" sortKey="daysAgo" sort={sort} onSort={toggleSort} />
-                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-black/40">Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedRows.map(({ card, columnId }) => (
-                <tr
-                  key={card.id}
-                  onClick={() => onOpen(card.id)}
-                  className="border-b border-black/6 last:border-b-0 hover:bg-[#f6f6f6]/70 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
-                      <span className="text-xs font-semibold text-black/70 truncate">{card.company}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs font-medium text-primary">{card.title}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {/* The pill is the control — StatusMenu stops propagation
-                      itself so the row click never fires underneath it. */}
-                    <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "—"}</span>
-                  </td>
-                  <td className="px-4 py-3 max-w-[240px]">
-                    {card.statusChip ? <StatusChipBadge chip={card.statusChip} /> : <span className="text-xs text-black/30">—</span>}
-                  </td>
-                </tr>
-              ))}
-
-              {pagedRows.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-xs font-medium text-black/40">
-                    No applications yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </DashCard>
-
-      <DashPagination
-        page={currentPage}
-        totalPages={totalPages}
-        pageSize={pageSize}
-        totalItems={rows.length}
-        itemNoun="applications"
-        onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          const firstVisible = (currentPage - 1) * pageSize;
-          setPageSize(next);
-          setPage(Math.floor(firstVisible / next) + 1);
-        }}
-      />
-    </>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Calendar view — month grid built with date-fns, plain client state only.
-// Highlighted days are derived from `buildTrackerEvents`; clicking one shows
-// its events in the side panel.
-// ---------------------------------------------------------------------------
-
-const TrackerCalendarView: FC<{
-  columns: TrackerColumn[];
-  onMove: (cardId: string, to: TrackerColumnId) => void;
-  onOpen: (cardId: string) => void;
-}> = ({ columns, onMove, onOpen }) => {
-  const today = useMemo(() => new Date(), []);
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(today));
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-
-  const trackerEvents = useMemo(() => buildTrackerEvents(columns, today), [columns, today]);
-
-  const eventsByDate = useMemo(() => {
-    const map = new Map<string, TrackerEvent[]>();
-    for (const ev of trackerEvents) {
-      const key = format(ev.date, "yyyy-MM-dd");
-      const list = map.get(key);
-      if (list) list.push(ev);
-      else map.set(key, [ev]);
-    }
-    return map;
-  }, [trackerEvents]);
-
-  const days = useMemo(() => {
-    const gridStart = startOfWeek(startOfMonth(calendarMonth), { weekStartsOn: 1 });
-    const gridEnd = endOfWeek(endOfMonth(calendarMonth), { weekStartsOn: 1 });
-    return eachDayOfInterval({ start: gridStart, end: gridEnd });
-  }, [calendarMonth]);
-
-  const selectedDayEvents = selectedDate ? (eventsByDate.get(format(selectedDate, "yyyy-MM-dd")) ?? []) : [];
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
-      <DashCard className="border-2 border-[#222325] p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setCalendarMonth((m) => subMonths(m, 1))}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-black/50 hover:bg-[#f0f0ea] hover:text-primary transition-colors cursor-pointer"
-              aria-label="Previous month">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <h2 className="text-sm font-bold text-primary w-36 text-center whitespace-nowrap">{format(calendarMonth, "MMMM yyyy")}</h2>
-            <button
-              type="button"
-              onClick={() => setCalendarMonth((m) => addMonths(m, 1))}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-black/50 hover:bg-[#f0f0ea] hover:text-primary transition-colors cursor-pointer"
-              aria-label="Next month">
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          <StickerButton
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setCalendarMonth(startOfMonth(today));
-              setSelectedDate(today);
-            }}>
-            Today
-          </StickerButton>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-            <div key={d} className="text-center text-[11px] font-semibold text-black/40 py-1">
-              {d}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-1.5">
-          {days.map((day) => {
-            const key = format(day, "yyyy-MM-dd");
-            const dayEvents = eventsByDate.get(key) ?? [];
-            const inMonth = isSameMonth(day, calendarMonth);
-            const todayFlag = isToday(day);
-            const selected = selectedDate ? isSameDay(day, selectedDate) : false;
-
-            return (
-              <button
-                key={key}
-                type="button"
-                disabled={dayEvents.length === 0}
-                onClick={() => setSelectedDate(day)}
-                className={cn(
-                  "aspect-square rounded-xl border text-left p-1.5 flex flex-col gap-1 transition-colors",
-                  inMonth ? "bg-white" : "bg-[#f6f6f6]",
-                  dayEvents.length > 0 ? "border-black/15 cursor-pointer hover:border-primary/50" : "border-black/5 cursor-default",
-                  selected && "ring-2 ring-primary border-primary",
-                  todayFlag && !selected && "border-[1.5px] border-primary",
-                )}>
-                <span className={cn("text-xs font-semibold", inMonth ? "text-primary" : "text-black/30")}>{format(day, "d")}</span>
-                {dayEvents.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-0.5 mt-auto">
-                    {dayEvents.slice(0, 3).map((ev) => (
-                      <span key={ev.id} className={cn("h-1.5 w-1.5 rounded-full flex-none", EVENT_TYPE_META[ev.type].dot)} aria-hidden />
-                    ))}
-                    {dayEvents.length > 3 && <span className="text-[9px] font-semibold text-black/40">+{dayEvents.length - 3}</span>}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-black/8">
-          {(Object.entries(EVENT_TYPE_META) as [TrackerEventType, (typeof EVENT_TYPE_META)[TrackerEventType]][]).map(([type, meta]) => (
-            <div key={type} className="flex items-center gap-1.5">
-              <span className={cn("h-2 w-2 rounded-full flex-none", meta.dot)} aria-hidden />
-              <span className="text-[11px] font-medium text-black/50">{meta.label}</span>
-            </div>
-          ))}
-        </div>
-      </DashCard>
-
-      <DashCard className="border-2 border-[#222325] p-5 lg:sticky lg:top-24">
-        <h3 className="text-sm font-bold text-primary mb-3">{selectedDate ? format(selectedDate, "EEEE, MMM d") : "Select a day"}</h3>
-
-        {selectedDayEvents.length === 0 ? (
-          <p className="text-xs text-black/45 leading-relaxed">
-            {selectedDate ? "Nothing on this day." : "Click a highlighted day on the calendar to see what's happening."}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2.5">
-            {selectedDayEvents.map((ev) => (
-              // A door into the job, not a read-only note: the row opens the
-              // timeline, the pill changes the status right here.
-              <div
-                key={ev.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onOpen(ev.cardId)}
-                onKeyDown={(e) => e.key === "Enter" && onOpen(ev.cardId)}
-                className="cursor-pointer rounded-xl border border-black/10 p-3 transition-colors hover:border-[#222325]">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {ev.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}
-                    <span className="text-xs font-semibold text-black/60 truncate">{ev.company}</span>
-                  </div>
-                </div>
-                <p className="text-sm font-semibold text-primary leading-snug mb-1.5">{ev.title}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusMenu value={ev.columnId} onChange={(to) => onMove(ev.cardId, to)} />
-                  <span className="min-w-0 truncate text-[11px] font-medium text-black/55">
-                    {EVENT_TYPE_META[ev.type].label}
-                    {ev.detail ? ` · ${ev.detail}` : ""}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </DashCard>
-    </div>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -745,6 +62,7 @@ const TrackerClient: FC = () => {
   // folded in during render using React's "adjust state when input changes"
   // pattern — an effect would paint the stale board first, then correct it.
   const { applications, recordAction } = useActivity();
+  const { openWinLog } = useWin();
   const [mergedIds, setMergedIds] = useState<string[]>([]);
   const pending = applications.filter((a) => !mergedIds.includes(a.id));
   if (pending.length > 0) {
@@ -791,6 +109,41 @@ const TrackerClient: FC = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  /**
+   * Whatever is under the pointer wins; corners are the fallback.
+   *
+   * `closestCorners` on its own compares the dragged card's corners against
+   * every droppable's, and an empty column always loses that: its droppable is
+   * one tall rectangle whose corners sit far from the cursor, so a small card
+   * rect in a neighbouring column wins even when the pointer is squarely
+   * inside the empty one. Offer was effectively undroppable.
+   *
+   * The second step matters just as much: a column's droppable spans its whole
+   * height, so the pointer is inside BOTH a card and its column. If the column
+   * won, every drop would append to the end instead of landing where you
+   * aimed, so a populated column re-resolves to its nearest card.
+   *
+   * Safe against the layout the drop gap introduces: droppable rects are
+   * measured once per drag (`MeasuringFrequency.Optimized`), so opening a gap
+   * does not move the rects this reads and cannot oscillate.
+   */
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointer = pointerWithin(args);
+    const hits = pointer.length > 0 ? pointer : closestCorners(args);
+    const first = hits[0]?.id;
+    if (first == null) return hits;
+
+    const col = columns.find((c) => c.id === first);
+    if (!col || col.cards.length === 0) return hits;
+
+    const cardIds = new Set<string>(col.cards.map((c) => c.id));
+    const inner = closestCorners({
+      ...args,
+      droppableContainers: args.droppableContainers.filter((d) => cardIds.has(String(d.id))),
+    });
+    return inner.length > 0 ? inner : hits;
+  };
+
   function findColumnIdForCard(cardId: string, cols: TrackerColumn[]): TrackerColumnId | null {
     return cols.find((c) => c.cards.some((card) => card.id === cardId))?.id ?? null;
   }
@@ -815,6 +168,14 @@ const TrackerClient: FC = () => {
   /** The one mover — drag-drop, the status pills and the timeline dialog all
    *  land here, so every view agrees. Both `count` and `cards` shift, per the
    *  count-is-the-real-total contract. */
+  /** Landing in Offer is the win-log’s moment — offered, never forced. */
+  function offerWinToast(company: string) {
+    toast.success(`${company} moved to Offer 🎉`, {
+      description: "That sounds like a job. Log it and your pod sees.",
+      action: { label: "I got the job", onClick: openWinLog },
+    });
+  }
+
   function moveCard(cardId: string, to: TrackerColumnId) {
     const from = findColumnIdForCard(cardId, columns);
     if (!from || from === to) return;
@@ -831,6 +192,7 @@ const TrackerClient: FC = () => {
     // Keeping the board honest is a qualifying action — the "status-change"
     // kind existed for exactly this and had no caller until now.
     recordAction("status-change", cardId, `${card.company} → ${COLUMN_LABELS[to]}`);
+    if (to === "offer") offerWinToast(card.company);
   }
 
   /** "Add job" — dedupe against the board; new jobs land in Saved. */
@@ -902,7 +264,10 @@ const TrackerClient: FC = () => {
     const preTarget = columns.some((c) => c.id === overId) ? (overId as TrackerColumnId) : findColumnIdForCard(overId, columns);
     if (preSource && preTarget && preSource !== preTarget) {
       const moved = columns.find((c) => c.id === preSource)?.cards.find((c) => c.id === activeId);
-      if (moved) recordAction("status-change", activeId, `${moved.company} → ${COLUMN_LABELS[preTarget]}`);
+      if (moved) {
+        recordAction("status-change", activeId, `${moved.company} → ${COLUMN_LABELS[preTarget]}`);
+        if (preTarget === "offer") offerWinToast(moved.company);
+      }
     }
 
     setColumns((prev) => {
@@ -946,8 +311,6 @@ const TrackerClient: FC = () => {
   }
 
   return (
-    // The board is a fixed-height surface: the columns scroll, the page
-    // doesn't. Table and Calendar keep normal page flow.
     <div className={cn("bg-[#f6f6f6]", view === "board" ? "h-screen flex flex-col overflow-hidden" : "min-h-screen")}>
       {/* Header */}
       <header className="sticky top-0 z-10 h-16 flex-none flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
@@ -1013,7 +376,7 @@ const TrackerClient: FC = () => {
             <DndContext
               id="tracker-board"
               sensors={sensors}
-              collisionDetection={closestCorners}
+              collisionDetection={collisionDetection}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               // Escape mid-drag never reaches onDragEnd — without this the

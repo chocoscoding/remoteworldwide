@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { Lottie } from "lottie-react";
 
 /**
  * The front door: pick which resume to scan, then choose how to scan it.
@@ -32,13 +33,24 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
 
   return (
     <div className="mx-auto flex min-h-[440px] max-w-[680px] flex-col items-center justify-center text-center">
-      <h2 className="text-2xl font-bold text-primary">Score a resume</h2>
-      <p className="mt-2 max-w-[460px] text-sm leading-relaxed text-black/50">
-        Pick one of yours or upload a file, then scan it on its own or against a specific job.
+      <span className="flex  items-center justify-center rounded-full">
+        <Lottie
+          src={`/Lottie/neobrutalism/View_Square_lottie.json`}
+          autoplay
+          loop
+          className=""
+          speed={0.63}
+          style={{ width: 340, height: 340 }}
+        />
+      </span>
+
+      <p className="mt-2 max-w-[500px] text-sm leading-relaxed text-black/50">
+        {/* This is how applicant tracking systems read your resume. <br /> */}
+        Pick one of your resume, then scan it on its own or against a specific job.
       </p>
 
       {/* Step 1 — which resume */}
-      <div className="mt-7 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <div className="mt-2 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
         {resumes.map((r) => {
           const selected = r.id === selectedId;
           const badge = sourceBadgeLabel(r.source);
@@ -51,9 +63,13 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
               aria-pressed={selected}
               className={cn(
                 "flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors cursor-pointer",
-                selected ? "border-[#222325] bg-[#f6faea]" : "border-black/10 bg-white hover:border-black/30"
+                selected ? "border-[#222325] bg-[#f6faea]" : "border-black/10 bg-white hover:border-black/30",
               )}>
-              <span className={cn("grid h-9 w-9 flex-none place-content-center rounded-lg", selected ? "bg-[#222325] text-[#e1f073]" : "bg-[#f0f0ea] text-primary")}>
+              <span
+                className={cn(
+                  "grid h-9 w-9 flex-none place-content-center rounded-lg",
+                  selected ? "bg-[#222325] text-[#e1f073]" : "bg-[#f0f0ea] text-primary",
+                )}>
                 <FileText className="h-4 w-4" />
               </span>
               <span className="min-w-0 flex-1">
@@ -74,8 +90,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
         })}
 
         {/* Upload — any resume, whether or not it lives here. */}
-        <label
-          className="flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-dashed border-black/20 bg-white p-3.5 text-left transition-colors hover:border-[#222325]">
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-dashed border-black/20 bg-white p-3.5 text-left transition-colors hover:border-[#222325]">
           <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
             <Upload className="h-4 w-4 text-primary" />
           </span>
@@ -106,9 +121,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
                 <ScanSearch className="h-4 w-4 text-[#e1f073]" />
               </span>
               <span className="mt-3 block text-sm font-bold">General score</span>
-              <span className="mt-1 block text-xs leading-relaxed text-white/55">
-                How it reads for your niche — no job needed.
-              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-white/55">How it reads for your niche — no job needed.</span>
             </button>
             <button
               type="button"

@@ -140,12 +140,6 @@ const ReferralsClient: FC = () => {
             <Network className="h-4 w-4" />
             Network sources
           </StickerButton>
-          {!job && (
-            <StickerButton variant="primary" size="md" onClick={() => setPickerOpen(true)}>
-              <Briefcase className="h-4 w-4" />
-              Pick a job
-            </StickerButton>
-          )}
         </div>
       </header>
 
@@ -197,7 +191,7 @@ const ReferralsClient: FC = () => {
           }}
           options={[
             { id: "all", label: "All contacts", count: contacts.length },
-            { id: "job", label: "For this job", count: paths?.direct.length },
+            { id: "job", label: "For a job", count: paths?.direct.length },
           ]}
         />
 
@@ -258,8 +252,7 @@ const ReferralsClient: FC = () => {
                         the direct list. */}
                     <h2 className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55">Might know someone</h2>
                     <p className="mt-1 text-xs text-black/55">
-                      Recruiters and alumni elsewhere — they can&apos;t refer you to {job.company}, but they can point you at
-                      whoever can.
+                      Recruiters and alumni elsewhere — they can&apos;t refer you to {job.company}, but they can point you at whoever can.
                     </p>
                   </div>
                   <DashCard className="overflow-hidden p-0">
@@ -304,7 +297,7 @@ const ReferralsClient: FC = () => {
                   onClick={() => resetFilters(setTieFilter, f.id)}
                   className={cn(
                     "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    tieFilter === f.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary"
+                    tieFilter === f.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
                   )}>
                   {f.label}
                   <span className={cn("font-normal tabular-nums", tieFilter === f.id ? "text-black/60" : "text-black/55")}>
@@ -326,7 +319,7 @@ const ReferralsClient: FC = () => {
                   onClick={t.toggle}
                   className={cn(
                     "cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    t.on ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary"
+                    t.on ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
                   )}>
                   {t.label}
                 </button>

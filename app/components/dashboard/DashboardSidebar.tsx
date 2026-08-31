@@ -19,7 +19,6 @@ import {
   Users,
   MessageSquare,
   FolderOpen,
-  PartyPopper,
   UsersRound,
   Gift,
   type LucideIcon,
@@ -28,6 +27,7 @@ import { cn } from "@/lib/utils";
 import LogoFull from "@/app/components/svg/LogoFull";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { useSidebarCollapse } from "./SidebarCollapseContext";
+import { photoOf } from "@/app/lib/dashboard/people-photos";
 import { useActivity } from "./activity/ActivityProvider";
 
 type NavItem = { id: string; label: string; href: string; icon: LucideIcon };
@@ -62,7 +62,6 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "referrals", label: "Referral search", href: "/dashboard/referrals", icon: Users },
       { id: "questions", label: "Application answers", href: "/dashboard/questions", icon: MessageSquare },
       { id: "vault", label: "My documents", href: "/dashboard/vault", icon: FolderOpen },
-      { id: "landed", label: "You got the job", href: "/dashboard/landed", icon: PartyPopper },
     ],
   },
   {
@@ -178,8 +177,13 @@ const DashboardSidebar: FC = () => {
             collapsed ? "justify-center px-1" : "gap-2.5 px-1",
             isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]"
           )}>
-          <div className="h-8 w-8 flex-none rounded-full bg-[#222325] text-[#e1f073] font-extrabold text-xs flex items-center justify-center">
-            AO
+          <div className="h-8 w-8 flex-none overflow-hidden rounded-full bg-[#222325] text-[#e1f073] font-extrabold text-xs flex items-center justify-center">
+            {photoOf("Amara Okafor") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoOf("Amara Okafor")!} alt="" className="h-full w-full object-cover" />
+            ) : (
+              "AO"
+            )}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">

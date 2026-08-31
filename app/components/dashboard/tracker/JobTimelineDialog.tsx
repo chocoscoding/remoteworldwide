@@ -4,11 +4,14 @@ import { FC, useState } from "react";
 import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowRight, Check, MessageSquare, Mic, PartyPopper, Users, X } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
+import { usePod } from "@/app/components/dashboard/pod/PodProvider";
+import { useWin } from "@/app/components/dashboard/win/WinProvider";
 import type { TrackerCard, TrackerColumnId } from "@/app/lib/dashboard/types";
 import StatusMenu from "./StatusMenu";
 import { COLUMN_LABELS, STATUS_ORDER } from "./tracker-meta";
@@ -82,6 +85,7 @@ const NextStep: FC<{ card: TrackerCard; columnId: TrackerColumnId; onMove: JobTi
   onMove,
 }) => {
   const { recordAction } = useActivity();
+  const { openWinLog } = useWin();
   // Lives and dies with the dialog (keyed by card) — no reset effect needed.
   const [followedUp, setFollowedUp] = useState(false);
 
@@ -126,13 +130,12 @@ const NextStep: FC<{ card: TrackerCard; columnId: TrackerColumnId; onMove: JobTi
         </Link>
       );
     case "offer":
+      // Not a route any more — logging the win is a moment, and it auto-shares
+      // to the pod. The WinProvider owns the whole flow.
       return (
-        <Link href="/dashboard/landed">
-          <StickerButton variant="primary" size="sm" type="button">
-            <PartyPopper className="h-3.5 w-3.5" />
-            Start your first 90 days
-          </StickerButton>
-        </Link>
+        <StickerButton variant="primary" size="sm" onClick={openWinLog}>
+          <PartyPopper className="h-3.5 w-3.5" />I got the job
+        </StickerButton>
       );
   }
 };
@@ -142,7 +145,53 @@ const NEXT_STEP_HINT: Record<TrackerColumnId, string> = {
   applied: "A week of silence is normal. A short nudge isn't pushy.",
   conversation: "A warm voice inside the company moves this faster than waiting.",
   interviewing: "A practice round before the real one is the highest-leverage hour here.",
-  offer: "Congratulations — the checklist takes it from here.",
+  offer: "Congratulations — log it and let your pod see.",
+};
+
+/**
+ * "Add this step to your pod" — the same milestone the timeline shows, pushed
+ * onto the pod's What's moving feed where the others can fire it. Keyed by
+ * card+column from the call site so reopening on another job (or after a
+ * status change) offers a fresh share.
+ */
+const SharePodRow: FC<{ card: TrackerCard; columnId: TrackerColumnId }> = ({ card, columnId }) => {
+  const { shareToPod } = usePod();
+  const [shared, setShared] = useState(false);
+
+  const milestone =
+    columnId === "saved" ? `You saved a role at ${card.company}` : `You: ${card.company} — now ${COLUMN_LABELS[columnId]}`;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 px-6 py-3">
+      <p className="text-xs text-black/55">Feels like progress? Your pod sees what&apos;s moving.</p>
+      <button
+        type="button"
+        disabled={shared}
+        onClick={() => {
+          shareToPod(milestone);
+          setShared(true);
+          toast.success("On your pod's board", { description: milestone });
+        }}
+        className={cn(
+          "inline-flex flex-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+          shared
+            ? "cursor-default border-black/10 bg-[#f0f0ea] text-black/45"
+            : "cursor-pointer border-black/15 text-primary hover:border-[#222325]"
+        )}>
+        {shared ? (
+          <>
+            <Check className="h-3.5 w-3.5" />
+            On your pod
+          </>
+        ) : (
+          <>
+            <Users className="h-3.5 w-3.5" />
+            Add this to your pod
+          </>
+        )}
+      </button>
+    </div>
+  );
 };
 
 const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenChange, onMove }) => {
@@ -224,6 +273,9 @@ const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenC
                   })}
                 </div>
               </div>
+
+              {/* Feels like progress? Put it on the pod's board. */}
+              <SharePodRow key={`share-${card.id}-${columnId}`} card={card} columnId={columnId} />
 
               {/* One suggested action, matched to the stage. */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 bg-[#fbfbf7] px-6 py-4">

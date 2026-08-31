@@ -287,6 +287,7 @@ export const BOARD: BoardRow[] = [
 export const POD_GOALS: PodGoal[] = [
   {
     id: "goal-land-job",
+    kind: "job-win",
     label: "Someone in the pod lands a job",
     detail: "Every pod carries this by default — it can't be voted out.",
     target: 1,
@@ -298,6 +299,7 @@ export const POD_GOALS: PodGoal[] = [
   },
   {
     id: "goal-daily-apps",
+    kind: "applications",
     label: "10 applications a day, together",
     target: 10,
     current: 6,
@@ -308,6 +310,7 @@ export const POD_GOALS: PodGoal[] = [
   },
   {
     id: "goal-warm-referrals",
+    kind: "referrals",
     label: "Land 3 warm referrals this week",
     target: 3,
     current: 0,
@@ -334,7 +337,15 @@ export const INVITES: InviteRow[] = [
   { name: "Dami Aluko", meta: "Subscribed 12 days ago", status: "subscribed" },
   { name: "Ines Costa", meta: "Subscribed 5 days ago", status: "subscribed" },
   { name: "Grace Mensah", meta: "Joined 4 days ago", status: "joined" },
+  { name: "Kwame Boateng", meta: "Joined 8 days ago", status: "joined" },
+  { name: "Lerato Dube", meta: "Joined 2 weeks ago", status: "joined" },
   { name: "Tolu Bakare", meta: "Invited 6 days ago", status: "invited" },
+  { name: "Yara Haddad", meta: "Invited 9 days ago", status: "invited" },
+  { name: "Sipho Ndlovu", meta: "Invited 2 weeks ago", status: "invited" },
+  { name: "Aisha Bello", meta: "Invited 3 weeks ago", status: "invited" },
+  { name: "Marcus Vieira", meta: "Invited 3 weeks ago", status: "invited" },
+  { name: "Nadia Farouk", meta: "Invited last month", status: "invited" },
+  { name: "Obi Chukwu", meta: "Invited last month", status: "invited" },
 ];
 
 // ---------------------------------------------------------------------------

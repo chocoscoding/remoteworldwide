@@ -31,6 +31,7 @@ import {
 } from "@/app/lib/dashboard/activity";
 import { scoreApplication, type ApplicationScore } from "@/app/lib/dashboard/ats-stub";
 import { MAX_STREAK_PROMPTS_PER_DAY, balanceOf, priceOf, restoreCost, type CreditEntry, type SpendItem } from "@/app/lib/dashboard/credits";
+import { INVITE_CREDITS_EARNED, SUBSCRIBED_INVITES } from "@/app/lib/dashboard/invites";
 import { DEFAULT_LOG_SECONDS, clampTarget } from "@/app/lib/dashboard/goals";
 import {
   addDays,
@@ -226,10 +227,17 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [atRiskDismissed, setAtRiskDismissed] = useState(false);
   const [pausedDaysLeft, setPausedDaysLeft] = useState<number | null>(null);
   const [retiredStreak, setRetiredStreak] = useState<number | null>(null);
-  // Seeded with the balance the old hardcoded copies claimed, as a single
-  // opening entry — so even the starting number has a row behind it.
+  // Seeded from the invites that actually subscribed, as a single opening
+  // entry — so the balance, the "Earned" block in the credit modal and the
+  // invites screen are three views of one number rather than three constants
+  // free to drift. The old seed was a hardcoded 18 that agreed with nothing.
   const [ledger, setLedger] = useState<CreditEntry[]>(() => [
-    { id: "credit-opening", delta: 18, reason: "Opening balance", at: today.toISOString() },
+    {
+      id: "credit-invites",
+      delta: INVITE_CREDITS_EARNED,
+      reason: `${SUBSCRIBED_INVITES.length} invites subscribed`,
+      at: today.toISOString(),
+    },
   ]);
 
   const todayKey = dayKey(today);
