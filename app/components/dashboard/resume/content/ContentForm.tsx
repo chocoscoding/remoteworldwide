@@ -93,7 +93,7 @@ const ContentForm: FC<ContentFormProps> = ({
                 "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[13px] cursor-pointer transition-all text-left",
                 activeGroup === group.id
                   ? "bg-[#222325] text-white font-bold shadow-[inset_3px_3px_0_0_rgba(0,0,0,0.4)] translate-x-px translate-y-px"
-                  : "font-medium text-black/60 hover:bg-[#f6f6f6]"
+                  : "font-medium text-black/60 hover:bg-[#f6f6f6]",
               )}>
               <span className="flex min-w-0 items-center gap-2">
                 {group.id === "summary" && !isBlank && summarySuggestion === "pending" && (
@@ -111,7 +111,11 @@ const ContentForm: FC<ContentFormProps> = ({
 
       <div className="flex flex-col gap-4 pt-3 border-t border-black/15">
         {/* Personal details */}
-        <div ref={(el) => { groupRefs.current.personal = el; }} className={cn("flex flex-col gap-2.5 p-1", flashClass("personal"))}>
+        <div
+          ref={(el) => {
+            groupRefs.current.personal = el;
+          }}
+          className={cn("flex flex-col gap-2.5 p-1", flashClass("personal"))}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Personal details</p>
           <TextField label="Name" value={content.name} onChange={(v) => setField("name", v)} placeholder="Your name" />
           <TextField label="Title" value={content.title} onChange={(v) => setField("title", v)} placeholder="Your title" />
@@ -121,18 +125,30 @@ const ContentForm: FC<ContentFormProps> = ({
         </div>
 
         {/* Summary */}
-        <div ref={(el) => { groupRefs.current.summary = el; }} className={cn("flex flex-col gap-2 p-1", flashClass("summary"))}>
+        <div
+          ref={(el) => {
+            groupRefs.current.summary = el;
+          }}
+          className={cn("flex flex-col gap-2 p-1", flashClass("summary"))}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Summary</p>
           <TextAreaField value={content.summary} onChange={(v) => setField("summary", v)} placeholder="A short summary…" rows={5} />
           {!isBlank && summarySuggestion === "pending" && (
             <div className="rounded-lg bg-secondary/25 px-3 py-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
               <Sparkles className="h-3 w-3 text-black/50 flex-none" />
-              <span className="text-black/55">AI suggestion — leads with &quot;developer experience&quot; to match {docLabel}&apos;s JD.</span>
-              <button type="button" onClick={onAcceptSummarySuggestion} className="font-semibold text-primary hover:underline cursor-pointer">
+              <span className="text-black/55">
+                AI suggestion — leads with &quot;developer experience&quot; to match {docLabel}&apos;s JD.
+              </span>
+              <button
+                type="button"
+                onClick={onAcceptSummarySuggestion}
+                className="font-semibold text-primary hover:underline cursor-pointer">
                 Accept
               </button>
               <span className="text-black/25">·</span>
-              <button type="button" onClick={onDismissSummarySuggestion} className="font-semibold text-black/45 hover:underline cursor-pointer">
+              <button
+                type="button"
+                onClick={onDismissSummarySuggestion}
+                className="font-semibold text-black/45 hover:underline cursor-pointer">
                 Dismiss
               </button>
             </div>
@@ -141,13 +157,21 @@ const ContentForm: FC<ContentFormProps> = ({
         </div>
 
         {/* Links */}
-        <div ref={(el) => { groupRefs.current.links = el; }} className={cn("flex flex-col gap-2 p-1", flashClass("links"))}>
+        <div
+          ref={(el) => {
+            groupRefs.current.links = el;
+          }}
+          className={cn("flex flex-col gap-2 p-1", flashClass("links"))}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Links</p>
           <LinksEditor links={content.links} onChange={(links) => setField("links", links)} />
         </div>
 
         {/* Education */}
-        <div ref={(el) => { groupRefs.current.education = el; }} className={cn("flex flex-col gap-2 p-1", flashClass("education"))}>
+        <div
+          ref={(el) => {
+            groupRefs.current.education = el;
+          }}
+          className={cn("flex flex-col gap-2 p-1", flashClass("education"))}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Education</p>
           <EntryListEditor<ResumeEducationEntry>
             items={content.education}
@@ -159,8 +183,20 @@ const ContentForm: FC<ContentFormProps> = ({
               <>
                 <TextField value={item.school} onChange={(v) => update({ school: v })} placeholder="School" isDark={isActive} />
                 <div className="flex gap-2">
-                  <TextField value={item.degree} onChange={(v) => update({ degree: v })} placeholder="Degree" className="flex-1" isDark={isActive} />
-                  <TextField value={item.dates} onChange={(v) => update({ dates: v })} placeholder="2019–2022" className="w-32 flex-none" isDark={isActive} />
+                  <TextField
+                    value={item.degree}
+                    onChange={(v) => update({ degree: v })}
+                    placeholder="Degree"
+                    className="flex-1"
+                    isDark={isActive}
+                  />
+                  <TextField
+                    value={item.dates}
+                    onChange={(v) => update({ dates: v })}
+                    placeholder="2019–2022"
+                    className="w-32 flex-none"
+                    isDark={isActive}
+                  />
                 </div>
                 <TextField
                   value={item.location ?? ""}
@@ -168,14 +204,23 @@ const ContentForm: FC<ContentFormProps> = ({
                   placeholder="Location (optional)"
                   isDark={isActive}
                 />
-                <TextField value={item.detail ?? ""} onChange={(v) => update({ detail: v })} placeholder="Detail (optional)" isDark={isActive} />
+                <TextField
+                  value={item.detail ?? ""}
+                  onChange={(v) => update({ detail: v })}
+                  placeholder="Detail (optional)"
+                  isDark={isActive}
+                />
               </>
             )}
           />
         </div>
 
         {/* Projects */}
-        <div ref={(el) => { groupRefs.current.projects = el; }} className={cn("flex flex-col gap-2 p-1", flashClass("projects"))}>
+        <div
+          ref={(el) => {
+            groupRefs.current.projects = el;
+          }}
+          className={cn("flex flex-col gap-2 p-1", flashClass("projects"))}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Projects</p>
           <EntryListEditor<ResumeProjectEntry>
             items={content.projects}
@@ -186,7 +231,13 @@ const ContentForm: FC<ContentFormProps> = ({
             renderFields={(item, update, isActive) => (
               <>
                 <TextField value={item.name} onChange={(v) => update({ name: v })} placeholder="Project name" isDark={isActive} />
-                <TextAreaField value={item.detail} onChange={(v) => update({ detail: v })} placeholder="What it does / your impact" rows={2} isDark={isActive} />
+                <TextAreaField
+                  value={item.detail}
+                  onChange={(v) => update({ detail: v })}
+                  placeholder="What it does / your impact"
+                  rows={2}
+                  isDark={isActive}
+                />
                 <TextField value={item.link ?? ""} onChange={(v) => update({ link: v })} placeholder="Link (optional)" isDark={isActive} />
               </>
             )}
@@ -194,7 +245,11 @@ const ContentForm: FC<ContentFormProps> = ({
         </div>
 
         {/* Certifications */}
-        <div ref={(el) => { groupRefs.current.certifications = el; }} className={cn("flex flex-col gap-2 p-1", flashClass("certifications"))}>
+        <div
+          ref={(el) => {
+            groupRefs.current.certifications = el;
+          }}
+          className={cn("flex flex-col gap-2 p-1", flashClass("certifications"))}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Certifications</p>
           <EntryListEditor<ResumeCertEntry>
             items={content.certifications}
@@ -206,8 +261,20 @@ const ContentForm: FC<ContentFormProps> = ({
               <>
                 <TextField value={item.name} onChange={(v) => update({ name: v })} placeholder="Certification name" isDark={isActive} />
                 <div className="flex gap-2">
-                  <TextField value={item.issuer ?? ""} onChange={(v) => update({ issuer: v })} placeholder="Issuer (optional)" className="flex-1" isDark={isActive} />
-                  <TextField value={item.year ?? ""} onChange={(v) => update({ year: v })} placeholder="Year" className="w-20 flex-none" isDark={isActive} />
+                  <TextField
+                    value={item.issuer ?? ""}
+                    onChange={(v) => update({ issuer: v })}
+                    placeholder="Issuer (optional)"
+                    className="flex-1"
+                    isDark={isActive}
+                  />
+                  <TextField
+                    value={item.year ?? ""}
+                    onChange={(v) => update({ year: v })}
+                    placeholder="Year"
+                    className="w-20 flex-none"
+                    isDark={isActive}
+                  />
                 </div>
               </>
             )}

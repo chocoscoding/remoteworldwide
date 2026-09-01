@@ -363,7 +363,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
    * woven keywords are the user's resume now, not part of the scorecard.
    */
   const clearTailoring = () => {
-    setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, score: d.before ?? d.score, before: null, tailoredAt: null } : d)));
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === activeDocId ? { ...d, score: d.before ?? d.score, before: null, tailoredAt: null } : d)),
+    );
     setAiDone((prev) => {
       const next = new Set(prev);
       next.delete("tailor");
