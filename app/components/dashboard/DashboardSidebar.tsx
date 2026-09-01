@@ -28,7 +28,11 @@ import LogoFull from "@/app/components/svg/LogoFull";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { useSidebarCollapse } from "./SidebarCollapseContext";
 import { photoOf } from "@/app/lib/dashboard/people-photos";
+import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import { useActivity } from "./activity/ActivityProvider";
+
+/** Monthly credit allowance on the free plan — mirrors settings/billing. */
+const PLAN_ALLOWANCE = 50;
 
 type NavItem = { id: string; label: string; href: string; icon: LucideIcon };
 type NavGroup = { label?: string; items: NavItem[] };
@@ -78,7 +82,7 @@ const DashboardSidebar: FC = () => {
   const { collapsed, setCollapsed } = useSidebarCollapse();
   // Reads the derived ledger balance. This used to be a hardcoded 18 that
   // silently disagreed with the streak panel the moment anything was earned.
-  const { credits, openCredits } = useActivity();
+  const { credits, giftsWaiting, openGifts } = useActivity();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -89,10 +93,14 @@ const DashboardSidebar: FC = () => {
     <aside
       className={cn(
         "flex-none bg-white border-r border-black/10 h-screen sticky top-0 flex flex-col transition-[width] duration-200",
-        collapsed ? "w-[76px]" : "w-[252px]"
+        collapsed ? "w-[76px]" : "w-[252px]",
       )}>
       {/* Header */}
-      <div className={cn("h-16 flex-none border-b border-black/8 flex items-center", collapsed ? "justify-center px-2" : "justify-between px-[18px]")}>
+      <div
+        className={cn(
+          "h-16 flex-none border-b border-black/8 flex items-center",
+          collapsed ? "justify-center px-2" : "justify-between px-[18px]",
+        )}>
         {collapsed ? <LogoMini className="h-[22px] w-auto" /> : <LogoFull className="h-[19px] w-auto" />}
         {!collapsed && (
           <button
@@ -132,7 +140,7 @@ const DashboardSidebar: FC = () => {
                     className={cn(
                       "flex items-center rounded-lg text-sm cursor-pointer transition-colors",
                       collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-3 py-2.5",
-                      active ? "font-bold bg-[#222325] text-white" : "font-medium text-black/70 hover:bg-[#f3f3ef]"
+                      active ? "font-bold bg-[#222325] text-white" : "font-medium text-black/70 hover:bg-[#f3f3ef]",
                     )}>
                     <item.icon className="h-[17px] w-[17px] flex-none" />
                     {!collapsed && <span>{item.label}</span>}
@@ -146,24 +154,39 @@ const DashboardSidebar: FC = () => {
 
       {/* Footer */}
       <div className={cn("flex-none border-t border-black/8", collapsed ? "p-2" : "p-3")}>
+        {/* Two clickable facts, no pitch: the gift chip opens the gifts
+            modal, the credit ring goes to billing where usage lives. The
+            ring's fill is THIS MONTH'S USAGE against the plan allowance;
+            the number inside is what's left. */}
         {!collapsed && (
           <div className="rounded-2xl border border-black/10 bg-[#fbfbf7] p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-bold text-primary">Free plan</span>
               <button
                 type="button"
-                onClick={openCredits}
+                onClick={openGifts}
+                title="Open your gifts"
                 className="rounded-full bg-secondary px-2 py-0.5 text-xs font-bold text-primary transition-colors hover:bg-secondary2 cursor-pointer">
-                {credits} credits
+                {giftsWaiting} {giftsWaiting === 1 ? "gift" : "gifts"}
               </button>
             </div>
-            <p className="text-xs text-black/60 mb-3">Spend them on freezes, rewrites or a day of Pro.</p>
-            <button
-              type="button"
-              onClick={openCredits}
-              className="w-full border border-black text-xs font-bold rounded-lg py-1.5 text-center cursor-pointer hover:shadow-[3px_3px_0_0_#e1f073] hover:-translate-x-px hover:-translate-y-px transition-all">
-              Spend credits
-            </button>
+            <Link
+              href="/dashboard/settings/billing"
+              title="Credits usage — see billing"
+              className="group flex items-center gap-3 rounded-xl px-1 py-0.5 transition-colors hover:bg-black/[0.04]">
+              <ScoreRing
+                value={Math.min(100, Math.round(((PLAN_ALLOWANCE - credits) / PLAN_ALLOWANCE) * 100))}
+                size={44}
+                trackColor="#e6e5dd"
+                label={<span className="text-[13px] font-extrabold tabular-nums text-primary">{credits}</span>}
+              />
+              <span className="min-w-0">
+                <span className="block text-xs font-bold text-primary">Credits</span>
+                <span className="block text-[11px] text-black/55 transition-colors group-hover:text-black/75">
+                  {Math.max(0, PLAN_ALLOWANCE - credits)} of {PLAN_ALLOWANCE} used
+                </span>
+              </span>
+            </Link>
           </div>
         )}
 
@@ -171,23 +194,23 @@ const DashboardSidebar: FC = () => {
             name is where people look for it first. */}
         <Link
           href="/dashboard/settings/profile"
-          title={collapsed ? "Amara Okafor · Settings" : "Profile and settings"}
+          title={collapsed ? "Chocos coding · Settings" : "Profile and settings"}
           className={cn(
             "flex items-center mt-3 rounded-lg py-1.5 transition-colors cursor-pointer",
             collapsed ? "justify-center px-1" : "gap-2.5 px-1",
-            isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]"
+            isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]",
           )}>
           <div className="h-8 w-8 flex-none overflow-hidden rounded-full bg-[#222325] text-[#e1f073] font-extrabold text-xs flex items-center justify-center">
-            {photoOf("Amara Okafor") ? (
+            {photoOf("Chocos coding") ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoOf("Amara Okafor")!} alt="" className="h-full w-full object-cover" />
+              <img src={photoOf("Chocos coding")!} alt="" className="h-full w-full object-cover" />
             ) : (
               "AO"
             )}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-primary truncate">Amara Okafor</p>
+              <p className="text-[13px] font-bold text-primary truncate">Chocos coding</p>
               <p className="text-[11px] text-black/50 truncate">Lagos · GMT+1</p>
             </div>
           )}

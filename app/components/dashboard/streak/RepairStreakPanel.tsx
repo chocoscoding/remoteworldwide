@@ -18,20 +18,20 @@ import { RotateCcw, Trophy, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { REPAIR_WINDOW_HOURS, restoreCost } from "@/app/lib/dashboard/credits";
+import { REPAIR_WINDOW_HOURS } from "@/app/lib/dashboard/credits";
+import { heldOf } from "@/app/lib/dashboard/gifts";
 
 const RepairStreakPanel: FC = () => {
-  const { repair, credits, longest, applications, restoreStreak, halfRestoreStreak, freeRestoreUsed, dismissRepair, openCredits } =
+  const { repair, gifts, longest, applications, restoreStreak, halfRestoreStreak, freeRestoreUsed, dismissRepair, openGifts } =
     useActivity();
   const reduceMotion = useReducedMotion();
 
   if (!repair) return null;
 
   const { brokenStreak, hoursSinceBreak } = repair;
-  const cost = restoreCost(brokenStreak);
   const inWindow = hoursSinceBreak <= REPAIR_WINDOW_HOURS;
   const hoursLeft = Math.max(0, Math.ceil(REPAIR_WINDOW_HOURS - hoursSinceBreak));
-  const canPay = credits >= cost;
+  const hasRestore = heldOf(gifts, "restore") > 0;
   const half = Math.floor(brokenStreak / 2);
 
   return (
@@ -51,8 +51,8 @@ const RepairStreakPanel: FC = () => {
             </div>
             <DialogDescription className="mt-2 text-sm text-white/55">
               {inWindow
-                ? `You can have them back for ${hoursLeft} more hours.`
-                : "That run is done — but none of the work behind it is."}
+                ? `Life happened — it does. You can have them back for ${hoursLeft} more hours.`
+                : "That run is done — but none of the work behind it is. Every application still counts."}
             </DialogDescription>
           </div>
 
@@ -75,27 +75,31 @@ const RepairStreakPanel: FC = () => {
 
             {inWindow ? (
               <div className="flex flex-col gap-2.5">
-                <StickerButton variant="primary" size="lg" className="w-full" disabled={!canPay} onClick={restoreStreak}>
+                <StickerButton variant="primary" size="lg" className="w-full" disabled={!hasRestore} onClick={restoreStreak}>
                   <RotateCcw className="h-4 w-4" />
-                  Restore {brokenStreak} days — {cost} credits
+                  {hasRestore ? `Use your Streak restore \u2014 all ${brokenStreak} days back` : "No restore gift held"}
                 </StickerButton>
 
-                {!canPay && (
-                  <p className="text-center text-xs text-black/50">
-                    You have {credits}.{" "}
-                    <button type="button" onClick={openCredits} className="font-semibold text-primary underline underline-offset-2 cursor-pointer">
-                      See credits
-                    </button>
-                  </p>
-                )}
+                <p className="mt-2 text-center text-xs text-black/50">
+                  {hasRestore ? (
+                    "A gift you earned \u2014 no charge, ever."
+                  ) : (
+                    <>
+                      Restore gifts come from the big milestones and real wins.{" "}
+                      <button type="button" onClick={openGifts} className="cursor-pointer font-semibold text-primary underline decoration-dotted underline-offset-2">
+                        See your gifts
+                      </button>
+                    </>
+                  )}
+                </p>
 
                 {/* The fallback, only offered when they genuinely can't pay. */}
-                {!canPay && !freeRestoreUsed && half > 0 && (
+                {!hasRestore && !freeRestoreUsed && half > 0 && (
                   <StickerButton variant="outline" size="md" className="w-full" onClick={halfRestoreStreak}>
                     Take {half} days back, free
                   </StickerButton>
                 )}
-                {!canPay && freeRestoreUsed && (
+                {!hasRestore && freeRestoreUsed && (
                   <p className="text-center text-[11px] text-black/40">Free restore already used this month.</p>
                 )}
 

@@ -12,6 +12,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STREAK_MILESTONES, milestoneProgress, nextMilestone } from "@/app/lib/dashboard/streak";
+import { GIFT_CATALOGUE } from "@/app/lib/dashboard/gifts";
 import { useStreak } from "./StreakContext";
 
 export interface StreakRewardsProps {
@@ -21,7 +22,7 @@ export interface StreakRewardsProps {
 }
 
 const StreakRewards: FC<StreakRewardsProps> = ({ dark = false, className }) => {
-  const { current, claimed } = useStreak();
+  const { current, claimed, gifts } = useStreak();
   const reduceMotion = useReducedMotion();
   const upcoming = nextMilestone(current);
   const progress = milestoneProgress(current);
@@ -105,7 +106,14 @@ const StreakRewards: FC<StreakRewardsProps> = ({ dark = false, className }) => {
                   </span>
                 </div>
                 <p className={cn("text-[11px] truncate", unlocked ? (dark ? "text-white/55" : "text-primary/65") : dark ? "text-white/40" : "text-black/40")}>
-                  +{m.credits} credits{m.perk ? ` · ${m.perk}` : ""}
+                  {/* Unearned rungs promise a surprise; earned ones show the
+                      gift actually drawn (the inventory holds the roll).
+                      Seeded history has no entry — fall back to the promise. */}
+                  {(() => {
+                    const drawn = gifts.find((g) => g.refId === String(m.days));
+                    const what = unlocked && drawn ? `\u{1F381} ${GIFT_CATALOGUE[drawn.kind].label}` : "\u{1F381} Surprise gift";
+                    return `${what}${m.perk ? ` · ${m.perk}` : ""}`;
+                  })()}
                 </p>
               </div>
 

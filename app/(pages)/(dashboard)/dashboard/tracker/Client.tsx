@@ -61,7 +61,7 @@ const TrackerClient: FC = () => {
   // state so drag-and-drop keeps working, and newly logged applications are
   // folded in during render using React's "adjust state when input changes"
   // pattern — an effect would paint the stale board first, then correct it.
-  const { applications, recordAction } = useActivity();
+  const { applications, recordAction, awardStrongEvent } = useActivity();
   const { openWinLog } = useWin();
   const [mergedIds, setMergedIds] = useState<string[]>([]);
   const pending = applications.filter((a) => !mergedIds.includes(a.id));
@@ -192,7 +192,13 @@ const TrackerClient: FC = () => {
     // Keeping the board honest is a qualifying action — the "status-change"
     // kind existed for exactly this and had no caller until now.
     recordAction("status-change", cardId, `${card.company} → ${COLUMN_LABELS[to]}`);
-    if (to === "offer") offerWinToast(card.company);
+    // Reaching a real stage pays a rare-event credit drop, once per
+    // application forever — dragging back and forth can't farm it.
+    if (to === "interviewing") awardStrongEvent("reached-interview", cardId, `Reached interview — ${card.company}`);
+    if (to === "offer") {
+      awardStrongEvent("reached-offer", cardId, `Offer reached — ${card.company}`);
+      offerWinToast(card.company);
+    }
   }
 
   /** "Add job" — dedupe against the board; new jobs land in Saved. */
@@ -266,7 +272,11 @@ const TrackerClient: FC = () => {
       const moved = columns.find((c) => c.id === preSource)?.cards.find((c) => c.id === activeId);
       if (moved) {
         recordAction("status-change", activeId, `${moved.company} → ${COLUMN_LABELS[preTarget]}`);
-        if (preTarget === "offer") offerWinToast(moved.company);
+        if (preTarget === "interviewing") awardStrongEvent("reached-interview", activeId, `Reached interview — ${moved.company}`);
+        if (preTarget === "offer") {
+          awardStrongEvent("reached-offer", activeId, `Offer reached — ${moved.company}`);
+          offerWinToast(moved.company);
+        }
       }
     }
 

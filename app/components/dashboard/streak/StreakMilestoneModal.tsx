@@ -14,7 +14,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { Flame, Snowflake } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { tierFor } from "@/app/lib/dashboard/streak";
+import { nextMilestone, tierFor } from "@/app/lib/dashboard/streak";
+import { GIFT_CATALOGUE, type GiftKind } from "@/app/lib/dashboard/gifts";
 import { useStreak } from "./StreakContext";
 
 const CONFETTI_COLORS = ["#e1f073", "#cddd54", "#f0c86a", "#222325"];
@@ -54,7 +55,7 @@ function makeConfetti(): ConfettiPiece[] {
 const REVEAL_DELAY_MS = 1100;
 
 const StreakMilestoneModal: FC = () => {
-  const { celebrating, dismissCelebration, credits, freezes, longest } = useStreak();
+  const { celebrating, dismissCelebration, giftsWaiting, freezes, longest } = useStreak();
   const reduceMotion = useReducedMotion();
 
   // Same derived-gate pattern as the rec detail page: the timer callback is
@@ -130,8 +131,11 @@ const StreakMilestoneModal: FC = () => {
             className="mb-3 w-full rounded-xl border-2 border-[#222325] bg-[#e1f073] px-5 py-3.5 shadow-[4px_4px_0_0_#222325]">
             <div className="flex items-center justify-center gap-2">
               <Flame className="h-4 w-4 text-primary" />
-              <span className="text-lg font-extrabold text-primary tabular-nums">+{celebrating.credits}</span>
-              <span className="text-sm font-bold text-primary/70">credits</span>
+              <span className="text-lg" aria-hidden>🎁</span>
+              <span className="text-lg font-extrabold text-primary">
+                {celebrating.gift ? GIFT_CATALOGUE[celebrating.gift as GiftKind].label : "A gift"}
+              </span>
+              <span className="text-sm font-bold text-primary/70">is waiting for you</span>
             </div>
             {celebrating.perk && (
               <div className="mt-1.5 flex items-center justify-center gap-1.5 border-t border-[#222325]/20 pt-1.5">
@@ -142,7 +146,7 @@ const StreakMilestoneModal: FC = () => {
           </motion.div>
 
           <div className="mb-6 flex w-full items-center gap-2 text-[11px] font-semibold text-black/45">
-            <span className="flex-1 rounded-lg bg-[#f0f0ea] px-3 py-2">{credits} credits total</span>
+            <span className="flex-1 rounded-lg bg-[#f0f0ea] px-3 py-2">{giftsWaiting} gifts waiting</span>
             <span className="flex-1 rounded-lg bg-[#f0f0ea] px-3 py-2">{freezes} freezes left</span>
           </div>
 
@@ -151,6 +155,17 @@ const StreakMilestoneModal: FC = () => {
           <StickerButton variant="primary" size="lg" className="w-full" onClick={dismissCelebration}>
             Keep it going
           </StickerButton>
+
+          {/* The day after a reward is the highest-churn moment — seed the
+              next rung before the confetti settles. */}
+          {(() => {
+            const next = nextMilestone(celebrating.days);
+            return (
+              <p className="mt-3 text-[11px] font-semibold text-black/45">
+                Next: {next.label} at {next.days} days — {next.days - celebrating.days} to go.
+              </p>
+            );
+          })()}
         </motion.div>
       </DialogContent>
     </Dialog>

@@ -21,7 +21,7 @@ const INVOICES: { id: string; date: string; amount: string; status: "paid" | "re
 const BillingClient: FC = () => {
   // The single source of truth for credits — the sidebar and streak panel read
   // the same derived balance, so this screen can't drift from them.
-  const { credits, openCredits } = useActivity();
+  const { credits, openGifts } = useActivity();
 
   // Free plan allowance, purely so the meter has something to read against.
   const monthlyAllowance = 50;
@@ -43,8 +43,8 @@ const BillingClient: FC = () => {
             <p className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-black/40">Credits left</p>
             <p className="mt-1 text-3xl font-bold text-primary tabular-nums">{credits}</p>
           </div>
-          <button type="button" className={BUTTON_OUTLINE} onClick={openCredits}>
-            Spend credits
+          <button type="button" className={BUTTON_OUTLINE} onClick={openGifts}>
+            Your gifts
           </button>
         </div>
 
@@ -70,9 +70,9 @@ const BillingClient: FC = () => {
         </ul>
         <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-3 bg-[#fbfbf7] px-4 py-3")}>
           <p className="text-xs leading-relaxed text-black/60">
-            Earn credits free by keeping a streak, inviting friends, or hitting milestones.
+            Earn credits by inviting friends — the streak pays in gifts instead.
           </p>
-          <button type="button" className={BUTTON_OUTLINE} onClick={openCredits}>
+          <button type="button" className={BUTTON_OUTLINE} onClick={openGifts}>
             See how
           </button>
         </div>

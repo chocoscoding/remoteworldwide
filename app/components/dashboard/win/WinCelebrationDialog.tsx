@@ -32,7 +32,7 @@ import { paintWinCard } from "./win-card-render";
  */
 export interface WinCelebrationDialogProps {
   win: WinRecord;
-  /** "Amara Okafor" — the card carries the profile name, not an input. */
+  /** "Chocos coding" — the card carries the profile name, not an input. */
   ownerName: string;
   onClose: () => void;
 }
@@ -52,9 +52,21 @@ interface ShareTarget {
 }
 
 const SHARE_TARGETS: ShareTarget[] = [
-  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, tile: "bg-[#25d366]", url: (c) => `https://wa.me/?text=${encodeURIComponent(c)}` },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    icon: MessageCircle,
+    tile: "bg-[#25d366]",
+    url: (c) => `https://wa.me/?text=${encodeURIComponent(c)}`,
+  },
   { id: "linkedin", label: "LinkedIn", icon: Linkedin, tile: "bg-[#0a66c2]", url: () => "https://www.linkedin.com/feed/?shareActive=true" },
-  { id: "telegram", label: "Telegram", icon: Send, tile: "bg-[#229ed9]", url: (c) => `https://t.me/share/url?url=${encodeURIComponent("https://remoteworldwide.net/j/amara")}&text=${encodeURIComponent(c)}` },
+  {
+    id: "telegram",
+    label: "Telegram",
+    icon: Send,
+    tile: "bg-[#229ed9]",
+    url: (c) => `https://t.me/share/url?url=${encodeURIComponent("https://remoteworldwide.net/j/amara")}&text=${encodeURIComponent(c)}`,
+  },
   { id: "x", label: "X", icon: Twitter, tile: "bg-[#222325]", url: (c) => `https://x.com/intent/tweet?text=${encodeURIComponent(c)}` },
 ];
 
@@ -164,9 +176,7 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
 
           <div className="flex flex-none items-start justify-between gap-4 px-6 pb-3 pt-6">
             <div>
-              <DialogPrimitive.Title className="text-lg font-bold text-primary">
-                You did it. Now tell people.
-              </DialogPrimitive.Title>
+              <DialogPrimitive.Title className="text-lg font-bold text-primary">You did it. Now tell people.</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-0.5 text-xs text-black/60">
                 Your card carries the whole road — saved, applied, interviewed, offer.
               </DialogPrimitive.Description>
@@ -202,7 +212,7 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
                   onClick={() => setFormat(f)}
                   className={cn(
                     "cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors",
-                    format === f ? "bg-[#222325] text-white" : "text-black/60 hover:text-primary"
+                    format === f ? "bg-[#222325] text-white" : "text-black/60 hover:text-primary",
                   )}>
                   {CARD_DIMENSIONS[f].label}
                   <span className={cn("ml-1.5 text-[10px] font-medium", format === f ? "text-white/60" : "text-black/40")}>
@@ -224,7 +234,7 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
                     onClick={() => setToggles((prev) => ({ ...prev, [t.key]: !prev[t.key] }))}
                     className={cn(
                       "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                      on ? "border-[#222325] bg-[#222325] text-white" : "border-black/20 bg-white text-black/60 hover:border-black/40"
+                      on ? "border-[#222325] bg-[#222325] text-white" : "border-black/20 bg-white text-black/60 hover:border-black/40",
                     )}>
                     {on && <Check className="h-3 w-3" />}
                     {on ? t.onLabel : t.offLabel}

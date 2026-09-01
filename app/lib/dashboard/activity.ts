@@ -91,6 +91,15 @@ export interface ActionKindSpec {
   href: string | null;
   /** Two-word name for tight controls, where `artifact` would truncate. */
   short: string;
+  /**
+   * How much this action contributes to a day's INTENSITY, which is what the
+   * credit rewards read. Keeping a streak alive and earning from it are
+   * deliberately different bars: `prep` and `status-change` weigh 0, so a
+   * tracker drag preserves your streak and pays nothing. Remote Worldwide
+   * vets the jobs, so the seeker's binding constraint is volume of real
+   * outreach — that is what this weights.
+   */
+  intensityWeight: number;
 }
 
 /**
@@ -105,6 +114,7 @@ export const ACTION_KINDS: Record<ActionKind, ActionKindSpec> = {
     habitLabel: "Apply to 1 role",
     href: null,
     short: "Application",
+    intensityWeight: 1,
   },
   "follow-up": {
     kind: "follow-up",
@@ -113,6 +123,7 @@ export const ACTION_KINDS: Record<ActionKind, ActionKindSpec> = {
     habitLabel: "Follow up on an application",
     href: "/dashboard/tracker",
     short: "Follow-up",
+    intensityWeight: 0.5,
   },
   message: {
     kind: "message",
@@ -121,6 +132,7 @@ export const ACTION_KINDS: Record<ActionKind, ActionKindSpec> = {
     habitLabel: "Message a referral or pod member",
     href: "/dashboard/referrals",
     short: "Message",
+    intensityWeight: 0.5,
   },
   prep: {
     kind: "prep",
@@ -129,6 +141,7 @@ export const ACTION_KINDS: Record<ActionKind, ActionKindSpec> = {
     habitLabel: "15 minutes of interview prep",
     href: "/dashboard/prep",
     short: "Prep session",
+    intensityWeight: 0,
   },
   "status-change": {
     kind: "status-change",
@@ -137,8 +150,28 @@ export const ACTION_KINDS: Record<ActionKind, ActionKindSpec> = {
     habitLabel: "Update your tracker",
     href: "/dashboard/tracker",
     short: "Status change",
+    intensityWeight: 0,
   },
 };
+
+/** Weighted intensity of one day, summed across that day's actions. */
+export function dayIntensity(actions: QualifyingAction[], day: string): number {
+  return actions.reduce((sum, a) => (a.day === day ? sum + ACTION_KINDS[a.kind].intensityWeight : sum), 0);
+}
+
+/**
+ * The per-day bar, derived from the weekly goal rather than configured twice —
+ * 8 a week over 5 weekdays is the "2 a day, Mon-Fri" the Home card already
+ * prints. Rounded up so the target is never fractional.
+ */
+export function dailyTargetFrom(weeklyTarget: number, weekdays = 5): number {
+  return Math.max(1, Math.ceil(weeklyTarget / weekdays));
+}
+
+/** A day is `full` once its weighted intensity reaches the daily target. */
+export function isFullDay(intensity: number, dailyTarget: number): boolean {
+  return intensity >= dailyTarget;
+}
 
 /**
  * A daily habit is only ever a *binding* to an artifact type — the label is the
@@ -262,19 +295,25 @@ export function markDay(
   day: string,
   status: Extract<StreakDay["status"], "logged" | "backfilled">,
   reason: string,
-  at: Date
+  at: Date,
+  /** Weighted contribution of the action doing the marking — see `ACTION_KINDS`. */
+  intensityWeight = 0
 ): { days: StreakDay[]; audit: AuditEntry | null } {
   const existing = days.find((d) => d.date === day);
   if (existing?.status === status) {
     // Already in this state — bump the count, but there is no transition.
     return {
-      days: days.map((d) => (d.date === day ? { ...d, count: d.count + 1 } : d)),
+      days: days.map((d) =>
+        d.date === day ? { ...d, count: d.count + 1, intensity: (d.intensity ?? 0) + intensityWeight } : d
+      ),
       audit: null,
     };
   }
 
   return {
-    days: days.map((d) => (d.date === day ? { ...d, status, count: d.count + 1 } : d)),
+    days: days.map((d) =>
+      d.date === day ? { ...d, status, count: d.count + 1, intensity: (d.intensity ?? 0) + intensityWeight } : d
+    ),
     audit: {
       id: `audit-${day}-${at.getTime()}`,
       at: at.toISOString(),

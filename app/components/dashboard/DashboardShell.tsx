@@ -22,7 +22,7 @@ import WinProvider from "./win/WinProvider";
 import { SettingsProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import StreakMilestoneModal from "./streak/StreakMilestoneModal";
 import LogApplicationDialog from "./log/LogApplicationDialog";
-import CreditStore from "./credits/CreditStore";
+import GiftStore from "./gifts/GiftStore";
 import RepairStreakPanel from "./streak/RepairStreakPanel";
 
 const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
@@ -45,7 +45,7 @@ const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
         <div className="flex-1 min-w-0">{children}</div>
       </div>
       <LogApplicationDialog />
-      <CreditStore />
+      <GiftStore />
       <RepairStreakPanel />
       <StreakMilestoneModal />
       <Toaster />

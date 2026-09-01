@@ -1,5 +1,6 @@
 "use client";
 
+import { cva } from "class-variance-authority";
 import { FC, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ export const SettingsRow: FC<SettingsRowProps> = ({ label, hint, children, stack
     className={cn(
       "border-b border-black/8 py-3.5 first:pt-0 last:border-b-0 last:pb-0",
       stacked ? "" : "flex items-center justify-between gap-6",
-      className
+      className,
     )}>
     <div className={cn("min-w-0", stacked && "mb-2")}>
       <label htmlFor={htmlFor} className="block text-sm font-semibold text-primary">
@@ -87,9 +88,58 @@ export interface ToggleProps {
   onChange: (next: boolean) => void;
   label: string;
   disabled?: boolean;
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
-export const Toggle: FC<ToggleProps> = ({ checked, onChange, label, disabled }) => (
+const toggleVariants = cva(
+  "relative inline-flex flex-none items-center rounded-full border-[1.5px] border-[#222325] cursor-pointer transition-[background-color,box-shadow,transform] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:pointer-events-none",
+  {
+    variants: {
+      size: {
+        sm: "h-5 w-9",
+        md: "h-6 w-11",
+        lg: "h-7 w-14",
+      },
+      checked: {
+        true: "bg-[#e1f073]",
+        false: "bg-white",
+      },
+    },
+    defaultVariants: {
+      size: "md",
+      checked: false,
+    },
+  },
+);
+
+const toggleThumbVariants = cva("block rounded-full border-[1.5px] border-[#222325] bg-white transition-transform duration-150 ease-out", {
+  variants: {
+    size: {
+      sm: "h-3 w-3",
+      md: "h-4 w-4",
+      lg: "h-5 w-5",
+    },
+    checked: {
+      true: "",
+      false: "",
+    },
+  },
+  compoundVariants: [
+    { checked: true, size: "sm", class: "translate-x-[20px]" },
+    { checked: true, size: "md", class: "translate-x-[22px]" },
+    { checked: true, size: "lg", class: "translate-x-[28px]" },
+    { checked: false, size: "sm", class: "translate-x-[3px]" },
+    { checked: false, size: "md", class: "translate-x-[3px]" },
+    { checked: false, size: "lg", class: "translate-x-[3px]" },
+  ],
+  defaultVariants: {
+    size: "md",
+    checked: false,
+  },
+});
+
+export const Toggle: FC<ToggleProps> = ({ checked, onChange, label, disabled, size = "md", className }) => (
   <button
     type="button"
     role="switch"
@@ -97,19 +147,8 @@ export const Toggle: FC<ToggleProps> = ({ checked, onChange, label, disabled }) 
     aria-label={label}
     disabled={disabled}
     onClick={() => onChange(!checked)}
-    className={cn(
-      "relative inline-flex h-6 w-11 flex-none items-center rounded-full border-[1.5px] border-[#222325] cursor-pointer",
-      "transition-[background-color,box-shadow,transform] duration-100 ease-out",
-      "shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
-      "disabled:opacity-40 disabled:pointer-events-none",
-      checked ? "bg-[#e1f073]" : "bg-white"
-    )}>
-    <span
-      className={cn(
-        "block h-4 w-4 rounded-full border-[1.5px] border-[#222325] bg-white transition-transform duration-150 ease-out",
-        checked ? "translate-x-[22px]" : "translate-x-[3px]"
-      )}
-    />
+    className={cn(toggleVariants({ size, checked }), className)}>
+    <span className={cn(toggleThumbVariants({ size, checked }))} />
   </button>
 );
 
@@ -132,7 +171,7 @@ export function Choice<T extends string>({ value, options, onChange, className }
           aria-pressed={value === o.id}
           className={cn(
             "rounded-md px-3 py-1.5 text-xs font-bold cursor-pointer transition-colors whitespace-nowrap",
-            value === o.id ? "bg-[#222325] text-white" : "text-black/55 hover:text-primary"
+            value === o.id ? "bg-[#222325] text-white" : "text-black/55 hover:text-primary",
           )}>
           {o.label}
         </button>
@@ -154,7 +193,9 @@ export const TagList: FC<TagListProps> = ({ tags, onRemove, emptyNote }) =>
   ) : (
     <div className="flex flex-wrap gap-1.5">
       {tags.map((t) => (
-        <span key={t} className="inline-flex items-center gap-1.5 rounded-full bg-[#f0f0ea] py-1 pl-3 pr-1.5 text-xs font-semibold text-primary">
+        <span
+          key={t}
+          className="inline-flex items-center gap-1.5 rounded-full bg-[#f0f0ea] py-1 pl-3 pr-1.5 text-xs font-semibold text-primary">
           {t}
           <button
             type="button"

@@ -17,7 +17,8 @@ export interface CustomizePanelsRailProps {
   registerRef: (id: string, el: HTMLDivElement | null) => void;
 }
 
-const CustomizePanelsRail: FC<CustomizePanelsRailProps> = ({ flashItem, registerRef }) => (
+const 
+CustomizePanelsRail: FC<CustomizePanelsRailProps> = ({ flashItem, registerRef }) => (
   <div className="scrollbar-neo flex flex-col gap-4 max-h-[calc(100vh-112px)] overflow-y-auto pr-1">
     {CUSTOMIZE_PANELS.map((panel) => (
       <div

@@ -2,6 +2,7 @@
 
 import { FC, useState } from "react";
 import { Check, ChevronDown, Download, FileText, Link2, X } from "lucide-react";
+import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
@@ -20,6 +21,8 @@ import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsPro
  */
 export interface AtsResultsProps {
   resume: VaultDoc;
+  /** When this report was produced — null before the first scan. */
+  scannedAt: Date | null;
   resumes: VaultDoc[];
   job: JobOption | null;
   fixedIds: Set<string>;
@@ -41,6 +44,7 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 
 const AtsResults: FC<AtsResultsProps> = ({
   resume,
+  scannedAt,
   resumes,
   job,
   fixedIds,
@@ -132,9 +136,24 @@ const AtsResults: FC<AtsResultsProps> = ({
 
       {/* Score card */}
       <DashCard className="p-7">
-        <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.1em] text-black/35">
-          {job ? `Scored against ${job.company} · ${job.role}` : "General score · what your niche screens for"}
-        </p>
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-black/35">
+            {job ? `Scored against ${job.company} · ${job.role}` : "General score · what your niche screens for"}
+          </p>
+          {scannedAt && (
+            <p className="flex items-baseline gap-2 text-[11px] font-semibold text-black/45">
+              <span>
+                scanned <TimeAgo datetime={scannedAt} opts={{ minInterval: 10 }} />
+              </span>
+              <button
+                type="button"
+                onClick={onExit}
+                className="cursor-pointer font-bold text-black/55 underline decoration-2 underline-offset-2 transition-colors hover:text-[#b23c26]">
+                Clear scan
+              </button>
+            </p>
+          )}
+        </div>
         <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start">
           <div className="relative flex-none">
             <ScoreRing value={displayed} size={164} />

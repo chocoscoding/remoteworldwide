@@ -1,5 +1,5 @@
 // Static mock content for the Job Seeker Dashboard feature.
-// Persona throughout: Amara Okafor, product designer in Lagos, Nigeria (GMT+1)
+// Persona throughout: Chocos coding, product designer in Lagos, Nigeria (GMT+1)
 // job-hunting for remote roles. Every dashboard screen renders against these
 // typed constants — there is no backend for this feature, so "Save"/"Submit"
 // style actions in the UI should only ever mutate local component state.
@@ -192,7 +192,10 @@ export const APPS: Application[] = [
     rww: true,
     qs: [
       { q: "Why Vercel?", a: "I ship on Vercel for every side project I run, and I want to design the tools I already rely on daily." },
-      { q: "Describe a developer-facing product you've designed.", a: "Built the internal design-system documentation site at Paystack, used by 40+ engineers weekly." },
+      {
+        q: "Describe a developer-facing product you've designed.",
+        a: "Built the internal design-system documentation site at Paystack, used by 40+ engineers weekly.",
+      },
     ],
   },
   {
@@ -202,7 +205,10 @@ export const APPS: Application[] = [
     rww: true,
     qs: [
       { q: "Salary expectations", a: "$70,000–95,000 USD, negotiable based on scope and equity." },
-      { q: "Are you comfortable designing for global payroll compliance flows?", a: "Yes — I designed Paystack's cross-border settlement flow, which involved similar regulatory constraints." },
+      {
+        q: "Are you comfortable designing for global payroll compliance flows?",
+        a: "Yes — I designed Paystack's cross-border settlement flow, which involved similar regulatory constraints.",
+      },
     ],
   },
   {
@@ -210,7 +216,10 @@ export const APPS: Application[] = [
     title: "Senior Product Designer",
     meta: "Supabase · Applied 5 days ago",
     qs: [
-      { q: "Have you worked with open-source developer tools before?", a: "I contributed design and docs to two open-source component libraries and maintain my own design-tokens plugin." },
+      {
+        q: "Have you worked with open-source developer tools before?",
+        a: "I contributed design and docs to two open-source component libraries and maintain my own design-tokens plugin.",
+      },
       // Same text as the `qa-why-company` library answer: shows a saved answer
       // reaching an application with the token resolved to the real company.
       {
@@ -224,7 +233,10 @@ export const APPS: Application[] = [
     title: "Senior Product Designer",
     meta: "Linear · Applied 9 days ago",
     qs: [
-      { q: "What draws you to Linear specifically?", a: "The craft bar — Linear is the rare tool where the interaction details are as considered as the information architecture." },
+      {
+        q: "What draws you to Linear specifically?",
+        a: "The craft bar — Linear is the rare tool where the interaction details are as considered as the information architecture.",
+      },
       { q: "Portfolio link", a: "https://portfolio.dev" },
     ],
   },
@@ -232,16 +244,17 @@ export const APPS: Application[] = [
     id: "app-calcom",
     title: "Product Designer",
     meta: "Cal.com · Applied 12 days ago",
-    qs: [
-      { q: "Notice period", a: "2 weeks" },
-    ],
+    qs: [{ q: "Notice period", a: "2 weeks" }],
   },
   {
     id: "app-paystack",
     title: "Staff Designer",
     meta: "Paystack · Applied 2 days ago",
     qs: [
-      { q: "Why leave your current role at Paystack?", a: "I'm looking to grow into a fully remote, distributed-team context after 3 years building for one region." },
+      {
+        q: "Why leave your current role at Paystack?",
+        a: "I'm looking to grow into a fully remote, distributed-team context after 3 years building for one region.",
+      },
     ],
   },
   {
@@ -250,7 +263,10 @@ export const APPS: Application[] = [
     meta: "Ramp · Applied 4 days ago",
     qs: [
       { q: "Do you require visa sponsorship?", a: "No — I work as a remote contractor, no relocation needed." },
-      { q: "Describe a time you used data to change a design direction.", a: "Usage data showed 60% of users abandoned a multi-step form at step 3; I collapsed it to a single screen and drop-off fell to 9%." },
+      {
+        q: "Describe a time you used data to change a design direction.",
+        a: "Usage data showed 60% of users abandoned a multi-step form at step 3; I collapsed it to a single screen and drop-off fell to 9%.",
+      },
     ],
   },
 ];
@@ -353,7 +369,7 @@ export const INVITES: InviteRow[] = [
 // ---------------------------------------------------------------------------
 
 export const RESUME: ResumeContent = {
-  name: "Amara Okafor",
+  name: "Chocos coding",
   title: "Product Designer",
   location: "Lagos, Nigeria (GMT+1)",
   email: "amara@mail.com",
@@ -363,8 +379,7 @@ export const RESUME: ResumeContent = {
     { label: "Portfolio", url: "amaraokafor.design" },
     { label: "LinkedIn", url: "linkedin.com/in/amaraokafor" },
   ],
-  summary:
-    "Product designer with 6 years shipping design systems and B2B workflow tools for distributed teams across four time zones.",
+  summary: "Product designer with 6 years shipping design systems and B2B workflow tools for distributed teams across four time zones.",
   experience: [
     {
       id: "exp-paystack",
@@ -459,7 +474,7 @@ export const COVER_LETTER: CoverLetterContent = {
     "Most recently I led a checkout redesign that cut failed-payment support tickets by 31%, and I built the internal design-system documentation that 40+ engineers now rely on weekly. Both projects meant translating regulatory and technical constraints into interfaces regular people trust with their money — the same tension I imagine shows up constantly in global payroll.",
     "I work async by default, across a four-hour overlap with most US teams, and I'd love to bring that discipline to Deel's design team.",
   ],
-  signOff: "Amara Okafor",
+  signOff: "Chocos coding",
   wordCount: 218,
 };
 
@@ -615,14 +630,14 @@ export const ATS_KEYWORDS: AtsKeyword[] = [
 export const ATS_FIX_ITEMS: AtsFixItem[] = [
   {
     id: "fix-keyword",
-    label: "Missing keyword: \"developer experience\"",
+    label: 'Missing keyword: "developer experience"',
     detail: "This job description mentions it 3 times — your resume doesn't use the phrase once.",
     action: "Add it",
   },
   {
     id: "fix-bullets",
     label: "2 bullets have no measurable outcome",
-    detail: "\"Led the Paystack checkout redesign\" and one Andela bullet read as tasks, not results.",
+    detail: '"Led the Paystack checkout redesign" and one Andela bullet read as tasks, not results.',
     action: "Quantify",
   },
   {
@@ -821,7 +836,7 @@ export const JD_QA_EXCHANGES: JdQaAnswer[] = [
     id: "fit",
     question: "Am I a fit for this role?",
     verdict: "Strong fit. Your Paystack and Andela experience covers developer-facing tools and cross-timezone async work directly.",
-    missing: "You don't yet have a bullet that names \"developer experience\" explicitly, which this JD repeats three times.",
+    missing: 'You don\'t yet have a bullet that names "developer experience" explicitly, which this JD repeats three times.',
     tips: [
       "Reframe the design-system documentation work as a developer-experience win, with the 40-engineer adoption number front and center.",
       "Mention that you already prototype in code — the JD calls this out as a plus.",
@@ -830,7 +845,8 @@ export const JD_QA_EXCHANGES: JdQaAnswer[] = [
   {
     id: "really-asking",
     question: "What are they really asking for?",
-    verdict: "Beyond the listed skills, this reads like a team that got burned by a designer who couldn't work independently across time zones.",
+    verdict:
+      "Beyond the listed skills, this reads like a team that got burned by a designer who couldn't work independently across time zones.",
     missing: "There's no explicit mention of portfolio depth — they're weighting collaboration signals over pure craft in the copy.",
     tips: [
       "Lead your intro with how you work async, not just what you've shipped.",
@@ -850,11 +866,12 @@ export const JD_QA_EXCHANGES: JdQaAnswer[] = [
   {
     id: "questions-to-ask",
     question: "What should I ask them in the screen?",
-    verdict: "Good screens for this role usually cover team structure, how design debt gets prioritized, and what \"senior\" actually means day to day.",
+    verdict:
+      'Good screens for this role usually cover team structure, how design debt gets prioritized, and what "senior" actually means day to day.',
     missing: "The JD doesn't say who this role reports to — worth asking directly.",
     tips: [
-      "\"How is design headcount split across the deployment platform vs. the rest of the product?\"",
-      "\"What would make this hire feel like a clear win a year from now?\"",
+      '"How is design headcount split across the deployment platform vs. the rest of the product?"',
+      '"What would make this hire feel like a clear win a year from now?"',
     ],
   },
 ];
@@ -1035,7 +1052,7 @@ export const LANDED_CHECKLIST: ChecklistItem[] = [
   { id: "landed-5", text: "Ship one visible thing", done: false },
   { id: "landed-6", text: "Find your two go-to people for unblocking work", done: false },
   { id: "landed-7", text: "Book a 60-day check-in on the calendar", done: false },
-  { id: "landed-8", text: "Write down what \"good\" looks like at 90 days", done: false },
+  { id: "landed-8", text: 'Write down what "good" looks like at 90 days', done: false },
   { id: "landed-9", text: "Share your onboarding notes back with your pod", done: false },
 ];
 

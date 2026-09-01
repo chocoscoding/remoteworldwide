@@ -488,8 +488,15 @@ export interface StreakDay {
   /** Local calendar date as `yyyy-mm-dd` — the stable key for a day. */
   date: string;
   status: StreakDayStatus;
-  /** Applications logged that day. 0 for every non-`done` status. */
+  /** Qualifying actions logged that day. 0 for every non-`done` status. */
   count: number;
+  /**
+   * Weighted intensity for the day (see `ACTION_KINDS[kind].intensityWeight`).
+   * Separate from `count` because keeping a streak alive and earning from it
+   * are different bars: five tracker drags are count 5, intensity 0.
+   * Optional so seeded history without it still reads as 0.
+   */
+  intensity?: number;
 }
 
 /**
@@ -501,8 +508,17 @@ export interface StreakMilestone {
   days: number;
   label: string;
   blurb: string;
-  /** Credits paid out on unlock. */
-  credits: number;
+  /**
+   * Which gift pool this rung draws from when it fires. WHICH gift lands is
+   * random — the surprise is the point — but the tier scales with the rung.
+   */
+  giftTier: "small" | "mid" | "big";
+  /**
+   * The gift actually drawn, filled in at unlock. Absent on the static ladder
+   * definition; present on the instance that reaches the inventory and the
+   * celebration modal, so those two can never disagree.
+   */
+  gift?: string;
   /** Which `StreakTier` this rung corresponds to. */
   tierId: string;
   emoji: string;

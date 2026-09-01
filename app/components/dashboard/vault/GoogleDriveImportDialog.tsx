@@ -6,12 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { Award, Check, Download, File as FileIcon, FileText, Image as ImageIcon, Paperclip, ShieldCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import {
-  driveDocId,
-  formatSize,
-  useDocuments,
-  type DriveFile,
-} from "@/app/components/dashboard/documents/DocumentsProvider";
+import { driveDocId, formatSize, useDocuments, type DriveFile } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { DocKind } from "@/app/lib/dashboard/types";
 
 /**
@@ -59,7 +54,7 @@ interface DriveListing extends DriveFile {
  * response, not app data, and no other screen should read it.
  */
 const DRIVE_FILES: DriveListing[] = [
-  { id: "1a7f", name: "Amara Okafor — Resume 2026", kind: "resume", ext: "pdf", size: 421_888, modifiedLabel: "Modified 3 days ago" },
+  { id: "1a7f", name: "Chocos coding — Resume 2026", kind: "resume", ext: "pdf", size: 421_888, modifiedLabel: "Modified 3 days ago" },
   { id: "2b3c", name: "Cover letter — Linear", kind: "cover-letter", ext: "docx", size: 69_632, modifiedLabel: "Modified last week" },
   { id: "4d9e", name: "Portfolio — Case studies", kind: "portfolio", ext: "pdf", size: 8_808_038, modifiedLabel: "Modified 2 weeks ago" },
   { id: "5f2a", name: "Design systems audit", kind: "portfolio", ext: "pdf", size: 1_258_291, modifiedLabel: "Modified last month" },
@@ -147,7 +142,7 @@ const GoogleDriveImportDialog: FC<GoogleDriveImportDialogProps> = ({ open, onOpe
                           ? "cursor-default border-dashed border-black/15 bg-transparent"
                           : isPicked
                             ? "cursor-pointer border-[#222325] bg-[#f7fbe4]"
-                            : "cursor-pointer border-black/12 bg-white hover:border-black/30"
+                            : "cursor-pointer border-black/12 bg-white hover:border-black/30",
                       )}>
                       <span
                         className={cn(
@@ -156,7 +151,7 @@ const GoogleDriveImportDialog: FC<GoogleDriveImportDialogProps> = ({ open, onOpe
                             ? "border-black/15 bg-[#f0f0ea]"
                             : isPicked
                               ? "border-[#222325] bg-[#222325]"
-                              : "border-black/25 bg-white"
+                              : "border-black/25 bg-white",
                         )}>
                         {(isPicked || imported) && (
                           <Check className={cn("h-3 w-3", imported ? "text-black/40" : "text-[#e1f073]")} strokeWidth={3.5} />
@@ -175,9 +170,7 @@ const GoogleDriveImportDialog: FC<GoogleDriveImportDialogProps> = ({ open, onOpe
                         </span>
                       </span>
 
-                      {imported && (
-                        <span className="flex-none text-[11px] font-semibold text-black/50">In your documents</span>
-                      )}
+                      {imported && <span className="flex-none text-[11px] font-semibold text-black/50">In your documents</span>}
                     </button>
                   </li>
                 );
@@ -186,8 +179,8 @@ const GoogleDriveImportDialog: FC<GoogleDriveImportDialogProps> = ({ open, onOpe
           </div>
 
           <p className="mx-6 mb-5 mt-4 flex-none rounded-lg bg-[#f0f0ea] px-3.5 py-2.5 text-xs leading-relaxed text-black/65">
-            Drive isn&apos;t connected in this build — importing adds them as real documents so you can see exactly how they
-            land, but nothing is fetched from Google.
+            Drive isn&apos;t connected in this build — importing adds them as real documents so you can see exactly how they land, but
+            nothing is fetched from Google.
           </p>
 
           <div className="flex flex-none items-center gap-2.5 border-t border-black/10 px-6 py-4">

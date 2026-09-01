@@ -38,6 +38,9 @@ const AtsClient: FC = () => {
   // picker leaves you where you were instead of dumping you into results.
   const [pendingResumeId, setPendingResumeId] = useState<string | null>(null);
   const [fixedIds, setFixedIds] = useState<Set<string>>(new Set());
+  // When the current report was produced — drives the live "scanned X ago"
+  // stamp on the results, and resets with every fresh scan.
+  const [scannedAt, setScannedAt] = useState<Date | null>(null);
   const [queuedKeywordIds, setQueuedKeywordIds] = useState<Set<string>>(new Set());
 
   const resumes = docs.filter((d) => d.kind === "resume");
@@ -47,6 +50,7 @@ const AtsClient: FC = () => {
   function resetReport() {
     setFixedIds(new Set());
     setQueuedKeywordIds(new Set());
+    setScannedAt(new Date());
   }
 
   function scoreGeneral(id: string) {
@@ -98,7 +102,9 @@ const AtsClient: FC = () => {
   function backToLanding() {
     setResumeId(null);
     setJob(null);
-    resetReport();
+    setFixedIds(new Set());
+    setQueuedKeywordIds(new Set());
+    setScannedAt(null);
     setView("score");
   }
 
@@ -142,6 +148,7 @@ const AtsClient: FC = () => {
         ) : (
           <AtsResults
             resume={activeResume}
+            scannedAt={scannedAt}
             resumes={activeResumes}
             job={job}
             fixedIds={fixedIds}

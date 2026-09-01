@@ -19,7 +19,7 @@ import { weekdayIndex, fromDayKey } from "@/app/lib/dashboard/streak";
 import { AT_RISK_HOUR } from "@/app/lib/dashboard/credits";
 
 const AtRiskBanner: FC = () => {
-  const { current, loggedToday, goals, todayKey, openLog, atRiskDismissed, dismissAtRisk, nowHour } = useActivity();
+  const { current, loggedToday, goals, todayKey, openLog, atRiskDismissed, dismissAtRisk, nowHour, freezes } = useActivity();
 
   if (atRiskDismissed) return null;
   if (goals.paused) return null;
@@ -32,7 +32,8 @@ const AtRiskBanner: FC = () => {
     <div className="mb-5 flex flex-wrap items-center gap-3 rounded-[14px] border-2 border-[#222325] bg-[#e1f073] px-4 py-3">
       <AlertTriangle className="h-4 w-4 flex-none text-primary" />
       <p className="min-w-0 flex-1 text-sm font-bold text-primary">
-        Your {current}-day streak ends at midnight. One application keeps it.
+        Your {current}-day streak ends at midnight. One application keeps it
+        {freezes > 0 ? " — and if today gets away from you, a freeze has it covered." : "."}
       </p>
       <StickerButton variant="primary" size="sm" onClick={openLog}>
         Log one

@@ -87,7 +87,7 @@ export const WIN_SALARY_PREFILL = "+$12k";
 
 export const WIN_REFERRAL_LINK = "remoteworldwide.net/j/amara";
 
-/** First name only, for the card toggle — "Amara Okafor" -> "Amara". */
+/** First name only, for the card toggle — "Chocos coding" -> "Amara". */
 export const firstNameOf = (name: string) => name.split(" ")[0] ?? name;
 
 /**

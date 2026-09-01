@@ -28,10 +28,15 @@ import {
   type AuditEntry,
   type HabitDef,
   type QualifyingAction,
+  dayIntensity,
+  dailyTargetFrom,
+  isFullDay,
 } from "@/app/lib/dashboard/activity";
 import { scoreApplication, type ApplicationScore } from "@/app/lib/dashboard/ats-stub";
-import { MAX_STREAK_PROMPTS_PER_DAY, balanceOf, priceOf, restoreCost, type CreditEntry, type SpendItem } from "@/app/lib/dashboard/credits";
-import { INVITE_CREDITS_EARNED, SUBSCRIBED_INVITES } from "@/app/lib/dashboard/invites";
+import { MAX_STREAK_PROMPTS_PER_DAY } from "@/app/lib/dashboard/credits";
+import { GIFT_CATALOGUE, drawGift, heldGifts, type GiftEvent, type GiftKind } from "@/app/lib/dashboard/gifts";
+import { STRONG_EVENTS, strongRefId, weekKey, type StrongEventKind } from "@/app/lib/dashboard/rewards";
+import { INVITE_CREDITS_EARNED } from "@/app/lib/dashboard/invites";
 import { DEFAULT_LOG_SECONDS, clampTarget } from "@/app/lib/dashboard/goals";
 import {
   addDays,
@@ -113,13 +118,38 @@ interface ActivityContextValue extends StreakState {
   recordAction: (kind: ActionKind, artifactId: string, label?: string) => void;
   checkDuplicate: (candidate: { company: string; role: string; url?: string }) => Application | null;
 
-  // --- credits ---
-  /** Append-only. The balance is always summed from this, never stored. */
-  ledger: CreditEntry[];
-  /** Spends against the ledger. Returns false when the balance won't cover it. */
-  spend: (item: SpendItem, reason?: string) => boolean;
-  /** What restoring the current streak would cost right now. */
-  restorePrice: number;
+  // --- intensity (what the credit rewards read) ---
+  /** Per-day bar, derived from the weekly goal — 8/week => 2 a day. */
+  dailyTarget: number;
+  /** Today's weighted intensity so far. */
+  todayIntensity: number;
+
+  // --- freezes, two tiers ---
+  /** Free weekly allowance left (2/week, use-it-or-lose-it, no rollover). */
+  freeFreezes: number;
+  /** Purchased + milestone-perk stock. Spent only after the free tier. */
+  heldFreezes: number;
+
+  // --- gifts (the reward economy: no shop, no prices) ---
+  /** Every gift ever granted, used or not. History reads straight off this. */
+  gifts: GiftEvent[];
+  /** Unused gifts waiting to be redeemed. */
+  giftsWaiting: number;
+  /**
+   * Redeems the oldest unused gift of `kind`. Returns false when none is
+   * held or the redemption is refused (e.g. freezes at cap).
+   */
+  redeemGift: (kind: GiftKind) => boolean;
+  /**
+   * Grants a rare-event gift exactly once per `suffix` (application id,
+   * recommendation id, ISO week) — the gift list's refId is the dedupe
+   * record. Returns false when it already fired.
+   */
+  awardStrongEvent: (kind: StrongEventKind, suffix: string, detail?: string) => boolean;
+  giftsOpen: boolean;
+  openGifts: () => void;
+  closeGifts: () => void;
+  /** @deprecated aliases kept while surfaces migrate — same modal. */
   creditsOpen: boolean;
   openCredits: () => void;
   closeCredits: () => void;
@@ -195,6 +225,9 @@ interface ActivityContextValue extends StreakState {
   retiredStreak: number | null;
 }
 
+/** Free tier + held stock never exceed this — abundant repair is the failure mode. */
+const FREEZE_CAP = 4;
+
 const ActivityCtx = createContext<ActivityContextValue | null>(null);
 
 let seq = 0;
@@ -215,11 +248,16 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [actions, setActions] = useState<QualifyingAction[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [logDurations, setLogDurations] = useState<number[]>([]);
+  // Free freeze allowance: 2 per week, use-it-or-lose-it. `state.freezes` is
+  // the purchased/perk stock; this tier is always spent first and resets on
+  // the ISO-week boundary rather than accumulating.
+  const [freeFreezes, setFreeFreezes] = useState(2);
+  const [freeWeek, setFreeWeek] = useState(() => weekKey(today));
   const [queue, setQueue] = useState<StreakMilestone[]>([]);
   const [logPulse, setLogPulse] = useState(0);
   const [logOpen, setLogOpen] = useState(false);
   const [habits, setHabits] = useState<HabitDef[]>(DEFAULT_HABITS);
-  const [creditsOpen, setCreditsOpen] = useState(false);
+  const [giftsOpen, setGiftsOpen] = useState(false);
   const [freeRestoreUsed, setFreeRestoreUsed] = useState(false);
   const [repairDismissed, setRepairDismissed] = useState(false);
   /** Streak length at the moment it broke, so it can be bought back. */
@@ -227,15 +265,13 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [atRiskDismissed, setAtRiskDismissed] = useState(false);
   const [pausedDaysLeft, setPausedDaysLeft] = useState<number | null>(null);
   const [retiredStreak, setRetiredStreak] = useState<number | null>(null);
-  // Seeded from the invites that actually subscribed, as a single opening
-  // entry — so the balance, the "Earned" block in the credit modal and the
-  // invites screen are three views of one number rather than three constants
-  // free to drift. The old seed was a hardcoded 18 that agreed with nothing.
-  const [ledger, setLedger] = useState<CreditEntry[]>(() => [
+  // The gift inventory. Seeded with one waiting freeze so the modal has a
+  // real row on first open — everything else is earned live.
+  const [gifts, setGifts] = useState<GiftEvent[]>(() => [
     {
-      id: "credit-invites",
-      delta: INVITE_CREDITS_EARNED,
-      reason: `${SUBSCRIBED_INVITES.length} invites subscribed`,
+      id: "gift-seed-freeze",
+      kind: "freeze",
+      reason: "Welcome gift",
       at: today.toISOString(),
     },
   ]);
@@ -252,6 +288,9 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     ...h,
     done: actions.some((a) => a.kind === h.kind && a.day === todayKey),
   }));
+
+  const dailyTarget = dailyTargetFrom(goals.weeklyTarget);
+  const todayIntensity = dayIntensity(actions, todayKey);
 
   // Applications this week, Monday-start, duplicates excluded so re-logging the
   // same role can't inflate the weekly number.
@@ -270,26 +309,73 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     setActions((prev) => [...prev, { id: nextId("act"), kind, artifactId, at: at.toISOString(), day }]);
 
+    // Fresh ISO week => the free freeze allowance resets to 2. Use-it-or-
+    // lose-it: last week's unspent free tier does NOT roll into this one.
+    const wk = weekKey(at);
+    if (wk !== freeWeek) {
+      setFreeWeek(wk);
+      setFreeFreezes(2);
+    }
+    const freeAvailable = wk !== freeWeek ? 2 : freeFreezes;
+
+    const weight = ACTION_KINDS[kind].intensityWeight;
     const before = state.current;
-    const marked = markDay(state.days, day, "logged", reason, at);
+    const marked = markDay(state.days, day, "logged", reason, at, weight);
     let days = marked.days;
     const auditRows: AuditEntry[] = marked.audit ? [marked.audit] : [];
 
     // If there's an unplanned miss sitting behind us and a freeze to spend,
     // absorb it and tell the user after the fact — never ask permission.
-    const absorbed = absorbMissWithFreeze(days, state.freezes, at);
+    // The free weekly tier is spent before the purchased/perk stock, so paid
+    // freezes never burn while a free one quietly expires.
+    const absorbed = absorbMissWithFreeze(days, freeAvailable + state.freezes, at);
     let freezesSpent = 0;
+    let freeSpent = 0;
     if (absorbed.coveredDay) {
       days = absorbed.days;
-      freezesSpent = 1;
+      if (freeAvailable > 0) freeSpent = 1;
+      else freezesSpent = 1;
       if (absorbed.audit) auditRows.push(absorbed.audit);
     }
+    if (freeSpent) setFreeFreezes((n) => Math.max(0, n - 1));
 
     const current = computeStreak(days);
     const earned = milestonesCrossed(before, current, state.claimed);
+
+    // ------------------------------------------------------------------
+    // Gift grants. All randomness is drawn HERE, in the handler — never in
+    // render, never inside a setState updater (React can run those twice,
+    // which would reroll a gift). The drawn results are plain locals shared
+    // by the inventory and the celebration queue.
+    // ------------------------------------------------------------------
+    const earnedWithPayout = earned.map((m) => ({ ...m, gift: drawGift(m.giftTier) }));
+
+    const alreadyGranted = (ref: string) => gifts.some((g) => g.refId === ref);
+    const grants: GiftEvent[] = [];
+
+    // Weekly goal met (applications only) — one small gift per ISO week, ever.
+    if (kind === "application") {
+      const weeklyAfter = weeklyLogged + 1;
+      const weeklyRef = strongRefId("weekly-goal", wk);
+      if (weeklyAfter >= goals.weeklyTarget && !alreadyGranted(weeklyRef)) {
+        grants.push({
+          id: nextId("gift"),
+          kind: drawGift("small"),
+          reason: STRONG_EVENTS["weekly-goal"].reason,
+          refId: weeklyRef,
+          at: at.toISOString(),
+        });
+      }
+    }
+
+    // A full day earns recognition, deliberately not a gift — material
+    // rewards every day would flood the inventory into meaninglessness.
+    const intensityNow = dayIntensity(actions, day) + weight;
+    const becameFull = isFullDay(intensityNow, dailyTarget) && !isFullDay(intensityNow - weight, dailyTarget);
+
     const freezesEarned = earned.reduce((n, m) => {
-      // "+2 streak freezes" grants two, not one — the old code counted rungs,
-      // not freezes, so the 60-day reward silently paid out half.
+      // "+2 streak freezes" grants two, not one — counting rungs instead of
+      // freezes once silently paid the 60-day reward out at half.
       const match = m.perk?.match(/\+(\d+) streak freeze/);
       return n + (match ? Number(match[1]) : 0);
     }, 0);
@@ -300,34 +386,44 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       current,
       longest: Math.max(computeLongest(days), current),
       claimed: [...prev.claimed, ...earned.map((m) => m.days)],
-      freezes: prev.freezes - freezesSpent + freezesEarned,
+      // Held stock caps at FREEZE_CAP minus the free tier, so perk grants
+      // can't stockpile repair into meaninglessness.
+      freezes: Math.min(prev.freezes - freezesSpent + freezesEarned, FREEZE_CAP - freeAvailable + freeSpent),
     }));
-    if (earned.length > 0) {
-      setLedger((prev) => [
-        ...prev,
-        ...earned.map((m) => ({
-          id: nextId("credit"),
-          delta: m.credits,
-          reason: `${m.label} reached`,
-          refId: String(m.days),
-          at: at.toISOString(),
-        })),
-      ]);
+    const milestoneGifts: GiftEvent[] = earnedWithPayout.map((m) => ({
+      id: nextId("gift"),
+      kind: m.gift as GiftKind,
+      reason: `${m.label} reached`,
+      refId: String(m.days),
+      at: at.toISOString(),
+    }));
+    if (grants.length > 0 || milestoneGifts.length > 0) {
+      setGifts((prev) => [...prev, ...grants, ...milestoneGifts]);
     }
     if (auditRows.length) setAudit((prev) => [...prev, ...auditRows]);
     setLogPulse((n) => n + 1);
 
+    // The milestone modal announces its own gift; smaller grants get one
+    // quiet toast; a full day gets recognition without a package.
+    if (grants.length > 0) {
+      toast.success(`\u{1F381} ${grants.map((g) => GIFT_CATALOGUE[g.kind].label).join(" · ")}`, {
+        description: `${grants.map((g) => g.reason).join(" · ")} — waiting in your gifts.`,
+      });
+    } else if (becameFull) {
+      toast.success("Full day \u2713", { description: `You hit today's bar of ${dailyTarget}.` });
+    }
+
     // Side effects stay out of the setState updaters — React may run those more
     // than once in development.
     if (absorbed.coveredDay) {
-      const left = state.freezes - 1 + freezesEarned;
-      toast(`A freeze covered ${weekdayName(absorbed.coveredDay)}.`, {
-        description: `${left} ${left === 1 ? "freeze" : "freezes"} left.`,
+      const left = freeAvailable - freeSpent + state.freezes - freezesSpent + freezesEarned;
+      toast(`Life happened — a freeze covered ${weekdayName(absorbed.coveredDay)}.`, {
+        description: `Your streak never broke. ${left} ${left === 1 ? "freeze" : "freezes"} left.`,
       });
     }
 
-    if (earned.length > 0) {
-      setQueue((prev) => [...prev, ...earned]);
+    if (earnedWithPayout.length > 0) {
+      setQueue((prev) => [...prev, ...earnedWithPayout]);
       return;
     }
 
@@ -373,6 +469,63 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     applyQualifyingAction(kind, artifactId, new Date(), label);
   }
 
+  /**
+   * Rare-event gift (interview reached, offer reached, questions answered,
+   * weekly goal). Deduped forever by the gift list's refId, so re-dragging a
+   * card through the same stage can never pay twice. Drawn here, in the
+   * handler — see the purity note above.
+   */
+  function awardStrongEvent(kind: StrongEventKind, suffix: string, detail?: string): boolean {
+    const ref = strongRefId(kind, suffix);
+    if (gifts.some((g) => g.refId === ref)) return false;
+    const spec = STRONG_EVENTS[kind];
+    const drawn: GiftKind = typeof spec.gift === "string" ? spec.gift : drawGift(spec.gift.tier);
+    setGifts((prev) => [
+      ...prev,
+      { id: nextId("gift"), kind: drawn, reason: detail ?? spec.reason, refId: ref, at: new Date().toISOString() },
+    ]);
+    toast.success(`\u{1F381} ${GIFT_CATALOGUE[drawn].label}`, {
+      description: `${detail ?? spec.reason} — waiting in your gifts.`,
+    });
+    return true;
+  }
+
+  /**
+   * Redeems the oldest unused gift of `kind`. Consumable effects apply here;
+   * service gifts (rewrite, Pro day, intro) are marked used and acknowledged —
+   * in a real build they enqueue the actual service.
+   */
+  function redeemGift(kind: GiftKind): boolean {
+    const target = gifts.find((g) => g.kind === kind && !g.usedAt);
+    if (!target) return false;
+    if (kind === "freeze") {
+      if (freeFreezes + state.freezes >= FREEZE_CAP) {
+        toast("You're holding the maximum freezes", { description: `${FREEZE_CAP} is the cap — use one first.` });
+        return false;
+      }
+      setState((prev) => ({ ...prev, freezes: prev.freezes + 1 }));
+    }
+    if (kind === "backfill") {
+      const yesterday = dayKey(addDays(today, -1));
+      const marked = markDay(state.days, yesterday, "backfilled", "Backfill gift used", new Date());
+      const current = computeStreak(marked.days);
+      setState((prev) => ({ ...prev, days: marked.days, current, longest: Math.max(prev.longest, current) }));
+      if (marked.audit) setAudit((prev) => [...prev, marked.audit!]);
+    }
+    if (kind === "restore" && brokenStreak !== null) {
+      setState((prev) => ({ ...prev, current: brokenStreak }));
+      setBrokenStreak(null);
+    }
+    setGifts((prev) => prev.map((g) => (g.id === target.id ? { ...g, usedAt: new Date().toISOString() } : g)));
+    toast.success(`${GIFT_CATALOGUE[kind].label} used`, {
+      description:
+        kind === "rewrite" || kind === "pro-day" || kind === "referral-intro"
+          ? "It's queued — you'll see it land shortly."
+          : undefined,
+    });
+    return true;
+  }
+
   function checkDuplicate(candidate: { company: string; role: string; url?: string }) {
     return findDuplicate(candidate, applications, today);
   }
@@ -388,26 +541,29 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }
 
-  function spend(item: SpendItem, reason?: string): boolean {
-    const cost = priceOf(item, state.current);
-    if (balanceOf(ledger) < cost) return false;
-    setLedger((prev) => [
-      ...prev,
-      { id: nextId("credit"), delta: -cost, reason: reason ?? item.label, refId: item.id, at: new Date().toISOString() },
-    ]);
-    if (item.id === "freeze") setState((prev) => ({ ...prev, freezes: prev.freezes + 1 }));
-    toast.success(`${item.label} — ${cost} credits`, { description: `${balanceOf(ledger) - cost} credits left.` });
-    return true;
-  }
 
   const value: ActivityContextValue = {
     ...state,
-    // Derived, never stored. Four independent "balances" used to drift apart
-    // the moment anything was earned; there is now one list and one sum.
-    credits: balanceOf(ledger),
-    ledger,
-    spend,
-    restorePrice: restoreCost(state.current),
+    // Total across both tiers — existing consumers keep reading one number.
+    freezes: freeFreezes + state.freezes,
+    freeFreezes,
+    heldFreezes: state.freezes,
+    dailyTarget,
+    todayIntensity,
+    awardStrongEvent,
+    gifts,
+    giftsWaiting: heldGifts(gifts).length,
+    redeemGift,
+    // The credit economy is gone from this surface: referral credits live on
+    // the invites page, and the streak pays gifts. `credits` remains only for
+    // legacy readers (sidebar/billing) and counts referral credits alone.
+    credits: INVITE_CREDITS_EARNED,
+    giftsOpen,
+    openGifts: () => setGiftsOpen(true),
+    closeGifts: () => setGiftsOpen(false),
+    creditsOpen: giftsOpen,
+    openCredits: () => setGiftsOpen(true),
+    closeCredits: () => setGiftsOpen(false),
     todayKey,
     byKey,
     loggedToday,
@@ -429,9 +585,6 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     recordAction,
     checkDuplicate,
 
-    creditsOpen,
-    openCredits: () => setCreditsOpen(true),
-    closeCredits: () => setCreditsOpen(false),
 
     repair: brokenStreak !== null && !repairDismissed ? { brokenStreak, hoursSinceBreak: 6 } : null,
     freeRestoreUsed,
@@ -459,16 +612,12 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       ]);
     },
     restoreStreak: () => {
+      // A restore is a GIFT now, never a purchase — earned at the big rungs
+      // and rare events, redeemed here when it matters most.
       if (brokenStreak === null) return false;
-      const cost = restoreCost(brokenStreak);
-      if (balanceOf(ledger) < cost) return false;
-      setLedger((prev) => [
-        ...prev,
-        { id: nextId("credit"), delta: -cost, reason: `Streak restored (${brokenStreak} days)`, at: new Date().toISOString() },
-      ]);
-      setState((prev) => ({ ...prev, current: brokenStreak }));
-      setBrokenStreak(null);
-      toast.success(`${brokenStreak}-day streak restored.`, { description: `${balanceOf(ledger) - cost} credits left.` });
+      const days = brokenStreak;
+      if (!redeemGift("restore")) return false;
+      toast.success(`${days}-day streak restored.`, { description: "Your restore gift brought it back whole." });
       return true;
     },
     halfRestoreStreak: () => {

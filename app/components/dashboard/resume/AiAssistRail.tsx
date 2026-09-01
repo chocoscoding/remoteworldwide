@@ -8,6 +8,7 @@
 
 import type { FC } from "react";
 import { Check, Plus, Send, Sparkles, X } from "lucide-react";
+import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
@@ -22,6 +23,10 @@ export interface AiAssistRailProps {
   isBlank: boolean;
   displayScore: number;
   before: number | null;
+  /** When the tailoring pass ran — shown as a live time-ago next to `before`. */
+  tailoredAt: Date | null;
+  /** Clears the tailoring result so another check can run clean. */
+  onClearTailoring: () => void;
   keywordsAdded: Set<string>;
   onToggleKeyword: (id: string) => void;
   appliedSuggestions: Set<string>;
@@ -40,6 +45,8 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   isBlank,
   displayScore,
   before,
+  tailoredAt,
+  onClearTailoring,
   keywordsAdded,
   onToggleKeyword,
   appliedSuggestions,
@@ -94,7 +101,17 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
         </div>
         <ProgressBar value={displayScore} />
         {before !== null ? (
-          <p className="text-xs font-semibold text-[#6c7a1e] mt-2">up from {before} before tailoring</p>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-[#6c7a1e]">
+              up from {before} — tailored {tailoredAt ? <TimeAgo datetime={tailoredAt} opts={{ minInterval: 10 }} /> : "earlier"}
+            </p>
+            <button
+              type="button"
+              onClick={onClearTailoring}
+              className="flex-none cursor-pointer text-[11px] font-bold text-black/45 underline decoration-2 underline-offset-2 transition-colors hover:text-[#b23c26]">
+              Clear
+            </button>
+          </div>
         ) : (
           <p className="text-xs text-black/55 mt-2">General score — not yet tailored to a specific job</p>
         )}

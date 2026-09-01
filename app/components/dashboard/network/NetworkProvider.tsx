@@ -48,7 +48,7 @@ const sameCompany = (a: string, b: string) => a.trim().toLowerCase() === b.trim(
 const byWarmth = (a: ReferralContact, b: ReferralContact) => TIE_META[a.tie].rank - TIE_META[b.tie].rank;
 
 export const NetworkProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { recordAction } = useActivity();
+  const { recordAction, awardStrongEvent } = useActivity();
 
   const [contacts] = useState<ReferralContact[]>(REFERRAL_CONTACTS);
   const [targets] = useState<RecommendationTarget[]>(RECOMMENDATION_TARGETS);
@@ -69,6 +69,10 @@ export const NetworkProvider: FC<{ children: ReactNode }> = ({ children }) => {
   function answerIntroQuestions(entryId: string, answers: Record<string, string>) {
     const entry = pipeline.find((e) => e.id === entryId);
     if (!entry?.questions) return;
+
+    // A company's questions answered is a rare, high-signal event — pays a
+    // credit drop exactly once per recommendation (deduped on the ledger).
+    awardStrongEvent("answered-questions", entryId, `Answered ${entry.company}'s questions`);
 
     setPipeline((prev) =>
       prev.map((e) =>

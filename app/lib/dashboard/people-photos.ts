@@ -9,7 +9,7 @@ const unsplash = (id: string) => `https://images.unsplash.com/${id}?auto=format&
 
 const PERSON_PHOTOS: Record<string, string> = {
   // Yourself — the sidebar, "You" rows, community quotes.
-  "Amara Okafor": unsplash("photo-1531123897727-8f129e1688ce"),
+  "Chocos coding": unsplash("photo-1531123897727-8f129e1688ce"),
 
   // Pod members.
   "Priya Sharma": unsplash("photo-1494790108377-be9c29b29330"),
@@ -37,6 +37,6 @@ const PERSON_PHOTOS: Record<string, string> = {
  * and their surfaces render initials.
  */
 export function photoOf(name: string): string | null {
-  if (name === "You") return PERSON_PHOTOS["Amara Okafor"];
+  if (name === "You") return PERSON_PHOTOS["Chocos coding"];
   return PERSON_PHOTOS[name] ?? null;
 }

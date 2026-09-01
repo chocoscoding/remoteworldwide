@@ -43,9 +43,6 @@ const Navbar = () => {
               <Link href="/bookmarks" onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
                 Bookmarks
               </Link>
-              <Link href="/dashboard/settings/sessions" onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
-                Sessions
-              </Link>
               {data.user?.role === "AUTHOR" ? (
                 <Link href="/heroshima/blogs">
                   <p onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">

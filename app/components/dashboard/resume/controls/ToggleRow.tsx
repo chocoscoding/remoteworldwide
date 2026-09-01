@@ -2,6 +2,7 @@
 
 import { type FC } from "react";
 import { cn } from "@/lib/utils";
+import { Toggle } from "../../settings/settings-ui";
 
 /**
  * Label (+ optional description) on the left, switch on the right.
@@ -26,23 +27,6 @@ export interface ToggleRowProps {
   className?: string;
 }
 
-// Written out in full so every class is visible to Tailwind's static
-// build-time scan — same house pattern as StickerButton's STICKER_SHADOW_HOVER.
-const TRACK_CLASS: Record<"sm" | "md", string> = {
-  sm: "h-5 w-9 rounded-md border border-black/15",
-  md: "h-6 w-11 rounded-md border border-black/15",
-};
-
-const KNOB_CLASS: Record<"sm" | "md", string> = {
-  sm: "h-3.5 w-3.5 rounded-sm",
-  md: "h-4 w-4 rounded-sm",
-};
-
-const KNOB_ON_CLASS: Record<"sm" | "md", string> = {
-  sm: "translate-x-4",
-  md: "translate-x-5",
-};
-
 const LABEL_CLASS: Record<"sm" | "md", string> = {
   sm: "text-xs font-semibold text-black/60",
   md: "text-[13px] font-bold text-primary",
@@ -54,26 +38,14 @@ const ToggleRow: FC<ToggleRowProps> = ({ label, description, checked, onCheckedC
       <p className={LABEL_CLASS[size]}>{label}</p>
       {description && <p className="mt-0.5 text-[11px] text-black/45">{description}</p>}
     </div>
-    <button
-      type="button"
-      role="switch"
+    <Toggle
+      checked={checked}
       aria-checked={checked}
-      aria-label={label}
+      label={label}
       disabled={disabled}
-      onClick={() => onCheckedChange(!checked)}
-      className={cn(
-        "relative flex-none transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
-        TRACK_CLASS[size],
-        checked ? "bg-primary" : "bg-[#e5e5e0]"
-      )}>
-      <span
-        className={cn(
-          "absolute left-0.5 top-0.5 bg-white shadow-[1px_1px_0_0_rgba(34,35,37,0.3)] transition-transform",
-          KNOB_CLASS[size],
-          checked && KNOB_ON_CLASS[size]
-        )}
-      />
-    </button>
+      onChange={() => onCheckedChange(!checked)}
+      size="sm"
+    />
   </div>
 );
 

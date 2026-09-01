@@ -88,6 +88,8 @@ const HomeClient: FC = () => {
     addHabit,
     updateHabit,
     removeHabit,
+    dailyTarget,
+    todayIntensity,
   } = useActivity();
   const habitsDone = habitsToday.filter((h) => h.done).length;
 
@@ -249,7 +251,6 @@ const HomeClient: FC = () => {
                   {habitsDone} of {habitsToday.length} done
                 </span>
               </div>
-              <p className="text-xs text-black/45 mb-3 flex-none">Any one of these keeps your streak alive.</p>
 
               <div className="flex flex-col gap-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto scrollbar-neo lg:-mr-1 lg:pr-1">
                 {habitsToday.map((h) => {

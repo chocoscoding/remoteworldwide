@@ -8,14 +8,15 @@
 // remove button, dashed "Add …" button) — the same minimal pattern the old
 // screen used for its (previously disconnected) Projects/Education cards.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface EntryListEditorProps<T extends { id: string }> {
   items: T[];
   onChange: (items: T[]) => void;
   createItem: () => T;
-  renderFields: (item: T, update: (patch: Partial<T>) => void) => ReactNode;
+  renderFields: (item: T, update: (patch: Partial<T>) => void, isActive: boolean) => ReactNode;
   addLabel: string;
   emptyLabel: string;
 }
@@ -28,6 +29,8 @@ export function EntryListEditor<T extends { id: string }>({
   addLabel,
   emptyLabel,
 }: EntryListEditorProps<T>) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+
   const updateItem = (id: string, patch: Partial<T>) => {
     onChange(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
@@ -39,18 +42,43 @@ export function EntryListEditor<T extends { id: string }>({
       {items.length === 0 ? (
         <p className="text-xs text-black/50 italic">{emptyLabel}</p>
       ) : (
-        items.map((item) => (
-          <div key={item.id} className="group relative rounded-none border border-black/40 px-3 py-2.5 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => removeItem(item.id)}
-              aria-label="Remove entry"
-              className="absolute top-2 right-2 grid h-6 w-6 place-content-center rounded-none border border-black/30 bg-white text-black/50 opacity-0 transition-all group-hover:opacity-100 hover:border-[#222325] hover:bg-[#222325] hover:text-white hover:shadow-[2px_2px_0_0_#e1f073] cursor-pointer">
-              <X className="h-3.5 w-3.5" />
-            </button>
-            {renderFields(item, (patch) => updateItem(item.id, patch))}
-          </div>
-        ))
+        items.map((item) => {
+          const isActive = activeId === item.id;
+
+          return (
+            <div
+              key={item.id}
+              onMouseEnter={() => setActiveId(item.id)}
+              onMouseLeave={() => setActiveId((prev) => (prev === item.id ? null : prev))}
+              onFocusCapture={() => setActiveId(item.id)}
+              onBlurCapture={(event) => {
+                const nextFocusTarget = event.relatedTarget as Node | null;
+                if (!event.currentTarget.contains(nextFocusTarget)) {
+                  setActiveId((prev) => (prev === item.id ? null : prev));
+                }
+              }}
+              className={cn(
+                "group relative flex flex-col gap-2.5 rounded-xl border bg-white p-2 transition-all duration-200 mb-2",
+                isActive
+                  ? "border-[#1f1f1f] shadow-[0_0_0_1px_rgba(31,31,31,0.25),3px_3px_0_0_#e1f073]"
+                  : "border-black/15 hover:border-black/45 hover:bg-[#f8f8f6]",
+              )}>
+              <button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                aria-label="Remove entry"
+                className={cn(
+                  "absolute right-2 top-2 grid h-6 w-6 place-content-center rounded-md border transition-all duration-200 cursor-pointer",
+                  isActive
+                    ? "border-[#1f1f1f] bg-[#1f1f1f] text-white hover:border-[#2a2a2a] hover:bg-[#2a2a2a]"
+                    : "border-black/30 bg-white text-black/50 opacity-0 group-hover:opacity-100 hover:border-[#222325] hover:bg-[#222325] hover:text-white hover:shadow-[2px_2px_0_0_#e1f073]",
+                )}>
+                <X className="h-3.5 w-3.5" />
+              </button>
+              {renderFields(item, (patch) => updateItem(item.id, patch), isActive)}
+            </div>
+          );
+        })
       )}
       <button
         type="button"

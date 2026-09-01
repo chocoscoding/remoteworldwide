@@ -88,7 +88,7 @@ const PodClient: FC = () => {
   const [pauseOpen, setPauseOpen] = useState(false);
 
   // Your own streak, shared with the Home header and the streak panel.
-  const { current: myStreak, logPulse, loggedToday, goals: userGoals, pausedDaysLeft, resumeSearch } = useActivity();
+  const { current: myStreak, logPulse, loggedToday, goals: userGoals, pausedDaysLeft, resumeSearch, dailyTarget, todayIntensity } = useActivity();
   const myTier = tierFor(myStreak);
 
   // --- Pod streak -------------------------------------------------------
@@ -341,6 +341,9 @@ const PodClient: FC = () => {
                   {podLoggedToday
                     ? "Quorum reached — today counts for everyone."
                     : `${loggedNames.length} of ${quorum} logged. ${quorum - loggedNames.length} more keeps it alive.`}
+                  {todayIntensity >= dailyTarget && (
+                    <span className="ml-1 font-bold text-[#6c7a1e]">You put in a full day.</span>
+                  )}
                 </p>
 
                 {/* Logging lives in the tracker; nudging lives here. */}

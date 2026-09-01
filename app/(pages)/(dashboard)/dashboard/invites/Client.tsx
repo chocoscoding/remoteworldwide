@@ -8,7 +8,6 @@ import DashPagination, { type PageSize } from "@/app/components/dashboard/ui/Das
 import Pill from "@/app/components/dashboard/ui/Pill";
 import type { PillProps } from "@/app/components/dashboard/ui/Pill";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
-import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import ShareChannelDialog, {
   SHARE_CHANNELS,
   type ShareChannel,
@@ -26,7 +25,6 @@ const STATUS_META: Record<InviteRow["status"], { label: string; variant: NonNull
 const INVITE_LINK = "remoteworldwide.net/j/amara";
 
 const InvitesClient: FC = () => {
-  const { openCredits } = useActivity();
   const [copied, setCopied] = useState(false);
   const [channel, setChannel] = useState<ShareChannel | null>(null);
   const [page, setPage] = useState(1);
@@ -107,17 +105,12 @@ const InvitesClient: FC = () => {
         <DashCard className="p-6">
           <div className="mb-1 flex items-center justify-between gap-3">
             <p className="text-[15px] font-bold text-primary">People you invited</p>
-            {/* The running total lives here, next to the people who produced
-                it. Clicking opens the credit modal, which holds the breakdown. */}
-            <button
-              type="button"
-              onClick={openCredits}
-              className="group inline-flex flex-none cursor-pointer items-baseline gap-1.5 rounded-lg px-2 py-1 transition-colors hover:bg-[#f0f0ea]">
+            {/* Referral credits are this page's own story — the gifts modal
+                deliberately knows nothing about them. */}
+            <span className="inline-flex flex-none items-baseline gap-1.5 rounded-lg bg-[#f0f0ea] px-2 py-1">
               <span className="text-[17px] font-bold tabular-nums text-[#6c7a1e]">{INVITE_CREDITS_EARNED}</span>
-              <span className="text-xs font-semibold text-black/60 transition-colors group-hover:text-primary">
-                credits earned
-              </span>
-            </button>
+              <span className="text-xs font-semibold text-black/60">credits earned</span>
+            </span>
           </div>
           <p className="mb-5 text-xs text-black/60">
             {SUBSCRIBED_INVITES.length} of {INVITES.length} have subscribed.

@@ -29,7 +29,7 @@ export interface StreakCalendarProps {
 }
 
 const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) => {
-  const { byKey, current, todayKey, loggedToday } = useStreak();
+  const { byKey, current, todayKey, loggedToday, dailyTarget } = useStreak();
   const reduceMotion = useReducedMotion();
   const today = useMemo(() => fromDayKey(todayKey), [todayKey]);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -115,6 +115,10 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
               {week.map((cell, di) => {
                 const status = cell.day?.status ?? "missed";
                 const visual = dayVisual(status, tier);
+                // A day that met the daily bar reads stronger than one merely
+                // kept alive — intensity is optional on seeded history.
+                const fullDay =
+                  (status === "logged" || status === "backfilled") && (cell.day?.intensity ?? 0) >= dailyTarget;
                 const isOpenToday = cell.isToday && !loggedToday;
                 const muted = !cell.inMonth;
 
@@ -125,7 +129,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
                     animate={reduceMotion ? undefined : { opacity: muted ? 0.3 : 1, scale: 1 }}
                     transition={{ duration: 0.2, delay: reduceMotion ? 0 : (wi * 7 + di) * 0.006, ease: "easeOut" }}
                     whileHover={reduceMotion ? undefined : { scale: 1.14, zIndex: 1 }}
-                    title={`${shortDateLabel(cell.key)} — ${visual.label}${cell.day?.count ? ` (${cell.day.count})` : ""}`}
+                    title={`${shortDateLabel(cell.key)} — ${fullDay ? "Full day" : visual.label}${cell.day?.count ? ` (${cell.day.count})` : ""}`}
                     className={cn(
                       "relative aspect-square rounded-md border-[1.5px] flex items-center justify-center text-[11px] font-bold cursor-default select-none",
                       visual.cell,
@@ -133,7 +137,8 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
                       isOpenToday && "ring-2 ring-offset-1 ring-[#222325]",
                       dark && status === "missed" && "bg-white/5 border-white/15 text-white/30",
                       dark && status === "future" && "text-white/20",
-                      dark && status === "rest" && "bg-white/10 text-white/40"
+                      dark && status === "rest" && "bg-white/10 text-white/40",
+                      fullDay && "border-[#222325] ring-1 ring-[#222325]"
                     )}>
                     {/* Today's unlogged cell keeps a slow breathing ring */}
                     {isOpenToday && !reduceMotion && (

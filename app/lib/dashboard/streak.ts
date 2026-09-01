@@ -277,33 +277,38 @@ function romanNumeral(n: number): string {
 
 /**
  * Each rung fires exactly once, the day the streak first reaches `days`.
- * Credit amounts climb faster than the day counts so the later rungs stay
- * worth chasing.
+ *
+ * Rungs pay GIFTS, not currency: which one lands is drawn when the rung
+ * fires — a variable reward motivates more than a known one — and the pool's
+ * tier scales up the ladder, so a long streak reliably pays bigger things.
+ *
+ * Six rungs, deliberately — a longer ladder read as a wall. The milestone
+ * modal's "Next: X at Y days" line covers the gaps between them.
  */
 export const STREAK_MILESTONES: StreakMilestone[] = [
-  { days: 3, tierId: "spark", emoji: "🔥", label: "Spark", blurb: "Three days back to back.", credits: 2 },
-  { days: 7, tierId: "ember", emoji: "🔥", label: "Ember", blurb: "Seven days without dropping it.", credits: 5, perk: "+1 streak freeze" },
-  { days: 14, tierId: "flame", emoji: "🔥", label: "Flame", blurb: "A fortnight of showing up.", credits: 10, perk: "+1 streak freeze" },
+  { days: 3, tierId: "spark", emoji: "🔥", label: "Spark", blurb: "Three days back to back.", giftTier: "small" },
+  { days: 7, tierId: "ember", emoji: "🔥", label: "Ember", blurb: "Seven days without dropping it.", giftTier: "small", perk: "+1 streak freeze" },
+  { days: 14, tierId: "flame", emoji: "🔥", label: "Flame", blurb: "A fortnight of showing up.", giftTier: "mid", perk: "+1 streak freeze" },
   {
     days: 30,
     tierId: "blaze",
     emoji: "🔥",
     label: "Blaze",
     blurb: "Thirty days. This is a habit now.",
-    credits: 25,
+    giftTier: "mid",
     // Deliberately not a free week of Pro. That lands on your most engaged
     // user at precisely the moment they were about to convert, and trades a
     // subscription for a week of goodwill. A permanent unlock rewards the
     // streak without cannibalising the upgrade.
     perk: "Unlimited resume tailoring, permanently",
   },
-  { days: 60, tierId: "wildfire", emoji: "🔥", label: "Wildfire", blurb: "Sixty days of steady work.", credits: 50, perk: "+2 streak freezes" },
-  { days: 100, tierId: "firestorm", emoji: "🔥", label: "Firestorm", blurb: "One hundred days. Very few get here.", credits: 100, perk: "Profile badge" },
+  { days: 60, tierId: "wildfire", emoji: "🔥", label: "Wildfire", blurb: "Sixty days of steady work.", giftTier: "big", perk: "+2 streak freezes" },
+  { days: 100, tierId: "firestorm", emoji: "🔥", label: "Firestorm", blurb: "One hundred days. Very few get here.", giftTier: "big", perk: "Profile badge" },
 ];
-
 /**
  * Rungs past the last fixed one, generated every 100 days so the ladder never
- * dead-ends. Credits keep climbing so the later rungs stay worth chasing.
+ * dead-ends. Generated rungs stay on the big-gift pool, and the freeze perk
+ * keeps them worth reaching.
  */
 function generatedMilestone(level: number): StreakMilestone {
   const days = level * TIER_REPEAT_DAYS;
@@ -313,7 +318,7 @@ function generatedMilestone(level: number): StreakMilestone {
     emoji: "🔥",
     label: `Firestorm ${romanNumeral(level)}`,
     blurb: `${days} days. This is who you are now.`,
-    credits: level * 100,
+    giftTier: "big",
     perk: "+2 streak freezes",
   };
 }
@@ -547,7 +552,12 @@ export function buildStreakHistory(today: Date, options: BuildHistoryOptions = {
     const activeChance = offset < span * 0.55 ? 0.82 : 0.55;
     days.push(
       roll < activeChance
-        ? { date: key, status: "logged", count: 1 + Math.floor(seeded(offset + 99) * 3) }
+        ? (() => {
+            const count = 1 + Math.floor(seeded(offset + 99) * 3);
+            // Seeded intensity: most logged days were real applications, a
+            // few were kept alive by lighter work — mirrors live behaviour.
+            return { date: key, status: "logged" as const, count, intensity: seeded(offset + 7) < 0.3 ? count - 1 : count };
+          })()
         : { date: key, status: "missed", count: 0 }
     );
   }
@@ -583,7 +593,9 @@ export function buildInitialStreak(today: Date, restDays: number[] = [5, 6]): St
   return {
     current,
     longest: Math.max(computeLongest(days), current),
-    freezes: 2,
+    // Purchased/perk stock only — the free weekly allowance (2/week,
+    // use-it-or-lose-it) lives in the provider, not in this snapshot.
+    freezes: 1,
     days,
     // Everything already earned by the seeded history counts as celebrated,
     // so opening the screen doesn't replay six old milestone modals.

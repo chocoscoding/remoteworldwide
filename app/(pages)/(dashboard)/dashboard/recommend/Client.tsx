@@ -91,7 +91,7 @@ const RecommendClient: FC = () => {
         <div
           className={cn(
             "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
-            lookForOpen ? "mb-6 max-h-[420px] opacity-100" : "max-h-0 opacity-0"
+            lookForOpen ? "mb-6 max-h-[420px] opacity-100" : "max-h-0 opacity-0",
           )}>
           <DashCard className="bg-[#fbfbf7] p-6">
             <p className="mb-3 text-sm font-bold text-primary">What our reviewers look for</p>
@@ -118,9 +118,9 @@ const RecommendClient: FC = () => {
             We pick one or two people a week and put them straight in front of a company — no application, no queue.
           </p>
           <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-white/60">
-            A reviewer here reads your work and decides. If a company wants to go further, they send a question or two; you
-            answer them below, and you&apos;re talking to their hiring team directly. You can&apos;t request this — keeping your
-            profile sharp is what puts you in the running.
+            A reviewer here reads your work and decides. If a company wants to go further, they send a question or two; you answer them
+            below, and you&apos;re talking to their hiring team directly. You can&apos;t request this — keeping your profile sharp is what
+            puts you in the running.
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -141,9 +141,7 @@ const RecommendClient: FC = () => {
               <BadgeCheck className="h-4 w-4 text-[#222325]" />
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-primary">
-                {paused ? "Recommendations are paused" : "You're in the running"}
-              </p>
+              <p className="text-sm font-bold text-primary">{paused ? "You're Unavailable" : "You're Available"}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-black/55">
                 {paused
                   ? `You're hidden from reviewers — resume anytime.${pausedDaysLeft !== null ? ` ${pausedDaysLeft}d left on the pause.` : ""}`

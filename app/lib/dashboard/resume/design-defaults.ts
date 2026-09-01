@@ -1,12 +1,7 @@
 // `DEFAULT_DESIGN` — the "basic corporate" base look every template diffs
 // against — plus the default section order and the discrete slider step tables.
 
-import type {
-  ResumeDesign,
-  SectionConfig,
-  SectionKind,
-  SectionSeed,
-} from "./design-types";
+import type { ResumeDesign, SectionConfig, SectionKind, SectionSeed } from "./design-types";
 
 // ---------------------------------------------------------------------------
 // The base template — "basic corporate"
@@ -44,8 +39,8 @@ export const DEFAULT_DESIGN: ResumeDesign = {
   spacing: {
     lineHeight: 1.3,
     elementGapPt: 8,
-    marginXmm: 14,
-    marginYmm: 16,
+    marginXmm: 6,
+    marginYmm: 6,
   },
   entries: {
     structure: "full-width",
@@ -191,27 +186,19 @@ export function sectionsFromSeeds(seeds: SectionSeed[]): SectionConfig[] {
 // literals for that reason.
 
 /** Base body size, pt. `DEFAULT_DESIGN.fontSize.basePt` (11) is index 6. */
-export const BASE_PT_STEPS: number[] = [
-  8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14,
-];
+export const BASE_PT_STEPS: number[] = [8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14];
 
 /** Offsets added to `basePt` for name / title / heading / entry header, pt. */
-export const OFFSET_PT_STEPS: number[] = [
-  0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10,
-];
+export const OFFSET_PT_STEPS: number[] = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 
 /** Unitless line-height multiplier. */
-export const LINE_HEIGHT_STEPS: number[] = [
-  1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2,
-];
+export const LINE_HEIGHT_STEPS: number[] = [1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2];
 
 /** Vertical space between elements, pt. */
 export const ELEMENT_GAP_STEPS: number[] = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
 
 /** Page margins, mm. Shared by the X and Y margin sliders. */
-export const MARGIN_MM_STEPS: number[] = [
-  6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30,
-];
+export const MARGIN_MM_STEPS: number[] = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30];
 
 /** Side-column width, % of the paper. Matches the 28–40 range in ResumeDesign. */
 export const SIDE_WIDTH_PCT_STEPS: number[] = [28, 30, 32, 34, 36, 38, 40];

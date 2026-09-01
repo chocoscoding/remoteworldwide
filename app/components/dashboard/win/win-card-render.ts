@@ -28,7 +28,7 @@ export interface RenderWinCardOptions {
   format: WinCardFormat;
   /** The page's real font stack — read from computed style, since next/font hashes the family name. */
   fontFamily: string;
-  /** "Amara Okafor" from the profile. */
+  /** "Chocos coding" from the profile. */
   ownerName: string;
 }
 
@@ -83,15 +83,7 @@ function drawChip(ctx: CanvasRenderingContext2D, x: number, y: number, text: str
  * The journey panel — the tracker's path, dated. This is the card's whole
  * point: not "I got the job" but the visible road to it.
  */
-function drawJourney(
-  ctx: CanvasRenderingContext2D,
-  win: WinRecord,
-  x: number,
-  y: number,
-  w: number,
-  size: number,
-  family: string
-): number {
+function drawJourney(ctx: CanvasRenderingContext2D, win: WinRecord, x: number, y: number, w: number, size: number, family: string): number {
   const rowH = size * 2.45;
   const padX = size * 1.2;
   const padY = size * 1.3;
@@ -172,7 +164,7 @@ function drawQuote(
   w: number,
   maxY: number,
   size: number,
-  family: string
+  family: string,
 ) {
   ctx.font = `600 ${size}px ${family}`;
   ctx.fillStyle = INK_60;
@@ -223,11 +215,7 @@ export function renderWinCard(canvas: HTMLCanvasElement, opts: RenderWinCardOpti
   const name = toggles.firstNameOnly ? firstNameOf(ownerName) : ownerName;
   const roleLine = toggles.hideCompany ? win.facts.role : `${win.facts.role} at ${win.facts.company}`;
 
-  const chips = [
-    `${win.stats.applications} applications`,
-    `${win.stats.interviewLoops} interview loops`,
-    `${win.stats.streak}-day streak`,
-  ];
+  const chips = [`${win.stats.applications} applications`, `${win.stats.interviewLoops} interview loops`, `${win.stats.streak}-day streak`];
   if (!toggles.hideSalary && win.stats.salaryDelta) chips.push(`${win.stats.salaryDelta} negotiated`);
 
   const contentW = width - L.pad * 2;
@@ -319,7 +307,7 @@ export function renderWinCard(canvas: HTMLCanvasElement, opts: RenderWinCardOpti
 export function paintWinCard(
   el: HTMLCanvasElement,
   live: () => HTMLCanvasElement | null,
-  opts: Omit<RenderWinCardOptions, "fontFamily">
+  opts: Omit<RenderWinCardOptions, "fontFamily">,
 ): void {
   const fontFamily = getComputedStyle(document.body).fontFamily || "sans-serif";
   renderWinCard(el, { ...opts, fontFamily });
