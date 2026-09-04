@@ -61,7 +61,7 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
           <form onSubmit={submit} className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <DialogPrimitive.Title className="text-lg font-bold text-primary">Add an answer yourself</DialogPrimitive.Title>
+                <DialogPrimitive.Title className="text-lg font-bold text-primary">Add an answer</DialogPrimitive.Title>
                 <DialogPrimitive.Description className="mt-1 text-sm text-black/50">
                   Saved here, it&apos;s available on every future application.
                 </DialogPrimitive.Description>
@@ -90,21 +90,14 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                 <label className={LABEL} htmlFor="new-a">
                   Answer
                 </label>
-                <TokenTextarea
-                  id="new-a"
-                  value={a}
-                  onChange={setA}
-                  rows={4}
-                  required
-                  placeholder="Write the answer you want saved…"
-                />
+                <TokenTextarea id="new-a" value={a} onChange={setA} rows={4} required placeholder="Write the answer you want saved…" />
                 <p className="mt-1.5 text-xs text-black/40">
-                  Type <code className="rounded bg-[#f0f0ea] px-1 font-mono text-[11px]">{"{company}"}</code> anywhere and it&apos;s
-                  swapped for whoever you&apos;re applying to.
+                  Type <code className="rounded bg-[#859c03] px-1 font-mono text-[14px]">{"{company}"}</code> anywhere and it&apos;s swapped
+                  for whoever you&apos;re applying to.
                 </p>
               </div>
               <div>
-                <span className={cn(LABEL, "inline-flex items-center gap-1.5")}>
+                <div className={cn(LABEL, "flex items-center gap-1.5")}>
                   Category
                   <DashTooltip label="What these categories mean">
                     <span className="block text-xs font-semibold normal-case tracking-normal text-primary">Screening</span>
@@ -113,11 +106,11 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                     </span>
                     <span className="mt-2.5 block text-xs font-semibold normal-case tracking-normal text-primary">Demographics</span>
                     <span className="mt-0.5 block text-xs font-normal normal-case leading-relaxed tracking-normal text-black/55">
-                      Optional diversity questions — gender, ethnicity, veteran status. Never required, and the extension leaves
-                      them blank unless you turn that on.
+                      Optional diversity questions — gender, ethnicity, veteran status. Never required, and the extension leaves them blank
+                      unless you turn that on.
                     </span>
                   </DashTooltip>
-                </span>
+                </div>
                 <div className="inline-flex items-center gap-0.5 rounded-lg bg-[#f0f0ea] p-1">
                   {(["screening", "demographics"] as const).map((c) => (
                     <button
@@ -127,7 +120,7 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                       aria-pressed={cat === c}
                       className={cn(
                         "rounded-md px-3 py-1.5 text-xs font-bold capitalize transition-colors cursor-pointer",
-                        cat === c ? "bg-[#222325] text-white" : "text-black/55 hover:text-primary"
+                        cat === c ? "bg-[#222325] text-white" : "text-black/55 hover:text-primary",
                       )}>
                       {c}
                     </button>

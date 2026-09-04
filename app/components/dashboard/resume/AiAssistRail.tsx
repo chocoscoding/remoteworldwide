@@ -15,18 +15,20 @@ import Pill from "@/app/components/dashboard/ui/Pill";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { ATS_FIX_ITEMS, ATS_KEYWORDS } from "@/app/lib/dashboard/mock-data";
+import type { ResumeScan } from "./resume-document";
 
 const SUGGESTION_ITEMS = ATS_FIX_ITEMS.filter((f) => f.id === "fix-keyword" || f.id === "fix-skills");
 
 export interface AiAssistRailProps {
-  docLabel: string;
   isBlank: boolean;
   displayScore: number;
+  /** The general baseline a job check moved from — null for a general check. */
   before: number | null;
-  /** When the tailoring pass ran — shown as a live time-ago next to `before`. */
-  tailoredAt: Date | null;
-  /** Clears the tailoring result so another check can run clean. */
-  onClearTailoring: () => void;
+  /** The standing ATS check; null shows the two ways to run one instead. */
+  scan: ResumeScan | null;
+  onRemoveScan: () => void;
+  onScanGeneral: () => void;
+  onScanAgainstJob: () => void;
   keywordsAdded: Set<string>;
   onToggleKeyword: (id: string) => void;
   appliedSuggestions: Set<string>;
@@ -41,12 +43,13 @@ export interface AiAssistRailProps {
 }
 
 const AiAssistRail: FC<AiAssistRailProps> = ({
-  docLabel,
   isBlank,
   displayScore,
   before,
-  tailoredAt,
-  onClearTailoring,
+  scan,
+  onRemoveScan,
+  onScanGeneral,
+  onScanAgainstJob,
   keywordsAdded,
   onToggleKeyword,
   appliedSuggestions,
@@ -65,15 +68,12 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
     return (
       <div className="flex flex-col gap-4">
         <DashCard className="border-2 border-[#222325] p-4">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-[13px] font-bold text-primary">Match score</p>
-            <Pill variant="neutral">{docLabel}</Pill>
-          </div>
+          <p className="text-[13px] font-bold text-primary">ATS score</p>
           <div className="flex items-baseline gap-2 mt-3 mb-2.5">
             <span className="text-[32px] font-bold text-black/30 leading-none">—</span>
             <span className="text-sm text-black/50">/ 100</span>
           </div>
-          <p className="text-xs text-black/55 mt-2">Add a summary, experience, or skills to see a match score here.</p>
+          <p className="text-xs text-black/55 mt-2">Add a summary, experience, or skills to see an ATS score here.</p>
         </DashCard>
 
         <DashCard className="border-2 border-[#222325] p-3.5">
@@ -89,54 +89,86 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
 
   return (
     <div className="scrollbar-neo flex flex-col gap-4 max-h-[calc(100vh-112px)] overflow-y-auto pr-1">
-      {/* Match score */}
+      {/* ATS score — a standing check, or the two ways to run one. The card
+          names the JOB it was scored against, never the document's own label. */}
       <DashCard className="border-2 border-[#222325] p-4">
         <div className="flex items-center justify-between mb-1">
-          <p className="text-[13px] font-bold text-primary">Match score</p>
-          <Pill variant="neutral">{docLabel}</Pill>
-        </div>
-        <div className="flex items-baseline gap-2 mt-3 mb-2.5">
-          <span className="text-[32px] font-bold text-primary leading-none">{displayScore}</span>
-          <span className="text-sm text-black/50">/ 100</span>
-        </div>
-        <ProgressBar value={displayScore} />
-        {before !== null ? (
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-[#6c7a1e]">
-              up from {before} — tailored {tailoredAt ? <TimeAgo datetime={tailoredAt} opts={{ minInterval: 10 }} /> : "earlier"}
-            </p>
+          <p className="text-[13px] font-bold text-primary">ATS score</p>
+          {scan && (
             <button
               type="button"
-              onClick={onClearTailoring}
-              className="flex-none cursor-pointer text-[11px] font-bold text-black/45 underline decoration-2 underline-offset-2 transition-colors hover:text-[#b23c26]">
-              Clear
+              onClick={onRemoveScan}
+              className="cursor-pointer text-[11px] font-bold text-black/45 underline decoration-2 underline-offset-2 transition-colors hover:text-[#b23c26]">
+              Remove
             </button>
-          </div>
-        ) : (
-          <p className="text-xs text-black/55 mt-2">General score — not yet tailored to a specific job</p>
-        )}
-
-        <div className="mt-4 pt-4 border-t border-black/15">
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/50 mb-2">Missing keywords</p>
-          <div className="flex flex-wrap gap-1.5">
-            {missingKeywords.map((kw) => {
-              const added = keywordsAdded.has(kw.id);
-              return (
-                <button
-                  key={kw.id}
-                  type="button"
-                  onClick={() => onToggleKeyword(kw.id)}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-colors",
-                    added ? "bg-secondary text-primary" : "border border-dashed border-black/25 text-black/50 hover:border-black/45"
-                  )}>
-                  {added ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                  {kw.label}
-                </button>
-              );
-            })}
-          </div>
+          )}
         </div>
+
+        {scan ? (
+          <>
+            <div className="flex items-baseline gap-2 mt-3 mb-2.5">
+              <span className="text-[32px] font-bold text-primary leading-none">{displayScore}</span>
+              <span className="text-sm text-black/50">/ 100</span>
+            </div>
+            <ProgressBar value={displayScore} />
+            <p className="mt-2 text-xs font-semibold text-primary">
+              {scan.kind === "job" ? `Against ${scan.job}` : "General score — how it reads for your niche"}
+            </p>
+            <p className="mt-0.5 text-xs text-black/50">
+              {scan.kind === "job" && before !== null && (
+                <span className={cn("font-semibold", displayScore >= before ? "text-[#6c7a1e]" : "text-[#b23c26]")}>
+                  {displayScore >= before ? "up from" : "down from"} {before} general ·{" "}
+                </span>
+              )}
+              scanned <TimeAgo datetime={scan.at} opts={{ minInterval: 10 }} />
+            </p>
+
+            <div className="mt-4 pt-4 border-t border-black/15">
+              <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/50 mb-2">Missing keywords</p>
+              <div className="flex flex-wrap gap-1.5">
+                {missingKeywords.map((kw) => {
+                  const added = keywordsAdded.has(kw.id);
+                  return (
+                    <button
+                      key={kw.id}
+                      type="button"
+                      onClick={() => onToggleKeyword(kw.id)}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-colors",
+                        added ? "bg-secondary text-primary" : "border border-dashed border-black/25 text-black/50 hover:border-black/45"
+                      )}>
+                      {added ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                      {kw.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-baseline gap-2 mt-3 mb-2.5">
+              <span className="text-[32px] font-bold text-black/30 leading-none">—</span>
+              <span className="text-sm text-black/50">/ 100</span>
+            </div>
+            <p className="text-xs leading-relaxed text-black/55">No check standing. See how this resume reads to applicant tracking systems:</p>
+            <div className="mt-2.5 flex items-center gap-3 text-xs">
+              <button
+                type="button"
+                onClick={onScanGeneral}
+                className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2 transition-colors hover:decoration-[#6c7a1e]">
+                General score
+              </button>
+              <span className="text-black/40">or</span>
+              <button
+                type="button"
+                onClick={onScanAgainstJob}
+                className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2 transition-colors hover:decoration-[#6c7a1e]">
+                Against a job
+              </button>
+            </div>
+          </>
+        )}
       </DashCard>
 
       {/* Suggestion cards */}

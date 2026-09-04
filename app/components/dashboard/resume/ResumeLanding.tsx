@@ -115,18 +115,19 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ documents, onOpen, onCreateBlan
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold text-primary">{d.label}</span>
                     <span className="block truncate text-xs text-black/45">
-                      {d.tailoredAt ? (
+                      {d.scan ? (
                         <>
-                          tailored <TimeAgo datetime={d.tailoredAt} opts={{ minInterval: 10 }} />
+                          {d.scan.kind === "job" ? `against ${d.scan.job}` : "general"} · scanned{" "}
+                          <TimeAgo datetime={d.scan.at} opts={{ minInterval: 10 }} />
                         </>
                       ) : (
-                        "general — not tailored yet"
+                        "no ATS check yet"
                       )}
                     </span>
                   </span>
                   <span className="flex-none text-right">
-                    <span className="block text-base font-bold text-primary tabular-nums">{d.score}</span>
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">Match</span>
+                    <span className="block text-base font-bold text-primary tabular-nums">{d.scan ? d.score : "—"}</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">ATS</span>
                   </span>
                 </button>
               ))}

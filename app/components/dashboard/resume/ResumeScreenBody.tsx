@@ -26,7 +26,8 @@ import { DEFAULT_DESIGN, DEFAULT_SECTIONS } from "@/app/lib/dashboard/resume/des
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
-import { cloneContent, createBlankContent, type ResumeDocument } from "./resume-document";
+import { cloneContent, createBlankContent, generalScoreFor, type ResumeDocument } from "./resume-document";
+import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import DocumentSwitcher from "./DocumentSwitcher";
 import NewResumeDialog, { type NewResumeMode } from "./NewResumeDialog";
 import ContentForm from "./content/ContentForm";
@@ -84,6 +85,13 @@ const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
         ai: "grid-cols-[308px_1fr_324px]",
       };
 
+// The three zoom controls share one quiet recipe — hairline border, full
+// circle, muted ink — so the control sits in the background. Hover is where
+// it comes forward: ink border, a hair of hard shadow, and a real press that
+// travels onto that shadow and drops it.
+const ZOOM_BUTTON_CLASS =
+  "grid h-6 w-6 place-content-center rounded-full border border-black/15 bg-white text-sm font-semibold leading-none text-black/70 transition-[transform,box-shadow,background-color,border-color,color] duration-100 ease-out hover:border-[#222325] hover:bg-[#f7f7f7] hover:text-primary hover:shadow-[0.5px_0.5px_0_0_#222325] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none cursor-pointer";
+
 const TAILORED_SUMMARY =
   "Product designer with 6 years shipping design systems and developer-experience-focused workflow tools for distributed teams across four time zones.";
 
@@ -117,7 +125,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   const [rewriteOptions, setRewriteOptions] = useState<RewriteVariant[] | null>(null);
   const [quantifyList, setQuantifyList] = useState<QuantifySuggestion[] | null>(null);
   const [quantifyApplied, setQuantifyApplied] = useState<Set<number>>(new Set());
-  const [tailorPickerOpen, setTailorPickerOpen] = useState(false);
+  // One job picker, two reasons to open it: the Tailor tool rewrites content
+  // against the job; the ATS card's "Against a job" only scores against it.
+  const [pickerFor, setPickerFor] = useState<"tailor" | "scan" | null>(null);
   const [tailorJobs, setTailorJobs] = useState<JobOption[]>(PLATFORM_JOBS);
 
   const [keywordsAdded, setKeywordsAdded] = useState<Set<string>>(new Set());
@@ -218,7 +228,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
         sections: DEFAULT_SECTIONS,
         score: 0,
         before: null,
-        tailoredAt: null,
+        scan: null,
         isBlank: mode === "blank",
       };
       setDocuments((prev) => [...prev.map((d) => (d.id === activeDocId ? { ...d, design, sections, content } : d)), newDoc]);
@@ -268,7 +278,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
   const runAiTool = (id: string) => {
     if (id === "tailor") {
-      setTailorPickerOpen(true);
+      setPickerFor("tailor");
       return;
     }
     setAiRunning(id);
@@ -338,34 +348,61 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
   /** Tailor lands here from the job picker — score moves like a real tailoring pass. */
   const handleTailorJob = (job: JobOption) => {
-    setTailorPickerOpen(false);
+    setPickerFor(null);
     setAiRunning("tailor");
     const result = tailorToJob(content, { company: job.company, role: job.role, jdText: job.jdText });
     // Stamped here, outside the setState updater — updaters may run twice.
     const stampedAt = new Date();
+    const general = generalScoreFor(activeDocId);
+    const jobLabel = `${job.company} — ${job.role}`;
     finishAiTool(
       "tailor",
       `Tailored to ${job.role} at ${job.company} — wove ${result.woven.map((w) => `"${w}"`).join(" and ")} in.`,
       () => {
         setContent(result.content);
-        // The document's score records the before/after the match card shows.
+        // Tailoring IS a job check — the ATS card names the job and the lift.
         setDocuments((prev) =>
-          prev.map((d) => (d.id === activeDocId ? { ...d, before: d.score, score: Math.min(97, d.score + 13), tailoredAt: stampedAt } : d)),
+          prev.map((d) =>
+            d.id === activeDocId
+              ? { ...d, before: general, score: Math.min(97, d.score + 13), scan: { kind: "job", at: stampedAt, job: jobLabel } }
+              : d,
+          ),
         );
       },
     );
   };
 
-  /**
-   * Removes the tailoring result from the match card — score falls back to
-   * what it was before the pass, and the Tailor tool resets to "Run" so a
-   * fresh check against another job starts clean. Content edits stay: the
-   * woven keywords are the user's resume now, not part of the scorecard.
-   */
-  const clearTailoring = () => {
+  // -------------------------------------------------------------------------
+  // The ATS card's own checks — score only, never a content rewrite. Same
+  // stub the ATS screen uses, so the two surfaces agree on the numbers.
+  // -------------------------------------------------------------------------
+
+  const scanGeneral = () => {
+    const at = new Date();
+    const general = generalScoreFor(activeDocId);
+    setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, before: null, score: general, scan: { kind: "general", at } } : d)));
+  };
+
+  const handleScanJob = (job: JobOption) => {
+    setPickerFor(null);
+    const at = new Date();
+    const general = generalScoreFor(activeDocId);
+    const { score } = scoreApplication(activeDocId, job.jdText);
+    const jobLabel = `${job.company} — ${job.role}`;
     setDocuments((prev) =>
-      prev.map((d) => (d.id === activeDocId ? { ...d, score: d.before ?? d.score, before: null, tailoredAt: null } : d)),
+      prev.map((d) => (d.id === activeDocId ? { ...d, before: general, score, scan: { kind: "job", at, job: jobLabel } } : d)),
     );
+  };
+
+  /**
+   * Removes the standing check — the card offers the two ways to run another.
+   * Score resets to the general baseline so nothing compounds; the Tailor tool
+   * goes back to "Run". Content edits stay: woven keywords are the user's
+   * resume now, not part of the scorecard.
+   */
+  const removeScan = () => {
+    const general = generalScoreFor(activeDocId);
+    setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, before: null, score: general, scan: null } : d)));
     setAiDone((prev) => {
       const next = new Set(prev);
       next.delete("tailor");
@@ -534,26 +571,24 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
                 {pageCount} page{pageCount === 1 ? "" : "s"} · {content.experience.length} roles · last edited 2 minutes ago.
               </p>
 
-              <div className="flex items-center gap-2 rounded-full border border-black/15 bg-white px-2 py-1 shadow-sm">
+              {/* Zoom — a quiet pill that only comes forward on hover. */}
+              <div className="group/zoom flex items-center gap-2 rounded-full border border-black/15 bg-white px-2 py-1 shadow-sm transition-[border-color,box-shadow] duration-100 ease-out hover:border-[#222325] hover:shadow-[1px_1px_0_0_#222325]">
                 <button
                   type="button"
                   aria-label="Zoom out"
                   onClick={() => setZoom(Math.max(45, zoomPercent - 10))}
-                  className="grid h-6 w-6 place-content-center rounded-full border border-black/15 bg-white text-sm font-semibold text-black/70 hover:border-black/35 hover:bg-[#f7f7f7] cursor-pointer">
+                  className={ZOOM_BUTTON_CLASS}>
                   −
                 </button>
-                <span className="min-w-[52px] text-center font-semibold text-black/70">{zoomPercent}%</span>
+                <span className="min-w-[48px] text-center text-xs font-semibold tabular-nums text-black/70 transition-colors group-hover/zoom:text-primary">{zoomPercent}%</span>
                 <button
                   type="button"
                   aria-label="Zoom in"
                   onClick={() => setZoom(Math.min(180, zoomPercent + 10))}
-                  className="grid h-6 w-6 place-content-center rounded-full border border-black/15 bg-white text-sm font-semibold text-black/70 hover:border-black/35 hover:bg-[#f7f7f7] cursor-pointer">
+                  className={ZOOM_BUTTON_CLASS}>
                   +
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom(100)}
-                  className="ml-1 rounded-full border border-black/15 bg-[#f4f4f0] px-2 py-1 font-medium text-black/70 hover:border-black/30 hover:bg-[#efefeb] cursor-pointer">
+                <button type="button" onClick={() => setZoom(100)} className={cn(ZOOM_BUTTON_CLASS, "ml-1 w-auto bg-[#f4f4f0] px-2.5 text-xs font-medium hover:bg-[#e1f073]")}>
                   Fit
                 </button>
               </div>
@@ -602,12 +637,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
               <CustomizePanelsRail flashItem={flashCustomizeItem} registerRef={registerCustomizeRef} />
             ) : (
               <AiAssistRail
-                docLabel={activeDoc.label}
                 isBlank={activeDoc.isBlank ?? false}
                 displayScore={displayScore}
                 before={activeDoc.before}
-                tailoredAt={activeDoc.tailoredAt}
-                onClearTailoring={clearTailoring}
+                scan={activeDoc.scan}
+                onRemoveScan={removeScan}
+                onScanGeneral={scanGeneral}
+                onScanAgainstJob={() => setPickerFor("scan")}
                 keywordsAdded={keywordsAdded}
                 onToggleKeyword={toggleKeyword}
                 appliedSuggestions={appliedSuggestions}
@@ -625,16 +661,20 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
         </div>
       </main>
 
-      {/* Tailor's job source — the same picker the tracker and win log use. */}
+      {/* The job source for both Tailor and the ATS card's "Against a job" —
+          the same picker the tracker and win log use. */}
       <JobPickerDialog
-        open={tailorPickerOpen}
-        onOpenChange={setTailorPickerOpen}
+        open={pickerFor !== null}
+        onOpenChange={(open) => {
+          if (!open) setPickerFor(null);
+        }}
         jobs={tailorJobs}
-        onPick={handleTailorJob}
+        onPick={(job) => (pickerFor === "scan" ? handleScanJob(job) : handleTailorJob(job))}
         onCreate={(input: PastedJobInput) => {
           const job = createPastedJob(input);
           setTailorJobs((prev) => [...prev, job]);
-          handleTailorJob(job);
+          if (pickerFor === "scan") handleScanJob(job);
+          else handleTailorJob(job);
         }}
       />
 

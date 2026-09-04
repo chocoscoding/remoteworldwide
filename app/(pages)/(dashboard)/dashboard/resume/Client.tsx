@@ -49,7 +49,7 @@ const ResumeClient: FC = () => {
       sections: DEFAULT_SECTIONS,
       score: 0,
       before: null,
-      tailoredAt: null,
+      scan: null,
       isBlank: true,
     };
     setDocuments((prev) => [...prev, doc]);

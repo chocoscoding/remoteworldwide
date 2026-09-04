@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useMemo, useState } from "react";
-import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Mic, Plus, Search, Target } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Mic, Plus, Search, Target } from "lucide-react";
 import { differenceInCalendarDays, format as formatDate } from "date-fns";
 import { cn } from "@/lib/utils";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
@@ -135,7 +135,7 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
           ) : (
             <PrepEmptyState
               className="w-full justify-center"
-              icon={Calendar}
+              lottieSrc="/Lottie/neobrutalism/Video_Vlog_lottie.json"
               title="Nothing scheduled yet"
               body="Prep gets built around a job you're already talking to someone about — once one shows up in your tracker as Interviewing, it'll show up here too."
               ctaLabel="View your applications"

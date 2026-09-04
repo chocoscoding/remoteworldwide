@@ -58,10 +58,12 @@ export function EntryListEditor<T extends { id: string }>({
                 }
               }}
               className={cn(
-                "group relative flex flex-col gap-2.5 rounded-xl border bg-white p-2 transition-all duration-200 mb-2",
+                "group relative flex flex-col gap-2.5 rounded-xl border p-2 transition-all duration-200 mb-2",
+                // Active reads as a tone of gray, with the fields a deeper
+                // gray inside it (see FormField) — never a black block.
                 isActive
-                  ? "border-[#1f1f1f] shadow-[0_0_0_1px_rgba(31,31,31,0.25),3px_3px_0_0_#e1f073]"
-                  : "border-black/15 hover:border-black/45 hover:bg-[#f8f8f6]",
+                  ? "border-[#222325] bg-[#e9e9e4] shadow-[3px_3px_0_0_#e1f073]"
+                  : "border-black/15 bg-white hover:border-black/45 hover:bg-[#f8f8f6]",
               )}>
               <button
                 type="button"

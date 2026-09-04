@@ -58,18 +58,11 @@ const TokenTextarea: FC<TokenTextareaProps> = ({
   const segments = value.split(TOKEN).filter((s) => s !== "");
 
   return (
-    <div
-      className={cn(
-        "relative rounded-lg border border-black/15 bg-white transition-colors focus-within:border-[#222325]",
-        className
-      )}>
+    <div className={cn("relative rounded-lg border border-black/15 bg-white transition-colors focus-within:border-[#222325]", className)}>
       <div
         ref={overlayRef}
         aria-hidden="true"
-        className={cn(
-          TYPOGRAPHY,
-          "pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-primary"
-        )}>
+        className={cn(TYPOGRAPHY, "pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-primary")}>
         {segments.map((seg, i) =>
           seg === "{company}" ? (
             // PAINT-ONLY styling. No padding, no font-weight, no letter-spacing:
@@ -78,12 +71,12 @@ const TokenTextarea: FC<TokenTextareaProps> = ({
             // keeps its own metrics, and the two layers visibly separate. The
             // fill hugs the token exactly, which also leaves the neighbouring
             // characters their own space instead of bleeding under them.
-            <span key={i} className="rounded-[2px] bg-[#6c7a1e] text-white">
+            <span key={i} className="rounded-[2px] bg-[#859c03] text-white">
               {seg}
             </span>
           ) : (
             <span key={i}>{seg}</span>
-          )
+          ),
         )}
         {/* A trailing newline has no glyph, so the mirror would collapse a line
             short of the textarea and the last row would scroll out of sync. */}
@@ -102,7 +95,7 @@ const TokenTextarea: FC<TokenTextareaProps> = ({
         spellCheck
         className={cn(
           TYPOGRAPHY,
-          "relative block w-full resize-none bg-transparent text-transparent caret-[#222325] outline-none placeholder:text-black/35"
+          "relative block w-full resize-none bg-transparent text-transparent caret-[#222325] outline-none placeholder:text-black/35",
         )}
       />
     </div>

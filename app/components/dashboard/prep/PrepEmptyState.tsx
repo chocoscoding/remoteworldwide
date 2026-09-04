@@ -2,6 +2,7 @@ import { FC, ReactNode } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import EmptyStateLottie from "@/app/components/dashboard/ui/EmptyStateLottie";
 import { BUTTON_SOLID, PANEL } from "./prep-styles";
 
 /**
@@ -14,7 +15,11 @@ import { BUTTON_SOLID, PANEL } from "./prep-styles";
  * content it stands in for.
  */
 export interface PrepEmptyStateProps {
-  icon: LucideIcon;
+  /** The quiet default. Ignored when `lottieSrc` is set. */
+  icon?: LucideIcon;
+  /** Public path to a Lottie shown instead of the icon circle — the page-level
+   *  "nothing scheduled" state earns the animated figure; in-panel tabs stay quiet. */
+  lottieSrc?: string;
   title: string;
   body: ReactNode;
   ctaLabel?: string;
@@ -30,11 +35,17 @@ export interface PrepEmptyStateProps {
   className?: string;
 }
 
-const PrepEmptyState: FC<PrepEmptyStateProps> = ({ icon: Icon, title, body, ctaLabel, onCta, ctaHref, ctaBusy, bare, className }) => (
-  <div className={cn(bare ? "" : PANEL, "px-6 py-10 flex flex-col items-center text-center gap-3.5", className)}>
-    <span className="h-12 w-12 rounded-full bg-[#f0f0ea] flex items-center justify-center">
-      <Icon className="h-4.5 w-4.5 text-black/40" />
-    </span>
+const PrepEmptyState: FC<PrepEmptyStateProps> = ({ icon: Icon, lottieSrc, title, body, ctaLabel, onCta, ctaHref, ctaBusy, bare, className }) => (
+  <div className={cn(bare ? "" : PANEL, "px-6 flex flex-col items-center text-center", lottieSrc ? "gap-2 py-6" : "gap-3.5 py-10", className)}>
+    {lottieSrc ? (
+      <EmptyStateLottie src={lottieSrc} />
+    ) : (
+      Icon && (
+        <span className="h-12 w-12 rounded-full bg-[#f0f0ea] flex items-center justify-center">
+          <Icon className="h-4.5 w-4.5 text-black/40" />
+        </span>
+      )
+    )}
     <div>
       <p className="text-sm font-bold text-primary mb-1">{title}</p>
       <p className="text-sm text-black/50 max-w-sm mx-auto leading-relaxed">{body}</p>

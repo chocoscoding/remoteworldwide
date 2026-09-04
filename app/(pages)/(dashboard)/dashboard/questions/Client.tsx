@@ -7,7 +7,7 @@
 // tab, search, filter, pagination.
 
 import { FC, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, PlugZap, Plus, Search, SearchX } from "lucide-react";
+import { ChevronDown, ChevronUp, PlugZap, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
@@ -70,7 +70,7 @@ const QuestionsClient: FC = () => {
         if (!q) return true;
         return `${item.q} ${item.a} ${item.draft ?? ""}`.toLowerCase().includes(q);
       }),
-    [items, filter, q]
+    [items, filter, q],
   );
 
   const filteredApps = useMemo(
@@ -80,7 +80,7 @@ const QuestionsClient: FC = () => {
         const haystack = `${app.title} ${app.meta} ${app.qs.map((p) => `${p.q} ${p.a}`).join(" ")}`;
         return haystack.toLowerCase().includes(q);
       }),
-    [q]
+    [q],
   );
 
   const answersTotalPages = Math.max(1, Math.ceil(filteredAnswers.length / pageSize));
@@ -148,7 +148,7 @@ const QuestionsClient: FC = () => {
           </button>
           <StickerButton variant="primary" size="md" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4" />
-            Add an answer yourself
+            Add an answer
           </StickerButton>
         </div>
       </header>
@@ -183,18 +183,21 @@ const QuestionsClient: FC = () => {
         <div
           className={cn(
             "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
-            howOpen ? "mb-5 max-h-[400px] opacity-100" : "max-h-0 opacity-0"
+            howOpen ? "mb-5 max-h-[400px] opacity-100" : "max-h-0 opacity-0",
           )}>
           <DashCard className="bg-[#fbfbf7] p-5">
             <p className="mb-2 text-sm font-bold text-primary">How the extension uses this library</p>
             <p className="mb-3 text-sm leading-relaxed text-black/60">
-              The Remote Worldwide extension reads everything saved here and fills matching questions when you apply on a
-              company&apos;s own site. When it can&apos;t find a confident match it drafts its best guess and flags it below —
-              nothing goes out under your name until you resolve it.
+              The Remote Worldwide extension reads everything saved here and fills matching questions when you apply on a company&apos;s own
+              site. When it can&apos;t find a confident match it drafts its best guess and flags it below — nothing goes out under your name
+              until you resolve it.
             </p>
             <ul className="flex flex-col gap-1.5 text-xs text-black/55">
               <li>• Recognises matching questions across 200+ applicant-tracking platforms</li>
-              <li>• Swaps <code className="rounded bg-[#f0f0ea] px-1 font-mono text-[11px]">{"{company}"}</code> for whoever you&apos;re applying to</li>
+              <li>
+                • Swaps <code className="rounded bg-[#f0f0ea] px-1 font-mono text-[11px]">{"{company}"}</code> for whoever you&apos;re
+                applying to
+              </li>
               <li>• Flags anything it&apos;s unsure about instead of guessing silently</li>
             </ul>
           </DashCard>
@@ -243,7 +246,7 @@ const QuestionsClient: FC = () => {
                   }}
                   className={cn(
                     "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    filter === f.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary"
+                    filter === f.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
                   )}>
                   {f.label}
                   {/* The count is subordinate by WEIGHT, not by lightness. On
@@ -251,9 +254,7 @@ const QuestionsClient: FC = () => {
                       4.5:1, so the old black/35 (2.4:1) could not be fixed by
                       nudging the tone — dropping to font-normal against the
                       pill's semibold label is what carries the hierarchy. */}
-                  <span className={cn("font-normal tabular-nums", filter === f.id ? "text-black/60" : "text-black/55")}>
-                    {f.count}
-                  </span>
+                  <span className={cn("font-normal tabular-nums", filter === f.id ? "text-black/60" : "text-black/55")}>{f.count}</span>
                 </button>
               ))}
             </div>
@@ -263,7 +264,7 @@ const QuestionsClient: FC = () => {
               // filter with nothing in it.
               q ? (
                 <DashEmptyState
-                  icon={SearchX}
+                  lottieSrc="/Lottie/neobrutalism/Copy_Clipboard_lottie.json"
                   title={`Nothing matches “${query.trim()}”`}
                   body="Try a shorter search, or clear it to see everything you've saved."
                   ctaLabel="Clear search"
@@ -271,7 +272,7 @@ const QuestionsClient: FC = () => {
                 />
               ) : (
                 <DashEmptyState
-                  icon={SearchX}
+                  lottieSrc="/Lottie/neobrutalism/Copy_Clipboard_lottie.json"
                   title="Nothing in this filter"
                   body="You haven't got any answers in this category yet."
                   ctaLabel="Show all answers"
@@ -305,7 +306,7 @@ const QuestionsClient: FC = () => {
           <div>
             {filteredApps.length === 0 ? (
               <DashEmptyState
-                icon={SearchX}
+                lottieSrc="/Lottie/neobrutalism/Copy_Clipboard_lottie.json"
                 title={`No applications match “${query.trim()}”`}
                 body="Try a shorter search, or clear it to see every application you've sent."
                 ctaLabel="Clear search"

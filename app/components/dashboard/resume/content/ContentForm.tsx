@@ -181,34 +181,34 @@ const ContentForm: FC<ContentFormProps> = ({
             emptyLabel="No education added yet."
             renderFields={(item, update, isActive) => (
               <>
-                <TextField value={item.school} onChange={(v) => update({ school: v })} placeholder="School" isDark={isActive} />
+                <TextField value={item.school} onChange={(v) => update({ school: v })} placeholder="School" isActive={isActive} />
                 <div className="flex gap-2">
                   <TextField
                     value={item.degree}
                     onChange={(v) => update({ degree: v })}
                     placeholder="Degree"
                     className="flex-1"
-                    isDark={isActive}
+                    isActive={isActive}
                   />
                   <TextField
                     value={item.dates}
                     onChange={(v) => update({ dates: v })}
                     placeholder="2019–2022"
                     className="w-32 flex-none"
-                    isDark={isActive}
+                    isActive={isActive}
                   />
                 </div>
                 <TextField
                   value={item.location ?? ""}
                   onChange={(v) => update({ location: v })}
                   placeholder="Location (optional)"
-                  isDark={isActive}
+                  isActive={isActive}
                 />
                 <TextField
                   value={item.detail ?? ""}
                   onChange={(v) => update({ detail: v })}
                   placeholder="Detail (optional)"
-                  isDark={isActive}
+                  isActive={isActive}
                 />
               </>
             )}
@@ -230,15 +230,15 @@ const ContentForm: FC<ContentFormProps> = ({
             emptyLabel="No projects added yet."
             renderFields={(item, update, isActive) => (
               <>
-                <TextField value={item.name} onChange={(v) => update({ name: v })} placeholder="Project name" isDark={isActive} />
+                <TextField value={item.name} onChange={(v) => update({ name: v })} placeholder="Project name" isActive={isActive} />
                 <TextAreaField
                   value={item.detail}
                   onChange={(v) => update({ detail: v })}
                   placeholder="What it does / your impact"
                   rows={2}
-                  isDark={isActive}
+                  isActive={isActive}
                 />
-                <TextField value={item.link ?? ""} onChange={(v) => update({ link: v })} placeholder="Link (optional)" isDark={isActive} />
+                <TextField value={item.link ?? ""} onChange={(v) => update({ link: v })} placeholder="Link (optional)" isActive={isActive} />
               </>
             )}
           />
@@ -259,21 +259,21 @@ const ContentForm: FC<ContentFormProps> = ({
             emptyLabel="No certifications added yet."
             renderFields={(item, update, isActive) => (
               <>
-                <TextField value={item.name} onChange={(v) => update({ name: v })} placeholder="Certification name" isDark={isActive} />
+                <TextField value={item.name} onChange={(v) => update({ name: v })} placeholder="Certification name" isActive={isActive} />
                 <div className="flex gap-2">
                   <TextField
                     value={item.issuer ?? ""}
                     onChange={(v) => update({ issuer: v })}
                     placeholder="Issuer (optional)"
                     className="flex-1"
-                    isDark={isActive}
+                    isActive={isActive}
                   />
                   <TextField
                     value={item.year ?? ""}
                     onChange={(v) => update({ year: v })}
                     placeholder="Year"
                     className="w-20 flex-none"
-                    isDark={isActive}
+                    isActive={isActive}
                   />
                 </div>
               </>
