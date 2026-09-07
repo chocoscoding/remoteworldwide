@@ -1,10 +1,12 @@
 import { listAuthorPicks, listCtas, listLeadMagnets, myAuthor } from "@/libs/blog-admin";
 import BlogForm from "@/app/components/ADMIN/blog/BlogForm";
+import NeedAuthorProfile from "@/app/components/ADMIN/blog/NeedAuthorProfile";
 
 export const dynamic = "force-dynamic";
 
 const Page = async () => {
   const [authors, me, magnets, ctas] = await Promise.all([listAuthorPicks(), myAuthor(), listLeadMagnets(), listCtas()]);
+  if (!me) return <NeedAuthorProfile />;
   return (
     <BlogForm
       authors={authors}

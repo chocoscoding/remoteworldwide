@@ -1,5 +1,5 @@
 import { Company, Job } from "@prisma/client";
-import type { Author, Blog } from "@/app/lib/blog/types";
+import type { Author } from "@/app/lib/blog/types";
 
 export interface FilterData {
   category: FilterType[];
@@ -71,10 +71,6 @@ interface FetchDataFunction<T> {
   (currentPage: number, jobsPerPage: number): Promise<{ jobs: T[]; total: number }>;
 }
 
-interface FetchDataFunction_2<T> {
-  (currentPage: number, jobsPerPage: number): Promise<{ data: T[]; count: number }>;
-}
-
 export interface JobTileType {
   title: string;
   id: string;
@@ -140,13 +136,6 @@ export type FormStateAuthor_Client = {
   profileImage: string;
 };
 
-export interface BlogListWithAuthor extends Blog {
-  author: {
-    name: string;
-    profileImage: string;
-    slug: string;
-  };
-}
 
 export interface OneBookmarkType {
   job: {

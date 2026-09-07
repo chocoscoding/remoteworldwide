@@ -11,7 +11,14 @@ const AllAuthorsPage: FC<{ data: AuthorListChildType[] }> = ({ data }) => {
   return (
     <div className="w-full h-screen overflow-y-scroll">
       <main className="p-4">
-        <h1 className="text-2xl font-bold mb-4">Authors</h1>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">Authors</h1>
+          <Link
+            href="/heroshima/authors/create"
+            className="drop-shadow-secondary2-hover inline-flex h-10 items-center rounded-sm border-2 border-primary bg-white px-4 text-sm font-bold transition-all">
+            Create author
+          </Link>
+        </div>
         <section className="mb-8">
           {/* list of authors */}
           <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -6,7 +6,21 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { signOut } from "@/app/lib/authClient";
 
-const menuItemsForAdmin = [
+type SubItem = { label: string; path: string; disabled?: boolean; hint?: string };
+type MenuItem = { name: string; icon: typeof Home; path: string; section: string; subItems?: SubItem[] };
+
+const NO_PROFILE_HINT = "Create your author profile first";
+
+const blogSubItems = (role: "ADMIN" | "AUTHOR", hasProfile: boolean): SubItem[] => [
+  { label: "Create Blog", path: "/blogs/create", disabled: !hasProfile, hint: NO_PROFILE_HINT },
+  { label: "Blogs", path: "/blogs" },
+  hasProfile ? { label: "My profile", path: "/profile" } : { label: "Create my author profile", path: "/profile" },
+  ...(role === "ADMIN" ? [{ label: "Authors", path: "/authors" }] : []),
+  { label: "Conversions", path: "/conversions" },
+  ...(role === "ADMIN" ? [{ label: "Blog settings", path: "/blog-settings" }, { label: "Subscribers", path: "/subscribers" }] : []),
+];
+
+const menuItemsForAdmin: MenuItem[] = [
   { name: "Home", icon: Home, path: "/", section: "home" },
   {
     name: "Company",
@@ -40,15 +54,6 @@ const menuItemsForAdmin = [
     icon: Book,
     path: "/blogs",
     section: "blog",
-    subItems: [
-      { label: "Create Blog", path: "/blogs/create" },
-      { label: "Blogs", path: "/blogs" },
-      { label: "Create Author", path: "/authors/create" },
-      { label: "Authors", path: "/authors" },
-      { label: "Conversions", path: "/conversions" },
-      { label: "Blog settings", path: "/blog-settings" },
-      { label: "Subscribers", path: "/subscribers" },
-    ],
   },
   {
     name: "Automation",
@@ -57,24 +62,15 @@ const menuItemsForAdmin = [
     section: "automation",
   },
 ];
-const menuItemsForAuthor = [
+const menuItemsForAuthor: MenuItem[] = [
   { name: "Home", icon: Home, path: "/", section: "home" },
-  {
-    name: "Blogs",
-    icon: Book,
-    path: "/blogs",
-    section: "blog",
-    subItems: [
-      { label: "Create Blog", path: "/blogs/create" },
-      { label: "Blogs", path: "/blogs" },
-      { label: "Create Author", path: "/authors/create" },
-      { label: "Authors", path: "/authors" },
-      { label: "Conversions", path: "/conversions" },
-    ],
-  },
+  { name: "Blogs", icon: Book, path: "/blogs", section: "blog" },
 ];
 
-const Sidebar = () => {
+const withBlogSubItems = (items: MenuItem[], role: "ADMIN" | "AUTHOR", hasProfile: boolean): MenuItem[] =>
+  items.map((item) => (item.section === "blog" ? { ...item, subItems: blogSubItems(role, hasProfile) } : item));
+
+const Sidebar = ({ hasAuthorProfile }: { hasAuthorProfile: boolean }) => {
   const { data: userData, status } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string>("home");
@@ -85,7 +81,7 @@ const Sidebar = () => {
 
   useEffect(() => {
     setIsOpen(false);
-    if (pathname.includes("/authors")) {
+    if (pathname.includes("/authors") || pathname.includes("/profile")) {
       setOpenAccordion("blog");
     } else if (pathname.includes("/conversions") || pathname.includes("/blog-settings") || pathname.includes("/subscribers")) {
       setOpenAccordion("blog");
@@ -105,10 +101,11 @@ const Sidebar = () => {
   const isActive = (route: string) => pathname === "/heroshima" + route;
 
   const menuItems = useMemo(() => {
-    if (userData?.user?.role === "ADMIN") return menuItemsForAdmin;
-    if (userData?.user?.role === "AUTHOR") return menuItemsForAuthor;
-    else return [];
-  }, [userData]);
+    const role = userData?.user?.role;
+    if (role === "ADMIN") return withBlogSubItems(menuItemsForAdmin, role, hasAuthorProfile);
+    if (role === "AUTHOR") return withBlogSubItems(menuItemsForAuthor, role, hasAuthorProfile);
+    return [];
+  }, [userData, hasAuthorProfile]);
 
   return (
     <div className={`flex flex-col h-screen bg-primary text-white ${isOpen ? "w-64" : "w-16"} transition-width duration-300 sticky top-0`}>
@@ -164,11 +161,18 @@ const Sidebar = () => {
                     className={`pl-10 space-y-1 overflow-hidden transition-all duration-500 ${
                       isOpen && openAccordion === item.section ? "max-h-screen" : "max-h-0"
                     }`}>
-                    {item.subItems.map((subItem, index) => (
-                      <Link key={index} href={`/heroshima${subItem.path}`}>
-                        <li className="mt-2 mb-2">{subItem.label}</li>
-                      </Link>
-                    ))}
+                    {item.subItems.map((subItem) =>
+                      subItem.disabled ? (
+                        <li key={subItem.path} aria-disabled="true" title={subItem.hint} className="mt-2 mb-2 cursor-not-allowed select-none text-gray-500">
+                          {subItem.label}
+                          {subItem.hint && <span className="block text-[10px] leading-tight text-gray-500/80">{subItem.hint}</span>}
+                        </li>
+                      ) : (
+                        <Link key={subItem.path} href={`/heroshima${subItem.path}`}>
+                          <li className="mt-2 mb-2">{subItem.label}</li>
+                        </Link>
+                      ),
+                    )}
                   </ul>
                 )}
               </div>

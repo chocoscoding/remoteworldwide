@@ -2,6 +2,7 @@ import NotFound from "@/app/components/NotFound";
 import { getBlogBySlug } from "@/libs/query";
 import { listAuthorPicks, listCtas, listLeadMagnets, myAuthor } from "@/libs/blog-admin";
 import BlogForm from "@/app/components/ADMIN/blog/BlogForm";
+import NeedAuthorProfile from "@/app/components/ADMIN/blog/NeedAuthorProfile";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
   if (!BLOG?.data) {
     return <NotFound title="Blog" buttonType="back" />;
   }
+
+  if (!me) return <NeedAuthorProfile action="edit" />;
 
   return (
     <BlogForm

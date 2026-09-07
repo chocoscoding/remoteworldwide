@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { backend, BackendError, backendOrNull, type BackendInit } from "@/app/lib/backend";
-import type { Author, BlogSettings, Cta, CtaImageSide, CtaTone, LeadMagnet, Subscriber } from "@/app/lib/blog/types";
+import type { Author, BlogSettings, Cta, CtaImageSide, CtaTone, LeadMagnet, PostFull, Subscriber } from "@/app/lib/blog/types";
 import { renderArticle, type ArticleOffers } from "@/app/lib/blog/article";
 
 export interface LeadMagnetInput {
@@ -144,3 +144,21 @@ export const previewBlog = async (input: PreviewInput) => {
   const offers = await admin<ArticleOffers & { settings: BlogSettings }>("/posts/preview", { method: "POST", body: draft });
   return { ...offers, rendered: renderArticle({ content, inlineOffers, autoCtas: false }, offers) };
 };
+
+export interface MyAuthorInput {
+  name: string;
+  about: string;
+  profileImage: string;
+  website: string | null;
+  linkedin: string | null;
+  twitter: string | null;
+  instagram: string | null;
+}
+
+export type AdminPostScope = "mine" | "all";
+
+export const createMyAuthor = async (input: MyAuthorInput) => attempt(() => admin<Author>("/authors/me", { method: "POST", body: input }));
+export const updateMyAuthor = async (input: MyAuthorInput) => attempt(() => admin<Author>("/authors/me", { method: "PUT", body: input }));
+
+export const listAdminPosts = async (page: number, scope: AdminPostScope) =>
+  admin<{ data: PostFull[]; count: number }>(`/posts?page=${page}${scope === "mine" ? "&mine=1" : ""}`);

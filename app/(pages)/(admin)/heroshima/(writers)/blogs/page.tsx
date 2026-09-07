@@ -1,12 +1,13 @@
-import { BlogListWithAuthor } from "@/types/main";
-import React from "react";
-import { backend } from "@/app/lib/backend";
+import { listAdminPosts, myAuthor, type AdminPostScope } from "@/libs/blog-admin";
 import AllBlogsClient from "./Client";
 
-const getInitialBlogs = () => backend<{ data: BlogListWithAuthor[]; count: number }>("/blog/admin/posts?page=1", { session: true });
+export const dynamic = "force-dynamic";
+
 const Page = async () => {
-  const BLOGS = await getInitialBlogs();
-  return <AllBlogsClient initialData={BLOGS.data} initialCount={BLOGS.count} />;
+  const me = await myAuthor();
+  const scope: AdminPostScope = me ? "mine" : "all";
+  const posts = await listAdminPosts(1, scope);
+  return <AllBlogsClient initialRows={posts.data} initialCount={posts.count} initialScope={scope} hasAuthorProfile={me !== null} />;
 };
 
 export default Page;

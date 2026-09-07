@@ -90,7 +90,10 @@ const QUESTION_LEADS =
   /^(should i|can i|could i|how do i|how can i|how should i|what should i|what do i|do i|is it|what's|what is|whats|why do|why is|when should i|where do i|i want to|i need to|help me)\s+/i;
 
 function titleFromQuestion(question: string): string {
-  let t = question.trim().replace(/[?!.]+$/, "").replace(QUESTION_LEADS, "");
+  let t = question
+    .trim()
+    .replace(/[?!.]+$/, "")
+    .replace(QUESTION_LEADS, "");
   t = t.split(/\s+/).filter(Boolean).slice(0, 6).join(" ");
   if (t.length > 40) t = t.slice(0, 40).replace(/\s+\S*$/, "");
   return t ? t[0].toUpperCase() + t.slice(1) : "New session";
@@ -101,7 +104,9 @@ const NAME_DELAY_MS = 700;
 const REPLY_DELAY_MS = 1100;
 
 const CoachBadge: FC = () => (
-  <div className="h-7 w-7 flex-none rounded-full bg-secondary text-primary font-extrabold text-[10px] flex items-center justify-center mt-0.5">RW</div>
+  <div className="h-7 w-7 flex-none rounded-full bg-secondary text-primary font-extrabold text-[10px] flex items-center justify-center mt-0.5">
+    RW
+  </div>
 );
 
 const CoachClient: FC = () => {
@@ -148,8 +153,7 @@ const CoachClient: FC = () => {
   };
 
   /** Patch one session by id — replies land in the session they belong to even if you've switched away. */
-  const patchSession = (id: string, patch: (s: Session) => Session) =>
-    setSessions((prev) => prev.map((s) => (s.id === id ? patch(s) : s)));
+  const patchSession = (id: string, patch: (s: Session) => Session) => setSessions((prev) => prev.map((s) => (s.id === id ? patch(s) : s)));
 
   const handleSend = (e: FormEvent) => {
     e.preventDefault();
@@ -235,19 +239,21 @@ const CoachClient: FC = () => {
                         // on hover too made every row feel like a heavy button.
                         active
                           ? "bg-white font-bold text-[#222325] shadow-[2px_2px_0_0_#e1f073]"
-                          : "bg-transparent font-medium text-white/65 hover:bg-white/10 hover:text-white"
+                          : "bg-transparent font-medium text-white/65 hover:bg-white/10 hover:text-white",
                       )}>
                       {/* An unnamed session pulses lime until the coach names it. */}
                       <span
                         aria-hidden
                         className={cn(
                           "h-1.5 w-1.5 flex-none rounded-full transition-colors",
-                          untitled ? "animate-pulse bg-[#cddd54]" : active ? "bg-[#222325]" : "bg-white/25 group-hover:bg-[#e1f073]"
+                          untitled ? "animate-pulse bg-[#cddd54]" : active ? "bg-[#222325]" : "bg-white/25 group-hover:bg-[#e1f073]",
                         )}
                       />
                       {/* Titles run long — truncate rather than wrap, the full
                           text is on the tooltip. */}
-                      <span className={cn("min-w-0 flex-1 truncate", untitled && "italic font-medium opacity-60")}>{sn.title ?? "No title"}</span>
+                      <span className={cn("min-w-0 flex-1 truncate", untitled && "italic font-medium opacity-60")}>
+                        {sn.title ?? "No title"}
+                      </span>
                     </button>
                   );
                 })}
@@ -282,7 +288,7 @@ const CoachClient: FC = () => {
                     <span
                       className={cn(
                         "min-w-0 flex-1 truncate text-xs",
-                        item.done ? "text-white/35 line-through" : "font-medium text-white/85"
+                        item.done ? "text-white/35 line-through" : "font-medium text-white/85",
                       )}>
                       {item.text}
                     </span>
@@ -300,7 +306,13 @@ const CoachClient: FC = () => {
               {!activeSession && (
                 <div data-empty className="m-auto flex max-w-[420px] flex-col items-center text-center">
                   <span aria-hidden className="flex items-center justify-center">
-                    <Lottie src={`/Lottie/neobrutalism/Help_Support_lottie.json`} autoplay loop speed={0.63} style={{ width: 220, height: 220 }} />
+                    <Lottie
+                      src={`/Lottie/neobrutalism/Help_Support-1_lottie.json`}
+                      autoplay
+                      loop
+                      speed={0.63}
+                      style={{ width: 220, height: 220 }}
+                    />
                   </span>
                   <p className="text-[15px] font-bold text-primary">Ask your coach anything</p>
                   <p className="mt-1.5 text-sm leading-relaxed text-black/50">
@@ -316,7 +328,7 @@ const CoachClient: FC = () => {
                     <div
                       className={cn(
                         "rounded-2xl px-4 py-3 text-sm leading-relaxed",
-                        m.from === "user" ? "bg-primary text-white rounded-tr-sm" : "bg-[#f0f0ea] text-black/80 rounded-tl-sm"
+                        m.from === "user" ? "bg-primary text-white rounded-tr-sm" : "bg-[#f0f0ea] text-black/80 rounded-tl-sm",
                       )}>
                       {m.text}
                     </div>
@@ -358,7 +370,7 @@ const CoachClient: FC = () => {
               <div
                 className={cn(
                   "flex-1 flex items-center gap-2 h-11 rounded-lg border bg-[#f6f6f6] pl-4 pr-2 transition-colors",
-                  listening ? "border-[#222325]" : "border-black/12 focus-within:border-black/30"
+                  listening ? "border-[#222325]" : "border-black/12 focus-within:border-black/30",
                 )}>
                 {listening ? (
                   // While dictating the field shows the voice itself — the
@@ -399,7 +411,7 @@ const CoachClient: FC = () => {
                   }
                   className={cn(
                     "inline-flex h-8 w-8 flex-none items-center justify-center rounded-md cursor-pointer transition-colors disabled:opacity-30 disabled:pointer-events-none",
-                    listening ? "bg-[#222325] text-[#e1f073]" : "text-black/45 hover:bg-black/5 hover:text-primary"
+                    listening ? "bg-[#222325] text-[#e1f073]" : "text-black/45 hover:bg-black/5 hover:text-primary",
                   )}>
                   {micStatus === "requesting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
                 </button>
