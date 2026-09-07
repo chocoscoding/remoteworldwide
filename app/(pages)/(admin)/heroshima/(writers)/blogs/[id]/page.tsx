@@ -1,18 +1,16 @@
 import NotFound from "@/app/components/NotFound";
-import { backendOrNull } from "@/app/lib/backend";
-import type { Blog } from "@/app/lib/blog/types";
-import BlogPageClient from "./Client";
+import { getPostPageData } from "@/app/lib/blog/data";
+import { renderArticle } from "@/app/lib/blog/article";
+import Article from "@/app/components/blog/Article";
+import AdminPostActions from "./Client";
 
-const getBlogBySlug = (slug: string) => backendOrNull<Blog>(`/blog/admin/posts/${encodeURIComponent(slug)}`, { session: true });
+export const dynamic = "force-dynamic";
+
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
-  const blogSlug = decodeURIComponent((await params).id);
-  const BLOG = await getBlogBySlug(blogSlug);
-
-  if (!BLOG) {
-    return <NotFound title="Blog" buttonType="back" />;
-  }
-
-  return <BlogPageClient blog={BLOG} />;
+  const slug = decodeURIComponent((await params).id);
+  const data = await getPostPageData(slug);
+  if (!data) return <NotFound title="Blog" buttonType="back" />;
+  return <Article data={data} rendered={renderArticle(data.post, data)} toolbar={<AdminPostActions id={data.post.id} slug={data.post.slug} title={data.post.title} status={data.post.status} />} />;
 };
 
 export default Page;

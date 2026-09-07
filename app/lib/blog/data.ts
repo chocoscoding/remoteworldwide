@@ -64,7 +64,7 @@ export function getSitemapEntries(): Promise<{ posts: { slug: string; updatedAt:
   return backend("/blog/sitemap");
 }
 
-export type AuthorWithPosts = Author & { blogs: { title: string; createdAt: Date; slug: string; description: string }[]; _count: { blogs: number } };
+export type AuthorWithPosts = Author & { blogs: PostCard[]; _count: { blogs: number } };
 
 export const getAuthors = () => backend<(Author & { _count: { blogs: number } })[]>("/blog/authors");
 export const getAuthorProfile = (slug: string) => backendOrNull<AuthorWithPosts>(`/blog/authors/${encodeURIComponent(slug)}`);

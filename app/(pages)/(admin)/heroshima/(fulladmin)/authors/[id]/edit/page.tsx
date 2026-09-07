@@ -10,6 +10,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     <UpdateAuthorClient
       id={author.data?.id}
       data={{
+        userId: author.data.userId ?? "",
         profileImage: author.data.profileImage,
         name: author.data.name,
         website: author.data.website ?? "",

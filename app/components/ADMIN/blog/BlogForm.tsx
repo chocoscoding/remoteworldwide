@@ -8,23 +8,28 @@ import { CldUploadWidget } from "next-cloudinary";
 import { closeUploadWidget } from "./uploadWidget";
 import { TagsInput } from "react-tag-input-component";
 import { toast } from "react-toastify";
-import { ArrowDown, ArrowUp, PlusCircle, X } from "lucide-react";
-import type { Blog } from "@/app/lib/blog/types";
+import { ArrowDown, ArrowUp, Eye, PenLine, PlusCircle, X } from "lucide-react";
+import type { Author, Blog } from "@/app/lib/blog/types";
 import type { Option } from "@/types/main";
 import { createBlog, editBlog } from "@/libs/query";
+import { previewBlog } from "@/libs/blog-admin";
 import { quillToolbarOptions } from "@/libs/quillconfig";
-import { BLOG_CATEGORIES, inferCategory } from "@/app/lib/blog/categories";
+import { BLOG_CATEGORIES, categoryBySlug, inferCategory } from "@/app/lib/blog/categories";
 import { slugifyTitle } from "@/app/lib/blog/slug";
 import { AUTO, DEFAULT_INLINE_OFFERS, effectiveInlineOffers, offerToken, parseOfferToken, type OfferRef } from "@/app/lib/blog/offers";
+import Article from "@/app/components/blog/Article";
 import QuillEditor, { type QuillRef } from "./QuillEditor";
 import { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
 
 export interface BlogFormProps {
-  authors: Option[];
+  authors: Author[];
+  me: Author | null;
   magnets: { id: string; slug: string; title: string }[];
   ctas: { key: string; name: string }[];
-  blog?: Blog & { author: { name: string } };
+  blog?: Blog;
 }
+
+type Preview = Awaited<ReturnType<typeof previewBlog>>;
 
 const SELECT_THEME = (theme: import("react-select").Theme) => ({ ...theme, borderRadius: 6, colors: { ...theme.colors, primary25: "#e5e5e5", primary: "black" } });
 const AUTO_OPTION: Option = { value: "", label: "Auto (category → tags → site default)" };
@@ -47,9 +52,7 @@ const StatusChips: FC<{ value: "PUBLISHED" | "DRAFT"; onChange: (v: "PUBLISHED" 
     ).map((s) => {
       const on = value === s.v;
       return (
-        <label
-          key={s.v}
-          className={`cursor-pointer rounded-[4px] px-3.5 py-1.5 text-xs font-bold transition-colors ${on ? "bg-[#222325] text-[#e1f073]" : "text-gray-600 hover:text-[#222325]"}`}>
+        <label key={s.v} className={`cursor-pointer rounded-[4px] px-3.5 py-1.5 text-xs font-bold transition-colors ${on ? "bg-[#222325] text-[#e1f073]" : "text-gray-600 hover:text-[#222325]"}`}>
           <input type="radio" name="status" value={s.v} checked={on} onChange={() => onChange(s.v)} className="sr-only" />
           {s.label}
         </label>
@@ -58,32 +61,65 @@ const StatusChips: FC<{ value: "PUBLISHED" | "DRAFT"; onChange: (v: "PUBLISHED" 
   </div>
 );
 
-const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
+const ViewToggle: FC<{ view: "editor" | "preview"; loading: boolean; onChange: (v: "editor" | "preview") => void }> = ({ view, loading, onChange }) => (
+  <div role="tablist" aria-label="Mode" className="inline-flex rounded-md border-2 border-[#222325] bg-white p-0.5">
+    {(
+      [
+        { v: "editor", label: "Editor", Icon: PenLine },
+        { v: "preview", label: loading ? "Loading…" : "Preview", Icon: Eye },
+      ] as const
+    ).map((t) => {
+      const on = view === t.v;
+      return (
+        <button
+          key={t.v}
+          type="button"
+          role="tab"
+          aria-selected={on}
+          disabled={loading}
+          onClick={() => onChange(t.v)}
+          className={`inline-flex items-center gap-1.5 rounded-[4px] px-3.5 py-1.5 text-xs font-bold transition-colors ${on ? "bg-[#222325] text-[#e1f073]" : "text-gray-600 hover:text-[#222325]"}`}>
+          <t.Icon className="h-3.5 w-3.5" />
+          {t.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+const authorOption = (a: Author): Option => ({ value: a.id, label: a.name });
+
+const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
   const router = useRouter();
   const quillRef: QuillRef = useRef(null);
+  const byId = useMemo(() => new Map(authors.map((a) => [a.id, a])), [authors]);
 
   const [title, setTitle] = useState(blog?.title ?? "");
   const [description, setDescription] = useState(blog?.description ?? "");
   const [tags, setTags] = useState<string[]>(blog?.tags ?? []);
   const [text, setText] = useState(blog?.content ?? "");
-  const [author, setAuthor] = useState<Option | undefined>(blog ? { value: blog.authorId, label: blog.author.name } : undefined);
+  const [publisher] = useState<Author | null>(() => (blog ? (byId.get(blog.authorIds[0]) ?? null) : me));
+  const [coauthors, setCoauthors] = useState<Author[]>(() => (blog ? blog.authorIds.slice(1).flatMap((id) => byId.get(id) ?? []) : []));
   const [coverImage, setCoverImage] = useState(blog?.coverImage ?? "");
   const [category, setCategory] = useState<string>(blog?.category ?? "");
   const [status, setStatus] = useState<"DRAFT" | "PUBLISHED">(blog?.status ?? "PUBLISHED");
   const [featuredRank, setFeaturedRank] = useState<string>(blog?.featuredRank ? String(blog.featuredRank) : "");
   const [leadMagnetId, setLeadMagnetId] = useState<string>(blog?.leadMagnetId ?? "");
   const [ctaKey, setCtaKey] = useState<string>(blog?.ctaKey ?? "");
-  const [offers, setOffers] = useState<OfferRef[]>(() =>
-    blog ? effectiveInlineOffers(blog) : DEFAULT_INLINE_OFFERS.map((t) => parseOfferToken(t)!).filter(Boolean),
-  );
+  const [offers, setOffers] = useState<OfferRef[]>(() => (blog ? effectiveInlineOffers(blog) : DEFAULT_INLINE_OFFERS.map((t) => parseOfferToken(t)!).filter(Boolean)));
   const [slug, setSlug] = useState(blog?.slug ?? "");
   const [slugTouched, setSlugTouched] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<"editor" | "preview">("editor");
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const categoryOptions: Option[] = BLOG_CATEGORIES.map((c) => ({ value: c.slug, label: c.name }));
   const magnetOptions: Option[] = [AUTO_OPTION, ...magnets.map((m) => ({ value: m.id, label: m.title }))];
   const ctaOptions: Option[] = [AUTO_OPTION, ...ctas.map((c) => ({ value: c.key, label: c.name }))];
+  const coauthorOptions = authors.filter((a) => a.id !== publisher?.id).map(authorOption);
   const suggested = useMemo(() => (category ? null : inferCategory(tags)), [category, tags]);
+  const chosenCategory = category || suggested?.slug || "job-search";
   const markers = useMemo(() => markerSummary(text), [text]);
   const effectiveSlug = useMemo(() => {
     if (!slugTouched) return blog?.slug ?? slugifyTitle(title || "post");
@@ -91,6 +127,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
   }, [blog?.slug, slug, slugTouched, title]);
   const slugChanged = Boolean(blog) && effectiveSlug !== blog?.slug;
   const handPlaced = markers.cta.length + markers.magnet.length > 0;
+  const allAuthors = publisher ? [publisher, ...coauthors] : coauthors;
 
   const offerLabel = (o: OfferRef) => {
     if (o.kind === "cta") return o.ref === AUTO ? "Auto — the product CTA" : (ctas.find((c) => c.key === o.ref)?.name ?? `CTA "${o.ref}"`);
@@ -107,11 +144,26 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
       return next;
     });
 
+  const switchView = async (next: "editor" | "preview") => {
+    if (next === "editor") {
+      setView("editor");
+      return;
+    }
+    setPreviewing(true);
+    try {
+      setPreview(await previewBlog({ content: text, category: chosenCategory, tags, leadMagnetId: leadMagnetId || null, ctaKey: ctaKey || null, inlineOffers: offers.map(offerToken) }));
+      setView("preview");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not build the preview");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const chosenCategory = category || suggested?.slug || "job-search";
-    if (!title || !description || tags.length === 0 || !text || !author || !coverImage) {
-      toast.error("Please fill in all fields and upload a cover image.");
+    if (!title || !description || tags.length === 0 || !text || allAuthors.length === 0 || !coverImage) {
+      toast.error("Please fill in all fields, pick an author and upload a cover image.");
       return;
     }
     const knownCtas = new Set(ctas.map((c) => c.key));
@@ -127,7 +179,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
       description,
       tags,
       content: text,
-      authorId: author.value,
+      authorIds: allAuthors.map((a) => a.id),
       coverImage,
       slug: effectiveSlug,
       category: chosenCategory,
@@ -140,15 +192,9 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
     };
     setBusy(true);
     try {
-      if (blog) {
-        const res = await editBlog(blog.id, values);
-        toast.success("Blog updated");
-        router.push(`/heroshima/blogs/${res.data.slug}`);
-      } else {
-        const res = await createBlog(values);
-        toast.success("Blog created");
-        router.push(`/heroshima/blogs/${res.data.slug}`);
-      }
+      const res = blog ? await editBlog(blog.id, values) : await createBlog(values);
+      toast.success(blog ? "Blog updated" : "Blog created");
+      router.push(`/heroshima/blogs/${res.data.slug}`);
       router.refresh();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Could not save");
@@ -157,10 +203,41 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
     }
   };
 
+  const previewPost = {
+    slug: effectiveSlug,
+    title: title || "Untitled post",
+    description,
+    coverImage,
+    tags,
+    status,
+    createdAt: blog?.createdAt ?? new Date(),
+    updatedAt: new Date(),
+    publishedAt: blog?.publishedAt ?? null,
+    authors: allAuthors,
+  };
+
   return (
     <div className="w-full p-4">
-      <h1 className="mb-4 text-2xl font-bold">{blog ? "Edit blog" : "Create new blog"}</h1>
-      <form onSubmit={submit} className="space-y-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">{blog ? "Edit blog" : "Create new blog"}</h1>
+        <ViewToggle view={view} loading={previewing} onChange={switchView} />
+      </div>
+
+      {view === "preview" && preview && (
+        <div className="mb-6 overflow-hidden rounded-[20px] border-2 border-[#222325] shadow-[6px_6px_0_0_#e1f073]" data-preview>
+          <div className="flex items-center gap-3 border-b-2 border-[#222325] bg-[#222325] px-4 py-2 text-white">
+            <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#e1f073]">Preview</span>
+            <span className="text-xs text-white/60">Exactly what readers see, conversions included. Nothing is saved until you publish.</span>
+          </div>
+          {coverImage ? (
+            <Article data={{ post: previewPost, category: categoryBySlug(chosenCategory) ?? null, ...preview, featured: [], related: [] }} rendered={preview.rendered} />
+          ) : (
+            <p className="p-8 text-center text-sm text-gray-500">Upload a cover image to preview the post.</p>
+          )}
+        </div>
+      )}
+
+      <form onSubmit={submit} className={view === "preview" ? "hidden" : "space-y-4"}>
         <div>
           <label className={ADMIN_LABEL}>Title</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter blog title" className={ADMIN_INPUT} required />
@@ -194,9 +271,32 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
             <label className={ADMIN_LABEL}>Tags</label>
             <TagsInput value={tags} placeHolder="Enter tags" classNames={{ input: ADMIN_INPUT }} onChange={setTags} name="tags" />
           </div>
-          <div>
-            <label className={ADMIN_LABEL}>Author</label>
-            <Select theme={SELECT_THEME} value={author} onChange={(v) => setAuthor(v ?? undefined)} options={authors} placeholder="Select author" className="mt-1" />
+          <div data-authors>
+            <label className={ADMIN_LABEL}>Authors</label>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {publisher && (
+                <span className="inline-flex items-center gap-2 rounded-full border-2 border-[#222325] bg-[#e1f073] py-1 pl-1 pr-3 text-xs font-bold text-[#222325]" data-publisher>
+                  <span className="relative h-6 w-6 overflow-hidden rounded-full border border-[#222325]">
+                    <Image src={publisher.profileImage} alt="" fill sizes="24px" className="object-cover" />
+                  </span>
+                  {publisher.name}
+                  <span className="rounded-full bg-[#222325] px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-[#e1f073]">{blog ? "Publisher" : "You · publisher"}</span>
+                </span>
+              )}
+              <Select
+                theme={SELECT_THEME}
+                isMulti
+                value={coauthors.map(authorOption)}
+                onChange={(v) => setCoauthors(v.flatMap((o) => byId.get(o.value) ?? []))}
+                options={coauthorOptions}
+                placeholder={publisher ? "Add co-authors" : "Select authors"}
+                className="min-w-[240px] flex-1"
+                aria-label="Co-authors"
+              />
+            </div>
+            <p className={ADMIN_HINT}>
+              {publisher ? "The publisher is always listed first." : "No author profile is linked to your account — the first author you pick becomes the publisher."}
+            </p>
           </div>
         </div>
 
@@ -295,7 +395,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
             <p className={ADMIN_HINT}>
               {handPlaced
                 ? `This post has ${markers.cta.length + markers.magnet.length} marker(s) typed in the text — those positions win and this list is ignored.`
-                : "Want one at an exact spot? Type [[cta:key]] or [[magnet:slug]] on its own line in the text."}
+                : "Want one at an exact spot? Type [[cta:key]] or [[magnet:slug]] on its own line in the text. Conversions only show in Preview."}
             </p>
           </div>
 
@@ -344,6 +444,15 @@ const BlogForm: FC<BlogFormProps> = ({ authors, magnets, ctas, blog }) => {
           </button>
         </div>
       </form>
+
+      {view === "preview" && (
+        <div className="flex justify-center">
+          <button type="button" onClick={submit as unknown as () => void} disabled={busy} className="drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3 hover:rounded-md disabled:opacity-50">
+            <PlusCircle className="w-6 h-6 mr-2" />
+            {busy ? "Saving…" : blog ? "Save changes" : "Publish"}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

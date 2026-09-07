@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { categoryBySlug } from "@/app/lib/blog/categories";
+import AuthorStack, { formatAuthorNames, type StackAuthor } from "./AuthorStack";
 
 export interface PostCardData {
   slug: string;
@@ -12,7 +13,8 @@ export interface PostCardData {
   category: string;
   createdAt: Date | string;
   publishedAt?: Date | string | null;
-  author: { name: string; profileImage: string; slug: string };
+  author: StackAuthor;
+  authors?: StackAuthor[];
 }
 
 export function formatPostDate(d: Date | string | null | undefined): string {
@@ -20,10 +22,13 @@ export function formatPostDate(d: Date | string | null | undefined): string {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+export const postAuthors = (post: Pick<PostCardData, "author" | "authors">): StackAuthor[] => (post.authors?.length ? post.authors : [post.author]);
+
 const PostCard: FC<{ post: PostCardData; variant?: "default" | "compact" | "feature"; className?: string }> = ({ post, variant = "default", className }) => {
   const category = categoryBySlug(post.category);
   const date = formatPostDate(post.publishedAt ?? post.createdAt);
   const href = `/blogs/${post.slug}`;
+  const authors = postAuthors(post);
 
   if (variant === "compact") {
     return (
@@ -53,14 +58,7 @@ const PostCard: FC<{ post: PostCardData; variant?: "default" | "compact" | "feat
             </Link>
           </h3>
           <p className="mt-3 line-clamp-3 text-base text-primary/70">{post.description}</p>
-          <p className="mt-5 flex items-center gap-2 text-sm text-primary/60">
-            <span className="relative h-7 w-7 overflow-hidden rounded-full border border-primary/20">
-              <Image src={post.author.profileImage} alt="" fill sizes="28px" className="object-cover" />
-            </span>
-            <span className="font-semibold text-primary">{post.author.name}</span>
-            <span aria-hidden>·</span>
-            <span>{date}</span>
-          </p>
+          <AuthorStack authors={authors} size="sm" meta={date} link={false} className="mt-5" />
         </div>
       </article>
     );
@@ -80,9 +78,16 @@ const PostCard: FC<{ post: PostCardData; variant?: "default" | "compact" | "feat
         </h3>
         <p className="mt-2 line-clamp-2 text-sm text-primary/65">{post.description}</p>
         <p className="mt-auto flex items-center gap-2 pt-4 text-xs text-primary/55">
-          <span className="font-semibold text-primary/80">{post.author.name}</span>
+          <span className="flex items-center" aria-hidden>
+            {authors.slice(0, 3).map((a, i) => (
+              <span key={a.slug} className={cn("relative h-5 w-5 overflow-hidden rounded-full border border-primary/30 bg-white", i > 0 && "-ml-1.5")} style={{ zIndex: 3 - i }}>
+                <Image src={a.profileImage} alt="" fill sizes="20px" className="object-cover" />
+              </span>
+            ))}
+          </span>
+          <span className="truncate font-semibold text-primary/80">{formatAuthorNames(authors.map((a) => a.name))}</span>
           <span aria-hidden>·</span>
-          <span>{date}</span>
+          <span className="flex-none">{date}</span>
         </p>
       </div>
     </article>

@@ -108,9 +108,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#f9f8f1_35%,_rgba(249,248,241,0.6)_70%,_rgba(249,248,241,0.2)_100%)]" />
         <div className="relative mx-auto flex max-w-[1440px] flex-col items-center px-4 pb-14 pt-14 text-center md:pb-20 md:pt-20">
           <span className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-secondary px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary shadow-[3px_3px_0_0_#222325]">
-            <span aria-hidden className="font-black">
-              ///
-            </span>
+            <span aria-hidden className="font-black">{"///"}</span>
             Free career playbooks
           </span>
           <h1 className="mt-6 max-w-[14ch] text-[2.5rem] font-extrabold leading-[1.02] tracking-[-0.025em] text-primary md:text-[3.75rem] lg:text-[4.5rem]">

@@ -1,24 +1,34 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
+import { Home, RotateCcw } from "lucide-react";
+import ErrorScreen, { ERROR_BUTTON } from "@/app/components/ErrorScreen";
 
-export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+const Error = ({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) => {
   useEffect(() => {
-    // Optionally log the error to an error reporting service
     console.error(error);
   }, [error]);
 
   return (
-    <main className="flex h-full flex-col items-center justify-center">
-      <h2 className="text-center text-xl">{error.message ?? 'Something went wrong!'}</h2>
-      <button
-        className="my-3 drop-shadow-secondary2-hover flex items-center transition-all bg-white text-base border-2 border-primary font-bold rounded-sm p-3"
-        onClick={
-          // Attempt to recover by trying to re-render the invoices route
-          () => reset()
-        }>
-        Try again
-      </button>
-    </main>
+    <ErrorScreen
+      digits={["5", "0"]}
+      title="Something went wrong"
+      message={error.message || "An unexpected error occurred."}
+      action={
+        <>
+          <button type="button" onClick={reset} className={`${ERROR_BUTTON} bg-white text-primary hover:bg-secondary`}>
+            <RotateCcw className="h-4 w-4" />
+            Try again
+          </button>
+          <Link href="/heroshima" className={`${ERROR_BUTTON} bg-primary text-white`}>
+            <Home className="h-4 w-4" />
+            Go home
+          </Link>
+        </>
+      }
+    />
   );
-}
+};
+
+export default Error;

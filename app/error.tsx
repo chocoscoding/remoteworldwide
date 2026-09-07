@@ -8,7 +8,7 @@ const Error = ({ error }: { error: Error & { digest?: string } }) => {
     console.error(error);
   }, [error]);
 
-  return <ErrorScreen digits={["5", "0"]} title="Something went wrong" message={error.message || "An unexpected error occurred. Try again in a moment."} />;
+  return <ErrorScreen fit="screen" digits={["5", "0"]} title="Something went wrong" message={error.message || "An unexpected error occurred. Try again in a moment."} />;
 };
 
 export default Error;

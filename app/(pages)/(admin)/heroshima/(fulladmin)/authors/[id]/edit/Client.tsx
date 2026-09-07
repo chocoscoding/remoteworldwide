@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { updateAuthor } from "@/libs/query";
 import { useRouter } from "next/navigation";
 import { FormStateAuthor_Client } from "@/types/main";
+import LinkedAccountSelect from "@/app/components/ADMIN/blog/LinkedAccountSelect";
 
 const UpdateAuthorClient: FC<{ data: FormStateAuthor_Client; id: string }> = ({ data, id }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -87,6 +88,7 @@ const UpdateAuthorClient: FC<{ data: FormStateAuthor_Client; id: string }> = ({ 
             required
           />
         </div>
+        <LinkedAccountSelect value={formValues.userId} onChange={(userId) => setFormValues((prev) => ({ ...prev, userId }))} />
         <div>
           <label className="block text-sm font-medium text-primary">website</label>
           <input

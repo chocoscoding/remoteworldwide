@@ -262,7 +262,7 @@ export interface BlogInput extends BlogConversionFields {
   title: string;
   content: string;
   description: string;
-  authorId: string;
+  authorIds: string[];
   tags: string[];
   coverImage: string;
   slug?: string;

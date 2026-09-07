@@ -19,6 +19,7 @@ export interface AuthorProfile extends AuthorSummary {
 
 export interface Author extends AuthorProfile {
   id: string;
+  userId: string | null;
   createdAt: Date;
 }
 
@@ -34,19 +35,22 @@ export interface PostCard {
   createdAt: Date;
   publishedAt: Date | null;
   author: AuthorSummary;
+  authors: AuthorSummary[];
 }
 
-export interface PostFull extends Omit<PostCard, "author"> {
+export interface PostFull extends Omit<PostCard, "author" | "authors"> {
   content: string;
   updatedAt: Date;
   status: BlogStatus;
   authorId: string;
+  authorIds: string[];
   previousSlugs: string[];
   leadMagnetId: string | null;
   ctaKey: string | null;
   autoCtas: boolean;
   inlineOffers: string[];
   author: AuthorProfile;
+  authors: AuthorProfile[];
 }
 
 export type Blog = PostFull;

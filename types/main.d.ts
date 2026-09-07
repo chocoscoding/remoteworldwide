@@ -130,6 +130,7 @@ export interface AuthorWithBlog extends Author {
 }
 
 export type FormStateAuthor_Client = {
+  userId: string;
   website: string;
   twitter: string;
   linkedin: string;

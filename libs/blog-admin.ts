@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { backend, BackendError, backendOrNull, type BackendInit } from "@/app/lib/backend";
-import type { BlogSettings, Cta, CtaImageSide, CtaTone, LeadMagnet, Subscriber } from "@/app/lib/blog/types";
+import type { Author, BlogSettings, Cta, CtaImageSide, CtaTone, LeadMagnet, Subscriber } from "@/app/lib/blog/types";
+import { renderArticle, type ArticleOffers } from "@/app/lib/blog/article";
 
 export interface LeadMagnetInput {
   slug?: string;
@@ -118,3 +119,28 @@ export const blogConversionStats = async () =>
     magnets: { slug: string; title: string; claims: number; downloads: number; active: boolean }[];
     ctas: { key: string; name: string; clicks: number; active: boolean }[];
   }>("/stats");
+
+export interface LinkableUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
+
+export interface PreviewInput {
+  content: string;
+  category: string;
+  tags: string[];
+  leadMagnetId: string | null;
+  ctaKey: string | null;
+  inlineOffers: string[];
+}
+
+export const listAuthorPicks = async () => backend<Author[]>("/blog/authors");
+export const myAuthor = async () => backendOrNull<Author>("/blog/admin/authors/me", { session: true });
+export const listLinkableUsers = async () => admin<LinkableUser[]>("/authors/users");
+
+export const previewBlog = async (input: PreviewInput) => {
+  const { content, inlineOffers, ...draft } = input;
+  const offers = await admin<ArticleOffers & { settings: BlogSettings }>("/posts/preview", { method: "POST", body: draft });
+  return { ...offers, rendered: renderArticle({ content, inlineOffers, autoCtas: false }, offers) };
+};

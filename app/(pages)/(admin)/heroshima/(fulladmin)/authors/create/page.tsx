@@ -7,10 +7,12 @@ import { toast } from "react-toastify";
 import { createAuthor } from "@/libs/query";
 import { useRouter } from "next/navigation";
 import { FormStateAuthor_Client } from "@/types/main";
+import LinkedAccountSelect from "@/app/components/ADMIN/blog/LinkedAccountSelect";
 
 export default function CreateBlog() {
   const [isLoading, setIsLoading] = useState(false);
   const [formValues, setFormValues] = useState<FormStateAuthor_Client>({
+    userId: "",
     website: "",
     twitter: "",
     linkedin: "",
@@ -95,6 +97,7 @@ export default function CreateBlog() {
             required
           />
         </div>
+        <LinkedAccountSelect value={formValues.userId} onChange={(userId) => setFormValues((prev) => ({ ...prev, userId }))} />
         <div>
           <label className="block text-sm font-medium text-primary">website</label>
           <input

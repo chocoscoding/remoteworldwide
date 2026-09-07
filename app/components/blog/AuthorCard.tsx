@@ -15,7 +15,7 @@ export interface AuthorSummary {
   instagram?: string | null;
 }
 
-const AuthorCard: FC<{ author: AuthorSummary; variant?: "full" | "mini"; className?: string }> = ({ author, variant = "full", className }) => {
+const AuthorCard: FC<{ author: AuthorSummary; variant?: "full" | "mini"; label?: string; className?: string }> = ({ author, variant = "full", label = "Written by", className }) => {
   const socials = [
     { href: author.website, icon: Globe, label: "Website" },
     { href: author.linkedin, icon: Linkedin, label: "LinkedIn" },
@@ -30,7 +30,7 @@ const AuthorCard: FC<{ author: AuthorSummary; variant?: "full" | "mini"; classNa
           <Image src={author.profileImage} alt="" fill sizes="48px" className="object-cover" />
         </span>
         <span className="min-w-0">
-          <span className="block text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-primary/55">Written by</span>
+          <span className="block text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-primary/55">{label}</span>
           <span className="block text-sm font-bold text-primary group-hover:underline">{author.name}</span>
         </span>
       </Link>
@@ -44,7 +44,7 @@ const AuthorCard: FC<{ author: AuthorSummary; variant?: "full" | "mini"; classNa
           <Image src={author.profileImage} alt="" fill sizes="64px" className="object-cover" />
         </span>
         <div className="min-w-0">
-          <p className="text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-primary/55">Written by</p>
+          <p className="text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-primary/55">{label}</p>
           <Link href={`/author/${author.slug}`} className="mt-0.5 block text-lg font-extrabold text-primary hover:underline">
             {author.name}
           </Link>
