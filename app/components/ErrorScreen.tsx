@@ -50,11 +50,11 @@ const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, messa
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         {action ?? (
           <>
-            <button type="button" onClick={() => router.back()} className={`${ERROR_BUTTON}bg-white text-primary hover:bg-secondary`}>
+            <button type="button" onClick={() => router.back()} className={`${ERROR_BUTTON} bg-white text-primary hover:bg-secondary`}>
               <ArrowLeft className="h-4 w-4" />
               Go back
             </button>
-            <Link href={home} className={`${ERROR_BUTTON}  bg-primary text-white`}>
+            <Link href={home} className={`${ERROR_BUTTON} bg-primary text-white`}>
               <Home className="h-4 w-4" />
               Go home
             </Link>

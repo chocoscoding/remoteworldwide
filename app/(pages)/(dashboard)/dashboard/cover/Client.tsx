@@ -379,7 +379,7 @@ const CoverClient: FC = () => {
               autoplay
               loop
               className=""
-              speed={0.3}
+              speed={0.47}
               style={{ width: 340, height: 340 }}
             />
 

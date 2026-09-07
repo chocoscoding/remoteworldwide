@@ -136,12 +136,10 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
   const hasMore = below > 0 && !isOver;
 
   return (
-    // Outcome columns are narrower and quieter than the stages: they are the
-    // record, not the work, and five equal-weight stages plus four equal-weight
-    // outcomes would read as a nine-step pipeline.
-    <div
-      data-column={column.id}
-      className={cn("flex flex-col min-h-0", closed ? "w-[190px] flex-none" : "min-w-[250px] flex-1")}>
+    // Outcome columns match the stages in width — a card is a card, and a
+    // narrower one would make a closed application look like a different kind
+    // of object. What sets them apart is tone, not size.
+    <div data-column={column.id} className="min-w-[250px] flex-1 flex flex-col min-h-0">
       <div className="flex flex-none items-center gap-2 mb-3 px-0.5">
         <span className={cn("h-2 w-2 rounded-full flex-none", meta.dot)} aria-hidden />
         <span

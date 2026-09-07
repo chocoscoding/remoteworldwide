@@ -2,7 +2,27 @@
 import { FC } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, FileText, FolderOpen, Gift, HelpCircle, Home, Kanban, Mail, MessageCircle, MessageSquare, Mic, ScanSearch, Send, Settings, Sparkles, Users, UsersRound, type LucideIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  FolderOpen,
+  Gift,
+  HelpCircle,
+  Home,
+  Kanban,
+  Mail,
+  MessageCircle,
+  MessageSquare,
+  Mic,
+  ScanSearch,
+  Send,
+  Settings,
+  Sparkles,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import LogoFull from "@/app/components/svg/LogoFull";
 import LogoMini from "@/app/components/svg/LogoMini";
@@ -62,7 +82,7 @@ const DashboardSidebar: FC = () => {
   const { collapsed, setCollapsed } = useSidebarCollapse();
   // Reads the derived ledger balance. This used to be a hardcoded 18 that
   // silently disagreed with the streak panel the moment anything was earned.
-  const { credits, giftsWaiting, openGifts } = useActivity();
+  const { credits } = useActivity();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -77,10 +97,7 @@ const DashboardSidebar: FC = () => {
       )}>
       {/* Header */}
       <div
-        className={cn(
-          "h-16 flex-none border-b border-black/8 flex items-center",
-          collapsed ? "justify-center px-2" : "justify-between px-[18px]",
-        )}>
+        className={cn("h-16 flex-none border-b border-black/8 flex items-center", collapsed ? "justify-center px-2" : "justify-between px-[18px]")}>
         {collapsed ? <LogoMini className="h-[22px] w-auto" /> : <LogoFull className="h-[19px] w-auto" />}
         {!collapsed && (
           <button
@@ -134,64 +151,38 @@ const DashboardSidebar: FC = () => {
 
       {/* Footer */}
       <div className={cn("flex-none border-t border-black/8", collapsed ? "p-2" : "p-3")}>
-        {/* Two clickable facts, no pitch: the gift chip opens the gifts
-            modal, the credit ring goes to billing where usage lives. The
-            ring's fill is THIS MONTH'S USAGE against the plan allowance;
-            the number inside is what's left. */}
-        {!collapsed && (
-          <div className="rounded-2xl border border-black/10 bg-[#fbfbf7] p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-bold text-primary">Free plan</span>
-              <button
-                type="button"
-                onClick={openGifts}
-                title="Open your gifts"
-                className="rounded-full bg-secondary px-2 py-0.5 text-xs font-bold text-primary transition-colors hover:bg-secondary2 cursor-pointer">
-                {giftsWaiting} {giftsWaiting === 1 ? "gift" : "gifts"}
-              </button>
-            </div>
-            <Link
-              href="/dashboard/settings/billing"
-              title="Credits usage — see billing"
-              className="group flex items-center gap-3 rounded-xl px-1 py-0.5 transition-colors hover:bg-black/[0.04]">
-              <ScoreRing
-                value={Math.min(100, Math.round(((PLAN_ALLOWANCE - credits) / PLAN_ALLOWANCE) * 100))}
-                size={44}
-                trackColor="#e6e5dd"
-                label={<span className="text-[13px] font-extrabold tabular-nums text-primary">{credits}</span>}
-              />
-              <span className="min-w-0">
-                <span className="block text-xs font-bold text-primary">Credits</span>
-                <span className="block text-[11px] text-black/55 transition-colors group-hover:text-black/75">
-                  {Math.max(0, PLAN_ALLOWANCE - credits)} of {PLAN_ALLOWANCE} used
-                </span>
-              </span>
-            </Link>
-          </div>
-        )}
-
-        {/* The profile block is the way into settings — clicking your own
-            name is where people look for it first. */}
+        {/* The profile block is the way into settings — clicking your own name
+            is where people look for it first. The credit meter rides the avatar
+            rather than a panel of its own: it is a standing fact about the
+            account, like the face is, and it survives the collapsed rail where a
+            panel could not. The ring fills with THIS MONTH'S USAGE against the
+            plan allowance. */}
         <Link
           href="/dashboard/settings/profile"
-          title={collapsed ? "Chocos coding · Settings" : "Profile and settings"}
+          title={`${credits} credits left · ${Math.max(0, PLAN_ALLOWANCE - credits)} of ${PLAN_ALLOWANCE} used`}
           className={cn(
-            "flex items-center mt-3 rounded-lg py-1.5 transition-colors cursor-pointer",
+            "flex min-w-0 items-center rounded-lg py-1.5 transition-colors cursor-pointer",
             collapsed ? "justify-center px-1" : "gap-2.5 px-1",
             isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]",
           )}>
-          <div className="h-8 w-8 flex-none overflow-hidden rounded-full bg-[#222325] text-[#e1f073] font-extrabold text-xs flex items-center justify-center">
-            {photoOf("Chocos coding") ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoOf("Chocos coding")!} alt="" className="h-full w-full object-cover" />
-            ) : (
-              "AO"
-            )}
-          </div>
+          <ScoreRing
+            value={Math.min(100, Math.round(((PLAN_ALLOWANCE - credits) / PLAN_ALLOWANCE) * 100))}
+            size={40}
+            label={
+              <span className="grid h-full w-full place-content-center overflow-hidden rounded-full bg-[#222325] text-xs font-extrabold text-[#e1f073]">
+                {photoOf("Chocos coding") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoOf("Chocos coding")!} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  "AO"
+                )}
+              </span>
+            }
+          />
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold text-primary truncate">Chocos coding</p>
-              <p className="text-[11px] text-black/50 truncate">Lagos · GMT+1</p>
+              <p className="text-[11px] text-black/50 truncate">{credits} credits left</p>
             </div>
           )}
           {!collapsed && <Settings className="h-3.5 w-3.5 flex-none text-black/35" />}

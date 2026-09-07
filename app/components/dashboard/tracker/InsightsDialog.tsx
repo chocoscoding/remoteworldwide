@@ -93,41 +93,28 @@ const InsightsDialog: FC<InsightsDialogProps> = ({ open, onOpenChange }) => {
                     </span>
                   </div>
                 ))}
-              </div>
-
-              <div className="mt-4 border-t border-black/10 pt-4">
-                <p className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/45">How they ended</p>
-                {funnel.closures.length === 0 ? (
-                  <p className="text-sm text-black/45">Nothing closed yet.</p>
-                ) : (
-                  <div className="flex flex-col gap-2.5">
-                    {funnel.closures.map(({ reason, n }) => {
-                      const meta = CLOSED_META[reason];
-                      return (
-                        <div key={reason} className="flex items-center gap-3">
-                          <span
-                            className={cn(
-                              "inline-flex w-[104px] flex-none items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold",
-                              meta.pill,
-                            )}>
-                            <meta.icon className="h-3 w-3 flex-none" aria-hidden />
-                            {meta.label}
-                          </span>
-                          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-black/[0.05]">
-                            <div
-                              className={cn("h-full rounded-full", meta.dot)}
-                              style={{ width: `${(n / Math.max(funnel.closed, 1)) * 100}%` }}
-                            />
-                          </div>
-                          <span className="w-8 flex-none text-right text-sm font-bold tabular-nums text-primary">{n}</span>
-                          <span className="w-11 flex-none text-right text-[11px] font-semibold tabular-nums text-black/45">
-                            {pct(funnel.closed === 0 ? null : n / funnel.closed)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                {/* The outcomes are the same list, continued: an application
+                    that stopped is still an application that got somewhere, and
+                    a separate panel made the reader join the two halves up. The
+                    hairline is the only thing marking where the ladder ends. */}
+                {funnel.closures.map(({ reason, n }, i) => {
+                  const meta = CLOSED_META[reason];
+                  return (
+                    <div key={reason} className={cn("flex items-center gap-3", i === 0 && "mt-1.5 border-t border-black/10 pt-4")}>
+                      <span className="w-[104px] flex-none text-xs font-semibold text-black/50">{meta.label}</span>
+                      <div className="relative h-7 min-w-0 flex-1 overflow-hidden rounded-md bg-black/[0.05]">
+                        <div
+                          className={cn("h-full rounded-md transition-[width] duration-500", meta.dot)}
+                          style={{ width: `${Math.max(2, (n / widest) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-8 flex-none text-right text-sm font-bold tabular-nums text-primary">{n}</span>
+                      <span className="w-11 flex-none text-right text-[11px] font-semibold tabular-nums text-black/45">
+                        {pct(funnel.closed === 0 ? null : n / funnel.closed)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               <p className="mt-3.5 text-[11px] leading-relaxed text-black/40">
