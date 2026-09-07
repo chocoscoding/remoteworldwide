@@ -12,6 +12,8 @@ import { SortableTrackerCard } from "./TrackerCard";
 interface KanbanColumnProps {
   column: TrackerColumn;
   onOpen: (cardId: string) => void;
+  /** Closes a silent card as ghosted, straight from the board. */
+  onGhost: (cardId: string) => void;
 }
 
 /** A card only counts as reached once most of it is on screen. */
@@ -116,7 +118,7 @@ const DropGap: FC<{ height: number }> = ({ height }) => (
  * of its cards. The cards scroll inside the column; the column itself is
  * sized by the board.
  */
-export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen }) => {
+export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost }) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const { scrollRef, below, scrollToEnd } = useCardsBelowFold(column.cards.length);
 
@@ -132,7 +134,7 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen }) => {
   const hasMore = below > 0 && !isOver;
 
   return (
-    <div className="min-w-[250px] flex-1 flex flex-col min-h-0">
+    <div data-column={column.id} className="min-w-[250px] flex-1 flex flex-col min-h-0">
       <div className="flex flex-none items-center gap-2 mb-3 px-0.5">
         <span className={cn("h-2 w-2 rounded-full flex-none", COLUMN_META[column.id].dot)} aria-hidden />
         <span className="text-sm font-bold text-primary whitespace-nowrap">{column.label}</span>
@@ -152,7 +154,7 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen }) => {
             {column.cards.map((card, i) => (
               <Fragment key={card.id}>
                 {dropIndex === i && <DropGap height={gapHeight} />}
-                <SortableTrackerCard card={card} columnId={column.id} onOpen={onOpen} />
+                <SortableTrackerCard card={card} columnId={column.id} onOpen={onOpen} onGhost={onGhost} />
               </Fragment>
             ))}
             {dropIndex === column.cards.length && <DropGap height={gapHeight} />}

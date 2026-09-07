@@ -9,6 +9,8 @@ import AuthSessionLogger from "./components/AuthSessionLogger";
 import { ToastContainer, Slide } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Script from "next/script";
+import SiteJsonLd from "./components/SiteJsonLd";
+import { absoluteUrl, SITE_NAME, SITE_URL } from "./lib/seo";
 const font = Manrope({
   subsets: ["latin-ext"],
   weight: ["200", "300", "400", "500", "700"],
@@ -18,23 +20,24 @@ export const metadata: Metadata = {
   title: "Remote Worldwide",
   description: "Get worldwide remote jobs and get hired in no time! - With Remote Worldwide",
   icons: "/favicon.ico",
-  metadataBase: new URL("https://www.remoteworldwide.net"),
+  metadataBase: new URL(SITE_URL),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    url: "https://www.remoteworldwide.net",
+    type: "website",
+    siteName: SITE_NAME,
+    url: SITE_URL,
     title: "Remote Worldwide",
     description: "Get worldwide remote jobs and get hired in no time!",
-    images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
+    images: [absoluteUrl("/api/og/job")],
   },
-  // twitter: {
-  //   card: "summary_large_image",
-  //   title: "Remote Worldwide",
-  //   description: "Get worldwide remote jobs and get hired in no time!",
-  //   // creator: '@remoteworldwide',
-  //   images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`],
-  // },
+  twitter: {
+    card: "summary_large_image",
+    title: "Remote Worldwide",
+    description: "Get worldwide remote jobs and get hired in no time!",
+    images: [absoluteUrl("/api/og/job")],
+  },
   keywords: ["job", "remote", "remote work", "remote worldwide", "work", "remote jobs", "tech jobs", "worldwide jobs"],
 };
 
@@ -67,6 +70,7 @@ export default function RootLayout({
 </Script>
       </head>
       <body className={`${font.className} antialiased`}>
+        <SiteJsonLd />
         <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
         <ToastContainer
           className={"z-50"}

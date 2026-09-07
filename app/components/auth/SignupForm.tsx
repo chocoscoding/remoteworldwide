@@ -32,7 +32,6 @@ interface SignupFormProps {
   onSuccess?: () => void;
   /** When set, "Sign in" links switch views instead of navigating to /login. */
   onSwitchToLogin?: () => void;
-  /** Where OAuth providers land after sign-in. */
   oauthCallbackUrl?: string;
   /** Keeps input ids unique when the form renders both in a page and a dialog. */
   idPrefix?: string;
@@ -102,7 +101,7 @@ export default function SignupForm({
         router.refresh();
         return;
       }
-      router.push("/");
+      router.push(oauthCallbackUrl);
       router.refresh();
     } finally {
       setSubmitting(false);

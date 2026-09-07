@@ -160,15 +160,12 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-3.5">
-                <span className="h-11 w-11 flex-none rounded-full bg-[#f0f0ea] flex items-center justify-center">
-                  <Target className="h-4 w-4 text-black/40" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-primary mb-0.5">Nothing to average yet</p>
-                  <p className="text-xs text-black/50 leading-relaxed">Fills in once a job is actively interviewing.</p>
-                </div>
-              </div>
+              <PrepEmptyState
+                bare
+                icon={Target}
+                title="Nothing to average yet"
+                body="Fills in once a job is actively interviewing."
+              />
             )}
           </div>
         </div>
@@ -213,7 +210,7 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
         </div>
 
         {filtered.length === 0 ? (
-          <div className="px-5 py-12 text-center text-sm text-black/45">No interviews match your filters.</div>
+          <PrepEmptyState bare icon={Search} title="No interviews match" body="Try another filter, or clear the search." />
         ) : (
           pageItems.map((t) => {
             const score = computePreparedness(t);

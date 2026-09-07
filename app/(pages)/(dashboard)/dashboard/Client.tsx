@@ -13,6 +13,7 @@ import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import StreakPill from "@/app/components/dashboard/streak/StreakPill";
 import AtRiskBanner from "@/app/components/dashboard/streak/AtRiskBanner";
 import ProofOfProgress from "@/app/components/dashboard/ProofOfProgress";
+import NeedsANudge from "@/app/components/dashboard/followup/NeedsANudge";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { ACTION_KINDS, type ActionKind } from "@/app/lib/dashboard/activity";
@@ -471,6 +472,13 @@ const HomeClient: FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* The nudge list sits ABOVE the outcomes panel on purpose: that
+            panel reports what came back, and this is the highest-leverage
+            thing the user can do to make more of it come back. */}
+        <div className="mt-6">
+          <NeedsANudge />
         </div>
 
         <div className="mt-6">

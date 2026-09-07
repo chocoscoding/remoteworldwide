@@ -2,27 +2,7 @@
 import { FC } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  Send,
-  FileText,
-  Mail,
-  ScanSearch,
-  Settings,
-  MessageCircle,
-  HelpCircle,
-  Mic,
-  Kanban,
-  Sparkles,
-  Users,
-  MessageSquare,
-  FolderOpen,
-  UsersRound,
-  Gift,
-  type LucideIcon,
-} from "lucide-react";
+import { ChartNoAxesColumn, ChevronLeft, ChevronRight, FileText, FolderOpen, Gift, HelpCircle, Home, Kanban, Mail, MessageCircle, MessageSquare, Mic, ScanSearch, Send, Settings, Sparkles, Users, UsersRound, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LogoFull from "@/app/components/svg/LogoFull";
 import LogoMini from "@/app/components/svg/LogoMini";
@@ -62,6 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Apply & after",
     items: [
       { id: "tracker", label: "Application tracker", href: "/dashboard/tracker", icon: Kanban },
+      { id: "insights", label: "Insights", href: "/dashboard/insights", icon: ChartNoAxesColumn },
       { id: "recommend", label: "Recommendations", href: "/dashboard/recommend", icon: Sparkles },
       { id: "referrals", label: "Referral search", href: "/dashboard/referrals", icon: Users },
       { id: "questions", label: "Application answers", href: "/dashboard/questions", icon: MessageSquare },

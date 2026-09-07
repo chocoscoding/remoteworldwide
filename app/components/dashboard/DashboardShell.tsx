@@ -23,6 +23,7 @@ import { SettingsProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/S
 import StreakMilestoneModal from "./streak/StreakMilestoneModal";
 import LogApplicationDialog from "./log/LogApplicationDialog";
 import GiftStore from "./gifts/GiftStore";
+import { TrackerProvider } from "./tracker/TrackerProvider";
 import RepairStreakPanel from "./streak/RepairStreakPanel";
 
 const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
@@ -40,6 +41,12 @@ const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
           feed and its goals, so the win flow reads pod context. */}
       <PodProvider>
       <WinProvider>
+      {/* TrackerProvider is innermost: every board move is a logged action
+          (ActivityProvider) and landing in Offer offers the win log
+          (WinProvider), so it has to sit inside both. It lives here rather
+          than in the tracker screen because Home reads the same board to
+          decide which applications are owed a follow-up. */}
+      <TrackerProvider>
       <div className="w-full flex">
         <DashboardSidebar />
         <div className="flex-1 min-w-0">{children}</div>
@@ -49,6 +56,7 @@ const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
       <RepairStreakPanel />
       <StreakMilestoneModal />
       <Toaster />
+      </TrackerProvider>
       </WinProvider>
       </PodProvider>
       </DocumentsProvider>

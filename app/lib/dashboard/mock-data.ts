@@ -29,6 +29,7 @@ import type {
   ReferralContact,
   TieKind,
   ResumeContent,
+  TrackerCard,
   TrackerColumn,
   ApplyStepConfig,
   VaultDoc,
@@ -378,6 +379,7 @@ export const RESUME: ResumeContent = {
   links: [
     { label: "Portfolio", url: "amaraokafor.design" },
     { label: "LinkedIn", url: "linkedin.com/in/amaraokafor" },
+    { label: "Dribbble", url: "dribbble.com/amaraokafor" },
   ],
   summary: "Product designer with 6 years shipping design systems and B2B workflow tools for distributed teams across four time zones.",
   experience: [
@@ -516,8 +518,11 @@ export const TRACKER_COLUMNS: TrackerColumn[] = [
       { id: "trk-postman", title: "Senior Product Designer", company: "Postman", daysAgo: 14 },
       { id: "trk-sentry", title: "Staff Product Designer", company: "Sentry", daysAgo: 1, statusChip: "Closes in 3 days" },
       { id: "trk-typeform", title: "Product Designer", company: "Typeform", daysAgo: 12, statusChip: "Referral available" },
-      { id: "trk-attio", title: "Senior Product Designer", company: "Attio", daysAgo: 18 },
-      { id: "trk-flyio", title: "Product Designer", company: "Fly.io", daysAgo: 21 },
+      // Two that have gone quiet long past the point of hope — these are what
+      // the board's "Ghosted?" prompt is derived from. Nothing marks them; the
+      // silence is computed from `lastTouchedDaysAgo` at render time.
+      { id: "trk-attio", title: "Senior Product Designer", company: "Attio", daysAgo: 41, lastTouchedDaysAgo: 41 },
+      { id: "trk-flyio", title: "Product Designer", company: "Fly.io", daysAgo: 36, lastTouchedDaysAgo: 34 },
     ],
   },
   {
@@ -589,6 +594,29 @@ export const TRACKER_COLUMNS: TrackerColumn[] = [
     count: 0,
     cards: [],
   },
+];
+
+/**
+ * Applications that already ended. These never appear in a column — they're
+ * the denominator behind every honest funnel number, and they're seeded
+ * deliberately lopsided (rejections and silence far outnumbering anything
+ * else) because that is what a real search looks like.
+ *
+ * `closedFrom` matters as much as `closedReason`: three of these died at
+ * `applied` without a human ever reading them, while Notion and Airtable got
+ * through real interview rounds. Those are opposite problems, and the funnel
+ * can only tell them apart because the stage is recorded.
+ */
+export const TRACKER_CLOSED_CARDS: TrackerCard[] = [
+  { id: "trk-closed-render", title: "Staff Product Designer", company: "Render", daysAgo: 44, closedReason: "rejected", closedDaysAgo: 6, closedFrom: "interviewing", roundsReached: 3 },
+  { id: "trk-closed-planetscale", title: "Product Designer", company: "PlanetScale", daysAgo: 51, closedReason: "rejected", closedDaysAgo: 12, closedFrom: "interviewing", roundsReached: 2 },
+  { id: "trk-closed-clerk", title: "Product Design Lead", company: "Clerk", daysAgo: 38, closedReason: "rejected", closedDaysAgo: 9, closedFrom: "conversation" },
+  { id: "trk-closed-railway", title: "Staff Product Designer", company: "Railway", daysAgo: 47, closedReason: "rejected", closedDaysAgo: 15, closedFrom: "applied" },
+  { id: "trk-closed-neon", title: "Senior Product Designer", company: "Neon", daysAgo: 40, closedReason: "ghosted", closedDaysAgo: 4, closedFrom: "applied" },
+  { id: "trk-closed-resend", title: "Senior Product Designer", company: "Resend", daysAgo: 55, closedReason: "ghosted", closedDaysAgo: 18, closedFrom: "applied" },
+  { id: "trk-closed-warp", title: "Product Designer", company: "Warp", daysAgo: 62, closedReason: "ghosted", closedDaysAgo: 21, closedFrom: "conversation" },
+  { id: "trk-closed-census", title: "Senior Designer", company: "Census", daysAgo: 33, closedReason: "withdrawn", closedDaysAgo: 7, closedFrom: "applied" },
+  { id: "trk-closed-pitch", title: "Product Designer", company: "Pitch", daysAgo: 29, closedReason: "declined", closedDaysAgo: 3, closedFrom: "offer", roundsReached: 4 },
 ];
 
 // ---------------------------------------------------------------------------

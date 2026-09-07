@@ -1,10 +1,18 @@
 import SignupForm from "@/app/components/auth/SignupForm";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import { safeNext } from "@/app/lib/next-url";
 
-export default function SignupPage() {
+export default async function SignupPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const next = safeNext((await searchParams).next);
+  const authenticated = await auth();
+  if (authenticated?.user) {
+    redirect(next);
+  }
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        <SignupForm />
+        <SignupForm oauthCallbackUrl={next} />
       </div>
     </div>
   );

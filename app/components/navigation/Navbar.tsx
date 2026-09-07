@@ -34,6 +34,7 @@ const Navbar = () => {
             height={50}
             src={data.user?.image ?? "/images/noimage.png"}
             alt="User"
+            referrerPolicy="no-referrer"
             className="w-10 h-10 border-2 rounded-full cursor-pointer"
             onClick={toggleNavbar2} // Assuming toggleNavbar will handle the modal visibility
           />
@@ -101,6 +102,9 @@ const Navbar = () => {
             <Link href="/companies">
               <p className="text-gray-700 hover:text-gray-900">Companies</p>
             </Link>
+            <Link href="/blogs">
+              <p className="text-gray-700 hover:text-gray-900">Blog</p>
+            </Link>
 
             <User />
           </div>
@@ -139,6 +143,11 @@ const Navbar = () => {
             <Link href="/companies">
               <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
                 Companies
+              </p>
+            </Link>
+            <Link href="/blogs">
+              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
+                Blog
               </p>
             </Link>
           </div>

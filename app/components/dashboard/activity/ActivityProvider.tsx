@@ -50,6 +50,7 @@ import {
   tierFor,
   weekdayIndex,
 } from "@/app/lib/dashboard/streak";
+import { FOLLOW_UP_AFTER_APPLY_DAYS } from "@/app/lib/dashboard/follow-up";
 import type { StreakDay, StreakMilestone, StreakState, TrackerColumnId } from "@/app/lib/dashboard/types";
 
 // ---------------------------------------------------------------------------
@@ -462,7 +463,9 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
     applyQualifyingAction("application", application.id, at);
 
-    return { application, score, followUpOn: dayKey(addDays(at, 7)) };
+    // The same constant the follow-up engine nudges on, so the promise made
+    // here and the nudge that delivers it can never drift apart.
+    return { application, score, followUpOn: dayKey(addDays(at, FOLLOW_UP_AFTER_APPLY_DAYS)) };
   }
 
   function recordAction(kind: ActionKind, artifactId: string, label?: string) {

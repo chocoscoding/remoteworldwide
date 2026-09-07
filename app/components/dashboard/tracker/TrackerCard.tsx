@@ -2,7 +2,7 @@
 
 import { FC } from "react";
 import Link from "next/link";
-import { MoreHorizontal, Mic, Clock } from "lucide-react";
+import { MoreHorizontal, Mic, Clock, Ghost } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import LogoMini from "@/app/components/svg/LogoMini";
-import { COLUMN_META } from "@/app/components/dashboard/tracker/tracker-meta";
+import { COLUMN_META, daysSinceTouch, looksGhosted } from "@/app/components/dashboard/tracker/tracker-meta";
 import type { TrackerCard as TrackerCardData, TrackerColumnId } from "@/app/lib/dashboard/types";
 import { daysAgoLabel, chipMeta } from "../../../(pages)/(dashboard)/dashboard/tracker/types";
 
@@ -18,14 +18,20 @@ interface TrackerCardItemProps {
   card: TrackerCardData;
   columnId?: TrackerColumnId;
   onOptions?: () => void;
+  /** Offers the one-click close on a card that has gone silent. */
+  onGhost?: () => void;
 }
 
 /**
  * A single tracker card — shows job application details with optional status chip.
  * Can be highlighted (featured view) or normal (board view).
  */
-export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOptions }) => {
+export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOptions, onGhost }) => {
   const daysLabel = daysAgoLabel(card.daysAgo);
+  // Derived every render from the card's own silence — never stored, so it
+  // can't go stale and needs no effect to maintain.
+  const ghosted = columnId ? looksGhosted(card, columnId) : false;
+  const silentDays = daysSinceTouch(card);
 
   /**
    * The explicit way into a card's details. It sits inside the drag listeners,
@@ -131,6 +137,24 @@ export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOp
           {showEngagementBar && <ProgressBar value={65} height="h-1" className="mt-2" />}
         </div>
       )}
+
+      {/* Silence past the point of hope. Offered, never applied — a user who
+          knows the recruiter is on leave should not be overruled by a timer,
+          so this asks rather than tells and closing stays one tap either way. */}
+      {ghosted && onGhost && (
+        <button
+          type="button"
+          data-ghost-prompt=""
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onGhost();
+          }}
+          className="mt-2.5 flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-black/25 px-2 py-1.5 text-[11px] font-semibold text-black/45 transition-colors hover:border-[#222325] hover:text-primary">
+          <Ghost className="h-3 w-3 flex-none" />
+          <span className="truncate">Silent {silentDays} days — ghosted?</span>
+        </button>
+      )}
     </div>
   );
 };
@@ -139,6 +163,7 @@ interface SortableTrackerCardProps {
   card: TrackerCardData;
   columnId: TrackerColumnId;
   onOpen: (cardId: string) => void;
+  onGhost?: (cardId: string) => void;
 }
 
 /**
@@ -149,7 +174,7 @@ interface SortableTrackerCardProps {
  * no static Tailwind-class equivalent. Every other style here is a Tailwind
  * utility class.
  */
-export const SortableTrackerCard: FC<SortableTrackerCardProps> = ({ card, columnId, onOpen }) => {
+export const SortableTrackerCard: FC<SortableTrackerCardProps> = ({ card, columnId, onOpen, onGhost }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   // `data-tracker-card` marks this as an observable card for the column's
@@ -164,7 +189,12 @@ export const SortableTrackerCard: FC<SortableTrackerCardProps> = ({ card, column
       data-tracker-card=""
       onClick={() => onOpen(card.id)}
       className={cn("touch-none cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}>
-      <TrackerCardItem card={card} columnId={columnId} onOptions={() => onOpen(card.id)} />
+      <TrackerCardItem
+        card={card}
+        columnId={columnId}
+        onOptions={() => onOpen(card.id)}
+        onGhost={onGhost ? () => onGhost(card.id) : undefined}
+      />
     </div>
   );
 };

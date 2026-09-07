@@ -1,4 +1,6 @@
-import type { TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { LucideIcon } from "lucide-react";
+import { CircleSlash, Ghost, LogOut, ThumbsDown } from "lucide-react";
+import type { TrackerCard, TrackerClosedReason, TrackerColumnId } from "@/app/lib/dashboard/types";
 
 /**
  * The tracker's color system, one lookup for every surface that renders a
@@ -27,3 +29,75 @@ export const COLUMN_LABELS: Record<TrackerColumnId, string> = {
   interviewing: "Interviewing",
   offer: "Offer",
 };
+
+/**
+ * The closed half of the system. Same literal-class discipline as
+ * `COLUMN_META`, with one deliberate tonal choice: only `rejected` and
+ * `declined` carry the destructive red. Ghosting is not a verdict anyone
+ * delivered — painting it red would tell the user they were rejected when in
+ * truth nobody ever replied — and withdrawing is the user's own decision, so
+ * both read neutral. `menuLabel` is the imperative used in the status menu;
+ * `label` is the noun used everywhere the outcome is reported back.
+ */
+export const CLOSED_META: Record<TrackerClosedReason, { label: string; menuLabel: string; icon: LucideIcon; pill: string; dot: string }> = {
+  rejected: {
+    label: "Rejected",
+    menuLabel: "They said no",
+    icon: ThumbsDown,
+    pill: "bg-[#fdeae6] text-[#b23c26]",
+    dot: "bg-[#b23c26]",
+  },
+  ghosted: {
+    label: "Ghosted",
+    menuLabel: "Never heard back",
+    icon: Ghost,
+    pill: "bg-black/[0.06] text-black/55",
+    dot: "bg-black/30",
+  },
+  withdrawn: {
+    label: "Withdrawn",
+    menuLabel: "I pulled out",
+    icon: LogOut,
+    pill: "bg-black/[0.06] text-black/55",
+    dot: "bg-black/30",
+  },
+  declined: {
+    label: "Declined",
+    menuLabel: "I turned it down",
+    icon: CircleSlash,
+    pill: "bg-[#fdeae6] text-[#b23c26]",
+    dot: "bg-[#b23c26]",
+  },
+};
+
+/** Menu and summary order — worst-to-best is wrong here; this is frequency order. */
+export const CLOSED_ORDER: TrackerClosedReason[] = ["rejected", "ghosted", "withdrawn", "declined"];
+
+/**
+ * Days since anything happened on this application. `lastTouchedDaysAgo` wins
+ * when present; otherwise nothing has happened since it was applied to, so
+ * `daysAgo` IS the silence. Undefined only for cards with neither, which
+ * can't be judged stale at all.
+ */
+export function daysSinceTouch(card: TrackerCard): number | null {
+  return card.lastTouchedDaysAgo ?? card.daysAgo ?? null;
+}
+
+/**
+ * Past this, an application with no reply is almost certainly dead. Not a
+ * rule the app enforces — it only offers the close, because a user who knows
+ * something we don't should never be overruled by a timer.
+ */
+export const GHOST_AFTER_DAYS = 30;
+
+/**
+ * Pure, derived in render — never written to state. A stale card in a stage
+ * that's still waiting on the company earns the prompt; `saved` never does
+ * (nobody owes you a reply to an application you haven't sent) and neither
+ * does `offer` (silence there is the user's move to make).
+ */
+export function looksGhosted(card: TrackerCard, columnId: TrackerColumnId): boolean {
+  if (columnId === "saved" || columnId === "offer") return false;
+  const silent = daysSinceTouch(card);
+  return silent !== null && silent >= GHOST_AFTER_DAYS;
+}

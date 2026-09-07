@@ -17,8 +17,8 @@ interface Blog {
     name: string;
     profileImage: string;
   };
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   tags: string[];
   coverImage: string;
 }

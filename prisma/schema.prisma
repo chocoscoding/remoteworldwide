@@ -73,7 +73,6 @@ model Job {
   Bookmark Bookmark[]
 }
 
-
 model Region {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
   name String @unique
@@ -104,38 +103,9 @@ model Company {
   updatedAt DateTime @updatedAt
 }
 
-
 model Category {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
   name String @unique
-}
-
-model Blog {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  slug String @unique
-  title       String
-  content     String
-  description String
-  authorId    String     @db.ObjectId
-  author      Author    @relation(fields: [authorId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  tags        String[]
-  coverImage String
-}
-
-model Author {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String @unique
-  about       String
-    website   String?
-  linkedin String?
-  twitter String?
-  instagram String?
-  blogs     Blog[]
-  profileImage String
-  slug String @unique
-  createdAt DateTime @default(now())
 }
 
 enum Role {

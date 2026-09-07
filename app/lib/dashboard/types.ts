@@ -84,6 +84,28 @@ export interface TrackerCard {
   statusChip?: string;
   rww?: boolean;
   highlighted?: boolean;
+  /**
+   * Set only on closed applications — the reason it ended. A card carrying
+   * this lives in the closed list, never in a column.
+   */
+  closedReason?: TrackerClosedReason;
+  /** Days since it closed. Same relative-number convention as `daysAgo`. */
+  closedDaysAgo?: number;
+  /**
+   * The stage it was in when it closed. Reopening puts it back there, and the
+   * funnel reads it to know how far an application actually got — a rejection
+   * out of `interviewing` is a very different signal from one out of `applied`.
+   */
+  closedFrom?: TrackerColumnId;
+  /**
+   * Days since ANYTHING happened on this application — a move, a follow-up, a
+   * reply. Distinct from `daysAgo`, which is when it was applied to and never
+   * changes. Absent means "never touched since", so readers fall back to
+   * `daysAgo`; see `daysSinceTouch`.
+   */
+  lastTouchedDaysAgo?: number;
+  /** How far the interview loop actually got — the funnel's late-stage signal. */
+  roundsReached?: number;
 }
 
 /** One entry in the dashboard sidebar navigation. */
@@ -177,12 +199,37 @@ export interface CoverLetterContent {
 // Application tracker (Kanban)
 // ---------------------------------------------------------------------------
 
+/**
+ * A stage with its own board column. Deliberately NOT widened to include
+ * closed applications: keeping this union to "things that have a column" is
+ * what lets `COLUMN_META`, `STATUS_ORDER` and `KanbanColumn` stay exhaustive.
+ */
 export type TrackerColumnId =
   | "saved"
   | "applied"
   | "conversation"
   | "interviewing"
   | "offer";
+
+/**
+ * How an application ended. Every search produces far more of these than
+ * offers, and a board that can't express them drifts into fiction — the
+ * pipeline needs an exit, not just a ladder.
+ *
+ * `rejected` — they said no. `ghosted` — silence past the point of hope.
+ * `withdrawn` — the user pulled out. `declined` — an offer the user turned down.
+ */
+export type TrackerClosedReason = "rejected" | "ghosted" | "withdrawn" | "declined";
+
+/** Anywhere an application can be: on the board, or closed. */
+export type TrackerStatus = TrackerColumnId | TrackerClosedReason;
+
+export const CLOSED_REASONS: TrackerClosedReason[] = ["rejected", "ghosted", "withdrawn", "declined"];
+
+/** Narrows a status to the closed half — the type guard both the tracker and the funnel use. */
+export function isClosedReason(status: TrackerStatus): status is TrackerClosedReason {
+  return (CLOSED_REASONS as string[]).includes(status);
+}
 
 export interface TrackerColumn {
   id: TrackerColumnId;

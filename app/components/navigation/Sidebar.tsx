@@ -42,9 +42,12 @@ const menuItemsForAdmin = [
     section: "blog",
     subItems: [
       { label: "Create Blog", path: "/blogs/create" },
-      { label: "Create Author", path: "/authors/create" },
       { label: "Blogs", path: "/blogs" },
+      { label: "Create Author", path: "/authors/create" },
       { label: "Authors", path: "/authors" },
+      { label: "Conversions", path: "/conversions" },
+      { label: "Blog settings", path: "/blog-settings" },
+      { label: "Subscribers", path: "/subscribers" },
     ],
   },
   {
@@ -63,9 +66,10 @@ const menuItemsForAuthor = [
     section: "blog",
     subItems: [
       { label: "Create Blog", path: "/blogs/create" },
-      { label: "Create Author", path: "/authors/create" },
       { label: "Blogs", path: "/blogs" },
+      { label: "Create Author", path: "/authors/create" },
       { label: "Authors", path: "/authors" },
+      { label: "Conversions", path: "/conversions" },
     ],
   },
 ];
@@ -82,6 +86,8 @@ const Sidebar = () => {
   useEffect(() => {
     setIsOpen(false);
     if (pathname.includes("/authors")) {
+      setOpenAccordion("blog");
+    } else if (pathname.includes("/conversions") || pathname.includes("/blog-settings") || pathname.includes("/subscribers")) {
       setOpenAccordion("blog");
     } else if (pathname.includes("/blogs")) {
       setOpenAccordion("blog");

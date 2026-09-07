@@ -415,3 +415,228 @@ body {
     --chart-5: 340 75% 55%;
   }
 }
+
+.post-prose {
+  color: #222325;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+.post-prose > :first-child {
+  margin-top: 0;
+}
+.post-prose > :last-child {
+  margin-bottom: 0;
+}
+.post-prose p {
+  margin: 0 0 1.1em;
+}
+.post-prose h2 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin: 1.85em 0 0.5em;
+  scroll-margin-top: 96px;
+}
+.post-prose h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  font-weight: 800;
+  margin: 1.55em 0 0.4em;
+  scroll-margin-top: 96px;
+}
+.post-prose h4,
+.post-prose h5,
+.post-prose h6 {
+  font-size: 1.125rem;
+  font-weight: 800;
+  margin: 1.5em 0 0.4em;
+}
+.post-prose a {
+  color: #222325;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: #cddd54;
+}
+.post-prose a:hover {
+  text-decoration-color: #222325;
+}
+.post-prose strong,
+.post-prose b {
+  font-weight: 700;
+}
+.post-prose ul,
+.post-prose ol {
+  margin: 0 0 1.4em;
+  padding-left: 1.6em;
+}
+.post-prose ul {
+  list-style: disc;
+}
+.post-prose ol {
+  list-style: decimal;
+}
+.post-prose ol > li[data-list="bullet"] {
+  list-style: disc;
+}
+.post-prose li {
+  margin: 0.35em 0;
+  padding-left: 0.15em;
+}
+.post-prose li[data-list="checked"],
+.post-prose li[data-list="unchecked"] {
+  list-style: none;
+  margin-left: -1.6em;
+  padding-left: 1.9em;
+  position: relative;
+}
+.post-prose li[data-list="checked"]::before,
+.post-prose li[data-list="unchecked"]::before {
+  content: "";
+  position: absolute;
+  left: 0.1em;
+  top: 0.45em;
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid #222325;
+  border-radius: 4px;
+  background: #fff;
+}
+.post-prose li[data-list="checked"]::before {
+  background: #e1f073;
+}
+.post-prose blockquote {
+  margin: 1.4em 0;
+  padding: 0.7rem 1.15rem;
+  border: 2px solid #222325;
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 0 #e1f073;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.55;
+  position: relative;
+}
+.post-prose blockquote::before {
+  content: "///";
+  display: block;
+  color: #cddd54;
+  font-weight: 800;
+  letter-spacing: -0.12em;
+  line-height: 1px;
+  margin-bottom: 1.1rem;
+  font-size: 2.5rem;
+}
+.post-prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+.post-prose pre,
+.post-prose .ql-syntax {
+  margin: 1.5em 0;
+  padding: 1rem 1.25rem;
+  background: #222325;
+  color: #f6f6f6;
+  border-radius: 12px;
+  overflow-x: auto;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.post-prose code {
+  font-size: 0.9em;
+  background: #f0f0ea;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.post-prose pre code {
+  background: none;
+  padding: 0;
+}
+.post-prose img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.15em 0;
+  border-radius: 16px;
+  border: 2px solid #222325;
+}
+.post-prose iframe.ql-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin: 1.75em 0;
+  border-radius: 16px;
+  border: 2px solid #222325;
+}
+.post-prose hr {
+  border: 0;
+  border-top: 2px solid #222325;
+  margin: 2em 0;
+}
+.post-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  font-size: 0.95rem;
+}
+.post-prose th,
+.post-prose td {
+  border: 1px solid #d9d9d2;
+  padding: 0.6em 0.8em;
+  text-align: left;
+  vertical-align: top;
+}
+.post-prose th {
+  background: #f0f0ea;
+  font-weight: 700;
+}
+.post-prose .ql-align-center {
+  text-align: center;
+}
+.post-prose .ql-align-right {
+  text-align: right;
+}
+.post-prose .ql-align-justify {
+  text-align: justify;
+}
+@media (min-width: 1024px) {
+  .post-prose {
+    font-size: 1.125rem;
+  }
+  .post-prose h2 {
+    font-size: 1.625rem;
+  }
+  .post-prose h3 {
+    font-size: 1.3125rem;
+  }
+}
+
+.post-prose .ql-indent-1 {
+  padding-left: 2em;
+}
+.post-prose .ql-indent-2 {
+  padding-left: 4em;
+}
+.post-prose .ql-indent-3 {
+  padding-left: 6em;
+}
+@media (max-width: 767px) {
+  .post-prose {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+  }
+  .post-prose h2 {
+    font-size: 1.5rem;
+  }
+  .post-prose h3 {
+    font-size: 1.25rem;
+  }
+  .post-prose blockquote {
+    font-size: 1rem;
+    padding: 0.8rem 1rem 0.9rem;
+  }
+  .post-prose blockquote::before {
+    font-size: 1.75rem;
+  }
+}

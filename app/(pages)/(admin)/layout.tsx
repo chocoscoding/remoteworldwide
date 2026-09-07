@@ -20,7 +20,7 @@ export default async function RootLayout({
     <div className="w-full flex">
       <BotKeepAlive />
       <Sidebar />
-      <div className="w-full max-w-[1580px] overflow-clip m-auto">{children}</div>
+      <div className="h-screen w-full max-w-[1580px] overflow-x-clip overflow-y-auto m-auto">{children}</div>
     </div>
   );
 }

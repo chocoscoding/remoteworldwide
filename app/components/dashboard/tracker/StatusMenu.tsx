@@ -3,24 +3,30 @@
 import { FC, useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { TrackerColumnId } from "@/app/lib/dashboard/types";
-import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "./tracker-meta";
+import type { TrackerClosedReason, TrackerColumnId } from "@/app/lib/dashboard/types";
+import { CLOSED_META, CLOSED_ORDER, COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "./tracker-meta";
 
 /**
  * The status pill that IS the status control. One tinted pill (the user's
  * "just one pill, not icon and that") — click it and every stage is one
  * selection away, from the table, the calendar panel, or the timeline dialog.
  * Outside-click/Escape handling follows SplitButton's pattern; no new deps.
+ *
+ * Below the stages sits the exit. It's in the same menu because closing an
+ * application IS a status change — putting it behind a separate control would
+ * make the most common outcome in any job search the hardest one to record.
  */
 export interface StatusMenuProps {
   value: TrackerColumnId;
   onChange: (to: TrackerColumnId) => void;
+  /** Omitted where closing makes no sense; the close section hides with it. */
+  onClose?: (reason: TrackerClosedReason) => void;
   /** Just the pill, no menu — for places where changing makes no sense. */
   readOnly?: boolean;
   className?: string;
 }
 
-const StatusMenu: FC<StatusMenuProps> = ({ value, onChange, readOnly, className }) => {
+const StatusMenu: FC<StatusMenuProps> = ({ value, onChange, onClose, readOnly, className }) => {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -83,6 +89,31 @@ const StatusMenu: FC<StatusMenuProps> = ({ value, onChange, readOnly, className 
               {id === value && <Check className="h-3.5 w-3.5 flex-none text-[#6c7a1e]" strokeWidth={3} />}
             </button>
           ))}
+
+          {onClose && (
+            <>
+              <p className="border-t-[1.5px] border-black/10 bg-[#fbfbf7] px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.08em] text-black/40">
+                Close this one
+              </p>
+              {CLOSED_ORDER.map((reason) => {
+                const meta = CLOSED_META[reason];
+                return (
+                  <button
+                    key={reason}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onClose(reason);
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-2.5 border-b border-black/8 px-3 py-2 text-left text-xs font-semibold text-black/70 transition-colors last:border-b-0 hover:bg-[#fbfbf7] hover:text-primary">
+                    <meta.icon className="h-3.5 w-3.5 flex-none text-black/40" aria-hidden />
+                    <span className="flex-1">{meta.menuLabel}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       )}
     </div>

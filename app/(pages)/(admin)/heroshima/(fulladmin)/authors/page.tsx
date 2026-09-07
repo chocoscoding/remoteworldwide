@@ -1,24 +1,10 @@
-import { AuthorListChildType } from "@/types/main";
 import AllAuthorsPage from "./Client";
 import { FcEmptyTrash } from "react-icons/fc";
 import Link from "next/link";
+import { getAuthors } from "@/app/lib/blog/data";
 
-const getAllAuthors = async (id: string): Promise<AuthorListChildType[]> => {
-  try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/author", { cache: "no-cache" });
-    const data: Promise<{ data: AuthorListChildType[]; message: string }> = await res.json();
-    if (!res.ok) {
-      throw new Error((await data).message);
-    }
-    return (await data).data;
-  } catch (error) {
-    throw new Error("Failed to fetch authors.");
-  }
-};
-
-const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
-  const author = await getAllAuthors((await params).id);
-  console.log(author);
+const Page = async () => {
+  const author = await getAuthors();
 
   if (author.length === 0) {
     return (

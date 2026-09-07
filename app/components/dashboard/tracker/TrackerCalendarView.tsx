@@ -20,7 +20,7 @@ import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import StatusMenu from "@/app/components/dashboard/tracker/StatusMenu";
-import type { TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { TrackerClosedReason, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
 import {
   buildTrackerEvents,
   EVENT_TYPE_META,
@@ -31,6 +31,7 @@ import {
 interface TrackerCalendarViewProps {
   columns: TrackerColumn[];
   onMove: (cardId: string, to: TrackerColumnId) => void;
+  onClose: (cardId: string, reason: TrackerClosedReason) => void;
   onOpen: (cardId: string) => void;
 }
 
@@ -39,7 +40,7 @@ interface TrackerCalendarViewProps {
  * Highlighted days are derived from `buildTrackerEvents`; clicking one shows
  * its events in the side panel.
  */
-export const TrackerCalendarView: FC<TrackerCalendarViewProps> = ({ columns, onMove, onOpen }) => {
+export const TrackerCalendarView: FC<TrackerCalendarViewProps> = ({ columns, onMove, onOpen, onClose }) => {
   const today = useMemo(() => new Date(), []);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(today));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -177,7 +178,7 @@ export const TrackerCalendarView: FC<TrackerCalendarViewProps> = ({ columns, onM
                 </div>
                 <p className="text-sm font-semibold text-primary leading-snug mb-1.5">{ev.title}</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <StatusMenu value={ev.columnId} onChange={(to) => onMove(ev.cardId, to)} />
+                  <StatusMenu value={ev.columnId} onChange={(to) => onMove(ev.cardId, to)} onClose={(reason) => onClose(ev.cardId, reason)} />
                   <span className="min-w-0 truncate text-[11px] font-medium text-black/55">
                     {EVENT_TYPE_META[ev.type].label}
                     {ev.detail ? ` · ${ev.detail}` : ""}

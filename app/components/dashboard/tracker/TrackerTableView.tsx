@@ -9,7 +9,7 @@ import LogoMini from "@/app/components/svg/LogoMini";
 import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import StatusMenu from "@/app/components/dashboard/tracker/StatusMenu";
 import { STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
-import type { TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { TrackerClosedReason, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
 import { daysAgoLabel, chipMeta, type TableSort, type TableSortKey } from "../../../(pages)/(dashboard)/dashboard/tracker/types";
 
 interface StatusChipBadgeProps {
@@ -64,6 +64,7 @@ interface TrackerTableViewProps {
   columns: TrackerColumn[];
   onMove: (cardId: string, to: TrackerColumnId) => void;
   onOpen: (cardId: string) => void;
+  onClose: (cardId: string, reason: TrackerClosedReason) => void;
 }
 
 /**
@@ -71,7 +72,7 @@ interface TrackerTableViewProps {
  * Reads straight off the live `columns` state so it always matches whatever
  * the board currently shows (including cards dragged between columns).
  */
-export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onMove, onOpen }) => {
+export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onMove, onOpen, onClose }) => {
   const [sort, setSort] = useState<TableSort | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
@@ -139,7 +140,7 @@ export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onMove, o
                   <td className="px-4 py-3">
                     {/* The pill is the control — StatusMenu stops propagation
                       itself so the row click never fires underneath it. */}
-                    <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} />
+                    <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} onClose={(reason) => onClose(card.id, reason)} />
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "—"}</span>

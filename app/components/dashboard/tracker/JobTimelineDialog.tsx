@@ -12,7 +12,10 @@ import LogoMini from "@/app/components/svg/LogoMini";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { usePod } from "@/app/components/dashboard/pod/PodProvider";
 import { useWin } from "@/app/components/dashboard/win/WinProvider";
-import type { TrackerCard, TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { TrackerCard, TrackerClosedReason, TrackerColumnId } from "@/app/lib/dashboard/types";
+import { GHOST_AFTER_DAYS } from "@/app/components/dashboard/tracker/tracker-meta";
+import { followUpFor } from "@/app/lib/dashboard/follow-up";
+import FollowUpNudge from "@/app/components/dashboard/followup/FollowUpNudge";
 import StatusMenu from "./StatusMenu";
 import { COLUMN_LABELS, STATUS_ORDER } from "./tracker-meta";
 
@@ -31,6 +34,8 @@ export interface JobTimelineDialogProps {
   columnId: TrackerColumnId | null;
   onOpenChange: (open: boolean) => void;
   onMove: (cardId: string, to: TrackerColumnId) => void;
+  /** Ends the application. Closing the card also closes this dialog. */
+  onClose: (cardId: string, reason: TrackerClosedReason) => void;
 }
 
 interface TimelineStep {
@@ -194,7 +199,7 @@ const SharePodRow: FC<{ card: TrackerCard; columnId: TrackerColumnId }> = ({ car
   );
 };
 
-const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenChange, onMove }) => {
+const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenChange, onMove, onClose }) => {
   const open = !!card && !!columnId;
   const steps = open ? buildTimeline(card, columnId) : [];
 
@@ -219,7 +224,7 @@ const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenC
                       {card.company}
                     </DialogPrimitive.Description>
                     <div className="mt-2">
-                      <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} />
+                      <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} onClose={(reason) => onClose(card.id, reason)} />
                     </div>
                   </div>
                 </div>
@@ -275,6 +280,20 @@ const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenC
               </div>
 
               {/* Feels like progress? Put it on the pod's board. */}
+              {/* Owed a follow-up? Say so here, where the user already is,
+                  with the message written. Derived — it disappears the moment
+                  the card is touched. */}
+              {(() => {
+                const due = followUpFor(card, columnId, GHOST_AFTER_DAYS);
+                if (!due) return null;
+                return (
+                  <div className="border-t border-black/10 px-6 py-4">
+                    <p className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55">Owed a follow-up</p>
+                    <FollowUpNudge due={due} />
+                  </div>
+                );
+              })()}
+
               <SharePodRow key={`share-${card.id}-${columnId}`} card={card} columnId={columnId} />
 
               {/* One suggested action, matched to the stage. */}

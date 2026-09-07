@@ -10,6 +10,7 @@ import type {
   SeparatorMode,
 } from "@/app/lib/dashboard/resume/design-types";
 import { ICON_SETS, type IconSet } from "@/app/lib/dashboard/resume/icon-sets";
+import { detectPlatform } from "@/app/lib/dashboard/resume/link-platforms";
 
 export interface HeaderBlockProps {
   content: ResumeContent;
@@ -124,16 +125,26 @@ const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
 
         {design.links.show && content.links.length > 0 && (
           <div className={cn("mt-[4pt] flex flex-wrap gap-x-[10pt] gap-y-[2pt] text-[length:var(--r-fs-small)]", alignCenter && "justify-center")}>
-            {content.links.map((link) => (
-              <span key={link.url} className="inline-flex items-center gap-[4pt] text-[color:var(--r-text-muted)]">
-                {(design.links.style === "icon" || design.links.style === "both") && (
-                  <iconSet.link aria-hidden className="h-[1em] w-[1em] flex-none text-[color:var(--r-c-link-icon)]" />
-                )}
-                {(design.links.style === "text" || design.links.style === "both") && (
-                  <span className={cn(design.links.underline && "underline")}>{link.label}</span>
-                )}
-              </span>
-            ))}
+            {/* Each link wears its platform's brand mark (LinkedIn, GitHub,
+                Dribbble…) rather than the icon set's generic chain — the
+                registry resolves it from the URL, or the label until one
+                is typed, and falls back to a globe for a personal site. */}
+            {content.links.map((link, i) => {
+              const platform = detectPlatform(link.url, link.label);
+              return (
+                <span
+                  key={`${i}-${link.url}`}
+                  data-platform={platform.id}
+                  className="inline-flex items-center gap-[4pt] text-[color:var(--r-text-muted)]">
+                  {(design.links.style === "icon" || design.links.style === "both") && (
+                    <platform.Icon aria-hidden className="h-[1em] w-[1em] flex-none text-[color:var(--r-c-link-icon)]" />
+                  )}
+                  {(design.links.style === "text" || design.links.style === "both") && (
+                    <span className={cn(design.links.underline && "underline")}>{link.label}</span>
+                  )}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>

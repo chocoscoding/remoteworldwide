@@ -1,4 +1,5 @@
-import { Author, Blog, Company, Job } from "@prisma/client";
+import { Company, Job } from "@prisma/client";
+import type { Author, Blog } from "@/app/lib/blog/types";
 
 export interface FilterData {
   category: FilterType[];
@@ -117,7 +118,7 @@ export type AuthorListChildType = {
 
 export type BlogSummaryForAuthorList = {
   title: string;
-  createdAt: string;
+  createdAt: Date | string;
   slug: string;
   description: string;
 };

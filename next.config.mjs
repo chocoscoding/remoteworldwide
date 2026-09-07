@@ -21,6 +21,19 @@ const nextConfig = {
         source: "/api/users/:path*",
         destination: `${backend}/api/users/:path*`,
       },
+      // The blog, its conversions and settings live on the backend.
+      {
+        source: "/api/blog/:path*",
+        destination: `${backend}/api/blog/:path*`,
+      },
+      {
+        source: "/api/lead-magnets/claim",
+        destination: `${backend}/api/blog/claims`,
+      },
+      {
+        source: "/api/subscribers/export",
+        destination: `${backend}/api/blog/admin/subscribers.csv`,
+      },
     ];
   },
   images: {

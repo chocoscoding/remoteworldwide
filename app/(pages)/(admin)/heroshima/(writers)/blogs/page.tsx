@@ -1,20 +1,9 @@
 import { BlogListWithAuthor } from "@/types/main";
 import React from "react";
+import { backend } from "@/app/lib/backend";
 import AllBlogsClient from "./Client";
 
-const getInitialBlogs = async (): Promise<{ data: BlogListWithAuthor[]; count: number }> => {
-  try {
-    const response = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/blog?page=1", { cache: "no-cache" });
-    if (!response.ok) {
-      throw new Error("Failed to fetch companies");
-    }
-    const companies = await response.json();
-    return companies;
-  } catch (error) {
-    console.error("Error fetching companies:", error);
-    return { data: [], count: 0 };
-  }
-};
+const getInitialBlogs = () => backend<{ data: BlogListWithAuthor[]; count: number }>("/blog/admin/posts?page=1", { session: true });
 const Page = async () => {
   const BLOGS = await getInitialBlogs();
   return <AllBlogsClient initialData={BLOGS.data} initialCount={BLOGS.count} />;

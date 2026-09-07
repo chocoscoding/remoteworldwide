@@ -1,30 +1,10 @@
 "use server";
 
 import { prisma } from "@/prisma";
-import { Author, Job } from "@prisma/client";
-import { hexoid } from "hexoid";
+import { Job } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-
-function createSlugStatic(input: string) {
-  return input
-    .replace(/[*+,~|%.()'"!:@]/g, "") // Remove specified special characters
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-");
-}
-function createSlug(input: string) {
-  const timestamp = Date.now();
-  return (
-    input
-      .replace(/[*+|,%~.()'"!:@]/g, "") // Remove specified special characters
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "-") +
-    "-" +
-    `${hexoid(36)()}` +
-    `${timestamp}`
-  );
-}
+import { backend, BackendError, backendOrNull, type BackendInit } from "@/app/lib/backend";
+import type { Author, Blog, BlogStatus } from "@/app/lib/blog/types";
 
 export const deleteOneJob = async (id: string) => {
   try {
@@ -217,7 +197,12 @@ export const getAdminDashboardInfo = async () => {
       }),
       prisma.job.count(),
       prisma.company.count(),
-      prisma.blog.count(),
+      admin<{ posts: number }>("/stats")
+        .then((stats) => stats.posts)
+        .catch((error) => {
+          if (error instanceof BackendError) return 0;
+          throw error;
+        }),
     ]);
 
     return { latestJob, jobsCount, companiesCount, blogsCount };
@@ -226,206 +211,96 @@ export const getAdminDashboardInfo = async () => {
   }
 };
 
-//create an author
+const admin = <T,>(path: string, init: BackendInit = {}) => backend<T>(`/blog/admin${path}`, { ...init, session: true });
 
-export const createAuthor = async (body: Omit<Author, "id" | "createdAt" | "updatedAt" | "slug">) => {
+const surface = (error: unknown): never => {
+  throw new Error(error instanceof BackendError ? error.message : "something went wrong");
+};
+
+export type AuthorInput = Omit<Author, "id" | "createdAt" | "slug">;
+
+export const createAuthor = async (body: AuthorInput) => {
   try {
-    const requiredValues = { name: body.name, about: body.about, profileImage: body.profileImage };
-    const missingValue = Object.entries(requiredValues).filter(([key, value]) => !value);
-
-    const errorMessage = missingValue.length ? `Required values: ${missingValue.map(([key]) => key).join(", ")}` : null;
-    if (errorMessage) {
-      throw new Error(errorMessage);
-    }
-    const author = prisma.author.create({
-      data: { ...body, slug: createSlugStatic(body.name) },
-    });
-
-    return { data: author };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+    return { data: await admin<Author>("/authors", { method: "POST", body }) };
+  } catch (error) {
+    return surface(error);
   }
 };
 
-//update an author
-
-export const updateAuthor = async (id: string, body: Omit<Author, "id" | "createdAt" | "updatedAt" | "slug">) => {
+export const updateAuthor = async (id: string, body: AuthorInput) => {
   try {
-    const requiredValues = { id };
-    const missingValue = Object.entries(requiredValues).filter(([key, value]) => !value);
-
-    const errorMessage = missingValue.length ? `Required values: ${missingValue.map(([key]) => key).join(", ")}` : null;
-    if (errorMessage) {
-      throw new Error(errorMessage);
-    }
-    const author = prisma.author.update({
-      where: {
-        id,
-      },
-      data: { ...body, slug: createSlugStatic(body.name) },
-    });
-
-    return { data: author };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+    return { data: await admin<Author>(`/authors/${id}`, { method: "PUT", body }) };
+  } catch (error) {
+    return surface(error);
   }
 };
 
-//delete an author
 export const deleteAuthor = async (id: string) => {
   try {
-    await prisma.author.delete({
-      where: {
-        id,
-      },
-    });
+    await admin(`/authors/${id}`, { method: "DELETE" });
     return { status: "deleted author successfully" };
-  } catch (error: any) {
-    if (error.message.includes("Record to delete does not exist")) {
-      throw new Error("Record to delete does not exist");
-    }
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return surface(error);
   }
 };
 
-export const findAuthorBySlug = async (slug: string) => {
-  try {
-    const author = await prisma.author.findUnique({
-      where: {
-        slug,
-      },
-      select: {
-        id: true,
-        website: true,
-        twitter: true,
-        linkedin: true,
-        instagram: true,
-        name: true,
-        about: true,
-        profileImage: true,
-      },
-    });
-    return { data: author };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
-  }
-};
+export const findAuthorBySlug = async (slug: string) => ({ data: await backendOrNull<Author>(`/blog/admin/authors/${encodeURIComponent(slug)}`, { session: true }) });
 
-export const allAuthorsSelect = async () => {
-  try {
-    const authors = await prisma.author.findMany({
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-    return authors.map((author) => ({
-      label: author.name,
-      value: author.id,
-    }));
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
-  }
-};
+export const allAuthorsSelect = async () => admin<{ label: string; value: string }[]>("/authors/options");
 
-// Create Blog
-export const createBlog = async (data: {
+export interface BlogConversionFields {
+  category?: string;
+  status?: BlogStatus;
+  featuredRank?: number | null;
+  leadMagnetId?: string | null;
+  ctaKey?: string | null;
+  autoCtas?: boolean;
+  inlineOffers?: string[];
+}
+
+export interface BlogInput extends BlogConversionFields {
   title: string;
   content: string;
   description: string;
   authorId: string;
   tags: string[];
   coverImage: string;
-}) => {
+  slug?: string;
+}
+
+export const createBlog = async (data: BlogInput) => {
   try {
-    const slug = createSlug(data.title);
-    const blog = await prisma.blog.create({
-      data: { ...data, slug },
-    });
+    const blog = await admin<Blog>("/posts", { method: "POST", body: data });
+    revalidatePath("/blogs");
     return { data: blog };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return surface(error);
   }
 };
 
-// Get Blog by Slug
-export const getBlogBySlug = async (slug: string) => {
+export const getBlogBySlug = async (slug: string) => ({ data: await backendOrNull<Blog>(`/blog/admin/posts/${encodeURIComponent(slug)}`, { session: true }) });
+
+export const editBlog = async (id: string, data: Partial<BlogInput>) => {
   try {
-    const blog = await prisma.blog.findUnique({
-      where: { slug },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        description: true,
-        tags: true,
-        coverImage: true,
-        authorId: true,
-        slug: true,
-        author: {
-          select: {
-            name: true,
-            profileImage: true,
-            slug: true,
-            about: true,
-            instagram: true,
-            twitter: true,
-            linkedin: true,
-            website: true,
-          },
-        },
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const blog = await admin<Blog>(`/posts/${id}`, { method: "PUT", body: data });
+    revalidatePath("/blogs");
+    for (const slug of [blog.slug, ...blog.previousSlugs]) revalidatePath("/blogs/" + slug);
     return { data: blog };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return surface(error);
   }
 };
 
-// Edit Blog
-export const editBlog = async (
-  id: string,
-  data: {
-    title?: string;
-    content?: string;
-    description?: string;
-    tags?: string[];
-    authorId?: string;
-    coverImage?: string;
-  },
-) => {
-  try {
-    const blog = await prisma.blog.update({
-      where: { id },
-      data,
-    });
-    return { data: blog };
-  } catch (error: any) {
-    if (error.message.includes("Record to update does not exist")) {
-      throw new Error("Record to update does not exist");
-    }
-    throw new Error(error.message ?? "something went wrong");
-  }
-};
-
-// Delete Blog
 export const deleteBlog = async (id: string) => {
   try {
-    await prisma.blog.delete({
-      where: { id },
-    });
+    await admin(`/posts/${id}`, { method: "DELETE" });
+    revalidatePath("/blogs");
     return { status: "deleted blog successfully" };
-  } catch (error: any) {
-    if (error.message.includes("Record to delete does not exist")) {
-      throw new Error("Record to delete does not exist");
-    }
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return surface(error);
   }
 };
 
-//get all bookmarks
 export const getAllBookmarksForUser = async (userId: string, page: number) => {
   try {
     const bookmarksPromise = prisma.bookmark.findMany({

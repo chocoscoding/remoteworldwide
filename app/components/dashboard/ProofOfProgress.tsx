@@ -68,7 +68,15 @@ const ProofOfProgress: FC = () => {
         ))}
       </div>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+        {/* These five numbers say what came back; the funnel says where it
+            stopped. One is the summary, the other is the diagnosis. */}
+        <Link
+          href="/dashboard/insights"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-black/55 transition-colors hover:text-primary">
+          See the full funnel
+          <ArrowRight className="h-3.5 w-3.5 flex-none" />
+        </Link>
         <Link
           href="/dashboard/coach"
           className="inline-flex items-center gap-2 rounded-md border-[1.5px] border-[#222325] bg-white px-3.5 py-2 text-sm font-semibold text-primary shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">

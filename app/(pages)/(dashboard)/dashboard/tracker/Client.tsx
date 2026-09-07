@@ -1,5 +1,13 @@
 "use client";
 
+// The tracker screen. Board/table/calendar views over the shared board.
+//
+// The board itself lives in `TrackerProvider` (mounted by DashboardShell), not
+// here — Home needs the same cards to work out which applications are owed a
+// follow-up, and two copies would disagree the moment anything was closed.
+// What stays local is genuinely screen state: which view is showing, which
+// dialog is open, and the drag gesture.
+
 import { FC, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Calendar as CalendarIcon, Kanban as KanbanIcon, Plus, Table as TableIcon } from "lucide-react";
@@ -16,19 +24,18 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
-import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { useWin } from "@/app/components/dashboard/win/WinProvider";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
-import { TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
-import type { TrackerCard as TrackerCardData, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { TrackerCard as TrackerCardData } from "@/app/lib/dashboard/types";
 import JobTimelineDialog from "@/app/components/dashboard/tracker/JobTimelineDialog";
-import { COLUMN_LABELS } from "@/app/components/dashboard/tracker/tracker-meta";
+import ClosedDrawer from "@/app/components/dashboard/tracker/ClosedDrawer";
+import { useTracker } from "@/app/components/dashboard/tracker/TrackerProvider";
+import { CLOSED_META, CLOSED_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
 
 // Component imports
 import { TrackerCardItem } from "../../../../components/dashboard/tracker/TrackerCard";
@@ -53,51 +60,17 @@ const VIEWS: ViewConfig[] = [
 
 const TrackerClient: FC = () => {
   const { collapsed: sidebarCollapsed } = useSidebarCollapse();
-  const [view, setView] = useState<TrackerView>("board");
-  const [columns, setColumns] = useState<TrackerColumn[]>(() => TRACKER_COLUMNS.map((col) => ({ ...col, cards: [...col.cards] })));
-  const [activeCard, setActiveCard] = useState<TrackerCardData | null>(null);
+  const { columns, closed, findColumnIdForCard, moveCard, closeCard, reopenCard, addCard, commitDrop } = useTracker();
 
-  // Applications logged anywhere in the app land here. Columns stay in local
-  // state so drag-and-drop keeps working, and newly logged applications are
-  // folded in during render using React's "adjust state when input changes"
-  // pattern — an effect would paint the stale board first, then correct it.
-  const { applications, recordAction, awardStrongEvent } = useActivity();
-  const { openWinLog } = useWin();
-  const [mergedIds, setMergedIds] = useState<string[]>([]);
-  const pending = applications.filter((a) => !mergedIds.includes(a.id));
-  if (pending.length > 0) {
-    setMergedIds(applications.map((a) => a.id));
-    setColumns((prev) =>
-      prev.map((col) =>
-        col.id === "applied"
-          ? {
-              ...col,
-              // `count` is the real total and is independent of `cards.length`,
-              // which is only a representative sample — so both have to move.
-              count: col.count + pending.length,
-              cards: [
-                ...pending.map((a) => ({
-                  id: a.id,
-                  title: a.role,
-                  company: a.company,
-                  daysAgo: 0,
-                  statusChip: "Follow up",
-                  rww: a.source === "internal",
-                })),
-                ...col.cards,
-              ],
-            }
-          : col,
-      ),
-    );
-  }
+  const [view, setView] = useState<TrackerView>("board");
+  const [activeCard, setActiveCard] = useState<TrackerCardData | null>(null);
+  const [closedOpen, setClosedOpen] = useState(false);
 
   // Timeline dialog target — an id, resolved against live columns each render
   // so a status change made inside the dialog is reflected immediately.
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
-  const addSeq = useRef(0);
   // A completed drag fires a click on the source card as the pointer lifts —
   // this latch swallows exactly that one click so a drop never opens the
   // timeline dialog. Plain clicks (< the 6px activation distance) never start
@@ -144,10 +117,6 @@ const TrackerClient: FC = () => {
     return inner.length > 0 ? inner : hits;
   };
 
-  function findColumnIdForCard(cardId: string, cols: TrackerColumn[]): TrackerColumnId | null {
-    return cols.find((c) => c.cards.some((card) => card.id === cardId))?.id ?? null;
-  }
-
   const openEntry = (() => {
     if (!openCardId) return null;
     for (const col of columns) {
@@ -165,66 +134,20 @@ const TrackerClient: FC = () => {
     setOpenCardId(cardId);
   }
 
-  /** The one mover — drag-drop, the status pills and the timeline dialog all
-   *  land here, so every view agrees. Both `count` and `cards` shift, per the
-   *  count-is-the-real-total contract. */
-  /** Landing in Offer is the win-log’s moment — offered, never forced. */
-  function offerWinToast(company: string) {
-    toast.success(`${company} moved to Offer 🎉`, {
-      description: "That sounds like a job. Log it and your pod sees.",
-      action: { label: "I got the job", onClick: openWinLog },
-    });
+  /** Closing a card also dismisses the dialog that was showing it. */
+  function handleClose(cardId: string, reason: Parameters<typeof closeCard>[1]) {
+    closeCard(cardId, reason);
+    setOpenCardId(null);
   }
 
-  function moveCard(cardId: string, to: TrackerColumnId) {
-    const from = findColumnIdForCard(cardId, columns);
-    if (!from || from === to) return;
-    const card = columns.find((c) => c.id === from)!.cards.find((c) => c.id === cardId);
-    if (!card) return;
-
-    setColumns((prev) =>
-      prev.map((c) => {
-        if (c.id === from) return { ...c, cards: c.cards.filter((x) => x.id !== cardId), count: Math.max(0, c.count - 1) };
-        if (c.id === to) return { ...c, cards: [card, ...c.cards], count: c.count + 1 };
-        return c;
-      }),
-    );
-    // Keeping the board honest is a qualifying action — the "status-change"
-    // kind existed for exactly this and had no caller until now.
-    recordAction("status-change", cardId, `${card.company} → ${COLUMN_LABELS[to]}`);
-    // Reaching a real stage pays a rare-event credit drop, once per
-    // application forever — dragging back and forth can't farm it.
-    if (to === "interviewing") awardStrongEvent("reached-interview", cardId, `Reached interview — ${card.company}`);
-    if (to === "offer") {
-      awardStrongEvent("reached-offer", cardId, `Offer reached — ${card.company}`);
-      offerWinToast(card.company);
-    }
-  }
-
-  /** "Add job" — dedupe against the board; new jobs land in Saved. */
-  function addJob(job: JobOption) {
+  function handleAddJob(job: JobOption) {
     setAddOpen(false);
-    const existing = columns
-      .flatMap((c) => c.cards)
-      .find(
-        (c) =>
-          c.company.trim().toLowerCase() === job.company.trim().toLowerCase() &&
-          c.title.trim().toLowerCase() === job.role.trim().toLowerCase(),
-      );
-    if (existing) {
+    const result = addCard(job);
+    if (result.status === "duplicate") {
       toast("Already on your board", { description: `${job.company} — ${job.role}` });
-      setOpenCardId(existing.id);
+      setOpenCardId(result.card.id);
       return;
     }
-
-    const card: TrackerCardData = {
-      id: `trk-added-${++addSeq.current}`,
-      title: job.role,
-      company: job.company,
-      daysAgo: 0,
-      rww: job.source === "platform",
-    };
-    setColumns((prev) => prev.map((c) => (c.id === "saved" ? { ...c, cards: [card, ...c.cards], count: c.count + 1 } : c)));
     toast.success("Added to Saved", { description: `${job.company} — ${job.role}` });
   }
 
@@ -259,65 +182,7 @@ const TrackerClient: FC = () => {
     const { active, over } = event;
     setActiveCard(null);
     if (!over) return;
-    const activeId = String(active.id);
-    const overId = String(over.id);
-    if (activeId === overId) return;
-
-    // Record the status change outside the updater (state updaters must stay
-    // pure). Computed against the pre-drop state, which the drop hasn't
-    // changed yet — commits happen only here, on drop.
-    const preSource = findColumnIdForCard(activeId, columns);
-    const preTarget = columns.some((c) => c.id === overId) ? (overId as TrackerColumnId) : findColumnIdForCard(overId, columns);
-    if (preSource && preTarget && preSource !== preTarget) {
-      const moved = columns.find((c) => c.id === preSource)?.cards.find((c) => c.id === activeId);
-      if (moved) {
-        recordAction("status-change", activeId, `${moved.company} → ${COLUMN_LABELS[preTarget]}`);
-        if (preTarget === "interviewing") awardStrongEvent("reached-interview", activeId, `Reached interview — ${moved.company}`);
-        if (preTarget === "offer") {
-          awardStrongEvent("reached-offer", activeId, `Offer reached — ${moved.company}`);
-          offerWinToast(moved.company);
-        }
-      }
-    }
-
-    setColumns((prev) => {
-      const sourceColId = findColumnIdForCard(activeId, prev);
-      if (!sourceColId) return prev;
-
-      // `overId` is either a column's own droppable id (dropped on empty
-      // space) or another card's id (dropped onto a specific position).
-      const isOverColumn = prev.some((c) => c.id === overId);
-      const targetColId = isOverColumn ? (overId as TrackerColumnId) : findColumnIdForCard(overId, prev);
-      if (!targetColId) return prev;
-
-      // Same column — pure reorder.
-      if (sourceColId === targetColId) {
-        const col = prev.find((c) => c.id === sourceColId)!;
-        const oldIndex = col.cards.findIndex((c) => c.id === activeId);
-        const newIndex = isOverColumn ? col.cards.length - 1 : col.cards.findIndex((c) => c.id === overId);
-        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev;
-        return prev.map((c) => (c.id === sourceColId ? { ...c, cards: arrayMove(c.cards, oldIndex, newIndex) } : c));
-      }
-
-      // Different column — move the card and shift both counts.
-      const sourceCol = prev.find((c) => c.id === sourceColId)!;
-      const movedCard = sourceCol.cards.find((c) => c.id === activeId);
-      if (!movedCard) return prev;
-
-      return prev.map((c) => {
-        if (c.id === sourceColId) {
-          return { ...c, cards: c.cards.filter((card) => card.id !== activeId), count: Math.max(0, c.count - 1) };
-        }
-        if (c.id === targetColId) {
-          const overIndex = isOverColumn ? c.cards.length : c.cards.findIndex((card) => card.id === overId);
-          const insertAt = overIndex === -1 ? c.cards.length : overIndex;
-          const newCards = [...c.cards];
-          newCards.splice(insertAt, 0, movedCard);
-          return { ...c, cards: newCards, count: c.count + 1 };
-        }
-        return c;
-      });
-    });
+    commitDrop(String(active.id), String(over.id));
   }
 
   return (
@@ -397,23 +262,48 @@ const TrackerClient: FC = () => {
                   bar is the system's slim black one. */}
               <div className="flex flex-1 min-h-0 gap-6 items-stretch overflow-x-auto overflow-y-hidden pb-2 scrollbar-neo">
                 {columns.map((col) => (
-                  <KanbanColumn key={col.id} column={col} onOpen={openTimeline} />
+                  <KanbanColumn key={col.id} column={col} onOpen={openTimeline} onGhost={(id) => handleClose(id, "ghosted")} />
                 ))}
               </div>
 
               <DragOverlay>
                 {activeCard ? (
                   <div className="w-[240px] rotate-2 cursor-grabbing">
-                    <TrackerCardItem card={activeCard} columnId={findColumnIdForCard(activeCard.id, columns) ?? undefined} />
+                    <TrackerCardItem card={activeCard} columnId={findColumnIdForCard(activeCard.id) ?? undefined} />
                   </div>
                 ) : null}
               </DragOverlay>
             </DndContext>
           </>
         ) : view === "table" ? (
-          <TrackerTableView columns={columns} onMove={moveCard} onOpen={openTimeline} />
+          <TrackerTableView columns={columns} onMove={moveCard} onOpen={openTimeline} onClose={handleClose} />
         ) : (
-          <TrackerCalendarView columns={columns} onMove={moveCard} onOpen={openTimeline} />
+          <TrackerCalendarView columns={columns} onMove={moveCard} onOpen={openTimeline} onClose={handleClose} />
+        )}
+
+        {/* The closed strip. Quiet by design and never a column — it reports
+            the outcomes without making the user look at them all day. */}
+        {closed.length > 0 && (
+          <button
+            type="button"
+            data-closed-strip=""
+            onClick={() => setClosedOpen(true)}
+            className="mt-4 flex flex-none w-full cursor-pointer items-center gap-3 rounded-sm border border-black/15 bg-[#fbfbf7] px-4 py-2.5 text-left transition-colors hover:border-[#222325]">
+            <span className="text-xs font-bold text-black/60">{closed.length} closed</span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {CLOSED_ORDER.map((reason) => {
+                const n = closed.filter((c) => c.closedReason === reason).length;
+                if (n === 0) return null;
+                return (
+                  <span key={reason} className="inline-flex items-center gap-1 text-[11px] font-medium text-black/45">
+                    <span className={cn("h-1.5 w-1.5 flex-none rounded-full", CLOSED_META[reason].dot)} aria-hidden />
+                    {n} {CLOSED_META[reason].label.toLowerCase()}
+                  </span>
+                );
+              })}
+            </span>
+            <span className="ml-auto flex-none text-[11px] font-bold text-black/45">View</span>
+          </button>
         )}
       </main>
 
@@ -422,16 +312,18 @@ const TrackerClient: FC = () => {
         columnId={openEntry?.columnId ?? null}
         onOpenChange={(v) => !v && setOpenCardId(null)}
         onMove={moveCard}
+        onClose={handleClose}
       />
+      <ClosedDrawer open={closedOpen} onOpenChange={setClosedOpen} cards={closed} onReopen={reopenCard} />
       <JobPickerDialog
         open={addOpen}
         onOpenChange={setAddOpen}
         jobs={jobs}
-        onPick={addJob}
+        onPick={handleAddJob}
         onCreate={(input) => {
           const created = createPastedJob(input);
           setJobs((prev) => [created, ...prev]);
-          addJob(created);
+          handleAddJob(created);
         }}
       />
     </div>
