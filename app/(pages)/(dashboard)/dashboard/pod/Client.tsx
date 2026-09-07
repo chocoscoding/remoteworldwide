@@ -1,7 +1,8 @@
 "use client";
 
-import { FC, useState } from "react";
+import { FC, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowUpRight,
@@ -17,6 +18,7 @@ import {
   Settings2,
   Shuffle,
   Trophy,
+  UserPlus,
   UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,8 @@ import SuggestGoalDialog, { type SuggestedGoalInput } from "@/app/components/das
 import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
 import ManageGoalsDialog from "@/app/components/dashboard/pod/ManageGoalsDialog";
+import InvitePodDialog from "@/app/components/dashboard/pod/InvitePodDialog";
+import JoinPodDialog from "@/app/components/dashboard/pod/JoinPodDialog";
 import { usePod } from "@/app/components/dashboard/pod/PodProvider";
 import { useWin } from "@/app/components/dashboard/win/WinProvider";
 import { GOAL_KIND_META } from "@/app/components/dashboard/pod/pod-goal-meta";
@@ -36,6 +40,7 @@ import { useActivity } from "@/app/components/dashboard/activity/ActivityProvide
 import { tierFor } from "@/app/lib/dashboard/streak";
 import { NUDGE_LIMIT_PER_MEMBER_PER_DAY, podDayLogged, podQuorumCount } from "@/app/lib/dashboard/activity";
 import { BOARD } from "@/app/lib/dashboard/mock-data";
+import { JOIN_PARAM, JOIN_REFUSAL } from "@/app/lib/dashboard/pod-invite";
 import { photoOf } from "@/app/lib/dashboard/people-photos";
 
 // ---------------------------------------------------------------------------
@@ -74,11 +79,16 @@ function initials(name: string): string {
 }
 
 const PodClient: FC = () => {
-  const { moving, toggleFire, shareToPod, goals, suggestGoal } = usePod();
+  const { moving, toggleFire, shareToPod, goals, suggestGoal, inPod, capacity, memberCount, seatsLeft, joinByMatching, joinWithCode, leavePod } =
+    usePod();
   const { openWinLog } = useWin();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
 
-  const [podOn, setPodOn] = useState(true);
   const [muted, setMuted] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -124,6 +134,31 @@ const PodClient: FC = () => {
   const activeGoals = goals.filter((g) => g.status === "active");
   const votingCount = goals.filter((g) => g.status !== "active").length;
 
+  /**
+   * An invite link lands here as `?join=<code>`. It is consumed once and the
+   * parameter is stripped, so a refresh doesn't re-run the join and a link
+   * left open in a tab can't fire again later. A code that cannot be used —
+   * you already have a pod, the pod is full — says why in a toast that
+   * offers the dialog, since the link itself is nothing left to correct.
+   */
+  const consumed = useRef(false);
+  const joinParam = params.get(JOIN_PARAM);
+  useEffect(() => {
+    if (!joinParam || consumed.current) return;
+    consumed.current = true;
+    router.replace(pathname);
+
+    const result = joinWithCode(joinParam);
+    if (result === "joined") {
+      toast.success("You're in", { description: "Say hello on What's moving — a pod notices a new name." });
+      return;
+    }
+    toast.error("That invite didn't work", {
+      description: JOIN_REFUSAL[result],
+      action: { label: "Try another", onClick: () => setJoinOpen(true) },
+    });
+  }, [joinParam, joinWithCode, pathname, router]);
+
   const dailyGoal = goals.find((g) => g.id === DAILY_GOAL_ID);
   const podGoalTarget = dailyGoal?.target ?? 0;
   const podGoalCurrent = dailyGoal?.current ?? 0;
@@ -137,22 +172,35 @@ const PodClient: FC = () => {
           <h1 className="whitespace-nowrap text-[17px] font-bold text-primary">Your pod</h1>
           <span className="truncate text-sm text-black/45">Resets Sunday · Week 3</span>
         </div>
-        <div className="flex flex-none items-center gap-3">
-          <StickerButton variant="outline" size="md" onClick={() => setMuted((v) => !v)}>
-            {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-            {muted ? "Muted" : "Mute"}
-          </StickerButton>
-          <StickerButton variant="primary" size="md" onClick={() => setShareOpen(true)}>
-            <Trophy className="h-4 w-4" />
-            Share a win
-          </StickerButton>
-        </div>
+        {/* Every action here acts on a pod, so out of one the bar is empty
+            rather than offering things that would have nowhere to land. */}
+        {inPod && (
+          <div className="flex flex-none items-center gap-3">
+            <StickerButton
+              variant="outline"
+              size="md"
+              onClick={() => setInviteOpen(true)}
+              disabled={seatsLeft === 0}
+              title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}>
+              <UserPlus className="h-4 w-4" />
+              Invite
+            </StickerButton>
+            <StickerButton variant="outline" size="md" onClick={() => setMuted((v) => !v)}>
+              {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+              {muted ? "Muted" : "Mute"}
+            </StickerButton>
+            <StickerButton variant="primary" size="md" onClick={() => setShareOpen(true)}>
+              <Trophy className="h-4 w-4" />
+              Share a win
+            </StickerButton>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-[1180px] px-8 py-7 pb-14">
-        {!podOn ? (
+        {!inPod ? (
           // -----------------------------------------------------------------
-          // Solo mode
+          // Solo mode — two ways back in: ours, or someone else's invite.
           // -----------------------------------------------------------------
           <DashCard className="mx-auto mt-16 max-w-md p-10 text-center">
             <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#f0f0ea] text-black/40">
@@ -160,12 +208,21 @@ const PodClient: FC = () => {
             </div>
             <p className="text-lg font-bold text-primary">You&apos;re in solo mode</p>
             <p className="mt-2 text-sm leading-relaxed text-black/50">
-              Job seekers in a pod apply 2.4× more consistently. Get matched with 6 other Product Designers at your level, in
-              your timezone, going through the same thing right now.
+              Pods apply 2.4× more consistently. We&apos;ll match you with up to {capacity - 1} others at your level, in your
+              timezone.
             </p>
-            <StickerButton variant="primary" size="lg" className="mt-6" onClick={() => setPodOn(true)}>
-              Join a pod
+            <StickerButton variant="primary" size="lg" className="mt-6" onClick={joinByMatching}>
+              Match me with a pod
             </StickerButton>
+            <p className="mt-4 text-xs text-black/50">
+              Got an invite from someone?{" "}
+              <button
+                type="button"
+                onClick={() => setJoinOpen(true)}
+                className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                Join with a code or link
+              </button>
+            </p>
           </DashCard>
         ) : (
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_360px]">
@@ -190,7 +247,20 @@ const PodClient: FC = () => {
                         </div>
                       ))}
                     </div>
-                    <span className="ml-3 text-sm text-white/55">{BOARD.length} people</span>
+                    {/* The count is where "who else is in this" gets asked, so
+                        the invite hangs off it rather than off a settings row. */}
+                    <span className="ml-3 text-sm text-white/55">
+                      {memberCount} of {capacity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setInviteOpen(true)}
+                      disabled={seatsLeft === 0}
+                      title={seatsLeft === 0 ? "This pod is full" : `Invite — ${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}
+                      className="ml-3 inline-flex flex-none cursor-pointer items-center gap-1.5 rounded-lg border border-white/25 px-2.5 py-1 text-[11px] font-bold text-white transition-colors hover:border-secondary hover:text-secondary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/25 disabled:hover:text-white">
+                      <UserPlus className="h-3 w-3" />
+                      Invite
+                    </button>
                   </div>
 
                   <p className="mb-5 max-w-md text-2xl font-bold leading-snug">
@@ -486,7 +556,7 @@ const PodClient: FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPodOn(false)}
+                    onClick={leavePod}
                     className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border-[1.5px] border-black/12 px-3.5 py-2.5 text-sm font-semibold text-primary transition-colors hover:border-[#222325] hover:bg-[#f6f6f6]">
                     <span className="inline-flex items-center gap-2">
                       <LogOut className="h-3.5 w-3.5 text-black/45" />
@@ -504,6 +574,8 @@ const PodClient: FC = () => {
       {manageOpen && <ManageGoalsDialog onClose={() => setManageOpen(false)} onSuggest={() => setSuggestOpen(true)} />}
       <SuggestGoalDialog open={suggestOpen} onOpenChange={setSuggestOpen} onSuggest={handleSuggestGoal} />
       <PauseSearchDialog open={pauseOpen} onOpenChange={setPauseOpen} />
+      <InvitePodDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+      <JoinPodDialog open={joinOpen} onOpenChange={setJoinOpen} />
     </div>
   );
 };

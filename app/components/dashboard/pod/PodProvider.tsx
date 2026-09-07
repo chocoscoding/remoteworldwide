@@ -9,6 +9,13 @@
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
 import { toast } from "sonner";
 import { BOARD, FEED, POD_GOALS } from "@/app/lib/dashboard/mock-data";
+import {
+  POD_CAPACITY,
+  extractInviteCode,
+  generateInviteCode,
+  inviteUrl,
+  type JoinResult,
+} from "@/app/lib/dashboard/pod-invite";
 import type { PodGoal, PodGoalKind } from "@/app/lib/dashboard/types";
 import type { WinRecord } from "@/app/lib/dashboard/win";
 
@@ -33,6 +40,26 @@ export interface SuggestedGoal {
 }
 
 interface PodContextValue {
+  /** Whether you are in a pod at all. Leaving drops you to solo. */
+  inPod: boolean;
+  /** Ten. Exposed so every surface quotes the same number. */
+  capacity: number;
+  /** Members counting you when you are in; the seats left follow from it. */
+  memberCount: number;
+  seatsLeft: number;
+  /** This pod's invite code — what you hand out, and what the link carries. */
+  inviteCode: string;
+  /** The full link for this pod, built against the current origin. */
+  invitePath: (origin: string) => string;
+  /** The company's own route back in: matched by role, band and timezone. */
+  joinByMatching: () => void;
+  /**
+   * Joins with a pasted code or invite link. Refuses if you are already in a
+   * pod — an invite moves someone with no pod, never poaches one who has one.
+   */
+  joinWithCode: (input: string) => JoinResult;
+  leavePod: () => void;
+
   moving: PodMovingItem[];
   /** Prepends an update to What's moving as "just now". Everything that
    *  feels share-worthy anywhere in the dashboard funnels through this. */
@@ -58,13 +85,49 @@ const PodCtx = createContext<PodContextValue | null>(null);
 let seq = 0;
 const nextId = () => `pod-shared-${(seq += 1)}`;
 
+/**
+ * A seeded code that always answers "that pod is full" — the capacity rule is
+ * the whole point of the invite, so the state it produces has to be reachable
+ * in the mock rather than only in theory. Spelled from the code alphabet, so
+ * it passes the format check and fails on the rule being demonstrated.
+ */
+export const FULL_POD_CODE = "PACKEDPACKEDPACKEDPACKEDPACKED";
+
 const PodProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const [inPod, setInPod] = useState(true);
+  // Stable for the life of the session: an invite you copied a minute ago must
+  // still work. A real pod carries its code in the record.
+  const [inviteCode] = useState(generateInviteCode);
+
   const [moving, setMoving] = useState<PodMovingItem[]>(() =>
     FEED.map((f) => ({ id: f.id, text: f.text, time: f.time, fires: f.n, firedByMe: false, hot: f.hot }))
   );
   const [goals, setGoals] = useState<PodGoal[]>(POD_GOALS);
 
   const voteMajority = Math.floor(BOARD.length / 2) + 1;
+
+  // BOARD carries you as a row; out of the pod, the pod is everyone else.
+  const memberCount = inPod ? BOARD.length : BOARD.filter((row) => !row.me).length;
+  const seatsLeft = Math.max(0, POD_CAPACITY - memberCount);
+
+  function joinByMatching() {
+    setInPod(true);
+    toast.success("You're in a pod", { description: "Product Designers, 3–5 yrs, GMT±2 — matched on how you're searching." });
+  }
+
+  function joinWithCode(input: string): JoinResult {
+    if (inPod) return "already-in-pod";
+    const code = extractInviteCode(input);
+    if (!code) return "invalid";
+    if (code === FULL_POD_CODE) return "full";
+    setInPod(true);
+    return "joined";
+  }
+
+  function leavePod() {
+    setInPod(false);
+    toast("You left the pod", { description: "Your streak and board are untouched. Rejoin any time." });
+  }
 
   function shareToPod(text: string, opts?: { hot?: boolean }) {
     setMoving((prev) => [{ id: nextId(), text, time: "Just now", fires: 0, firedByMe: false, hot: opts?.hot, mine: true }, ...prev]);
@@ -145,7 +208,26 @@ const PodProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   return (
     <PodCtx.Provider
-      value={{ moving, shareToPod, toggleFire, goals, voteMajority, suggestGoal, suggestRemoval, castVote, recordJobWin }}>
+      value={{
+        inPod,
+        capacity: POD_CAPACITY,
+        memberCount,
+        seatsLeft,
+        inviteCode,
+        invitePath: (origin: string) => inviteUrl(inviteCode, origin),
+        joinByMatching,
+        joinWithCode,
+        leavePod,
+        moving,
+        shareToPod,
+        toggleFire,
+        goals,
+        voteMajority,
+        suggestGoal,
+        suggestRemoval,
+        castVote,
+        recordJobWin,
+      }}>
       {children}
     </PodCtx.Provider>
   );
