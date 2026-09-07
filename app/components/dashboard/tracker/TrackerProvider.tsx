@@ -21,8 +21,8 @@ import { useActivity } from "@/app/components/dashboard/activity/ActivityProvide
 import { useWin } from "@/app/components/dashboard/win/WinProvider";
 import { TRACKER_CLOSED_CARDS, TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
 import type { JobOption } from "@/app/lib/dashboard/job-options";
-import type { TrackerCard, TrackerClosedReason, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
-import { CLOSED_META, COLUMN_LABELS } from "./tracker-meta";
+import type { TrackerCard, TrackerClosedReason, TrackerColumn, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
+import { CLOSED_META, CLOSED_ORDER, COLUMN_LABELS, isClosedStatus } from "./tracker-meta";
 
 /** One card plus where it currently sits — what every cross-screen reader wants. */
 export interface PlacedCard {
@@ -30,14 +30,31 @@ export interface PlacedCard {
   columnId: TrackerColumnId;
 }
 
+/**
+ * A column on the board. The five stages and the four outcomes render through
+ * the same shape, so the board never special-cases half of itself.
+ */
+export interface BoardColumn {
+  id: TrackerStatus;
+  label: string;
+  count: number;
+  cards: TrackerCard[];
+}
+
 export type AddCardResult = { status: "added"; card: TrackerCard } | { status: "duplicate"; card: TrackerCard };
 
 interface TrackerContextValue {
   columns: TrackerColumn[];
   closed: TrackerCard[];
+  /** Stages and outcomes together, in board order. */
+  boardColumns: BoardColumn[];
   /** Every open card with its stage, board order. */
   placed: PlacedCard[];
   findColumnIdForCard: (cardId: string) => TrackerColumnId | null;
+  /** Where a card is now — a stage, an outcome, or null if it is gone. */
+  statusOf: (cardId: string) => TrackerStatus | null;
+  /** The one move: stage to stage, stage to outcome, and back again. */
+  setStatus: (cardId: string, to: TrackerStatus) => void;
   moveCard: (cardId: string, to: TrackerColumnId) => void;
   closeCard: (cardId: string, reason: TrackerClosedReason) => void;
   reopenCard: (cardId: string) => void;
@@ -92,8 +109,22 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const placed: PlacedCard[] = columns.flatMap((col) => col.cards.map((card) => ({ card, columnId: col.id })));
 
+  const boardColumns: BoardColumn[] = [
+    ...columns.map((col) => ({ id: col.id as TrackerStatus, label: col.label, count: col.count, cards: col.cards })),
+    ...CLOSED_ORDER.map((reason) => {
+      const cards = closed.filter((c) => c.closedReason === reason);
+      return { id: reason as TrackerStatus, label: CLOSED_META[reason].label, count: cards.length, cards };
+    }),
+  ];
+
   function findColumnIdForCard(cardId: string): TrackerColumnId | null {
     return columns.find((c) => c.cards.some((card) => card.id === cardId))?.id ?? null;
+  }
+
+  function statusOf(cardId: string): TrackerStatus | null {
+    const open = findColumnIdForCard(cardId);
+    if (open) return open;
+    return closed.find((c) => c.id === cardId)?.closedReason ?? null;
   }
 
   /** Landing in Offer is the win-log's moment — offered, never forced. */
@@ -104,14 +135,20 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }
 
-  /** The rewards a real stage change pays. Shared by the pill and by drops. */
+  /**
+   * The rewards a real stage change pays.
+   *
+   * Only landing an offer keeps the streak alive. Every other move is bookkeeping
+   * the user does for themselves, and a streak that a drag between two columns
+   * could preserve would be measuring tidiness rather than the work.
+   *
+   * The gifts are a separate currency and stay: reaching interview or offer pays
+   * once per application forever, so dragging back and forth can't farm it.
+   */
   function creditStageChange(cardId: string, company: string, to: TrackerColumnId) {
-    // Keeping the board honest is a qualifying action.
-    recordAction("status-change", cardId, `${company} → ${COLUMN_LABELS[to]}`);
-    // Reaching a real stage pays once per application forever — dragging back
-    // and forth can't farm it.
     if (to === "interviewing") awardStrongEvent("reached-interview", cardId, `Reached interview — ${company}`);
     if (to === "offer") {
+      recordAction("status-change", cardId, `${company} → ${COLUMN_LABELS[to]}`);
       awardStrongEvent("reached-offer", cardId, `Offer reached — ${company}`);
       offerWinToast(company);
     }
@@ -161,7 +198,6 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
       { ...card, statusChip: undefined, closedReason: reason, closedDaysAgo: 0, closedFrom: from },
       ...prev,
     ]);
-    recordAction("status-change", cardId, `${card.company} → ${CLOSED_META[reason].label}`);
     toast.success(`${card.company} closed`, {
       description: `Marked ${CLOSED_META[reason].label.toLowerCase()}. Your funnel just got more honest.`,
       // Passes the card by value, not by id: `closed` hasn't committed yet, so
@@ -187,6 +223,32 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const card = closed.find((c) => c.id === cardId);
     if (!card) return;
     restoreCard(card, card.closedFrom ?? "applied");
+  }
+
+  /**
+   * Every status change on the board goes through here, so a drag, a menu pick
+   * and a dialog all take the same four paths: forward through the stages,
+   * out to an outcome, back from one, or from one outcome to another.
+   */
+  function setStatus(cardId: string, to: TrackerStatus) {
+    const from = statusOf(cardId);
+    if (!from || from === to) return;
+
+    if (!isClosedStatus(from)) {
+      if (isClosedStatus(to)) closeCard(cardId, to);
+      else moveCard(cardId, to);
+      return;
+    }
+
+    const card = closed.find((c) => c.id === cardId);
+    if (!card) return;
+    if (isClosedStatus(to)) {
+      // Same card, different verdict — nothing moves, the reason is corrected.
+      setClosed((prev) => prev.map((c) => (c.id === cardId ? { ...c, closedReason: to } : c)));
+      return;
+    }
+    restoreCard(card, to);
+    creditStageChange(cardId, card.company, to);
   }
 
   /** Dedupes against the whole board; new jobs land in Saved. */
@@ -221,9 +283,24 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
   function commitDrop(activeId: string, overId: string) {
     if (activeId === overId) return;
 
-    const preSource = findColumnIdForCard(activeId);
-    const preTarget = columns.some((c) => c.id === overId) ? (overId as TrackerColumnId) : findColumnIdForCard(overId);
-    if (preSource && preTarget && preSource !== preTarget) {
+    // Resolve the drop target to a column: either the column itself, or the
+    // column holding the card it landed on.
+    const target = boardColumns.some((c) => c.id === overId)
+      ? (overId as TrackerStatus)
+      : (boardColumns.find((c) => c.cards.some((card) => card.id === overId))?.id ?? null);
+    const source = statusOf(activeId);
+    if (!target || !source) return;
+
+    // Anything involving an outcome column is a status change, not a reorder —
+    // closed cards carry no order worth preserving.
+    if (isClosedStatus(source) || isClosedStatus(target)) {
+      if (source !== target) setStatus(activeId, target);
+      return;
+    }
+
+    const preSource = source;
+    const preTarget = target as TrackerColumnId;
+    if (preSource !== preTarget) {
       const moved = columns.find((c) => c.id === preSource)?.cards.find((c) => c.id === activeId);
       if (moved) creditStageChange(activeId, moved.company, preTarget);
     }
@@ -273,8 +350,11 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
       value={{
         columns,
         closed,
+        boardColumns,
         placed,
         findColumnIdForCard,
+        statusOf,
+        setStatus,
         moveCard,
         closeCard,
         reopenCard,

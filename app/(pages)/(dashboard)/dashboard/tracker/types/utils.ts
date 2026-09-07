@@ -1,7 +1,7 @@
 import { addDays, set } from "date-fns";
 import { Clock, Users, MessageSquare, Eye } from "lucide-react";
-import { COLUMN_META } from "@/app/components/dashboard/tracker/tracker-meta";
-import type { TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
+import { COLUMN_META, isClosedStatus, statusMeta } from "@/app/components/dashboard/tracker/tracker-meta";
+import type { TrackerCard, TrackerStatus } from "@/app/lib/dashboard/types";
 import type { ChipMetaResult, TrackerEvent, TrackerEventType } from "./tracker";
 
 /**
@@ -76,9 +76,10 @@ export function parseDeadlineDate(chip: string, today: Date): Date | null {
  * @param today - Reference date for relative calculations
  * @returns Array of tracker events
  */
-export function buildTrackerEvents(cols: TrackerColumn[], today: Date): TrackerEvent[] {
+export function buildTrackerEvents(cols: { id: TrackerStatus; cards: TrackerCard[] }[], today: Date): TrackerEvent[] {
   const events: TrackerEvent[] = [];
   for (const col of cols) {
+    const closedColumn = isClosedStatus(col.id);
     for (const card of col.cards) {
       if (card.daysAgo !== undefined) {
         events.push({
@@ -90,6 +91,21 @@ export function buildTrackerEvents(cols: TrackerColumn[], today: Date): TrackerE
           type: col.id === "saved" ? "saved" : "applied",
           columnId: col.id,
           rww: card.rww,
+        });
+      }
+
+      // The day it ended is as much a part of the story as the day it started.
+      if (closedColumn && card.closedDaysAgo !== undefined) {
+        events.push({
+          id: `${card.id}-closed`,
+          date: addDays(today, -card.closedDaysAgo),
+          cardId: card.id,
+          company: card.company,
+          title: card.title,
+          type: "closed",
+          columnId: col.id,
+          rww: card.rww,
+          detail: statusMeta(col.id).label,
         });
       }
       if (card.statusChip) {
@@ -136,4 +152,5 @@ export const EVENT_TYPE_META: Record<TrackerEventType, { label: string; dot: str
   applied: { label: "Applied", dot: COLUMN_META.applied.dot },
   interview: { label: "Interview", dot: COLUMN_META.interviewing.dot },
   deadline: { label: "Deadline", dot: "bg-orange-500" },
+  closed: { label: "Closed", dot: "bg-black/30" },
 };

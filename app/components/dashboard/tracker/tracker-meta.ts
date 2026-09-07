@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { CircleSlash, Ghost, LogOut, ThumbsDown } from "lucide-react";
-import type { TrackerCard, TrackerClosedReason, TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { TrackerCard, TrackerClosedReason, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
 
 /**
  * The tracker's color system, one lookup for every surface that renders a
@@ -30,6 +30,9 @@ export const COLUMN_LABELS: Record<TrackerColumnId, string> = {
   offer: "Offer",
 };
 
+/** Menu and summary order — worst-to-best is wrong here; this is frequency order. */
+export const CLOSED_ORDER: TrackerClosedReason[] = ["rejected", "ghosted", "withdrawn", "declined"];
+
 /**
  * The closed half of the system. Same literal-class discipline as
  * `COLUMN_META`, with one deliberate tonal choice: only `rejected` and
@@ -39,13 +42,14 @@ export const COLUMN_LABELS: Record<TrackerColumnId, string> = {
  * both read neutral. `menuLabel` is the imperative used in the status menu;
  * `label` is the noun used everywhere the outcome is reported back.
  */
-export const CLOSED_META: Record<TrackerClosedReason, { label: string; menuLabel: string; icon: LucideIcon; pill: string; dot: string }> = {
+export const CLOSED_META: Record<TrackerClosedReason, { label: string; menuLabel: string; icon: LucideIcon; pill: string; dot: string; cardBorder: string }> = {
   rejected: {
     label: "Rejected",
     menuLabel: "They said no",
     icon: ThumbsDown,
     pill: "bg-[#fdeae6] text-[#b23c26]",
     dot: "bg-[#b23c26]",
+    cardBorder: "border-[#b23c26]/45",
   },
   ghosted: {
     label: "Ghosted",
@@ -53,6 +57,7 @@ export const CLOSED_META: Record<TrackerClosedReason, { label: string; menuLabel
     icon: Ghost,
     pill: "bg-black/[0.06] text-black/55",
     dot: "bg-black/30",
+    cardBorder: "border-black/25",
   },
   withdrawn: {
     label: "Withdrawn",
@@ -60,6 +65,7 @@ export const CLOSED_META: Record<TrackerClosedReason, { label: string; menuLabel
     icon: LogOut,
     pill: "bg-black/[0.06] text-black/55",
     dot: "bg-black/30",
+    cardBorder: "border-black/25",
   },
   declined: {
     label: "Declined",
@@ -67,11 +73,30 @@ export const CLOSED_META: Record<TrackerClosedReason, { label: string; menuLabel
     icon: CircleSlash,
     pill: "bg-[#fdeae6] text-[#b23c26]",
     dot: "bg-[#b23c26]",
+    cardBorder: "border-[#b23c26]/45",
   },
 };
 
-/** Menu and summary order — worst-to-best is wrong here; this is frequency order. */
-export const CLOSED_ORDER: TrackerClosedReason[] = ["rejected", "ghosted", "withdrawn", "declined"];
+/**
+ * Every column on the board, in order: the five stages, then the four ways an
+ * application ends. The outcomes are columns rather than a strip below the
+ * board because closing one is a move like any other — the same drag, the same
+ * menu — and a search that never shows its rejections is telling a nicer story
+ * than the truth.
+ */
+export const BOARD_ORDER: TrackerStatus[] = [...STATUS_ORDER, ...CLOSED_ORDER];
+
+export const isClosedStatus = (status: TrackerStatus): status is TrackerClosedReason =>
+  (CLOSED_ORDER as TrackerStatus[]).includes(status);
+
+/** One lookup for any column, open or closed — header dot, card border, pill. */
+export function statusMeta(status: TrackerStatus): { label: string; dot: string; cardBorder: string; pill: string } {
+  if (isClosedStatus(status)) {
+    const meta = CLOSED_META[status];
+    return { label: meta.label, dot: meta.dot, cardBorder: meta.cardBorder, pill: meta.pill };
+  }
+  return { label: COLUMN_LABELS[status], ...COLUMN_META[status] };
+}
 
 /**
  * Days since anything happened on this application. `lastTouchedDaysAgo` wins

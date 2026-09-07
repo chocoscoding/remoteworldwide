@@ -29,7 +29,10 @@ const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, messa
 
   return (
     <section
-      className={cn("flex w-full flex-col items-center justify-center bg-primary2 px-4 py-16 text-center", inShell ? "min-h-[calc(100vh-4rem)]" : "h-screen")}
+      className={cn(
+        "flex w-full flex-col items-center justify-center bg-primary2 px-4 py-16 text-center",
+        inShell ? "min-h-[calc(100vh-4rem)]" : "h-screen",
+      )}
       style={{ backgroundImage: "radial-gradient(#222325 0.9px, transparent 0.9px)", backgroundSize: "22px 22px" }}>
       <div className="flex items-center justify-center gap-1" aria-hidden>
         <Digit>{left}</Digit>
@@ -51,7 +54,7 @@ const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, messa
               <ArrowLeft className="h-4 w-4" />
               Go back
             </button>
-            <Link href={home} className={`${ERROR_BUTTON}bg-primary text-white`}>
+            <Link href={home} className={`${ERROR_BUTTON}  bg-primary text-white`}>
               <Home className="h-4 w-4" />
               Go home
             </Link>

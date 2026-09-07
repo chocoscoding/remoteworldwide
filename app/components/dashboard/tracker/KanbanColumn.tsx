@@ -5,12 +5,12 @@ import { Award, ChevronDown } from "lucide-react";
 import { useDndContext, useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
-import { COLUMN_META } from "@/app/components/dashboard/tracker/tracker-meta";
-import type { TrackerColumn } from "@/app/lib/dashboard/types";
+import { isClosedStatus, statusMeta } from "@/app/components/dashboard/tracker/tracker-meta";
+import type { BoardColumn } from "@/app/components/dashboard/tracker/TrackerProvider";
 import { SortableTrackerCard } from "./TrackerCard";
 
 interface KanbanColumnProps {
-  column: TrackerColumn;
+  column: BoardColumn;
   onOpen: (cardId: string) => void;
   /** Closes a silent card as ghosted, straight from the board. */
   onGhost: (cardId: string) => void;
@@ -85,7 +85,7 @@ function useCardsBelowFold(cardCount: number) {
  * card lands at the end) or a card id (it lands in that card's place).
  */
 function landingIndex(
-  column: TrackerColumn,
+  column: BoardColumn,
   activeId: string | number | undefined,
   overId: string | number | undefined
 ): number | null {
@@ -120,6 +120,8 @@ const DropGap: FC<{ height: number }> = ({ height }) => (
  */
 export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost }) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const meta = statusMeta(column.id);
+  const closed = isClosedStatus(column.id);
   const { scrollRef, below, scrollToEnd } = useCardsBelowFold(column.cards.length);
 
   // Read straight off dnd-kit rather than mirroring the drag into state of our
@@ -134,10 +136,18 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
   const hasMore = below > 0 && !isOver;
 
   return (
-    <div data-column={column.id} className="min-w-[250px] flex-1 flex flex-col min-h-0">
+    // Outcome columns are narrower and quieter than the stages: they are the
+    // record, not the work, and five equal-weight stages plus four equal-weight
+    // outcomes would read as a nine-step pipeline.
+    <div
+      data-column={column.id}
+      className={cn("flex flex-col min-h-0", closed ? "w-[190px] flex-none" : "min-w-[250px] flex-1")}>
       <div className="flex flex-none items-center gap-2 mb-3 px-0.5">
-        <span className={cn("h-2 w-2 rounded-full flex-none", COLUMN_META[column.id].dot)} aria-hidden />
-        <span className="text-sm font-bold text-primary whitespace-nowrap">{column.label}</span>
+        <span className={cn("h-2 w-2 rounded-full flex-none", meta.dot)} aria-hidden />
+        <span
+          className={cn("text-sm font-bold whitespace-nowrap", closed ? "text-black/50" : "text-primary")}>
+          {column.label}
+        </span>
         <span className="text-xs font-semibold text-black/40 ml-auto flex-none">{column.count}</span>
       </div>
 
@@ -161,10 +171,14 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
           </SortableContext>
 
           {column.cards.length === 0 && dropIndex === null && (
-            <div className="flex flex-col items-center justify-center text-center gap-2 rounded-xl border border-dashed border-black/15 py-8 px-3">
-              <Award className="h-5 w-5 text-black/25" />
+            <div
+              className={cn(
+                "flex flex-col items-center justify-center text-center gap-2 rounded-xl border border-dashed border-black/15 px-3",
+                closed ? "py-5" : "py-8",
+              )}>
+              {!closed && <Award className="h-5 w-5 text-black/25" />}
               <p className="text-[11px] font-medium text-black/40 leading-relaxed">
-                {column.id === "offer" ? "No offers yet — this is where they'll land." : "Nothing here yet."}
+                {column.id === "offer" ? "No offers yet — this is where they'll land." : closed ? "None." : "Nothing here yet."}
               </p>
             </div>
           )}

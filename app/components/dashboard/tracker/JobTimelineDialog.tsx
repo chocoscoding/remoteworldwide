@@ -3,7 +3,7 @@
 import { FC, useState } from "react";
 import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowRight, Check, MessageSquare, Mic, PartyPopper, Users, X } from "lucide-react";
+import { Check, MessageSquare, Mic, PartyPopper, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
@@ -12,11 +12,13 @@ import LogoMini from "@/app/components/svg/LogoMini";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { usePod } from "@/app/components/dashboard/pod/PodProvider";
 import { useWin } from "@/app/components/dashboard/win/WinProvider";
-import type { TrackerCard, TrackerClosedReason, TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { TrackerCard, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
 import { GHOST_AFTER_DAYS } from "@/app/components/dashboard/tracker/tracker-meta";
 import { followUpFor } from "@/app/lib/dashboard/follow-up";
 import FollowUpNudge from "@/app/components/dashboard/followup/FollowUpNudge";
 import StatusMenu from "./StatusMenu";
+import MoveToButton from "./MoveToButton";
+import { useTracker } from "./TrackerProvider";
 import { COLUMN_LABELS, STATUS_ORDER } from "./tracker-meta";
 
 /**
@@ -33,9 +35,7 @@ export interface JobTimelineDialogProps {
   card: TrackerCard | null;
   columnId: TrackerColumnId | null;
   onOpenChange: (open: boolean) => void;
-  onMove: (cardId: string, to: TrackerColumnId) => void;
   /** Ends the application. Closing the card also closes this dialog. */
-  onClose: (cardId: string, reason: TrackerClosedReason) => void;
 }
 
 interface TimelineStep {
@@ -84,10 +84,10 @@ function buildTimeline(card: TrackerCard, columnId: TrackerColumnId): TimelineSt
 }
 
 /** The one suggested action per stage — every branch is a real, wired step. */
-const NextStep: FC<{ card: TrackerCard; columnId: TrackerColumnId; onMove: JobTimelineDialogProps["onMove"] }> = ({
+const NextStep: FC<{ card: TrackerCard; columnId: TrackerColumnId; onStatus: (cardId: string, to: TrackerStatus) => void }> = ({
   card,
   columnId,
-  onMove,
+  onStatus,
 }) => {
   const { recordAction } = useActivity();
   const { openWinLog } = useWin();
@@ -96,12 +96,7 @@ const NextStep: FC<{ card: TrackerCard; columnId: TrackerColumnId; onMove: JobTi
 
   switch (columnId) {
     case "saved":
-      return (
-        <StickerButton variant="primary" size="sm" onClick={() => onMove(card.id, "applied")}>
-          <ArrowRight className="h-3.5 w-3.5" />
-          Move to Applied
-        </StickerButton>
-      );
+      return <MoveToButton current={columnId} suggested="applied" onMove={(to) => onStatus(card.id, to)} />;
     case "applied":
       return (
         <StickerButton
@@ -199,7 +194,8 @@ const SharePodRow: FC<{ card: TrackerCard; columnId: TrackerColumnId }> = ({ car
   );
 };
 
-const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenChange, onMove, onClose }) => {
+const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenChange }) => {
+  const { setStatus } = useTracker();
   const open = !!card && !!columnId;
   const steps = open ? buildTimeline(card, columnId) : [];
 
@@ -224,7 +220,7 @@ const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenC
                       {card.company}
                     </DialogPrimitive.Description>
                     <div className="mt-2">
-                      <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} onClose={(reason) => onClose(card.id, reason)} />
+                      <StatusMenu value={columnId} onChange={(to) => setStatus(card.id, to)} />
                     </div>
                   </div>
                 </div>
@@ -299,7 +295,7 @@ const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenC
               {/* One suggested action, matched to the stage. */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 bg-[#fbfbf7] px-6 py-4">
                 <p className="min-w-0 flex-1 basis-[200px] text-xs leading-relaxed text-black/60">{NEXT_STEP_HINT[columnId]}</p>
-                <NextStep key={card.id} card={card} columnId={columnId} onMove={onMove} />
+                <NextStep key={card.id} card={card} columnId={columnId} onStatus={setStatus} />
               </div>
             </>
           )}

@@ -10,7 +10,7 @@
 
 import { FC, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, Kanban as KanbanIcon, Plus, Table as TableIcon } from "lucide-react";
+import { Calendar as CalendarIcon, ChartNoAxesColumn, Kanban as KanbanIcon, Plus, Table as TableIcon } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -33,9 +33,8 @@ import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
 import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
 import type { TrackerCard as TrackerCardData } from "@/app/lib/dashboard/types";
 import JobTimelineDialog from "@/app/components/dashboard/tracker/JobTimelineDialog";
-import ClosedDrawer from "@/app/components/dashboard/tracker/ClosedDrawer";
+import InsightsDialog from "@/app/components/dashboard/tracker/InsightsDialog";
 import { useTracker } from "@/app/components/dashboard/tracker/TrackerProvider";
-import { CLOSED_META, CLOSED_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
 
 // Component imports
 import { TrackerCardItem } from "../../../../components/dashboard/tracker/TrackerCard";
@@ -60,11 +59,11 @@ const VIEWS: ViewConfig[] = [
 
 const TrackerClient: FC = () => {
   const { collapsed: sidebarCollapsed } = useSidebarCollapse();
-  const { columns, closed, findColumnIdForCard, moveCard, closeCard, reopenCard, addCard, commitDrop } = useTracker();
+  const { columns, boardColumns, statusOf, setStatus, closeCard, addCard, commitDrop } = useTracker();
 
   const [view, setView] = useState<TrackerView>("board");
   const [activeCard, setActiveCard] = useState<TrackerCardData | null>(null);
-  const [closedOpen, setClosedOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   // Timeline dialog target — an id, resolved against live columns each render
   // so a status change made inside the dialog is reflected immediately.
@@ -106,7 +105,7 @@ const TrackerClient: FC = () => {
     const first = hits[0]?.id;
     if (first == null) return hits;
 
-    const col = columns.find((c) => c.id === first);
+    const col = boardColumns.find((c) => c.id === first);
     if (!col || col.cards.length === 0) return hits;
 
     const cardIds = new Set<string>(col.cards.map((c) => c.id));
@@ -117,6 +116,9 @@ const TrackerClient: FC = () => {
     return inner.length > 0 ? inner : hits;
   };
 
+  // Resolved against the live board each render, so a status change made
+  // inside the dialog is reflected immediately. Only open stages get the
+  // dialog — a closed card's story is over.
   const openEntry = (() => {
     if (!openCardId) return null;
     for (const col of columns) {
@@ -154,7 +156,7 @@ const TrackerClient: FC = () => {
   function handleDragStart(event: DragStartEvent) {
     const id = String(event.active.id);
     dragHappened.current = true;
-    setActiveCard(columns.flatMap((c) => c.cards).find((c) => c.id === id) ?? null);
+    setActiveCard(boardColumns.flatMap((c) => c.cards).find((c) => c.id === id) ?? null);
   }
 
   /**
@@ -216,6 +218,17 @@ const TrackerClient: FC = () => {
             <Plus className="h-3.5 w-3.5" />
             Add job
           </StickerButton>
+
+          {/* The numbers live where the board does — one tap from it, never a
+              screen away. */}
+          <button
+            type="button"
+            onClick={() => setInsightsOpen(true)}
+            aria-label="Insights"
+            title="Insights"
+            className="inline-flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-primary transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[3px_3px_0_0_#e1f073] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none">
+            <ChartNoAxesColumn className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
@@ -261,7 +274,7 @@ const TrackerClient: FC = () => {
                   row and its own card list is what scrolls. The horizontal
                   bar is the system's slim black one. */}
               <div className="flex flex-1 min-h-0 gap-6 items-stretch overflow-x-auto overflow-y-hidden pb-2 scrollbar-neo">
-                {columns.map((col) => (
+                {boardColumns.map((col) => (
                   <KanbanColumn key={col.id} column={col} onOpen={openTimeline} onGhost={(id) => handleClose(id, "ghosted")} />
                 ))}
               </div>
@@ -269,52 +282,28 @@ const TrackerClient: FC = () => {
               <DragOverlay>
                 {activeCard ? (
                   <div className="w-[240px] rotate-2 cursor-grabbing">
-                    <TrackerCardItem card={activeCard} columnId={findColumnIdForCard(activeCard.id) ?? undefined} />
+                    <TrackerCardItem card={activeCard} columnId={statusOf(activeCard.id) ?? undefined} />
                   </div>
                 ) : null}
               </DragOverlay>
             </DndContext>
           </>
         ) : view === "table" ? (
-          <TrackerTableView columns={columns} onMove={moveCard} onOpen={openTimeline} onClose={handleClose} />
+          <TrackerTableView columns={boardColumns} onStatus={setStatus} onOpen={openTimeline} />
         ) : (
-          <TrackerCalendarView columns={columns} onMove={moveCard} onOpen={openTimeline} onClose={handleClose} />
-        )}
-
-        {/* The closed strip. Quiet by design and never a column — it reports
-            the outcomes without making the user look at them all day. */}
-        {closed.length > 0 && (
-          <button
-            type="button"
-            data-closed-strip=""
-            onClick={() => setClosedOpen(true)}
-            className="mt-4 flex flex-none w-full cursor-pointer items-center gap-3 rounded-sm border border-black/15 bg-[#fbfbf7] px-4 py-2.5 text-left transition-colors hover:border-[#222325]">
-            <span className="text-xs font-bold text-black/60">{closed.length} closed</span>
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {CLOSED_ORDER.map((reason) => {
-                const n = closed.filter((c) => c.closedReason === reason).length;
-                if (n === 0) return null;
-                return (
-                  <span key={reason} className="inline-flex items-center gap-1 text-[11px] font-medium text-black/45">
-                    <span className={cn("h-1.5 w-1.5 flex-none rounded-full", CLOSED_META[reason].dot)} aria-hidden />
-                    {n} {CLOSED_META[reason].label.toLowerCase()}
-                  </span>
-                );
-              })}
-            </span>
-            <span className="ml-auto flex-none text-[11px] font-bold text-black/45">View</span>
-          </button>
+          <TrackerCalendarView columns={boardColumns} onStatus={setStatus} onOpen={openTimeline} />
         )}
       </main>
 
+      {/* Every status change inside goes through the shared board, and a card
+          that leaves its column takes the dialog with it: `openEntry` stops
+          resolving, so this closes itself. */}
       <JobTimelineDialog
         card={openEntry?.card ?? null}
         columnId={openEntry?.columnId ?? null}
         onOpenChange={(v) => !v && setOpenCardId(null)}
-        onMove={moveCard}
-        onClose={handleClose}
       />
-      <ClosedDrawer open={closedOpen} onOpenChange={setClosedOpen} cards={closed} onReopen={reopenCard} />
+      <InsightsDialog open={insightsOpen} onOpenChange={setInsightsOpen} />
       <JobPickerDialog
         open={addOpen}
         onOpenChange={setAddOpen}

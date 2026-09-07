@@ -640,3 +640,25 @@ body {
     font-size: 1.75rem;
   }
 }
+
+/* The Home nudge rail. Halved because the track is rendered twice end to end,
+   so the reset lands exactly where the first copy started. */
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll 18s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}

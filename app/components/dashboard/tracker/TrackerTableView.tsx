@@ -8,8 +8,9 @@ import Pill from "@/app/components/dashboard/ui/Pill";
 import LogoMini from "@/app/components/svg/LogoMini";
 import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import StatusMenu from "@/app/components/dashboard/tracker/StatusMenu";
-import { STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
-import type { TrackerClosedReason, TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
+import { BOARD_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
+import type { BoardColumn } from "@/app/components/dashboard/tracker/TrackerProvider";
+import type { TrackerStatus } from "@/app/lib/dashboard/types";
 import { daysAgoLabel, chipMeta, type TableSort, type TableSortKey } from "../../../(pages)/(dashboard)/dashboard/tracker/types";
 
 interface StatusChipBadgeProps {
@@ -61,10 +62,9 @@ const SortableHeader: FC<SortableHeaderProps> = ({ label, sortKey, sort, onSort,
 };
 
 interface TrackerTableViewProps {
-  columns: TrackerColumn[];
-  onMove: (cardId: string, to: TrackerColumnId) => void;
+  columns: BoardColumn[];
+  onStatus: (cardId: string, to: TrackerStatus) => void;
   onOpen: (cardId: string) => void;
-  onClose: (cardId: string, reason: TrackerClosedReason) => void;
 }
 
 /**
@@ -72,7 +72,7 @@ interface TrackerTableViewProps {
  * Reads straight off the live `columns` state so it always matches whatever
  * the board currently shows (including cards dragged between columns).
  */
-export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onMove, onOpen, onClose }) => {
+export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onStatus, onOpen }) => {
   const [sort, setSort] = useState<TableSort | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
@@ -88,7 +88,7 @@ export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onMove, o
         case "role":
           return a.card.title.localeCompare(b.card.title) * dir;
         case "status":
-          return (STATUS_ORDER.indexOf(a.columnId) - STATUS_ORDER.indexOf(b.columnId)) * dir;
+          return (BOARD_ORDER.indexOf(a.columnId) - BOARD_ORDER.indexOf(b.columnId)) * dir;
         case "daysAgo":
           return ((a.card.daysAgo ?? 0) - (b.card.daysAgo ?? 0)) * dir;
         default:
@@ -140,7 +140,7 @@ export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onMove, o
                   <td className="px-4 py-3">
                     {/* The pill is the control — StatusMenu stops propagation
                       itself so the row click never fires underneath it. */}
-                    <StatusMenu value={columnId} onChange={(to) => onMove(card.id, to)} onClose={(reason) => onClose(card.id, reason)} />
+                    <StatusMenu value={columnId} onChange={(to) => onStatus(card.id, to)} />
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "—"}</span>

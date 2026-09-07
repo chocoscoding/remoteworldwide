@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { PillProps } from "@/app/components/dashboard/ui/Pill";
-import type { TrackerColumn, TrackerColumnId } from "@/app/lib/dashboard/types";
+import type { TrackerColumn, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
 import type { TrackerCard as TrackerCardData } from "@/app/lib/dashboard/types";
 
 export type TrackerView = "board" | "table" | "calendar";
@@ -11,7 +11,7 @@ export interface ViewConfig {
   icon: LucideIcon;
 }
 
-export type TrackerEventType = "saved" | "applied" | "interview" | "deadline";
+export type TrackerEventType = "saved" | "applied" | "interview" | "deadline" | "closed";
 
 export interface TrackerEvent {
   id: string;
@@ -20,7 +20,8 @@ export interface TrackerEvent {
   company: string;
   title: string;
   type: TrackerEventType;
-  columnId: TrackerColumnId;
+  /** Where the card sits now — a stage, or the outcome it ended in. */
+  columnId: TrackerStatus;
   rww?: boolean;
   /** Extra caption text for interview/deadline events, e.g. the full status chip. */
   detail?: string;

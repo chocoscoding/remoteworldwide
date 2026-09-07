@@ -2,7 +2,7 @@
 
 import { FC } from "react";
 import Link from "next/link";
-import { MoreHorizontal, Mic, Clock, Ghost } from "lucide-react";
+import { MoreHorizontal, Mic, Clock, Ghost, RotateCcw } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
@@ -10,13 +10,13 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import LogoMini from "@/app/components/svg/LogoMini";
-import { COLUMN_META, daysSinceTouch, looksGhosted } from "@/app/components/dashboard/tracker/tracker-meta";
-import type { TrackerCard as TrackerCardData, TrackerColumnId } from "@/app/lib/dashboard/types";
+import { daysSinceTouch, isClosedStatus, looksGhosted, statusMeta } from "@/app/components/dashboard/tracker/tracker-meta";
+import type { TrackerCard as TrackerCardData, TrackerStatus } from "@/app/lib/dashboard/types";
 import { daysAgoLabel, chipMeta } from "../../../(pages)/(dashboard)/dashboard/tracker/types";
 
 interface TrackerCardItemProps {
   card: TrackerCardData;
-  columnId?: TrackerColumnId;
+  columnId?: TrackerStatus;
   onOptions?: () => void;
   /** Offers the one-click close on a card that has gone silent. */
   onGhost?: () => void;
@@ -28,9 +28,11 @@ interface TrackerCardItemProps {
  */
 export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOptions, onGhost }) => {
   const daysLabel = daysAgoLabel(card.daysAgo);
+  const isClosed = columnId ? isClosedStatus(columnId) : false;
+  const stage = columnId && !isClosedStatus(columnId) ? columnId : null;
   // Derived every render from the card's own silence — never stored, so it
   // can't go stale and needs no effect to maintain.
-  const ghosted = columnId ? looksGhosted(card, columnId) : false;
+  const ghosted = stage ? looksGhosted(card, stage) : false;
   const silentDays = daysSinceTouch(card);
 
   /**
@@ -107,7 +109,9 @@ export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOp
     <div
       className={cn(
         "rounded-sm border bg-white p-3.5 transition-all hover:outline hover:outline-[#222325] hover:outline-1 ",
-        columnId ? COLUMN_META[columnId].cardBorder : "border-black/25",
+        columnId ? statusMeta(columnId).cardBorder : "border-black/25",
+        // A closed application is a record, not live work.
+        isClosed && "bg-[#fbfbf7] opacity-75",
       )}>
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -138,6 +142,14 @@ export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOp
         </div>
       )}
 
+      {/* A closed card says how it ended and offers the way back. */}
+      {isClosed && (
+        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-black/40">
+          <RotateCcw className="h-3 w-3 flex-none" aria-hidden />
+          Drag back to reopen
+        </p>
+      )}
+
       {/* Silence past the point of hope. Offered, never applied — a user who
           knows the recruiter is on leave should not be overruled by a timer,
           so this asks rather than tells and closing stays one tap either way. */}
@@ -161,7 +173,7 @@ export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOp
 
 interface SortableTrackerCardProps {
   card: TrackerCardData;
-  columnId: TrackerColumnId;
+  columnId: TrackerStatus;
   onOpen: (cardId: string) => void;
   onGhost?: (cardId: string) => void;
 }
@@ -192,7 +204,8 @@ export const SortableTrackerCard: FC<SortableTrackerCardProps> = ({ card, column
       <TrackerCardItem
         card={card}
         columnId={columnId}
-        onOptions={() => onOpen(card.id)}
+        // A closed card has no dialog to open — the way back is the drag.
+        onOptions={isClosedStatus(columnId) ? undefined : () => onOpen(card.id)}
         onGhost={onGhost ? () => onGhost(card.id) : undefined}
       />
     </div>

@@ -70,9 +70,9 @@ const ProofOfProgress: FC = () => {
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
         {/* These five numbers say what came back; the funnel says where it
-            stopped. One is the summary, the other is the diagnosis. */}
+            stopped. The funnel lives on the tracker, next to the board it reads. */}
         <Link
-          href="/dashboard/insights"
+          href="/dashboard/tracker"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-black/55 transition-colors hover:text-primary">
           See the full funnel
           <ArrowRight className="h-3.5 w-3.5 flex-none" />
