@@ -1,103 +1,310 @@
-import React from "react";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { absoluteUrl, SITE_NAME, SITE_URL } from "@/app/lib/seo";
 
-const PrivacyPolicy: React.FC = () => {
-  return (
-    <div className="bg-gray-100">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-4">Privacy Policy</h1>
+const COMPANY = "Remote Worldwide";
+const CONTACT_EMAIL = "hello@remoteworldwide.net";
+const JURISDICTION = "Nigeria";
+const LAST_UPDATED = "8 September 2026";
 
-        <p className="mb-4">
-          This privacy policy sets out how our website uses and protects any information that you give us when you use this website.
-        </p>
+const TITLE = `Privacy Policy — ${SITE_NAME}`;
+const DESCRIPTION = `What ${SITE_NAME} collects, why we collect it, who we share it with, and how to get it deleted.`;
 
-        <h2 className="text-2xl font-bold mb-2">Information We Collect</h2>
-
-        <p className="mb-4">We may collect the following information:</p>
-
-        <ul className="list-disc list-inside mb-4">
-          <li>Your name and contact information</li>
-          <li>Demographic information</li>
-          <li>Other information relevant to customer surveys and/or offers</li>
-        </ul>
-
-        <h2 className="text-2xl font-bold mb-2">How We Use the Information</h2>
-
-        <p className="mb-4">
-          We require this information to understand your needs and provide you with a better service, and in particular for the following
-          reasons:
-        </p>
-
-        <ul className="list-disc list-inside mb-4">
-          <li>Internal record keeping</li>
-          <li>Improving our products and services</li>
-          <li>
-            Sending promotional emails about new products, special offers, or other information which we think you may find interesting
-          </li>
-          <li>
-            From time to time, we may also use your information to contact you for market research purposes. We may contact you by email,
-            phone, or mail. We may use the information to customize the website according to your interests.
-          </li>
-        </ul>
-
-        <h2 className="text-2xl font-bold mb-2">Security</h2>
-
-        <p className="mb-4">
-          We are committed to ensuring that your information is secure. In order to prevent unauthorized access or disclosure, we have put
-          in place suitable physical, electronic, and managerial procedures to safeguard and secure the information we collect online.
-        </p>
-
-        <h2 className="text-2xl font-bold mb-2">Cookies</h2>
-
-        <p className="mb-4">
-          {`A cookie is a small file that asks permission to be placed on your computer's hard drive. Once you agree, the file is added, and
-          the cookie helps analyze web traffic or lets you know when you visit a particular site. Cookies allow web applications to respond
-          to you as an individual. The web application can tailor its operations to your needs, likes, and dislikes by gathering and
-          remembering information about your preferences.`}
-        </p>
-
-        <p className="mb-4">
-          Overall, cookies help us provide you with a better website by enabling us to monitor which pages you find useful and which you do
-          not. A cookie in no way gives us access to your computer or any information about you, other than the data you choose to share
-          with us.
-        </p>
-
-        <h2 className="text-2xl font-bold mb-2">Links to Other Websites</h2>
-
-        <p className="mb-4">
-          Our website may contain links to other websites of interest. However, once you have used these links to leave our site, you should
-          note that we do not have any control over that other website. Therefore, we cannot be responsible for the protection and privacy
-          of any information which you provide whilst visiting such sites and such sites are not governed by this privacy statement. You
-          should exercise caution and look at the privacy statement applicable to the website in question.
-        </p>
-
-        <h2 className="text-2xl font-bold mb-2">Controlling Your Personal Information</h2>
-
-        <p className="mb-4">You may choose to restrict the collection or use of your personal information in the following ways:</p>
-
-        <ul className="list-disc list-inside mb-4">
-          <li>
-            If you have previously agreed to us using your personal information for direct marketing purposes, you may change your mind at
-            any time by writing to or emailing us at support@example.com
-          </li>
-          <li>
-            We will not sell, distribute, or lease your personal information to third parties unless we have your permission or are required
-            by law to do so. We may use your personal information to send you promotional information about third parties which we think you
-            may find interesting if you tell us that you wish this to happen.
-          </li>
-          <li>
-            You may request details of personal information which we hold about you. If you would like a copy of the information held on
-            you, please write to [Your Company Name, Address, City, State, Zip Code] or email support@example.com
-          </li>
-          <li>
-            If you believe that any information we are holding on you is incorrect or incomplete, please write to or email us as soon as
-            possible at the above address. We will promptly correct any information found to be incorrect.
-          </li>
-        </ul>
-
-        <p className="mb-4">This privacy policy is subject to change without notice.</p>
-      </div>
-    </div>
-  );
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: absoluteUrl("/privacy-policy") },
+  openGraph: { type: "website", title: TITLE, description: DESCRIPTION, url: absoluteUrl("/privacy-policy"), siteName: SITE_NAME },
+  twitter: { card: "summary", title: TITLE, description: DESCRIPTION },
 };
 
-export default PrivacyPolicy;
+const Mail = () => (
+  <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold">
+    {CONTACT_EMAIL}
+  </a>
+);
+
+const sections: { id: string; title: string; body: ReactNode }[] = [
+  {
+    id: "summary",
+    title: "The short version",
+    body: (
+      <>
+        <p>
+          This policy explains what {COMPANY} does with your data across {SITE_URL} — the job board, the blog, and the career tools in your
+          dashboard. In brief:
+        </p>
+        <ul>
+          <li>We collect what you give us (your account, your resumes, your email) and a little about how you use the site.</li>
+          <li>We use it to run the service, improve it, and send you the emails you asked for.</li>
+          <li>We do not sell your data, and we do not send your resume to employers — you apply on their site, yourself.</li>
+          <li>You can export or delete your data at any time by writing to <Mail />.</li>
+        </ul>
+        <p>
+          The sections below are the detail. Our <Link href="/terms">Terms and Conditions</Link> cover the rest of the relationship.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "what-we-collect",
+    title: "What we collect",
+    body: (
+      <>
+        <p>
+          <strong>Your account.</strong> Your name, email address and profile picture. If you sign in with Google or GitHub we receive those
+          details from them; we never see your password for those accounts. If you sign up with an email address and password, we store the
+          password only as a salted hash.
+        </p>
+        <p>
+          <strong>What you create.</strong> Resumes and documents you build or upload, cover letters, interview notes, saved jobs, tracked
+          applications, and anything else you enter into the dashboard. Files are stored with our media host.
+        </p>
+        <p>
+          <strong>Email sign-ups.</strong> When you claim a free guide or checklist, we record your email address, which guide you claimed,
+          which post you claimed it from, and when you consented.
+        </p>
+        <p>
+          <strong>Usage.</strong> Pages viewed, which listings and calls-to-action you click, plus the technical data any web server
+          receives: IP address, browser, device and approximate location derived from the IP.
+        </p>
+        <p>
+          <strong>Sessions.</strong> To show you your signed-in devices and let you sign them out, we record the browser user-agent and IP
+          for each active login.
+        </p>
+        <p>
+          We do not ask for payment card details, government identity documents, or the special categories of data (health, religion,
+          biometrics and so on). Please do not put them in a document you upload here.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "why",
+    title: "Why we use it",
+    body: (
+      <>
+        <ul>
+          <li>
+            <strong>To run your account</strong> — signing you in, keeping you signed in, showing your saved jobs and documents, and
+            enforcing roles. Without this the service cannot work.
+          </li>
+          <li>
+            <strong>To provide the tools</strong> — scoring a resume, drafting a cover letter, preparing interview answers, tracking your
+            applications.
+          </li>
+          <li>
+            <strong>To send you email</strong> — the guide you asked for, and job and product emails you opted into. Every one has an
+            unsubscribe link.
+          </li>
+          <li>
+            <strong>To improve the product</strong> — understanding which listings, posts and tools people actually use, in aggregate.
+          </li>
+          <li>
+            <strong>To keep it safe and lawful</strong> — rate limiting, spam and fraud prevention, security investigations, and complying
+            with legal obligations.
+          </li>
+        </ul>
+        <p>
+          Where the law requires a legal basis, ours is: performing our contract with you (your account and the tools), your consent
+          (marketing email and non-essential cookies), our legitimate interests (security, and improving the product), and legal obligation
+          where one applies.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "ai",
+    title: "AI processing",
+    body: (
+      <p>
+        Some tools send the text you give them — a resume, a job description, your notes — to an AI provider so it can return a score or a
+        draft. That happens only when you use the tool, we send the minimum needed, and we do not permit the provider to use your content to
+        train its models. If you would rather not have your text processed this way, do not use those tools; the rest of the service works
+        without them.
+      </p>
+    ),
+  },
+  {
+    id: "sharing",
+    title: "Who we share it with",
+    body: (
+      <>
+        <p>
+          <strong>We do not sell your personal information, and we do not share it with advertisers.</strong> We also do not send your
+          resume, profile or application history to employers — when you apply, you leave our site and deal with them directly.
+        </p>
+        <p>We do share data with the service providers that make the site work, and only for that purpose:</p>
+        <ul>
+          <li>hosting and infrastructure for the site and its database;</li>
+          <li>Google and GitHub, if you choose to sign in with them;</li>
+          <li>Cloudinary, which stores images and files you upload;</li>
+          <li>our AI provider, for the tools described above;</li>
+          <li>analytics, to understand aggregate usage;</li>
+          <li>email delivery, when we send you a guide or a newsletter.</li>
+        </ul>
+        <p>
+          We may also disclose data if the law requires it, to protect our rights or someone&rsquo;s safety, or to a buyer if the business is
+          ever sold — in which case this policy continues to apply until it is replaced and you are told.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "cookies",
+    title: "Cookies",
+    body: (
+      <>
+        <p>
+          <strong>Essential cookies</strong> keep you signed in and protect forms against cross-site request forgery. The site cannot work
+          without them, so they are set whenever you use it.
+        </p>
+        <p>
+          <strong>Analytics cookies</strong> tell us which pages and listings are useful, in aggregate. We also store small preferences in
+          your browser (for example, a draft you have not submitted) — that data stays on your device.
+        </p>
+        <p>
+          Your browser can block or delete cookies. If you block the essential ones, signing in will stop working. Links we send you may
+          carry campaign tags (<code>utm_*</code>) so we know which post or email brought you here; they identify the campaign, not you.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "retention",
+    title: "How long we keep it",
+    body: (
+      <>
+        <ul>
+          <li>
+            <strong>Account and content</strong> — until you delete it or close your account, then removed from live systems, with backups
+            ageing out shortly after.
+          </li>
+          <li>
+            <strong>Email subscriptions</strong> — until you unsubscribe. We keep a record that you unsubscribed so we do not email you
+            again by accident.
+          </li>
+          <li>
+            <strong>Login sessions</strong> — until they expire or you revoke them.
+          </li>
+          <li>
+            <strong>Usage and security logs</strong> — a limited period, then deleted or aggregated so they no longer identify you.
+          </li>
+        </ul>
+      </>
+    ),
+  },
+  {
+    id: "your-rights",
+    title: "Your rights",
+    body: (
+      <>
+        <p>You can ask us to:</p>
+        <ul>
+          <li>give you a copy of the data we hold about you;</li>
+          <li>correct anything that is wrong or incomplete;</li>
+          <li>delete your account and its data;</li>
+          <li>stop sending marketing email — or use the unsubscribe link, which is instant;</li>
+          <li>restrict or object to a particular use, where the law gives you that right.</li>
+        </ul>
+        <p>
+          Write to <Mail /> and we will respond within 30 days. We may need to confirm who you are first. If you are in a place with a data
+          protection authority and you are unhappy with our answer, you may complain to it.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "security",
+    title: "Security",
+    body: (
+      <p>
+        Traffic is encrypted in transit, passwords are stored as salted hashes, sessions can be revoked per device, and access to production
+        data is limited to the people who need it. No system is perfectly secure, so we cannot guarantee absolute security — if a breach
+        ever affects your data, we will tell you and the relevant authority as the law requires.
+      </p>
+    ),
+  },
+  {
+    id: "transfers",
+    title: "Where your data goes",
+    body: (
+      <p>
+        We operate from {JURISDICTION} and our providers run in various countries, so your data may be processed outside where you live.
+        When it is, we rely on the safeguards those providers offer, such as standard contractual clauses.
+      </p>
+    ),
+  },
+  {
+    id: "children",
+    title: "Children",
+    body: (
+      <p>
+        The service is not for people under 16. We do not knowingly collect their data; if we learn that we have, we delete it. If you
+        believe a child has given us information, tell us at <Mail />.
+      </p>
+    ),
+  },
+  {
+    id: "changes",
+    title: "Changes and contact",
+    body: (
+      <p>
+        We update this policy as the product and the law change; the date at the top shows the current version, and we will give reasonable
+        notice of anything that materially affects you. Questions, requests or complaints: <Mail />.
+      </p>
+    ),
+  },
+];
+
+const Page = () => (
+  <div className="min-h-screen bg-white">
+    <header
+      className="relative overflow-hidden border-b-2 border-primary bg-primary2"
+      style={{ backgroundImage: "radial-gradient(#222325 0.9px, transparent 0.9px)", backgroundSize: "22px 22px" }}>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#f9f8f1_40%,_rgba(249,248,241,0.55)_75%,_rgba(249,248,241,0.2)_100%)]" />
+      <div className="relative mx-auto max-w-[1120px] px-4 pb-10 pt-10 md:pb-14 md:pt-14">
+        <span className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-secondary px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary shadow-[3px_3px_0_0_#222325]">
+          Legal
+        </span>
+        <h1 className="mt-5 text-[2.25rem] font-extrabold leading-[1.05] tracking-[-0.025em] text-primary md:text-[3.25rem]">
+          Privacy Policy
+        </h1>
+        <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-primary/70 md:text-lg">
+          What we collect, why we collect it, who we share it with, and how to get it back or get it deleted.
+        </p>
+        <p className="mt-4 text-sm font-semibold text-primary/55">Last updated {LAST_UPDATED}</p>
+      </div>
+    </header>
+
+    <div className="mx-auto max-w-[1120px] px-4 py-10 md:py-14 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-14">
+      <nav aria-label="On this page" className="mb-10 lg:sticky lg:top-24 lg:mb-0 lg:self-start">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary/55">On this page</p>
+        <ol className="mt-3 space-y-1.5">
+          {sections.map((section, i) => (
+            <li key={section.id} className="flex gap-2 text-sm">
+              <span className="w-4 flex-none text-right font-bold text-primary/35">{i + 1}</span>
+              <a href={`#${section.id}`} className="text-primary/70 hover:text-primary hover:underline">
+                {section.title}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <main className="post-prose min-w-0">
+        {sections.map((section, i) => (
+          <section key={section.id} aria-labelledby={section.id}>
+            <h2 id={section.id} className="scroll-mt-24">
+              {i + 1}. {section.title}
+            </h2>
+            {section.body}
+          </section>
+        ))}
+      </main>
+    </div>
+  </div>
+);
+
+export default Page;

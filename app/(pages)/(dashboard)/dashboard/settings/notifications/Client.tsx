@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings, type NotificationsState } from "../SettingsProvider";
 import { INPUT, SettingsRow, SettingsSection, Toggle } from "@/app/components/dashboard/settings/settings-ui";
+import SectionSave from "@/app/components/dashboard/settings/SectionSave";
 
 const EMAIL_ROWS: { key: keyof NotificationsState; label: string; hint: string }[] = [
   { key: "emailWeeklyDigest", label: "Weekly digest", hint: "Monday summary of applications, replies and what moved." },
@@ -32,7 +33,7 @@ const NotificationsClient: FC = () => {
 
   return (
     <>
-      <SettingsSection title="Email" description="Sent to the address on your account.">
+      <SettingsSection title="Email" description="Sent to the address on your account." action={<SectionSave section="notifications" />}>
         {EMAIL_ROWS.map((r) => (
           <SettingsRow key={r.key} label={r.label} hint={r.hint}>
             <Toggle

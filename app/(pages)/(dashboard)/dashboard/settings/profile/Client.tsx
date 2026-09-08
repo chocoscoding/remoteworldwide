@@ -10,7 +10,7 @@ import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagL
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
 
 const ProfileClient: FC = () => {
-  const { profile, setProfile, markSaved } = useSettings();
+  const { profile, setProfile, save, saving } = useSettings();
   const [skillDraft, setSkillDraft] = useState("");
 
   const initials = profile.fullName
@@ -33,20 +33,15 @@ const ProfileClient: FC = () => {
     setSkillDraft("");
   }
 
-  function save() {
-    markSaved();
-    toast.success("Profile saved", { description: "Mock only — this resets on reload." });
-  }
-
   return (
     <>
       <SettingsSection
         title="Profile"
         description="What recruiters see when we put your name forward."
         action={
-          <button type="button" onClick={save} className={BUTTON_SOLID}>
+          <button type="button" onClick={() => save("profile")} disabled={saving} className={BUTTON_SOLID}>
             <Check className="h-3.5 w-3.5" />
-            Save
+            {saving ? "Saving…" : "Save"}
           </button>
         }>
         <div className="mb-5 flex items-center gap-4 border-b border-black/8 pb-5">

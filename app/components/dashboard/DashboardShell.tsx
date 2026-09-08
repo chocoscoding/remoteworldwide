@@ -10,6 +10,7 @@
 // milestone celebration has to be able to fire from any of them.
 
 import type { FC, ReactNode } from "react";
+import type { BillingOverview, Settings } from "@/app/lib/settings/types";
 import { Toaster } from "@/components/ui/sonner";
 import DashboardSidebar from "./DashboardSidebar";
 import { SidebarCollapseProvider } from "./SidebarCollapseContext";
@@ -20,20 +21,22 @@ import { NetworkProvider } from "./network/NetworkProvider";
 import PodProvider from "./pod/PodProvider";
 import WinProvider from "./win/WinProvider";
 import { SettingsProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
+import { BillingProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
 import StreakMilestoneModal from "./streak/StreakMilestoneModal";
 import LogApplicationDialog from "./log/LogApplicationDialog";
 import GiftStore from "./gifts/GiftStore";
 import { TrackerProvider } from "./tracker/TrackerProvider";
 import RepairStreakPanel from "./streak/RepairStreakPanel";
 
-const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
+const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; children: ReactNode }> = ({ settings, billing, children }) => (
   <SidebarCollapseProvider>
     <ActivityProvider>
       {/* SettingsProvider is app-wide, not settings-scoped: your preferences
           are what the recommendation fit scores are computed from, so the
           recommend screen has to read them too. NetworkProvider sits inside
           ActivityProvider because asking for a referral is a logged action. */}
-      <SettingsProvider>
+      <SettingsProvider initial={settings}>
+      <BillingProvider initial={billing}>
       <NetworkProvider>
       <AnswersProvider>
       <DocumentsProvider>
@@ -62,6 +65,7 @@ const DashboardShell: FC<{ children: ReactNode }> = ({ children }) => (
       </DocumentsProvider>
       </AnswersProvider>
       </NetworkProvider>
+      </BillingProvider>
       </SettingsProvider>
     </ActivityProvider>
   </SidebarCollapseProvider>

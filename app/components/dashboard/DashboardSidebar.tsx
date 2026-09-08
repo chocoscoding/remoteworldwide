@@ -29,10 +29,7 @@ import LogoMini from "@/app/components/svg/LogoMini";
 import { useSidebarCollapse } from "./SidebarCollapseContext";
 import { photoOf } from "@/app/lib/dashboard/people-photos";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
-import { useActivity } from "./activity/ActivityProvider";
-
-/** Monthly credit allowance on the free plan — mirrors settings/billing. */
-const PLAN_ALLOWANCE = 50;
+import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
 
 type NavItem = { id: string; label: string; href: string; icon: LucideIcon };
 type NavGroup = { label?: string; items: NavItem[] };
@@ -80,9 +77,12 @@ const NAV_GROUPS: NavGroup[] = [
 const DashboardSidebar: FC = () => {
   const pathname = usePathname();
   const { collapsed, setCollapsed } = useSidebarCollapse();
-  // Reads the derived ledger balance. This used to be a hardcoded 18 that
-  // silently disagreed with the streak panel the moment anything was earned.
-  const { credits } = useActivity();
+  // Plan credits, from the same source the billing screen reads, so the two
+  // meters cannot disagree. Not ActivityProvider.credits, which counts
+  // referral credits earned through invites.
+  const { subscription } = useBilling();
+  const credits = subscription.creditBalance;
+  const allowance = subscription.monthlyCredits || credits;
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -159,14 +159,14 @@ const DashboardSidebar: FC = () => {
             plan allowance. */}
         <Link
           href="/dashboard/settings/profile"
-          title={`${credits} credits left · ${Math.max(0, PLAN_ALLOWANCE - credits)} of ${PLAN_ALLOWANCE} used`}
+          title={allowance > 0 ? `${credits} credits left · ${Math.max(0, allowance - credits)} of ${allowance} used` : "No credits yet"}
           className={cn(
             "flex min-w-0 items-center rounded-lg py-1.5 transition-colors cursor-pointer",
             collapsed ? "justify-center px-1" : "gap-2.5 px-1",
             isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]",
           )}>
           <ScoreRing
-            value={Math.min(100, Math.round(((PLAN_ALLOWANCE - credits) / PLAN_ALLOWANCE) * 100))}
+            value={allowance > 0 ? Math.min(100, Math.round(((allowance - credits) / allowance) * 100)) : 0}
             size={40}
             label={
               <span className="grid h-full w-full place-content-center overflow-hidden rounded-full bg-[#222325] text-xs font-extrabold text-[#e1f073]">

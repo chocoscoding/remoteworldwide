@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
-const DATE_KEYS = new Set(["createdAt", "updatedAt", "publishedAt", "consentAt", "unsubscribedAt"]);
+const DATE_KEYS = new Set(["createdAt", "updatedAt", "publishedAt", "consentAt", "unsubscribedAt", "periodStart", "periodEnd", "completedAt", "joinedAt", "subscribedAt"]);
 
 export class BackendError extends Error {
   constructor(

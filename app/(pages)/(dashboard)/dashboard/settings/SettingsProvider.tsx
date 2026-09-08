@@ -1,66 +1,27 @@
 "use client";
 
-// Settings — app-wide state.
+// Settings — app-wide state, hydrated from the backend in the dashboard layout
+// and persisted per section through libs/settings.ts.
 //
-// Mounted in DashboardShell. It began route-scoped (edits surviving a move
-// from Profile -> Billing -> back was the only requirement), but the
-// preferences screen's own promise — "drives your recommendations, referral
-// matches and resume scoring" — needed the recommend screen to read the same
-// object. `targetRoles`, `minSalary` and `remotePolicy` are now inputs to
-// lib/dashboard/fit.ts, so changing one moves every fit score on that screen.
-//
-// Anything the dashboard already owns for real — credits, weekly target,
-// hunt hour, paused state — is NOT duplicated here. Those come from
-// ActivityProvider so the sidebar and the streak panel can't disagree with
-// this screen. This holds only the settings that have no home yet.
-//
-// Mock-only: in-memory, resets on reload, same as every other domain here.
+// It is mounted app-wide rather than under the settings route because
+// `targetRoles`, `minSalary` and `remotePolicy` are inputs to
+// lib/dashboard/fit.ts: changing one moves every fit score on the recommend
+// screen, so that screen has to read the same object.
 
-import { createContext, useContext, useState, type FC, type ReactNode } from "react";
-import { RESUME } from "@/app/lib/dashboard/mock-data";
+import { createContext, useContext, useState, useTransition, type FC, type ReactNode } from "react";
+import { toast } from "sonner";
+import { saveNotifications, savePreferences, savePrivacy, saveProfile } from "@/libs/settings";
+import type { Availability, JobPreferences, NotificationSettings, PrivacySettings, ProfileSettings, RemotePolicy, Settings } from "@/app/lib/settings/types";
 
-export interface ProfileState {
-  fullName: string;
-  headline: string;
-  email: string;
-  phone: string;
-  location: string;
-  timezone: string;
-  summary: string;
-  portfolio: string;
-  linkedin: string;
-  github: string;
-  skills: string[];
-}
+export type { Availability, RemotePolicy };
+export type ProfileState = ProfileSettings;
+export type PreferencesState = JobPreferences;
+export type NotificationsState = NotificationSettings;
+export type PrivacyState = PrivacySettings;
 
-export type RemotePolicy = "anywhere" | "overlap" | "region";
-export type Availability = "immediately" | "two-weeks" | "month" | "browsing";
+export type SettingsSection = "profile" | "preferences" | "notifications" | "privacy";
 
-export interface PreferencesState {
-  targetRoles: string[];
-  minSalary: number;
-  currency: "USD" | "GBP" | "EUR" | "NGN";
-  remotePolicy: RemotePolicy;
-  availability: Availability;
-  openToContract: boolean;
-  openToRelocation: boolean;
-}
-
-export interface NotificationsState {
-  emailWeeklyDigest: boolean;
-  emailReplyAlerts: boolean;
-  emailPodActivity: boolean;
-  emailProductNews: boolean;
-  pushStreakReminder: boolean;
-  pushInterviewReminder: boolean;
-}
-
-export interface PrivacyState {
-  discoverableByRecruiters: boolean;
-  showProfileToPod: boolean;
-  shareOutcomesAnonymously: boolean;
-  allowResumeIndexing: boolean;
-}
+const CLEAN: Record<SettingsSection, boolean> = { profile: false, preferences: false, notifications: false, privacy: false };
 
 interface SettingsContextValue {
   profile: ProfileState;
@@ -71,78 +32,71 @@ interface SettingsContextValue {
   setNotifications: (patch: Partial<NotificationsState>) => void;
   privacy: PrivacyState;
   setPrivacy: (patch: Partial<PrivacyState>) => void;
-  /** True once anything has been edited this session. */
+  /** True once anything has been edited since the last successful save. */
   dirty: boolean;
+  dirtySections: Record<SettingsSection, boolean>;
+  saving: boolean;
+  save: (section: SettingsSection) => void;
   markSaved: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-// Seeded from the resume so the profile isn't blank on first open — this is
-// the same person the rest of the dashboard is built around.
-const INITIAL_PROFILE: ProfileState = {
-  fullName: RESUME.name,
-  headline: RESUME.title,
-  email: RESUME.email,
-  phone: RESUME.phone,
-  location: "Lagos, Nigeria",
-  timezone: "GMT+1",
-  summary: RESUME.summary,
-  portfolio: RESUME.links.find((l) => l.label === "Portfolio")?.url ?? RESUME.portfolio,
-  linkedin: RESUME.links.find((l) => l.label === "LinkedIn")?.url ?? "",
-  github: "",
-  skills: RESUME.skills,
-};
+export const SettingsProvider: FC<{ initial: Settings; children: ReactNode }> = ({ initial, children }) => {
+  const [profile, setProfileState] = useState<ProfileState>(initial.profile);
+  const [preferences, setPreferencesState] = useState<PreferencesState>(initial.preferences);
+  const [notifications, setNotificationsState] = useState<NotificationsState>(initial.notifications);
+  const [privacy, setPrivacyState] = useState<PrivacyState>(initial.privacy);
+  const [dirtySections, setDirtySections] = useState<Record<SettingsSection, boolean>>(CLEAN);
+  const [saving, startSaving] = useTransition();
 
-const INITIAL_PREFERENCES: PreferencesState = {
-  targetRoles: ["Senior Product Designer", "Product Designer", "Design Lead"],
-  minSalary: 90000,
-  currency: "USD",
-  remotePolicy: "overlap",
-  availability: "two-weeks",
-  openToContract: true,
-  openToRelocation: false,
-};
-
-const INITIAL_NOTIFICATIONS: NotificationsState = {
-  emailWeeklyDigest: true,
-  emailReplyAlerts: true,
-  emailPodActivity: false,
-  emailProductNews: false,
-  pushStreakReminder: true,
-  pushInterviewReminder: true,
-};
-
-const INITIAL_PRIVACY: PrivacyState = {
-  discoverableByRecruiters: true,
-  showProfileToPod: true,
-  shareOutcomesAnonymously: true,
-  allowResumeIndexing: false,
-};
-
-export const SettingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [profile, setProfileState] = useState<ProfileState>(INITIAL_PROFILE);
-  const [preferences, setPreferencesState] = useState<PreferencesState>(INITIAL_PREFERENCES);
-  const [notifications, setNotificationsState] = useState<NotificationsState>(INITIAL_NOTIFICATIONS);
-  const [privacy, setPrivacyState] = useState<PrivacyState>(INITIAL_PRIVACY);
-  const [dirty, setDirty] = useState(false);
+  const touch = (section: SettingsSection) => setDirtySections((prev) => ({ ...prev, [section]: true }));
 
   function setProfile(patch: Partial<ProfileState>) {
     setProfileState((prev) => ({ ...prev, ...patch }));
-    setDirty(true);
+    touch("profile");
   }
   function setPreferences(patch: Partial<PreferencesState>) {
     setPreferencesState((prev) => ({ ...prev, ...patch }));
-    setDirty(true);
+    touch("preferences");
   }
   function setNotifications(patch: Partial<NotificationsState>) {
     setNotificationsState((prev) => ({ ...prev, ...patch }));
-    setDirty(true);
+    touch("notifications");
   }
   function setPrivacy(patch: Partial<PrivacyState>) {
     setPrivacyState((prev) => ({ ...prev, ...patch }));
-    setDirty(true);
+    touch("privacy");
   }
+
+  // Every save answers with the whole settings object, so the local state is
+  // replaced by what the backend actually stored rather than what was typed.
+  const accept = (next: Settings, section: SettingsSection) => {
+    setProfileState(next.profile);
+    setPreferencesState(next.preferences);
+    setNotificationsState(next.notifications);
+    setPrivacyState(next.privacy);
+    setDirtySections((prev) => ({ ...prev, [section]: false }));
+  };
+
+  function save(section: SettingsSection) {
+    startSaving(async () => {
+      const result = await run(section);
+      if (result.error !== null) {
+        toast.error(result.error);
+        return;
+      }
+      accept(result.data, section);
+      toast.success(LABELS[section]);
+    });
+  }
+
+  const run = (section: SettingsSection) => {
+    if (section === "profile") return saveProfile(profile);
+    if (section === "preferences") return savePreferences(preferences);
+    if (section === "notifications") return saveNotifications(notifications);
+    return savePrivacy(privacy);
+  };
 
   return (
     <SettingsContext.Provider
@@ -155,12 +109,22 @@ export const SettingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
         setNotifications,
         privacy,
         setPrivacy,
-        dirty,
-        markSaved: () => setDirty(false),
+        dirty: Object.values(dirtySections).some(Boolean),
+        dirtySections,
+        saving,
+        save,
+        markSaved: () => setDirtySections(CLEAN),
       }}>
       {children}
     </SettingsContext.Provider>
   );
+};
+
+const LABELS: Record<SettingsSection, string> = {
+  profile: "Profile saved",
+  preferences: "Preferences saved",
+  notifications: "Notification settings saved",
+  privacy: "Privacy settings saved",
 };
 
 export function useSettings(): SettingsContextValue {

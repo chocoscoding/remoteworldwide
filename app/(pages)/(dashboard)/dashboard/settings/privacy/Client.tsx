@@ -5,6 +5,7 @@ import { Download, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useSettings, type PrivacyState } from "../SettingsProvider";
 import { BUTTON_OUTLINE, SettingsRow, SettingsSection, Toggle } from "@/app/components/dashboard/settings/settings-ui";
+import SectionSave from "@/app/components/dashboard/settings/SectionSave";
 
 const ROWS: { key: keyof PrivacyState; label: string; hint: string }[] = [
   {
@@ -34,7 +35,7 @@ const PrivacyClient: FC = () => {
 
   return (
     <>
-      <SettingsSection title="Who can see you" description="Nothing here is on by default that puts your name in front of your current employer.">
+      <SettingsSection title="Who can see you" description="Nothing here is on by default that puts your name in front of your current employer." action={<SectionSave section="privacy" />}>
         {ROWS.map((r) => (
           <SettingsRow key={r.key} label={r.label} hint={r.hint}>
             <Toggle

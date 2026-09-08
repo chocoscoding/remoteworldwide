@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ElementType, type FormEvent, useState } from "react";
@@ -13,7 +13,9 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/co
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { evaluatePassword, MIN_PASSWORD_LENGTH } from "@/app/lib/auth/password-strength";
 import { AuthLogo, GitHubIcon, GoogleIcon } from "./AuthIcons";
+import PasswordStrength from "./PasswordStrength";
 import {
   AuthDivider,
   brutalistCard,
@@ -52,8 +54,19 @@ export default function SignupForm({
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  // Latches on first focus. The checklist stays up while there's a password to
+  // check it against, so moving to the confirm field doesn't hide the rules
+  // the user is still reading.
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const strength = evaluatePassword(password);
+  const mismatch = confirmPassword.length > 0 && confirmPassword !== password;
+  const confirmed = confirmPassword.length > 0 && confirmPassword === password;
+  // Derived, never stored — no effect can leave it stale.
+  const canSubmit = strength.meetsRequirements && confirmed && agreed && !submitting;
 
   // Same markup, two skins: Card pieces on the standalone page, Dialog pieces
   // (with their aria wiring) when rendered inside the auth dialog.
@@ -66,8 +79,19 @@ export default function SignupForm({
 
   const handleSignup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // Checked here as well as on the button: the form can still be submitted
+    // by pressing Enter in a field, which bypasses a disabled button.
+    if (!strength.meetsRequirements) {
+      setPasswordTouched(true);
+      toast.error("Your password doesn't meet the requirements yet");
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error("Those passwords don't match");
+      return;
+    }
     if (!agreed) {
-      toast.error("Please accept the Terms and Conditions");
+      toast.error("Please accept the Terms and Conditions and the Privacy Policy");
       return;
     }
     setSubmitting(true);
@@ -193,17 +217,20 @@ export default function SignupForm({
             </Label>
             <div className="relative">
               <Input
+                aria-describedby={`password-rules-${idPrefix}`}
                 autoComplete="new-password"
                 className={cn(brutalistInput, "pr-10")}
                 id={`password-${idPrefix}`}
-                minLength={8}
+                minLength={MIN_PASSWORD_LENGTH}
                 onChange={(event) => setPassword(event.target.value)}
+                onFocus={() => setPasswordTouched(true)}
                 placeholder="********"
                 required
                 type={showPassword ? "text" : "password"}
                 value={password}
               />
               <Button
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 className="absolute top-0 right-0 h-full px-3 text-primary hover:bg-transparent"
                 onClick={() => setShowPassword(!showPassword)}
                 size="icon"
@@ -212,6 +239,45 @@ export default function SignupForm({
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
+
+            {/* Appears on first focus and stays while there's something to
+                check. One eye toggle governs both fields — they have to match,
+                so revealing one and not the other helps nobody. */}
+            <PasswordStrength id={`password-rules-${idPrefix}`} open={passwordTouched} password={password} />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="font-bold" htmlFor={`confirmPassword-${idPrefix}`}>
+              Confirm password
+            </Label>
+            <div className="relative">
+              <Input
+                aria-invalid={mismatch}
+                autoComplete="new-password"
+                className={cn(brutalistInput, "pr-10", mismatch && "border-[#b23c26]")}
+                id={`confirmPassword-${idPrefix}`}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="********"
+                required
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+              />
+              {confirmed && (
+                <span
+                  aria-hidden
+                  className="absolute top-0 right-0 grid h-full place-content-center px-3 text-[#6c7a1e]"
+                  data-passwords-match="">
+                  <Check className="h-4 w-4" strokeWidth={3} />
+                </span>
+              )}
+            </div>
+            {/* Only ever says "they don't match" while they don't — it never
+                complains about an unfinished password mid-typing beyond that. */}
+            {mismatch && (
+              <p className="text-[11px] font-semibold text-[#b23c26]" data-passwords-mismatch="">
+                Those passwords don&apos;t match yet.
+              </p>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -223,17 +289,22 @@ export default function SignupForm({
             />
             <label className="text-gray-600 text-sm" htmlFor={`terms-${idPrefix}`}>
               I agree to the{" "}
-              <Link className={brutalistLink} href="#">
-                Terms
+              <Link className={brutalistLink} href="/terms" target="_blank" rel="noopener noreferrer">
+                Terms and Conditions
               </Link>{" "}
-              and{" "}
-              <Link className={brutalistLink} href="#">
-                Conditions
+              and the{" "}
+              <Link className={brutalistLink} href="/privacy-policy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
               </Link>
             </label>
           </div>
 
-          <Button className="w-full rounded-md" disabled={submitting} size={"lg"} type="submit" variant="brutalist-accent">
+          <Button
+            className="w-full rounded-md disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!canSubmit}
+            size={"lg"}
+            type="submit"
+            variant="brutalist-accent">
             {submitting ? "Creating account…" : "Create free account"}
           </Button>
         </form>

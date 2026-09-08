@@ -26,6 +26,15 @@ const nextConfig = {
         source: "/api/blog/:path*",
         destination: `${backend}/api/blog/:path*`,
       },
+      // Dashboard settings and billing: same first-party-cookie reasoning.
+      {
+        source: "/api/settings/:path*",
+        destination: `${backend}/api/settings/:path*`,
+      },
+      {
+        source: "/api/billing/:path*",
+        destination: `${backend}/api/billing/:path*`,
+      },
       {
         source: "/api/lead-magnets/claim",
         destination: `${backend}/api/blog/claims`,

@@ -24,6 +24,10 @@ const links = [
     title: "Privacy Policy",
     href: "/privacy-policy",
   },
+  {
+    title: "Terms",
+    href: "/terms",
+  },
 ];
 
 const FooterSection = () => {

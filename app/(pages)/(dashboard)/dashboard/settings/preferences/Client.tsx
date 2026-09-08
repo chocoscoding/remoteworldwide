@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings, type Availability, type RemotePolicy } from "../SettingsProvider";
 import { BUTTON_OUTLINE, Choice, INPUT, SettingsRow, SettingsSection, TagList, Toggle } from "@/app/components/dashboard/settings/settings-ui";
+import SectionSave from "@/app/components/dashboard/settings/SectionSave";
 
 const REMOTE: { id: RemotePolicy; label: string }[] = [
   { id: "anywhere", label: "Anywhere" },
@@ -48,7 +49,7 @@ const PreferencesClient: FC = () => {
 
   return (
     <>
-      <SettingsSection title="What you're looking for" description="Drives your recommendations, referral matches and resume scoring.">
+      <SettingsSection title="What you're looking for" description="Drives your recommendations, referral matches and resume scoring." action={<SectionSave section="preferences" />}>
         <SettingsRow label="Target roles" hint="Add every title you'd genuinely take — near-misses cost you matches." stacked>
           <form onSubmit={addRole} className="mb-3 flex gap-2">
             <input
