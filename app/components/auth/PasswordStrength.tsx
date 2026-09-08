@@ -17,10 +17,17 @@
 // finish line, so the user can't tell whether they're one rule from done or
 // four, and every keystroke is a surprise.
 
-import { type FC } from "react";
+import { useEffect, useMemo, useState, type FC } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PASSWORD_RULES, STRENGTH_LABEL, evaluatePassword, type StrengthLevel } from "@/app/lib/auth/password-strength";
+import {
+  PASSWORD_RULES,
+  STRENGTH_LABEL,
+  evaluatePassword,
+  isStrengthModelReady,
+  loadStrengthModel,
+  type StrengthLevel,
+} from "@/app/lib/auth/password-strength";
 
 export interface PasswordStrengthProps {
   password: string;
@@ -38,7 +45,21 @@ const METER: Record<Exclude<StrengthLevel, "empty">, { fill: string; text: strin
 };
 
 const PasswordStrength: FC<PasswordStrengthProps> = ({ password, open, id }) => {
-  const strength = evaluatePassword(password);
+  // The entropy model is fetched rather than bundled, so this mount is what
+  // pulls it in. Flipping `ready` is the only reason to re-render for it.
+  const [ready, setReady] = useState(isStrengthModelReady);
+  useEffect(() => {
+    if (ready) return;
+    let live = true;
+    loadStrengthModel().then(() => {
+      if (live) setReady(isStrengthModelReady());
+    });
+    return () => {
+      live = false;
+    };
+  }, [ready]);
+
+  const strength = useMemo(() => evaluatePassword(password), [password, ready]);
   if (!open) return null;
 
   const meter = strength.level === "empty" ? null : METER[strength.level];

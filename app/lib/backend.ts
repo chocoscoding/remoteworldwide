@@ -1,30 +1,23 @@
+// Server-side backend calls.
+//
+// The error type, envelope unwrapping and date reviving now live in
+// `app/lib/api/core.ts` so the browser can use them too — this file is only
+// the server-specific half: reading the incoming request's cookies and
+// forwarded IP out of `next/headers` and passing them along. `BackendError` is
+// re-exported so the many `libs/*.ts` callers that import it from here keep
+// working unchanged.
+
 import { headers } from "next/headers";
+import { BackendError, unwrapResponse } from "@/app/lib/api/core";
+
+export { BackendError };
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
-const DATE_KEYS = new Set(["createdAt", "updatedAt", "publishedAt", "consentAt", "unsubscribedAt", "periodStart", "periodEnd", "completedAt", "joinedAt", "subscribedAt"]);
-
-export class BackendError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
 
 export interface BackendInit {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   session?: boolean;
-}
-
-function revive(value: unknown, key?: string): unknown {
-  if (Array.isArray(value)) return value.map((v) => revive(v));
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, revive(v, k)]));
-  }
-  if (typeof value === "string" && key && DATE_KEYS.has(key)) return new Date(value);
-  return value;
 }
 
 export async function backend<T>(path: string, init: BackendInit = {}): Promise<T> {
@@ -43,9 +36,7 @@ export async function backend<T>(path: string, init: BackendInit = {}): Promise<
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
     cache: "no-store",
   });
-  const json = (await res.json().catch(() => null)) as { data?: unknown; message?: string } | null;
-  if (!res.ok) throw new BackendError(res.status, json?.message ?? res.statusText);
-  return revive(json?.data) as T;
+  return unwrapResponse<T>(res);
 }
 
 export async function backendOrNull<T>(path: string, init: BackendInit = {}): Promise<T | null> {

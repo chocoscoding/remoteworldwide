@@ -15,6 +15,7 @@
 // real applications table fills.
 
 import { createContext, useContext, useRef, useState, type FC, type ReactNode } from "react";
+import { usePersistedState } from "@/app/lib/persist/usePersistedState";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
@@ -23,6 +24,9 @@ import { TRACKER_CLOSED_CARDS, TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-
 import type { JobOption } from "@/app/lib/dashboard/job-options";
 import type { TrackerCard, TrackerClosedReason, TrackerColumn, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
 import { CLOSED_META, CLOSED_ORDER, COLUMN_LABELS, isClosedStatus } from "./tracker-meta";
+
+/** Bump to discard persisted boards whose shape predates a change. */
+const BOARD_VERSION = 1;
 
 /** One card plus where it currently sits — what every cross-screen reader wants. */
 export interface PlacedCard {
@@ -71,8 +75,16 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { applications, recordAction, awardStrongEvent } = useActivity();
   const { openWinLog } = useWin();
 
-  const [columns, setColumns] = useState<TrackerColumn[]>(() => TRACKER_COLUMNS.map((col) => ({ ...col, cards: [...col.cards] })));
-  const [closed, setClosed] = useState<TrackerCard[]>(() => [...TRACKER_CLOSED_CARDS]);
+  // Persisted: the board is the user's actual work, and losing ten minutes of
+  // dragging to a refresh is indefensible. Bump BOARD_VERSION whenever the card
+  // or column shape changes so an old payload is discarded rather than
+  // hydrated into components that no longer understand it. When the tracker
+  // moves onto React Query these two lines go back to plain useState and the
+  // query-cache persister takes over.
+  const [columns, setColumns] = usePersistedState<TrackerColumn[]>("tracker.board", BOARD_VERSION, () =>
+    TRACKER_COLUMNS.map((col) => ({ ...col, cards: [...col.cards] })),
+  );
+  const [closed, setClosed] = usePersistedState<TrackerCard[]>("tracker.closed", BOARD_VERSION, () => [...TRACKER_CLOSED_CARDS]);
   const addSeq = useRef(0);
 
   // Applications logged anywhere in the app land here. Folded in during render

@@ -6,6 +6,7 @@ import { Manrope } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { SessionProvider } from "next-auth/react";
 import AuthSessionLogger from "./components/AuthSessionLogger";
+import QueryProvider from "@/app/components/providers/QueryProvider";
 import { ToastContainer, Slide } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Script from "next/script";
@@ -88,7 +89,10 @@ export default function RootLayout({
         />
         <SessionProvider>
           <AuthSessionLogger />
-          {children}
+          {/* Inside SessionProvider so anything that reads the session is
+              available to queries; outside everything else so one cache serves
+              the whole app. */}
+          <QueryProvider>{children}</QueryProvider>
         </SessionProvider>
       </body>
     </html>

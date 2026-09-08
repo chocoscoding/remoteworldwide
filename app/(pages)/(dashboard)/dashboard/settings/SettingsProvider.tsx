@@ -1,27 +1,53 @@
 "use client";
 
-// Settings — app-wide state, hydrated from the backend in the dashboard layout
-// and persisted per section through libs/settings.ts.
+// Settings — app-wide state, now backed by React Query.
 //
 // It is mounted app-wide rather than under the settings route because
 // `targetRoles`, `minSalary` and `remotePolicy` are inputs to
 // lib/dashboard/fit.ts: changing one moves every fit score on the recommend
 // screen, so that screen has to read the same object.
+//
+// This is deliberately an ADAPTER, not a rewrite. Its context value is
+// unchanged, so the ~30 call sites that read `useSettings()` did not move —
+// the server state underneath swapped from `useState` to a cached query, and
+// nothing above noticed. That is the migration path the remaining mock
+// providers will follow.
+//
+// One design note worth keeping: the server object and the user's unsaved
+// edits are held SEPARATELY. Drafts are per-section partials layered over the
+// query data at read time, so there is no state to keep in sync and no effect
+// mirroring server data into local state — which is both the `set-state-in-effect`
+// rule and the reason the old version could show a saved value being overwritten
+// by a stale local one.
 
-import { createContext, useContext, useState, useTransition, type FC, type ReactNode } from "react";
-import { toast } from "sonner";
-import { saveNotifications, savePreferences, savePrivacy, saveProfile } from "@/libs/settings";
-import type { Availability, JobPreferences, NotificationSettings, PrivacySettings, ProfileSettings, RemotePolicy, Settings } from "@/app/lib/settings/types";
+import { createContext, useContext, useState, type FC, type ReactNode } from "react";
+import { useSettingsQuery } from "@/hooks/queries/useSettingsQuery";
+import { useSaveSettingsSection, type SettingsSection } from "@/hooks/mutations/useSettingsMutations";
+import type {
+  Availability,
+  JobPreferences,
+  NotificationSettings,
+  PrivacySettings,
+  ProfileSettings,
+  RemotePolicy,
+  Settings,
+} from "@/app/lib/settings/types";
 
 export type { Availability, RemotePolicy };
 export type ProfileState = ProfileSettings;
 export type PreferencesState = JobPreferences;
 export type NotificationsState = NotificationSettings;
 export type PrivacyState = PrivacySettings;
+export type { SettingsSection };
 
-export type SettingsSection = "profile" | "preferences" | "notifications" | "privacy";
+const NO_DRAFTS: Drafts = { profile: {}, preferences: {}, notifications: {}, privacy: {} };
 
-const CLEAN: Record<SettingsSection, boolean> = { profile: false, preferences: false, notifications: false, privacy: false };
+interface Drafts {
+  profile: Partial<ProfileState>;
+  preferences: Partial<PreferencesState>;
+  notifications: Partial<NotificationsState>;
+  privacy: Partial<PrivacyState>;
+}
 
 interface SettingsContextValue {
   profile: ProfileState;
@@ -43,88 +69,67 @@ interface SettingsContextValue {
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export const SettingsProvider: FC<{ initial: Settings; children: ReactNode }> = ({ initial, children }) => {
-  const [profile, setProfileState] = useState<ProfileState>(initial.profile);
-  const [preferences, setPreferencesState] = useState<PreferencesState>(initial.preferences);
-  const [notifications, setNotificationsState] = useState<NotificationsState>(initial.notifications);
-  const [privacy, setPrivacyState] = useState<PrivacyState>(initial.privacy);
-  const [dirtySections, setDirtySections] = useState<Record<SettingsSection, boolean>>(CLEAN);
-  const [saving, startSaving] = useTransition();
+  // `initial` seeds the cache from the layout's server fetch, so the first
+  // paint has real data and no request goes out until it goes stale.
+  const { data } = useSettingsQuery(initial);
+  // `initial` is always present here, so this only satisfies the type — the
+  // query's `initialData` means `data` is populated from the first render.
+  const server = data ?? initial;
+  const [drafts, setDrafts] = useState<Drafts>(NO_DRAFTS);
 
-  const touch = (section: SettingsSection) => setDirtySections((prev) => ({ ...prev, [section]: true }));
+  const saveProfile = useSaveSettingsSection("profile");
+  const savePreferences = useSaveSettingsSection("preferences");
+  const saveNotifications = useSaveSettingsSection("notifications");
+  const savePrivacy = useSaveSettingsSection("privacy");
+  const mutations = { profile: saveProfile, preferences: savePreferences, notifications: saveNotifications, privacy: savePrivacy };
 
-  function setProfile(patch: Partial<ProfileState>) {
-    setProfileState((prev) => ({ ...prev, ...patch }));
-    touch("profile");
-  }
-  function setPreferences(patch: Partial<PreferencesState>) {
-    setPreferencesState((prev) => ({ ...prev, ...patch }));
-    touch("preferences");
-  }
-  function setNotifications(patch: Partial<NotificationsState>) {
-    setNotificationsState((prev) => ({ ...prev, ...patch }));
-    touch("notifications");
-  }
-  function setPrivacy(patch: Partial<PrivacyState>) {
-    setPrivacyState((prev) => ({ ...prev, ...patch }));
-    touch("privacy");
-  }
+  // Server value with the unsaved edits layered on top. Derived every render,
+  // so a background refetch that changes something the user has NOT edited
+  // shows through immediately, while their in-progress edit is never clobbered.
+  const profile = { ...server.profile, ...drafts.profile };
+  const preferences = { ...server.preferences, ...drafts.preferences };
+  const notifications = { ...server.notifications, ...drafts.notifications };
+  const privacy = { ...server.privacy, ...drafts.privacy };
 
-  // Every save answers with the whole settings object, so the local state is
-  // replaced by what the backend actually stored rather than what was typed.
-  const accept = (next: Settings, section: SettingsSection) => {
-    setProfileState(next.profile);
-    setPreferencesState(next.preferences);
-    setNotificationsState(next.notifications);
-    setPrivacyState(next.privacy);
-    setDirtySections((prev) => ({ ...prev, [section]: false }));
-  };
+  const edit = <S extends SettingsSection>(section: S, patch: Partial<Settings[S]>) =>
+    setDrafts((prev) => ({ ...prev, [section]: { ...prev[section], ...patch } }));
 
   function save(section: SettingsSection) {
-    startSaving(async () => {
-      const result = await run(section);
-      if (result.error !== null) {
-        toast.error(result.error);
-        return;
-      }
-      accept(result.data, section);
-      toast.success(LABELS[section]);
+    const patch = drafts[section];
+    if (Object.keys(patch).length === 0) return;
+    mutations[section].mutate(patch as never, {
+      // Only the saved section's draft clears; edits elsewhere are untouched.
+      onSuccess: () => setDrafts((prev) => ({ ...prev, [section]: {} })),
     });
   }
 
-  const run = (section: SettingsSection) => {
-    if (section === "profile") return saveProfile(profile);
-    if (section === "preferences") return savePreferences(preferences);
-    if (section === "notifications") return saveNotifications(notifications);
-    return savePrivacy(privacy);
+  const dirtySections: Record<SettingsSection, boolean> = {
+    profile: Object.keys(drafts.profile).length > 0,
+    preferences: Object.keys(drafts.preferences).length > 0,
+    notifications: Object.keys(drafts.notifications).length > 0,
+    privacy: Object.keys(drafts.privacy).length > 0,
   };
 
   return (
     <SettingsContext.Provider
       value={{
         profile,
-        setProfile,
+        setProfile: (patch) => edit("profile", patch),
         preferences,
-        setPreferences,
+        setPreferences: (patch) => edit("preferences", patch),
         notifications,
-        setNotifications,
+        setNotifications: (patch) => edit("notifications", patch),
         privacy,
-        setPrivacy,
+        setPrivacy: (patch) => edit("privacy", patch),
         dirty: Object.values(dirtySections).some(Boolean),
         dirtySections,
-        saving,
+        saving: Object.values(mutations).some((m) => m.isPending),
         save,
-        markSaved: () => setDirtySections(CLEAN),
+        markSaved: () => setDrafts(NO_DRAFTS),
       }}>
       {children}
     </SettingsContext.Provider>
   );
-};
-
-const LABELS: Record<SettingsSection, string> = {
-  profile: "Profile saved",
-  preferences: "Preferences saved",
-  notifications: "Notification settings saved",
-  privacy: "Privacy settings saved",
 };
 
 export function useSettings(): SettingsContextValue {

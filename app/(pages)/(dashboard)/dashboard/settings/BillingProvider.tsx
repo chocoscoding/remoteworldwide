@@ -1,13 +1,23 @@
 "use client";
 
-// Plan, credit balance and checkout state, hydrated in the dashboard layout.
+// Plan, credit balance and checkout state — now backed by React Query.
+//
 // App-wide because the sidebar credit meter and the billing screen must never
 // disagree. Distinct from ActivityProvider.credits, which counts referral
 // credits earned through invites — a different currency.
+//
+// Like SettingsProvider, this is an adapter: the context value is unchanged,
+// so every screen reading `useBilling()` was untouched. What changed
+// underneath is that a checkout or cancellation now invalidates the overview
+// and refetches it, instead of the provider hand-patching its own local copy
+// and hoping that guess matched what the server did.
+//
+// Note this domain is NOT persisted to localStorage (see PERSISTED_DOMAINS in
+// query/keys.ts) — the payload carries plan and payment identifiers.
 
-import { createContext, useContext, useState, useTransition, type FC, type ReactNode } from "react";
-import { toast } from "sonner";
-import { cancelSubscription, startCreditCheckout, startPlanCheckout } from "@/libs/billing";
+import { createContext, useContext, useState, type FC, type ReactNode } from "react";
+import { useBillingQuery } from "@/hooks/queries/useBillingQuery";
+import { useBuyCredits, useBuyPlan, useCancelPlan } from "@/hooks/mutations/useBillingMutations";
 import type { BillingOverview, Checkout } from "@/app/lib/settings/types";
 
 interface BillingContextValue extends BillingOverview {
@@ -22,48 +32,31 @@ interface BillingContextValue extends BillingOverview {
 const BillingContext = createContext<BillingContextValue | null>(null);
 
 export const BillingProvider: FC<{ initial: BillingOverview; children: ReactNode }> = ({ initial, children }) => {
-  const [overview, setOverview] = useState<BillingOverview>(initial);
+  const { data } = useBillingQuery(initial);
+  const overview = data ?? initial;
+
+  // Genuinely session-local: which checkout this tab just opened. It is not
+  // server state and does not belong in the cache.
   const [lastCheckout, setLastCheckout] = useState<Checkout | null>(null);
-  const [busy, startBusy] = useTransition();
 
-  function buyPlan(planKey: string) {
-    startBusy(async () => {
-      const result = await startPlanCheckout(planKey);
-      if (result.error !== null) {
-        toast.error(result.error);
-        return;
-      }
-      setLastCheckout(result.data);
-      setOverview((prev) => ({ ...prev, subscription: { ...prev.subscription, pendingPlanKey: planKey, status: "pending" } }));
-      toast.success("Plan reserved", { description: "Payments are not connected yet — we will be in touch to finish it." });
-    });
-  }
+  const buyPlan = useBuyPlan(setLastCheckout);
+  const buyCredits = useBuyCredits(setLastCheckout);
+  const cancelPlan = useCancelPlan();
+  const busy = buyPlan.isPending || buyCredits.isPending || cancelPlan.isPending;
 
-  function buyCredits(packKey: string) {
-    startBusy(async () => {
-      const result = await startCreditCheckout(packKey);
-      if (result.error !== null) {
-        toast.error(result.error);
-        return;
-      }
-      setLastCheckout(result.data);
-      toast.success("Credits reserved", { description: "Payments are not connected yet — we will be in touch to finish it." });
-    });
-  }
-
-  function cancelPlan() {
-    startBusy(async () => {
-      const result = await cancelSubscription();
-      if (result.error !== null) {
-        toast.error(result.error);
-        return;
-      }
-      setOverview((prev) => ({ ...prev, subscription: result.data }));
-      toast.success("Your plan will end at the close of this period");
-    });
-  }
-
-  return <BillingContext.Provider value={{ ...overview, busy, lastCheckout, buyPlan, buyCredits, cancelPlan }}>{children}</BillingContext.Provider>;
+  return (
+    <BillingContext.Provider
+      value={{
+        ...overview,
+        busy,
+        lastCheckout,
+        buyPlan: (planKey) => buyPlan.mutate(planKey),
+        buyCredits: (packKey) => buyCredits.mutate(packKey),
+        cancelPlan: () => cancelPlan.mutate(),
+      }}>
+      {children}
+    </BillingContext.Provider>
+  );
 };
 
 export function useBilling(): BillingContextValue {
