@@ -12,6 +12,7 @@ import "react-toastify/dist/ReactToastify.css";
 import Script from "next/script";
 import SiteJsonLd from "./components/SiteJsonLd";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "./lib/seo";
+import Downtime from "./components/Downtime";
 const font = Manrope({
   subsets: ["latin-ext"],
   weight: ["200", "300", "400", "500", "700"],
@@ -60,7 +61,7 @@ export default function RootLayout({
   gtag('config', '${process.env.GOOGLE_ANALYTICS_TOKEN}');`}
         </Script>
         <Script strategy="afterInteractive" id="hotjar">
-    {`(function(h,o,t,j,a,r){
+          {`(function(h,o,t,j,a,r){
         h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
         h._hjSettings={hjid:6481023,hjsv:6};
         a=o.getElementsByTagName('head')[0];
@@ -68,11 +69,12 @@ export default function RootLayout({
         r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
         a.appendChild(r);
     })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');`}
-</Script>
+        </Script>
       </head>
       <body className={`${font.className} antialiased`}>
         <SiteJsonLd />
         <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
+        <Downtime />
         <ToastContainer
           className={"z-50"}
           position="bottom-right"
