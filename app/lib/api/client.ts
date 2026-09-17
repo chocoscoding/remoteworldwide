@@ -16,19 +16,23 @@
 import { unwrapResponse } from "./core";
 
 interface RequestInit_ {
+  /** A FormData body is passed through untouched — see the note in `request`. */
   /** Passed through from React Query so a superseded query aborts its fetch. */
   signal?: AbortSignal;
   body?: unknown;
 }
 
 async function request<T>(method: string, path: string, init: RequestInit_ = {}): Promise<T> {
+  const multipart = init.body instanceof FormData;
   const headers: Record<string, string> = { accept: "application/json" };
-  if (init.body !== undefined) headers["content-type"] = "application/json";
+  // No content-type for multipart: only the browser knows the boundary it is
+  // about to write, and setting the header by hand omits it.
+  if (init.body !== undefined && !multipart) headers["content-type"] = "application/json";
 
   const res = await fetch(path, {
     method,
     headers,
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body: init.body === undefined ? undefined : multipart ? (init.body as FormData) : JSON.stringify(init.body),
     // The whole point of the rewrites — send the session cookie.
     credentials: "same-origin",
     cache: "no-store",

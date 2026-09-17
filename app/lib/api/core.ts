@@ -89,6 +89,10 @@ export function apiMessage(error: unknown): string {
         return "We couldn't find that.";
       case 409:
         return "That conflicts with something that already exists.";
+      case 413:
+        return "That file is too large.";
+      case 415:
+        return "That file type isn't supported.";
       case 429:
         return "Too many requests. Give it a moment.";
       default:
