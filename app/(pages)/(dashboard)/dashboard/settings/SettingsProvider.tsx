@@ -25,6 +25,7 @@ import { useSettingsQuery } from "@/hooks/queries/useSettingsQuery";
 import { useSaveSettingsSection, type SettingsSection } from "@/hooks/mutations/useSettingsMutations";
 import type {
   Availability,
+  ExperienceBand,
   JobPreferences,
   NotificationSettings,
   PrivacySettings,
@@ -33,7 +34,7 @@ import type {
   Settings,
 } from "@/app/lib/settings/types";
 
-export type { Availability, RemotePolicy };
+export type { Availability, ExperienceBand, RemotePolicy };
 export type ProfileState = ProfileSettings;
 export type PreferencesState = JobPreferences;
 export type NotificationsState = NotificationSettings;

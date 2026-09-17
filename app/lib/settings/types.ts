@@ -1,8 +1,17 @@
 export type Currency = "USD" | "GBP" | "EUR" | "NGN";
 export type RemotePolicy = "anywhere" | "overlap" | "region";
 export type Availability = "immediately" | "two-weeks" | "month" | "browsing";
+/**
+ * How far along you are. Ordered, and the order is the meaning: pod matching reads the position to
+ * decide whether you would arrive as the most, the median or the least experienced in a pod, and
+ * caps how many of any one band a pod can hold. "" means not said, and matching falls back to
+ * reading your headline.
+ */
+export type ExperienceBand = "intern" | "entry" | "mid" | "senior" | "lead";
 
 export interface ProfileSettings {
+  /** Resolved server-side: a signed CDN URL for an upload, or the OAuth photo as-is. */
+  avatarUrl: string;
   fullName: string;
   headline: string;
   email: string;
@@ -18,6 +27,7 @@ export interface ProfileSettings {
 
 export interface JobPreferences {
   targetRoles: string[];
+  experienceLevel: ExperienceBand | "";
   minSalary: number;
   currency: Currency;
   remotePolicy: RemotePolicy;
@@ -40,6 +50,7 @@ export interface PrivacySettings {
   showProfileToPod: boolean;
   shareOutcomesAnonymously: boolean;
   allowResumeIndexing: boolean;
+  allowAiCoaching: boolean;
 }
 
 export interface Settings {
