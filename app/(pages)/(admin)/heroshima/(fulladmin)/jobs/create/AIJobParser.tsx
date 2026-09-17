@@ -37,19 +37,22 @@ const AIJobParser: FC<AIJobParserProps> = ({ filters, allCompanies, onParseCompl
     toast.info("Parsing job posting...", { autoClose: 2000 });
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/jobs/parse`, {
+      // Same-origin, through the frontend's rewrite, so the Auth.js cookie is sent and the
+      // backend can require an admin session. Calling the backend cross-origin sent no
+      // cookie, which is why this used to carry a shared token — inlined into every
+      // browser bundle as NEXT_PUBLIC_BACKEND_TOKEN.
+      const response = await fetch("/api/admin/job-parse", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-token": process.env.NEXT_PUBLIC_BACKEND_TOKEN || "",
-        },
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobUrl: parseUrl }),
       });
 
-      const data = await response.json();
+      // A failure in the proxy itself (backend down or too slow) answers with a page, not JSON.
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || data.message || "Failed to parse job");
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Failed to parse job");
       }
 
       const { jobTitle, companyName, jobDescription, seniorityLevel, category, regions, region } = data.data;
