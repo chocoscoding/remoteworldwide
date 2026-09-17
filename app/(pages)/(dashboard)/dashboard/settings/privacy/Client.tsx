@@ -28,6 +28,11 @@ const ROWS: { key: keyof PrivacyState; label: string; hint: string }[] = [
     label: "Allow resume indexing",
     hint: "Lets partner job boards match your resume to their listings. Off by default.",
   },
+  {
+    key: "allowAiCoaching",
+    label: "Let the career coach read my search",
+    hint: "The coach sees your applications, outcomes and weekly goal so its advice is about your real search.",
+  },
 ];
 
 const PrivacyClient: FC = () => {
@@ -58,8 +63,9 @@ const PrivacyClient: FC = () => {
         <div className="mt-4 flex gap-2.5 rounded-xl border border-black/10 bg-[#fbfbf7] px-3.5 py-3">
           <Info className="mt-0.5 h-4 w-4 flex-none text-black/40" />
           <p className="text-xs leading-relaxed text-black/60">
-            These preferences are stored in this session only. Nothing on this screen currently changes what any real system
-            does with your data.
+            These preferences are saved to your account when you press Save. &ldquo;Let the career coach read my search&rdquo;
+            reaches the coach within a minute of saving. The others don&apos;t yet change what any other system does with your
+            data.
           </p>
         </div>
       </SettingsSection>
