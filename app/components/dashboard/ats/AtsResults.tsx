@@ -9,10 +9,14 @@ import Pill from "@/app/components/dashboard/ui/Pill";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import AddToPlanButton from "@/app/components/dashboard/plan/AddToPlanButton";
 import { scoreApplication, scoreTier } from "@/app/lib/dashboard/ats-stub";
 import { ATS_FIX_ITEMS, ATS_KEYWORDS } from "@/app/lib/dashboard/mock-data";
-import type { JobOption } from "@/app/lib/dashboard/job-options";
+import { TASK_LIMITS } from "@/app/lib/tasks/types";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
+
+/** Where an ATS fix on the plan leads: the resume it asks you to change. */
+const ATS_TASK_HREF = "/dashboard/resume";
 
 /**
  * The scan report. The number is computed live from the picked resume and
@@ -24,7 +28,11 @@ export interface AtsResultsProps {
   /** When this report was produced — null before the first scan. */
   scannedAt: Date | null;
   resumes: VaultDoc[];
-  job: JobOption | null;
+  /**
+   * The posting being scored against, or null for a general score. A job picked with "company, role, description" fits as-is.
+   * Its `id` (the saved job's) keys the fixes put on the plan, so the same fix against two postings is two tasks.
+   */
+  job: { id?: string; company: string; role: string; description: string } | null;
   fixedIds: Set<string>;
   queuedKeywordIds: Set<string>;
   onToggleFix: (id: string) => void;
@@ -59,7 +67,7 @@ const AtsResults: FC<AtsResultsProps> = ({
   const [keywordsOpen, setKeywordsOpen] = useState(true);
   const [reportDownloaded, setReportDownloaded] = useState(false);
 
-  const base = scoreApplication(resume.id, job?.jdText);
+  const base = scoreApplication(resume.id, job?.description);
   const lift = fixedIds.size * FIX_LIFT + queuedKeywordIds.size * KEYWORD_LIFT;
   const displayed = clamp(base.score + lift, 0, 100);
   const tier = scoreTier(displayed);
@@ -202,14 +210,31 @@ const AtsResults: FC<AtsResultsProps> = ({
         {ATS_FIX_ITEMS.map((item) => {
           const fixed = fixedIds.has(item.id);
           return (
-            <div key={item.id} className="flex items-center gap-4 border-b border-black/6 px-6 py-4 last:border-b-0">
-              <div className="min-w-0 flex-1">
+            <div key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2.5 border-b border-black/6 px-6 py-4 last:border-b-0">
+              <div className="min-w-0 flex-1 basis-[240px]">
                 <p className={cn("text-sm font-bold", fixed ? "text-black/40 line-through" : "text-primary")}>{item.label}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-black/50">{item.detail}</p>
               </div>
-              <StickerButton variant={fixed ? "outline" : "primary"} size="sm" className="flex-none" onClick={() => onToggleFix(item.id)}>
-                {fixed ? "Undo" : item.action}
-              </StickerButton>
+              <div className="flex flex-none items-start gap-2">
+                {/* Keyed on the fix and the posting, not the resume: one fix
+                    against one job is one task however many resumes are tried,
+                    and a general scan's fixes share "none". The source names
+                    the posting when there is one, since the fix is judged
+                    against it, and the resume otherwise. */}
+                <AddToPlanButton
+                  task={{
+                    title: item.label.slice(0, TASK_LIMITS.titleMax),
+                    detail: item.detail.slice(0, TASK_LIMITS.detailMax),
+                    href: ATS_TASK_HREF,
+                    dedupeKey: `ats:${item.id}:${job?.id || "none"}`,
+                    metadata: { resumeId: resume.id, jobId: job?.id || null },
+                  }}
+                  source={{ kind: "ats", ref: job?.id || resume.id }}
+                />
+                <StickerButton variant={fixed ? "outline" : "primary"} size="sm" className="flex-none" onClick={() => onToggleFix(item.id)}>
+                  {fixed ? "Undo" : item.action}
+                </StickerButton>
+              </div>
             </div>
           );
         })}
