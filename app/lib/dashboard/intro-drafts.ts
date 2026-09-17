@@ -7,8 +7,10 @@
 // A draft is a function of (who you're asking, what you're asking about, how
 // warm they are). Pure — a real generator replaces these templates.
 
-import type { JobOption } from "./job-options";
 import type { ReferralContact } from "./types";
+
+/** All a draft reads about the job: who is hiring, and for what. */
+type IntroJob = { company: string; role: string };
 
 export type DraftLength = "long" | "short";
 
@@ -19,17 +21,17 @@ const firstName = (name: string) => name.split(" ")[0];
  * "refer you" is nonsense — you're asking whether they know anyone. The screen
  * decides which case applies; this is the shape of the ask.
  */
-function isAdjacent(contact: ReferralContact, job: JobOption | undefined): boolean {
+function isAdjacent(contact: ReferralContact, job: IntroJob | undefined): boolean {
   return !!job && contact.company.toLowerCase() !== job.company.toLowerCase();
 }
 
-export function introSubject(contact: ReferralContact, job: JobOption | undefined): string {
+export function introSubject(contact: ReferralContact, job: IntroJob | undefined): string {
   if (!job) return `Quick question, ${firstName(contact.name)}`;
   if (isAdjacent(contact, job)) return `Do you know anyone at ${job.company}?`;
   return `${job.role} at ${job.company} — would you refer me?`;
 }
 
-export function draftIntro(contact: ReferralContact, job: JobOption | undefined, length: DraftLength): string {
+export function draftIntro(contact: ReferralContact, job: IntroJob | undefined, length: DraftLength): string {
   const name = firstName(contact.name);
   const role = job?.role ?? contact.targetRole;
   const company = job?.company ?? contact.company;

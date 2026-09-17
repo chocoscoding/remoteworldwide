@@ -11,8 +11,8 @@ import { FC, useState } from "react";
 import { FilePlus2 } from "lucide-react";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
-import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
-import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
+import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
+import type { PickedJob } from "@/app/lib/jobs/fields";
 import { useDocuments, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 import AtsLanding from "@/app/components/dashboard/ats/AtsLanding";
 import AtsResults from "@/app/components/dashboard/ats/AtsResults";
@@ -26,17 +26,18 @@ type AtsView = "score" | "resumes";
 // directly rather than importing a type from a route file.
 export type ResumeEntry = VaultDoc;
 
+// What a scan reads from a picked job: who it's for, and the posting to score
+// against. One constant feeds both the pick and the type, so they cannot drift.
+const ATS_JOB_SPEC = "company, role, description";
+type AtsJob = PickedJob<typeof ATS_JOB_SPEC>;
+
 const AtsClient: FC = () => {
   const { docs, addUploads, toggleArchive } = useDocuments();
+  const { pickJob } = useJobPicker();
 
   const [view, setView] = useState<AtsView>("score");
   const [resumeId, setResumeId] = useState<string | null>(null);
-  const [job, setJob] = useState<JobOption | null>(null);
-  const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  // Resume waiting on a job pick — kept apart from resumeId so cancelling the
-  // picker leaves you where you were instead of dumping you into results.
-  const [pendingResumeId, setPendingResumeId] = useState<string | null>(null);
+  const [job, setJob] = useState<AtsJob | null>(null);
   const [fixedIds, setFixedIds] = useState<Set<string>>(new Set());
   // When the current report was produced — drives the live "scanned X ago"
   // stamp on the results, and resets with every fresh scan.
@@ -61,24 +62,29 @@ const AtsClient: FC = () => {
   }
 
   function scoreVsJob(id: string) {
-    setPendingResumeId(id);
-    setPickerOpen(true);
+    void chooseJob(id);
   }
 
-  function handleJobChosen(next: JobOption) {
-    setJob(next);
-    if (pendingResumeId) setResumeId(pendingResumeId);
-    setPendingResumeId(null);
+  /**
+   * Pick a job, then score against it. `forResumeId` is the resume waiting on
+   * the pick, applied only once a job comes back, so cancelling the picker
+   * leaves you where you were instead of dumping you into results. Null keeps
+   * the resume already on screen (Change job).
+   */
+  async function chooseJob(forResumeId: string | null) {
+    const result = await pickJob(ATS_JOB_SPEC);
+    if (result.status !== "picked") return;
+    setJob(result.job);
+    if (forResumeId) setResumeId(forResumeId);
     resetReport();
-    setPickerOpen(false);
     setView("score");
   }
 
   /** Uploads land in the shared documents store (forced kind "resume", since
    *  this screen only scores resumes) — so My documents shows them too. */
-  function handleUpload(file: File): ResumeEntry {
-    const [entry] = addUploads([file], { kind: "resume" });
-    return entry;
+  async function handleUpload(file: File): Promise<ResumeEntry | null> {
+    const [entry] = await addUploads([file], { kind: "resume" });
+    return entry ?? null;
   }
 
   function toggleFix(id: string) {
@@ -159,10 +165,7 @@ const AtsClient: FC = () => {
               setResumeId(id);
               resetReport();
             }}
-            onChangeJob={() => {
-              setPendingResumeId(null);
-              setPickerOpen(true);
-            }}
+            onChangeJob={() => void chooseJob(null)}
             onRemoveJob={() => {
               setJob(null);
               resetReport();
@@ -171,21 +174,6 @@ const AtsClient: FC = () => {
           />
         )}
       </main>
-
-      <JobPickerDialog
-        open={pickerOpen}
-        onOpenChange={(v) => {
-          setPickerOpen(v);
-          if (!v) setPendingResumeId(null);
-        }}
-        jobs={jobs}
-        onPick={handleJobChosen}
-        onCreate={(input) => {
-          const created = createPastedJob(input);
-          setJobs((prev) => [created, ...prev]);
-          handleJobChosen(created);
-        }}
-      />
     </div>
   );
 };

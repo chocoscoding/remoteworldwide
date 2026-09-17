@@ -18,10 +18,10 @@ import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
+import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
-import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
-import { TIE_META } from "@/app/lib/dashboard/mock-data";
+import type { PickedJob } from "@/app/lib/jobs/fields";
+import { APPS, JD_CONTENT, TIE_META } from "@/app/lib/dashboard/mock-data";
 import type { TieKind } from "@/app/lib/dashboard/types";
 import ContactRow from "@/app/components/dashboard/referrals/ContactRow";
 import DraftPanel from "@/app/components/dashboard/referrals/DraftPanel";
@@ -39,26 +39,45 @@ const TIE_FILTERS: { id: TieFilter; label: string }[] = [
 
 const clampPage = (page: number, total: number) => Math.min(Math.max(page, 1), Math.max(total, 1));
 
+// Who's hiring, and for what: all a referral ask needs. One constant feeds
+// both the pick and the type, so they cannot drift.
+const REFERRAL_JOB_SPEC = "company, role";
+type ReferralJob = PickedJob<typeof REFERRAL_JOB_SPEC>;
+
+/**
+ * Companies that actually have a live role — what "Open role" filters on.
+ *
+ * Deliberately still the mock listings, not real ones: the contacts it filters
+ * are mock too, written against exactly these companies (see REFERRAL_CONTACTS),
+ * and real listings would match none of them. It used to be read off the
+ * picker's own job list, which is gone. A real version needs the backend to say
+ * which of a network's companies are hiring, once the network is real.
+ */
+const OPEN_ROLE_COMPANIES: ReadonlySet<string> = new Set(
+  [JD_CONTENT.company, ...APPS.map((a) => a.meta.split("·")[0].trim())].map((company) => company.toLowerCase()),
+);
+
 const ReferralsClient: FC = () => {
   const { contacts, askedContactIds, contactsForJob } = useNetwork();
   const params = useSearchParams();
+  const { pickJob } = useJobPicker();
 
-  // Read the deep link once, at mount — ?contact=ref-maria opens her draft and
-  // preselects the open job at her company so it lands job-tailored.
+  // Read the deep link once, at mount — ?contact=ref-maria opens her draft.
+  //
+  // It used to preselect "the open job at her company" from a mock list too.
+  // A job here is now always a saved job the picker returned, and a link cannot
+  // make that pick for you, so she opens untailored on All contacts, where her
+  // draft shows; Pick a job tailors it from there. (On the For a job tab with
+  // no job, the empty state would hide the very draft the link asked for.)
   const [deepLinked] = useState(() => {
     const id = params.get("contact");
     return id ? contacts.find((c) => c.id === id) : undefined;
   });
 
-  const [job, setJob] = useState<JobOption | null>(() => {
-    if (!deepLinked) return null;
-    return PLATFORM_JOBS.find((j) => j.company.toLowerCase() === deepLinked.company.toLowerCase()) ?? null;
-  });
-  const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
+  const [job, setJob] = useState<ReferralJob | null>(null);
   // Your contacts are the default view; narrowing to a job is the step you
-  // take from there (or arrive at via a deep link that already has one).
-  const [tab, setTab] = useState<Tab>(() => (deepLinked ? "job" : "all"));
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // take from there.
+  const [tab, setTab] = useState<Tab>("all");
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(deepLinked?.id ?? null);
   const [query, setQuery] = useState("");
@@ -73,8 +92,6 @@ const ReferralsClient: FC = () => {
   const paths = useMemo(() => (job ? contactsForJob(job.company) : null), [job, contactsForJob]);
   const selected = selectedId ? contacts.find((c) => c.id === selectedId) : undefined;
 
-  // Companies that actually have a live role — what "Open role" filters on.
-  const openRoleCompanies = useMemo(() => new Set(jobs.map((j) => j.company.toLowerCase())), [jobs]);
   const myTimezone = "GMT+1";
 
   const filteredAll = useMemo(() => {
@@ -82,13 +99,13 @@ const ReferralsClient: FC = () => {
     return contacts
       .filter((c) => {
         if (tieFilter !== "all" && c.tie !== tieFilter) return false;
-        if (openRoleOnly && !openRoleCompanies.has(c.company.toLowerCase())) return false;
+        if (openRoleOnly && !OPEN_ROLE_COMPANIES.has(c.company.toLowerCase())) return false;
         if (sameTzOnly && c.timezone !== myTimezone) return false;
         if (!q) return true;
         return `${c.name} ${c.company} ${c.role} ${c.targetRole}`.toLowerCase().includes(q);
       })
       .sort((a, b) => TIE_META[a.tie].rank - TIE_META[b.tie].rank);
-  }, [contacts, query, tieFilter, openRoleOnly, sameTzOnly, openRoleCompanies]);
+  }, [contacts, query, tieFilter, openRoleOnly, sameTzOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAll.length / pageSize));
   const currentPage = clampPage(page, totalPages);
@@ -106,9 +123,10 @@ const ReferralsClient: FC = () => {
     requestAnimationFrame(() => draftRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
-  function chooseJob(next: JobOption) {
-    setJob(next);
-    setPickerOpen(false);
+  async function chooseJob() {
+    const result = await pickJob(REFERRAL_JOB_SPEC);
+    if (result.status !== "picked") return;
+    setJob(result.job);
     setTab("job");
     setSelectedId(null);
   }
@@ -156,7 +174,7 @@ const ReferralsClient: FC = () => {
                 <p className="truncate text-[15px] font-bold text-white">{job.role}</p>
                 <p className="truncate text-xs text-white/60">
                   {job.company}
-                  {job.source === "pasted" && " · pasted in"}
+                  {job.source !== "platform" && " · pasted in"}
                   {paths && ` · ${paths.direct.length} ${paths.direct.length === 1 ? "person" : "people"} inside`}
                 </p>
               </div>
@@ -164,7 +182,7 @@ const ReferralsClient: FC = () => {
             <div className="flex flex-none items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setPickerOpen(true)}
+                onClick={chooseJob}
                 className="h-8 cursor-pointer rounded-lg border-[1.5px] border-white/30 px-3 text-xs font-semibold text-white transition-colors hover:border-white">
                 Change job
               </button>
@@ -202,7 +220,7 @@ const ReferralsClient: FC = () => {
               title="No job selected yet"
               body="Pick a role and this fills with the people who can get you in front of it."
               ctaLabel="Pick a job"
-              onCta={() => setPickerOpen(true)}
+              onCta={chooseJob}
             />
           ) : (
             <div className="flex flex-col gap-8">
@@ -384,17 +402,6 @@ const ReferralsClient: FC = () => {
         {tab === "all" && draftBlock && <div className="mt-8">{draftBlock}</div>}
       </main>
 
-      <JobPickerDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        jobs={jobs}
-        onPick={chooseJob}
-        onCreate={(input) => {
-          const created = createPastedJob(input);
-          setJobs((prev) => [created, ...prev]);
-          chooseJob(created);
-        }}
-      />
       <NetworkSourcesDialog open={sourcesOpen} onOpenChange={setSourcesOpen} />
     </div>
   );

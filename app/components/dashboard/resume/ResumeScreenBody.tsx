@@ -35,8 +35,8 @@ import CustomizeNav from "./CustomizeNav";
 import CustomizePanelsRail from "./CustomizePanelsRail";
 import AiAssistRail from "./AiAssistRail";
 import AiToolsList from "./AiToolsList";
-import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
-import { PLATFORM_JOBS, createPastedJob, type JobOption, type PastedJobInput } from "@/app/lib/dashboard/job-options";
+import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
+import type { PickedJob } from "@/app/lib/jobs/fields";
 import { ATS_KEYWORDS } from "@/app/lib/dashboard/mock-data";
 import {
   applyQuantify,
@@ -95,6 +95,12 @@ const ZOOM_BUTTON_CLASS =
 const TAILORED_SUMMARY =
   "Product designer with 6 years shipping design systems and developer-experience-focused workflow tools for distributed teams across four time zones.";
 
+// What Tailor and the ATS card's "Against a job" read from a picked job. Skills
+// and requirements are asked for but never required: a pasted posting may name
+// none. One constant feeds both the pick and the type, so they cannot drift.
+const RESUME_JOB_SPEC = "company, role, description, skills?, requirements?";
+type ResumeJob = PickedJob<typeof RESUME_JOB_SPEC>;
+
 export interface ResumeScreenBodyProps {
   documents: ResumeDocument[];
   activeDocId: string;
@@ -127,8 +133,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   const [quantifyApplied, setQuantifyApplied] = useState<Set<number>>(new Set());
   // One job picker, two reasons to open it: the Tailor tool rewrites content
   // against the job; the ATS card's "Against a job" only scores against it.
-  const [pickerFor, setPickerFor] = useState<"tailor" | "scan" | null>(null);
-  const [tailorJobs, setTailorJobs] = useState<JobOption[]>(PLATFORM_JOBS);
+  const { pickJob } = useJobPicker();
 
   const [keywordsAdded, setKeywordsAdded] = useState<Set<string>>(new Set());
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
@@ -278,7 +283,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
   const runAiTool = (id: string) => {
     if (id === "tailor") {
-      setPickerFor("tailor");
+      void pickJobFor("tailor");
       return;
     }
     setAiRunning(id);
@@ -347,10 +352,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   };
 
   /** Tailor lands here from the job picker — score moves like a real tailoring pass. */
-  const handleTailorJob = (job: JobOption) => {
-    setPickerFor(null);
+  const handleTailorJob = (job: ResumeJob) => {
     setAiRunning("tailor");
-    const result = tailorToJob(content, { company: job.company, role: job.role, jdText: job.jdText });
+    const target = { company: job.company, role: job.role, jdText: job.description };
+    const result = tailorToJob(content, target);
     // Stamped here, outside the setState updater — updaters may run twice.
     const stampedAt = new Date();
     const general = generalScoreFor(activeDocId);
@@ -359,7 +364,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
       "tailor",
       `Tailored to ${job.role} at ${job.company} — wove ${result.woven.map((w) => `"${w}"`).join(" and ")} in.`,
       () => {
-        setContent(result.content);
+        // Tailored against the content as it is when this lands, not as it was
+        // when Tailor was clicked: this handler now runs after an awaited pick,
+        // and another tool that finished while the picker was open must not be
+        // overwritten. `tailorToJob` is pure, so a doubled updater is harmless.
+        setContent((prev) => tailorToJob(prev, target).content);
         // Tailoring IS a job check — the ATS card names the job and the lift.
         setDocuments((prev) =>
           prev.map((d) =>
@@ -383,15 +392,22 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
     setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, before: null, score: general, scan: { kind: "general", at } } : d)));
   };
 
-  const handleScanJob = (job: JobOption) => {
-    setPickerFor(null);
+  const handleScanJob = (job: ResumeJob) => {
     const at = new Date();
     const general = generalScoreFor(activeDocId);
-    const { score } = scoreApplication(activeDocId, job.jdText);
+    const { score } = scoreApplication(activeDocId, job.description);
     const jobLabel = `${job.company} — ${job.role}`;
     setDocuments((prev) =>
       prev.map((d) => (d.id === activeDocId ? { ...d, before: general, score, scan: { kind: "job", at, job: jobLabel } } : d)),
     );
+  };
+
+  /** Both reasons start from the same pick; cancelling it leaves the document as it was. */
+  const pickJobFor = async (use: "tailor" | "scan") => {
+    const result = await pickJob(RESUME_JOB_SPEC);
+    if (result.status !== "picked") return;
+    if (use === "scan") handleScanJob(result.job);
+    else handleTailorJob(result.job);
   };
 
   /**
@@ -643,7 +659,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
                 scan={activeDoc.scan}
                 onRemoveScan={removeScan}
                 onScanGeneral={scanGeneral}
-                onScanAgainstJob={() => setPickerFor("scan")}
+                onScanAgainstJob={() => void pickJobFor("scan")}
                 keywordsAdded={keywordsAdded}
                 onToggleKeyword={toggleKeyword}
                 appliedSuggestions={appliedSuggestions}
@@ -660,23 +676,6 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
           </aside>
         </div>
       </main>
-
-      {/* The job source for both Tailor and the ATS card's "Against a job" —
-          the same picker the tracker and win log use. */}
-      <JobPickerDialog
-        open={pickerFor !== null}
-        onOpenChange={(open) => {
-          if (!open) setPickerFor(null);
-        }}
-        jobs={tailorJobs}
-        onPick={(job) => (pickerFor === "scan" ? handleScanJob(job) : handleTailorJob(job))}
-        onCreate={(input: PastedJobInput) => {
-          const job = createPastedJob(input);
-          setTailorJobs((prev) => [...prev, job]);
-          if (pickerFor === "scan") handleScanJob(job);
-          else handleTailorJob(job);
-        }}
-      />
 
       <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="resume" fileName={downloadFileName} />
       <NewResumeDialog open={newResumeOpen} onOpenChange={setNewResumeOpen} currentDocLabel={activeDoc.label} onCreate={createNewResume} />

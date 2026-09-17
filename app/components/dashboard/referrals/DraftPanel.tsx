@@ -12,7 +12,6 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import { draftIntro, introSubject, type DraftLength } from "@/app/lib/dashboard/intro-drafts";
 import { TIE_META } from "@/app/lib/dashboard/mock-data";
-import type { JobOption } from "@/app/lib/dashboard/job-options";
 import type { ReferralContact } from "@/app/lib/dashboard/types";
 
 const GHOST_BTN =
@@ -20,7 +19,8 @@ const GHOST_BTN =
 
 export interface DraftPanelProps {
   contact: ReferralContact;
-  job: JobOption | undefined;
+  /** Who is hiring, and for what. A job picked with "company, role" fits as-is. */
+  job: { company: string; role: string } | undefined;
 }
 
 /**

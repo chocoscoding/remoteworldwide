@@ -15,7 +15,7 @@ import { Lottie } from "lottie-react";
 export interface AtsLandingProps {
   resumes: VaultDoc[];
   /** Registers the upload and returns the new entry so it can be selected. */
-  onUpload: (file: File) => VaultDoc;
+  onUpload: (file: File) => Promise<VaultDoc | null>;
   onScoreGeneral: (resumeId: string) => void;
   onScoreVsJob: (resumeId: string) => void;
 }
@@ -24,11 +24,12 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  function handleFile(file: File | undefined) {
+  async function handleFile(file: File | undefined) {
     if (!file) return;
-    const entry = onUpload(file);
-    setSelectedId(entry.id);
+    // Cleared straight away so picking the same file twice still fires a change.
     if (fileRef.current) fileRef.current.value = "";
+    const entry = await onUpload(file);
+    if (entry) setSelectedId(entry.id);
   }
 
   return (

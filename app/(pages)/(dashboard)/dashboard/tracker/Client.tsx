@@ -29,8 +29,8 @@ import { cn } from "@/lib/utils";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import LogoMini from "@/app/components/svg/LogoMini";
-import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
-import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
+import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
+import type { PickedJob } from "@/app/lib/jobs/fields";
 import type { TrackerCard as TrackerCardData } from "@/app/lib/dashboard/types";
 import JobTimelineDialog from "@/app/components/dashboard/tracker/JobTimelineDialog";
 import InsightsDialog from "@/app/components/dashboard/tracker/InsightsDialog";
@@ -53,6 +53,12 @@ const VIEWS: ViewConfig[] = [
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
 ];
 
+// Company and role make a card. The link, location and salary are asked for
+// but never required: a job typed in by hand may have none of them. One
+// constant feeds both the pick and the type, so they cannot drift.
+const TRACKER_JOB_SPEC = "company, role, url?, location?, salary?";
+type TrackerJob = PickedJob<typeof TRACKER_JOB_SPEC>;
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
@@ -60,6 +66,7 @@ const VIEWS: ViewConfig[] = [
 const TrackerClient: FC = () => {
   const { collapsed: sidebarCollapsed } = useSidebarCollapse();
   const { columns, boardColumns, statusOf, setStatus, closeCard, addCard, commitDrop } = useTracker();
+  const { pickJob } = useJobPicker();
 
   const [view, setView] = useState<TrackerView>("board");
   const [activeCard, setActiveCard] = useState<TrackerCardData | null>(null);
@@ -68,8 +75,6 @@ const TrackerClient: FC = () => {
   // Timeline dialog target — an id, resolved against live columns each render
   // so a status change made inside the dialog is reflected immediately.
   const [openCardId, setOpenCardId] = useState<string | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
   // A completed drag fires a click on the source card as the pointer lifts —
   // this latch swallows exactly that one click so a drop never opens the
   // timeline dialog. Plain clicks (< the 6px activation distance) never start
@@ -142,8 +147,12 @@ const TrackerClient: FC = () => {
     setOpenCardId(null);
   }
 
-  function handleAddJob(job: JobOption) {
-    setAddOpen(false);
+  async function addJob() {
+    const result = await pickJob(TRACKER_JOB_SPEC);
+    if (result.status === "picked") handleAddJob(result.job);
+  }
+
+  function handleAddJob(job: TrackerJob) {
     const result = addCard(job);
     if (result.status === "duplicate") {
       toast("Already on your board", { description: `${job.company} — ${job.role}` });
@@ -214,7 +223,7 @@ const TrackerClient: FC = () => {
 
           {/* sm to sit level with the view switcher; opens the shared
               structured Add-job dialog, not the one-field log flow. */}
-          <StickerButton variant="primary" size="sm" onClick={() => setAddOpen(true)}>
+          <StickerButton variant="primary" size="sm" onClick={addJob}>
             <Plus className="h-3.5 w-3.5" />
             Add job
           </StickerButton>
@@ -304,17 +313,6 @@ const TrackerClient: FC = () => {
         onOpenChange={(v) => !v && setOpenCardId(null)}
       />
       <InsightsDialog open={insightsOpen} onOpenChange={setInsightsOpen} />
-      <JobPickerDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        jobs={jobs}
-        onPick={handleAddJob}
-        onCreate={(input) => {
-          const created = createPastedJob(input);
-          setJobs((prev) => [created, ...prev]);
-          handleAddJob(created);
-        }}
-      />
     </div>
   );
 };

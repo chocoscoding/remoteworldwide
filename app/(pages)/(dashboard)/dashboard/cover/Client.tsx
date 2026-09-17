@@ -10,8 +10,8 @@ import DownloadModal from "@/app/components/dashboard/modals/DownloadModal";
 import RichTextEditor from "@/app/components/dashboard/ui/RichTextEditor";
 import SplitButton from "@/app/components/dashboard/ui/SplitButton";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
-import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
-import { PLATFORM_JOBS, createPastedJob, type JobOption } from "@/app/lib/dashboard/job-options";
+import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
+import type { PickedJob } from "@/app/lib/jobs/fields";
 import { COVER_LETTER, RESUME } from "@/app/lib/dashboard/mock-data";
 import { Lottie } from "lottie-react";
 // ---------------------------------------------------------------------------
@@ -24,6 +24,12 @@ type ThemeId = "ats" | "bordered" | "warm";
 type FontId = "manrope" | "serif" | "mono";
 type SpacingId = "tight" | "normal" | "airy";
 type LetterheadId = "off" | "name" | "full";
+
+// What a letter needs from a picked job. The posting and its requirements are
+// asked for but optional: a letter can be written for a job nobody pasted the
+// description of. One constant feeds both the pick and the type.
+const COVER_JOB_SPEC = "company, role, description?, requirements?";
+type CoverJob = PickedJob<typeof COVER_JOB_SPEC>;
 
 const TONE_OPTIONS: { id: ToneId; label: string }[] = [
   { id: "warm", label: "Warm & direct" },
@@ -257,11 +263,10 @@ const CoverClient: FC = () => {
   // The job this letter is written for. Picking one is the only way in —
   // pasting a JD now happens inside the picker, alongside the platform's own
   // listings, instead of behind a separate "New cover letter" button.
-  const [jobs, setJobs] = useState<JobOption[]>(PLATFORM_JOBS);
+  const { pickJob } = useJobPicker();
   // Nobody arrives with a letter. The default state is the choice: write
   // your own, or create one from a job — nothing pre-linked, nothing assumed.
-  const [linkedJob, setLinkedJob] = useState<JobOption | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [linkedJob, setLinkedJob] = useState<CoverJob | null>(null);
 
   // Live editor contents. Seeded from the tone, then owned by the user.
   const [letterText, setLetterText] = useState("");
@@ -311,6 +316,13 @@ const CoverClient: FC = () => {
     }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handlePickJob = async () => {
+    const result = await pickJob(COVER_JOB_SPEC);
+    if (result.status !== "picked") return;
+    setLinkedJob(result.job);
+    setIsBlankDraft(false);
   };
 
   const handleTailor = () => {
@@ -389,7 +401,7 @@ const CoverClient: FC = () => {
             <div className=" grid w-full max-w-[560px] grid-cols-1 gap-3.5 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => setPickerOpen(true)}
+                onClick={handlePickJob}
                 className="group rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-5 text-left text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#e1f073] hover:shadow-[4px_4px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
                 <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
                   <Link2 className="h-4 w-4 text-[#e1f073]" />
@@ -447,7 +459,7 @@ const CoverClient: FC = () => {
                       Write from scratch
                     </StickerButton>
                   )}
-                  <StickerButton variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+                  <StickerButton variant="outline" size="sm" onClick={handlePickJob}>
                     <Link2 className="h-3.5 w-3.5" />
                     {linkedJob && !isBlankDraft ? "Change job" : "Pick a job"}
                   </StickerButton>
@@ -618,24 +630,6 @@ const CoverClient: FC = () => {
           </>
         )}
       </main>
-
-      <JobPickerDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        jobs={jobs}
-        onPick={(j) => {
-          setLinkedJob(j);
-          setIsBlankDraft(false);
-          setPickerOpen(false);
-        }}
-        onCreate={(input) => {
-          const created = createPastedJob(input);
-          setJobs((prev) => [created, ...prev]);
-          setLinkedJob(created);
-          setIsBlankDraft(false);
-          setPickerOpen(false);
-        }}
-      />
 
       <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="cover letter" fileName="Amara-Okafor-Cover-Letter" />
     </div>
