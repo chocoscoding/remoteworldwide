@@ -11,7 +11,11 @@ import SectionSave from "@/app/components/dashboard/settings/SectionSave";
 const EMAIL_ROWS: { key: keyof NotificationsState; label: string; hint: string }[] = [
   { key: "emailWeeklyDigest", label: "Weekly digest", hint: "Monday summary of applications, replies and what moved." },
   { key: "emailReplyAlerts", label: "Replies and status changes", hint: "When a company opens your resume or moves you along." },
-  { key: "emailPodActivity", label: "Pod activity", hint: "When someone in your pod lands an interview or hits a streak." },
+  {
+    key: "emailPodActivity",
+    label: "Pod activity",
+    hint: "When someone joins your pod, lands an interview or hits a streak. Changes to your own membership always reach you.",
+  },
   { key: "emailProductNews", label: "Product news", hint: "New features. Rare, and never a sales email." },
 ];
 

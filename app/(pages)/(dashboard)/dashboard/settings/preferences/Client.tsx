@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { useSettings, type Availability, type RemotePolicy } from "../SettingsProvider";
+import { useSettings, type Availability, type ExperienceBand, type RemotePolicy } from "../SettingsProvider";
 import { BUTTON_OUTLINE, Choice, INPUT, SettingsRow, SettingsSection, TagList, Toggle } from "@/app/components/dashboard/settings/settings-ui";
 import SectionSave from "@/app/components/dashboard/settings/SectionSave";
 
@@ -20,6 +20,17 @@ const AVAILABILITY: { id: Availability; label: string }[] = [
   { id: "two-weeks", label: "2 weeks" },
   { id: "month", label: "A month" },
   { id: "browsing", label: "Just looking" },
+];
+
+// "" is a real answer, not a missing one — pod matching reads your headline when you'd rather not
+// say. Ordered least to most, because the order is what decides where you land in a pod.
+const EXPERIENCE: { id: ExperienceBand | ""; label: string }[] = [
+  { id: "", label: "Rather not say" },
+  { id: "intern", label: "Intern" },
+  { id: "entry", label: "Entry" },
+  { id: "mid", label: "Mid" },
+  { id: "senior", label: "Senior" },
+  { id: "lead", label: "Lead+" },
 ];
 
 const REMOTE_HINT: Record<RemotePolicy, string> = {
@@ -94,6 +105,13 @@ const PreferencesClient: FC = () => {
               onChange={(e) => setPreferences({ minSalary: Math.max(0, Number(e.target.value) || 0) })}
             />
           </div>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Experience level"
+          hint="Used to build pods with a mix of experience rather than ten people stuck on the same problem."
+          stacked>
+          <Choice value={preferences.experienceLevel} options={EXPERIENCE} onChange={(v) => setPreferences({ experienceLevel: v })} />
         </SettingsRow>
 
         <SettingsRow label="Remote policy" hint={REMOTE_HINT[preferences.remotePolicy]} stacked>
