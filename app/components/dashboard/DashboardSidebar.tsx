@@ -27,9 +27,10 @@ import { cn } from "@/lib/utils";
 import LogoFull from "@/app/components/svg/LogoFull";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { useSidebarCollapse } from "./SidebarCollapseContext";
-import { photoOf } from "@/app/lib/dashboard/people-photos";
+import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
+import NotificationBell from "./notifications/NotificationBell";
 
 type NavItem = { id: string; label: string; href: string; icon: LucideIcon };
 type NavGroup = { label?: string; items: NavItem[] };
@@ -81,6 +82,17 @@ const DashboardSidebar: FC = () => {
   // meters cannot disagree. Not ActivityProvider.credits, which counts
   // referral credits earned through invites.
   const { subscription } = useBilling();
+  // The real account, not a mock lookup: whatever OAuth stored or the user
+  // uploaded, already resolved to a URL by the settings serializer.
+  const { profile } = useSettings();
+  const displayName = profile.fullName || "Your account";
+  const initials =
+    displayName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "?";
   const credits = subscription.creditBalance;
   const allowance = subscription.monthlyCredits || credits;
 
@@ -96,27 +108,35 @@ const DashboardSidebar: FC = () => {
         collapsed ? "w-[76px]" : "w-[252px]",
       )}>
       {/* Header */}
+      {/* The bell sits here because this is the only chrome on screen no matter which dashboard
+          route you are on — every screen draws its own header, so there is no topbar to use. */}
       <div
         className={cn("h-16 flex-none border-b border-black/8 flex items-center", collapsed ? "justify-center px-2" : "justify-between px-[18px]")}>
         {collapsed ? <LogoMini className="h-[22px] w-auto" /> : <LogoFull className="h-[19px] w-auto" />}
         {!collapsed && (
-          <button
-            type="button"
-            onClick={() => setCollapsed(true)}
-            aria-label="Collapse sidebar"
-            className="grid h-7 w-7 flex-none place-content-center rounded-lg text-black/40 hover:bg-[#f3f3ef] hover:text-black/70 transition-colors cursor-pointer">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
+          <div className="flex flex-none items-center gap-1">
+            <NotificationBell collapsed={false} />
+            <button
+              type="button"
+              onClick={() => setCollapsed(true)}
+              aria-label="Collapse sidebar"
+              className="grid h-7 w-7 flex-none place-content-center rounded-lg text-black/40 hover:bg-[#f3f3ef] hover:text-black/70 transition-colors cursor-pointer">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
       {collapsed && (
-        <button
-          type="button"
-          onClick={() => setCollapsed(false)}
-          aria-label="Expand sidebar"
-          className="mx-auto mt-2 grid h-7 w-7 flex-none place-content-center rounded-lg text-black/40 hover:bg-[#f3f3ef] hover:text-black/70 transition-colors cursor-pointer">
-          <ChevronRight className="h-4 w-4" />
-        </button>
+        <div className="mt-2 flex flex-col items-center gap-1">
+          <NotificationBell collapsed />
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            aria-label="Expand sidebar"
+            className="grid h-7 w-7 flex-none place-content-center rounded-lg text-black/40 hover:bg-[#f3f3ef] hover:text-black/70 transition-colors cursor-pointer">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       )}
 
       {/* Nav body */}
@@ -170,18 +190,18 @@ const DashboardSidebar: FC = () => {
             size={40}
             label={
               <span className="grid h-full w-full place-content-center overflow-hidden rounded-full bg-[#222325] text-xs font-extrabold text-[#e1f073]">
-                {photoOf("Chocos coding") ? (
+                {profile.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoOf("Chocos coding")!} alt="" className="h-full w-full object-cover" />
+                  <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  "AO"
+                  initials
                 )}
               </span>
             }
           />
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-primary truncate">Chocos coding</p>
+              <p className="text-[13px] font-bold text-primary truncate">{displayName}</p>
               <p className="text-[11px] text-black/50 truncate">{credits} credits left</p>
             </div>
           )}
