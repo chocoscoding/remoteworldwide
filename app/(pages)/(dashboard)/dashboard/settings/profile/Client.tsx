@@ -1,10 +1,11 @@
 "use client";
 
-import { FC, FormEvent, useState } from "react";
+import { FC, FormEvent, useRef, useState } from "react";
 import { Check, Plus, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
+import { useUploadAvatar } from "@/hooks/mutations/useAvatarMutation";
 import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagList } from "@/app/components/dashboard/settings/settings-ui";
 
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
@@ -12,6 +13,8 @@ const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"
 const ProfileClient: FC = () => {
   const { profile, setProfile, save, saving } = useSettings();
   const [skillDraft, setSkillDraft] = useState("");
+  const photoRef = useRef<HTMLInputElement | null>(null);
+  const uploadPhoto = useUploadAvatar();
 
   const initials = profile.fullName
     .split(" ")
@@ -45,13 +48,32 @@ const ProfileClient: FC = () => {
           </button>
         }>
         <div className="mb-5 flex items-center gap-4 border-b border-black/8 pb-5">
-          <span className="grid h-16 w-16 flex-none place-content-center rounded-full bg-[#222325] text-lg font-extrabold text-[#e1f073]">
-            {initials || "?"}
+          <span className="grid h-16 w-16 flex-none place-content-center overflow-hidden rounded-full bg-[#222325] text-lg font-extrabold text-[#e1f073]">
+            {profile.avatarUrl ? (
+              // A plain img, not next/image: the URL is signed and short-lived,
+              // and the initials below are the fallback when it stops resolving.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              initials || "?"
+            )}
           </span>
           <div className="min-w-0">
-            <button type="button" className={BUTTON_OUTLINE} onClick={() => toast("Photo upload isn't wired up yet.")}>
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                // Cleared first so picking the same file twice still fires.
+                e.target.value = "";
+                if (file) uploadPhoto.mutate(file);
+              }}
+            />
+            <button type="button" className={BUTTON_OUTLINE} disabled={uploadPhoto.isPending} onClick={() => photoRef.current?.click()}>
               <Upload className="h-3.5 w-3.5" />
-              Upload a photo
+              {uploadPhoto.isPending ? "Uploading…" : profile.avatarUrl ? "Change photo" : "Upload a photo"}
             </button>
             <p className="mt-1.5 text-xs text-black/45">JPG or PNG, at least 400×400.</p>
           </div>

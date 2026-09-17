@@ -9,6 +9,11 @@ declare module "next-auth" {
       email: string;
       image: string;
       role: "USER" | "ADMIN" | "AUTHOR";
+      /**
+       * Whether the address has been proven. Named apart from `emailVerified`, which Auth.js
+       * already defines as a Date — the only question asked here is whether to open the dashboard.
+       */
+      verified?: boolean;
     };
   }
 }

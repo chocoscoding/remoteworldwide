@@ -120,9 +120,16 @@ export default function LoginForm({
             />
           </div>
           <div className="space-y-2">
-            <Label className="font-bold" htmlFor={`password-${idPrefix}`}>
-              Password
-            </Label>
+            <div className="flex items-baseline justify-between gap-3">
+              <Label className="font-bold" htmlFor={`password-${idPrefix}`}>
+                Password
+              </Label>
+              {/* Next to the field it belongs to, which is where someone looks the moment the
+                  password they typed does not work. */}
+              <Link className={cn(brutalistLink, "text-sm")} href="/forgot-password">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Input
                 autoComplete="current-password"

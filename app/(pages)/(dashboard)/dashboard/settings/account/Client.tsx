@@ -1,22 +1,30 @@
 "use client";
 
 import { FC, useState } from "react";
-import { AlertTriangle, Check, LogOut, Mail } from "lucide-react";
+import { AlertTriangle, BadgeCheck, LogOut, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
+import { signOut } from "@/app/lib/authClient";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
+import ChangePassword from "@/app/components/dashboard/settings/ChangePassword";
+import { useResendVerification } from "@/hooks/mutations/useAccountMutations";
 import { BUTTON_DANGER, BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection } from "@/app/components/dashboard/settings/settings-ui";
 
 const CONFIRM_WORD = "DELETE";
 
-const AccountClient: FC = () => {
+const AccountClient: FC<{ verified: boolean }> = ({ verified }) => {
   const { profile, setProfile } = useSettings();
   const [confirm, setConfirm] = useState("");
+  const resend = useResendVerification();
 
   return (
     <>
       <SettingsSection title="Sign-in" description="How you get into Remote Worldwide.">
-        <SettingsRow label="Email" hint="Used for sign-in and every notification." stacked htmlFor="a-email">
+        <SettingsRow
+          label="Email"
+          hint={verified ? "Confirmed. Used for sign-in and every notification." : "Not confirmed yet — check your inbox for the link."}
+          stacked
+          htmlFor="a-email">
           <div className="flex flex-wrap gap-2">
             <input
               id="a-email"
@@ -25,13 +33,17 @@ const AccountClient: FC = () => {
               value={profile.email}
               onChange={(e) => setProfile({ email: e.target.value })}
             />
-            <button
-              type="button"
-              className={BUTTON_SOLID}
-              onClick={() => toast.success("Verification sent", { description: "Mock only — no email actually goes out." })}>
-              <Check className="h-3.5 w-3.5" />
-              Verify
-            </button>
+            {verified ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#f0f0ea] px-3 py-2 text-xs font-bold text-[#6c7a1e]">
+                <BadgeCheck className="h-3.5 w-3.5" />
+                Verified
+              </span>
+            ) : (
+              <button className={BUTTON_SOLID} disabled={resend.isPending} onClick={() => resend.mutate()} type="button">
+                <Send className="h-3.5 w-3.5" />
+                {resend.isPending ? "Sending…" : "Resend link"}
+              </button>
+            )}
           </div>
         </SettingsRow>
 
@@ -39,11 +51,7 @@ const AccountClient: FC = () => {
           <input id="a-phone" className={INPUT} value={profile.phone} onChange={(e) => setProfile({ phone: e.target.value })} />
         </SettingsRow>
 
-        <SettingsRow label="Password" hint="Last changed 3 months ago.">
-          <button type="button" className={BUTTON_OUTLINE} onClick={() => toast("Password changes aren't wired up in this build.")}>
-            Change password
-          </button>
-        </SettingsRow>
+        <ChangePassword />
       </SettingsSection>
 
       <SettingsSection title="Connected accounts" description="Sign in faster and keep your profile in sync.">
@@ -62,7 +70,7 @@ const AccountClient: FC = () => {
 
       <SettingsSection title="Session">
         <SettingsRow label="Sign out" hint="Ends this session on this device only.">
-          <button type="button" className={BUTTON_OUTLINE} onClick={() => toast("Sign-out isn't wired up from this screen.")}>
+          <button type="button" className={BUTTON_OUTLINE} onClick={() => signOut({ callbackUrl: "/" })}>
             <LogOut className="h-3.5 w-3.5" />
             Sign out
           </button>
