@@ -21,7 +21,6 @@ import type {
   HomeStat,
   IntroPipelineEntry,
   JdContent,
-  JdQaAnswer,
   JdQuickQuestion,
   PodGoal,
   QaItem,
@@ -859,51 +858,6 @@ export const JD_QUICK_QUESTIONS: JdQuickQuestion[] = [
   { id: "questions-to-ask", label: "Questions to ask them" },
 ];
 
-export const JD_QA_EXCHANGES: JdQaAnswer[] = [
-  {
-    id: "fit",
-    question: "Am I a fit for this role?",
-    verdict: "Strong fit. Your Paystack and Andela experience covers developer-facing tools and cross-timezone async work directly.",
-    missing: 'You don\'t yet have a bullet that names "developer experience" explicitly, which this JD repeats three times.',
-    tips: [
-      "Reframe the design-system documentation work as a developer-experience win, with the 40-engineer adoption number front and center.",
-      "Mention that you already prototype in code — the JD calls this out as a plus.",
-    ],
-  },
-  {
-    id: "really-asking",
-    question: "What are they really asking for?",
-    verdict:
-      "Beyond the listed skills, this reads like a team that got burned by a designer who couldn't work independently across time zones.",
-    missing: "There's no explicit mention of portfolio depth — they're weighting collaboration signals over pure craft in the copy.",
-    tips: [
-      "Lead your intro with how you work async, not just what you've shipped.",
-      "In the interview, ask how design and engineering currently hand off work — it tells you whether the async claim is real.",
-    ],
-  },
-  {
-    id: "salary",
-    question: "Is $140,000–$180,000 + equity reasonable for this role?",
-    verdict: "It's in range for a Senior IC design role at a Series-D+ developer tools company, and above your stated minimum of $70,000.",
-    missing: "The range doesn't specify equity refresh cadence — worth clarifying before final offer stage.",
-    tips: [
-      "Anchor any negotiation near the top third of the range given your systems + DX experience.",
-      "Ask whether the range is fixed globally or adjusted by location.",
-    ],
-  },
-  {
-    id: "questions-to-ask",
-    question: "What should I ask them in the screen?",
-    verdict:
-      'Good screens for this role usually cover team structure, how design debt gets prioritized, and what "senior" actually means day to day.',
-    missing: "The JD doesn't say who this role reports to — worth asking directly.",
-    tips: [
-      '"How is design headcount split across the deployment platform vs. the rest of the product?"',
-      '"What would make this hire feel like a clear win a year from now?"',
-    ],
-  },
-];
-
 // ---------------------------------------------------------------------------
 // Referrals
 // ---------------------------------------------------------------------------
@@ -915,9 +869,10 @@ export const TIE_META: Record<TieKind, { label: string; pillVariant: "positive" 
   alumni: { label: "Alumni", pillVariant: "neutral", rank: 2 },
 };
 
-// Most PLATFORM_JOBS companies (Vercel, Deel, Supabase, Linear, Cal.com,
-// Paystack, Ramp) resolve at least one direct path; Notion / Figma / Stripe
-// deliberately have none so the "open role" filter visibly excludes people.
+// Most companies with a mock opening (Vercel, Deel, Supabase, Linear, Cal.com,
+// Paystack, Ramp; see OPEN_ROLE_COMPANIES in dashboard/referrals/Client.tsx)
+// resolve at least one direct path; Notion / Figma / Stripe deliberately have
+// none so the "open role" filter visibly excludes people.
 export const REFERRAL_CONTACTS: ReferralContact[] = [
   {
     id: "ref-tunde",
