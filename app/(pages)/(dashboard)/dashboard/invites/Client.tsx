@@ -10,10 +10,7 @@ import DashPagination, { type PageSize } from "@/app/components/dashboard/ui/Das
 import Pill from "@/app/components/dashboard/ui/Pill";
 import type { PillProps } from "@/app/components/dashboard/ui/Pill";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
-import ShareChannelDialog, {
-  SHARE_CHANNELS,
-  type ShareChannel,
-} from "@/app/components/dashboard/invites/ShareChannelDialog";
+import ShareChannelDialog, { SHARE_CHANNELS, type ShareChannel } from "@/app/components/dashboard/invites/ShareChannelDialog";
 import type { InviteOverview, InviteRow } from "@/app/lib/invites/types";
 
 const DAY = 86_400_000;
@@ -29,18 +26,13 @@ function since(date: Date): string {
   return months === 1 ? "last month" : `${months} months ago`;
 }
 
-const statusMeta = (
-  row: InviteRow,
-  perSubscriber: number
-): { label: string; variant: NonNullable<PillProps["variant"]> } =>
+const statusMeta = (row: InviteRow, perSubscriber: number): { label: string; variant: NonNullable<PillProps["variant"]> } =>
   row.status === "subscribed"
     ? { label: `+${perSubscriber} credits`, variant: "positive" }
     : { label: "Not yet", variant: "outline-dashed" };
 
 const rowMeta = (row: InviteRow): string =>
-  row.status === "subscribed" && row.subscribedAt
-    ? `Subscribed ${since(row.subscribedAt)}`
-    : `Joined ${since(row.joinedAt)}`;
+  row.status === "subscribed" && row.subscribedAt ? `Subscribed ${since(row.subscribedAt)}` : `Joined ${since(row.joinedAt)}`;
 
 export interface InvitesClientProps {
   invites: InviteOverview;
@@ -85,8 +77,7 @@ const InvitesClient: FC<InvitesClientProps> = ({ invites, inviteUrl }) => {
           <div className="relative">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-primary/60">Your invite link</p>
             <p className="mb-6 max-w-[560px] text-[15px] font-semibold leading-relaxed text-primary/80">
-              Share your link and earn {invites.creditsPerSubscriber} credits every time someone who joins on it
-              subscribes — the only way credits are earned on Remote Worldwide.
+              Share your link and earn {invites.creditsPerSubscriber} credits every time someone who joins and subscribes.
             </p>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -120,7 +111,7 @@ const InvitesClient: FC<InvitesClientProps> = ({ invites, inviteUrl }) => {
 
         {/* People you invited */}
         <DashCard className="p-6">
-          <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="mb-0.5 flex items-center justify-between gap-3">
             <p className="text-[15px] font-bold text-primary">People you invited</p>
             {/* Referral credits are this page's own story — the gifts modal
                 deliberately knows nothing about them. */}
@@ -138,7 +129,7 @@ const InvitesClient: FC<InvitesClientProps> = ({ invites, inviteUrl }) => {
               bare
               icon={UserPlus}
               title="Nobody has used your link yet"
-              body="Send it to one person who is job hunting right now. They appear here the moment they sign up, and pay out when they subscribe."
+              body="Send it to one person who is job hunting right now."
               ctaLabel="Copy your link"
               onCta={handleCopy}
             />
