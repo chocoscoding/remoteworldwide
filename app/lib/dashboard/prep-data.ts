@@ -8,6 +8,12 @@
 // Round dates are computed relative to module-load time (same pattern as
 // mock-data.ts's POD_GOALS.proposedAt) rather than hardcoded, so the "in 2
 // days" framing never goes stale no matter when the app is opened.
+//
+// Sessions the AI service saved (Part 5) reuse these shapes with extra fields,
+// all optional, so a demo session built in memory is still a whole session.
+// The times on them are milliseconds into the session's recording.
+
+import type { BillingState, DeliveryReport, DeliverySummaryLine, LiveSttProvider, PrepSessionMode, PrepSessionStatus } from "@/app/lib/voice/types";
 
 export type SessionFormat = "behavioural" | "portfolio" | "salary";
 export type Difficulty = "warm-up" | "standard" | "tough";
@@ -58,6 +64,9 @@ export interface EvidenceItem {
   fix?: string;
   /** The question it answered, for context. */
   question?: string;
+  /** Where the line starts in the recording, for a chip that plays it. */
+  atMs?: number;
+  endMs?: number;
 }
 
 export interface DimensionScore {
@@ -89,6 +98,9 @@ export interface Rewrite {
   /** An authored exemplar for this question — not a literal edit of `said`. */
   better: string;
   why: string;
+  /** Where `said` was spoken in the recording. */
+  atMs?: number;
+  endMs?: number;
 }
 
 export interface ActionItem {
@@ -98,6 +110,9 @@ export interface ActionItem {
   effortMinutes: number;
   done: boolean;
   source: string;
+  /** The moment in the recording this action comes from. */
+  atMs?: number;
+  endMs?: number;
 }
 
 export interface TranscriptTurn {
@@ -105,6 +120,9 @@ export interface TranscriptTurn {
   who: "ai" | "user";
   text: string;
   questionId?: string;
+  /** For an answer, its window (the question ending to the send); for the interviewer, its own speech. */
+  startMs?: number;
+  endMs?: number;
 }
 
 export interface PrepSession {
@@ -125,6 +143,22 @@ export interface PrepSession {
   actionItems: ActionItem[];
   coachNote: string;
   tooShort: boolean;
+  /** The AI service's id for a saved session. Absent on a demo session, which lives in memory only. */
+  serverId?: string;
+  mode?: PrepSessionMode;
+  status?: PrepSessionStatus;
+  /** Measured pace, pauses, fillers, pitch variation and energy. Voice sessions only. */
+  delivery?: DeliveryReport;
+  /** The report's summary, a line at a time, each tied to a moment in the recording. */
+  summary?: DeliverySummaryLine[];
+  /** `credits` is null until the recording's length is known. */
+  billing?: { credits: number | null; state: BillingState };
+  /** The charge was refused: the graded sections are withheld until an unlock succeeds. */
+  locked?: boolean;
+  /** The user's 1-5 rating of the transcript's accuracy; null when not rated. */
+  rating?: number | null;
+  /** Who wrote the live captions. */
+  liveProvider?: LiveSttProvider;
 }
 
 export interface PrepTrack {
