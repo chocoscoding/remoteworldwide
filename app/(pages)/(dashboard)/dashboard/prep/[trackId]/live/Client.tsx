@@ -16,6 +16,8 @@ export interface LiveClientProps {
 }
 
 const DIFFICULTIES = ["warm-up", "standard", "tough"] as const;
+/** A shorter-session cap beyond this is not one the setup screen could have offered. */
+const CAP_MINUTES_MAX = 120;
 
 function parseConfig(searchParams: URLSearchParams): SessionConfig | null {
   const rawFormats = searchParams.get("format");
@@ -25,7 +27,12 @@ function parseConfig(searchParams: URLSearchParams): SessionConfig | null {
   if (formats.length === 0) return null;
   if (!difficulty || !DIFFICULTIES.includes(difficulty as (typeof DIFFICULTIES)[number])) return null;
   if (!SESSION_LENGTHS.includes(length as (typeof SESSION_LENGTHS)[number])) return null;
-  return { formats, difficulty: difficulty as SessionConfig["difficulty"], lengthMinutes: length as SessionConfig["lengthMinutes"] };
+  const config: SessionConfig = { formats, difficulty: difficulty as SessionConfig["difficulty"], lengthMinutes: length as SessionConfig["lengthMinutes"] };
+  // Links from before voice interviews carry no mode: they were typed sessions.
+  config.mode = searchParams.get("mode") === "voice" ? "voice" : "text";
+  const cap = Number(searchParams.get("cap"));
+  if (config.mode === "voice" && Number.isInteger(cap) && cap > 0 && cap <= CAP_MINUTES_MAX) config.capMinutes = cap;
+  return config;
 }
 
 const LiveClient: FC<LiveClientProps> = ({ trackId }) => {
@@ -41,10 +48,23 @@ const LiveClient: FC<LiveClientProps> = ({ trackId }) => {
     if (track && !config) router.replace(`/dashboard/prep/${trackId}/setup`);
   }, [track, config, trackId, router]);
 
+  // Only when the session could not be saved: the report is built in memory.
   function handleEnd(input: SessionInput) {
     const session = endSession(trackId, input);
     if (session) router.push(`/dashboard/prep/${trackId}/sessions/${session.id}`);
     else router.push(`/dashboard/prep/${trackId}`);
+  }
+
+  // A saved session's report is read from the AI service by its id.
+  function handleSaved(serverId: string) {
+    router.push(`/dashboard/prep/${trackId}/sessions/${encodeURIComponent(serverId)}`);
+  }
+
+  function handleSwitchToTyped() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("mode", "text");
+    params.delete("cap");
+    router.replace(`/dashboard/prep/${trackId}/live?${params.toString().replace(/%2C/g, ",")}`);
   }
 
   if (!track) {
@@ -57,7 +77,18 @@ const LiveClient: FC<LiveClientProps> = ({ trackId }) => {
 
   if (!config) return null; // redirecting via the effect above
 
-  return <PrepLive track={track} config={config} onEnd={handleEnd} />;
+  // Keyed by mode, so switching a voice session to typed starts the screen afresh.
+  return (
+    <PrepLive
+      key={config.mode ?? "text"}
+      track={track}
+      config={config}
+      onEnd={handleEnd}
+      onSaved={handleSaved}
+      onExit={() => router.push(`/dashboard/prep/${trackId}`)}
+      onSwitchToTyped={handleSwitchToTyped}
+    />
+  );
 };
 
 export default LiveClient;

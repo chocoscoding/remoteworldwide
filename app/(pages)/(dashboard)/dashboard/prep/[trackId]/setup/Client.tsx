@@ -27,8 +27,15 @@ const SetupClient: FC<SetupClientProps> = ({ trackId }) => {
   const track = getTrack(trackId);
   const initialFormats = parseFormats(searchParams.get("format"));
 
+  // The recording consent is not in the URL: PrepSetup hands it to the live
+  // page through sessionStorage (see RecordingConsent.tsx), so a shared or
+  // bookmarked link can never start a recording on its own.
   function handleStart(config: SessionConfig) {
-    router.push(`/dashboard/prep/${trackId}/live?format=${config.formats.join(",")}&difficulty=${config.difficulty}&length=${config.lengthMinutes}`);
+    const params = new URLSearchParams({ format: config.formats.join(","), difficulty: config.difficulty, length: String(config.lengthMinutes) });
+    params.set("mode", config.mode ?? "text");
+    if (config.mode === "voice" && config.capMinutes) params.set("cap", String(config.capMinutes));
+    // URLSearchParams would write the format list's commas as %2C; the live page reads either.
+    router.push(`/dashboard/prep/${trackId}/live?${params.toString().replace(/%2C/g, ",")}`);
   }
 
   if (!track) {
