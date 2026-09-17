@@ -9,13 +9,18 @@
 // by prep/layout.tsx — scoped to the /dashboard/prep/** tree only, not lifted
 // to DashboardShell, since nothing outside this feature reads it.
 //
-// Still mock-only: everything here is in-memory and resets on a hard reload,
-// same as every other dashboard domain.
+// The tracks are still mock-only: in memory, reset on a hard reload. Sessions
+// are half and half. A demo session scored in the browser lives here like
+// the tracks; a session the AI service saved (Part 5: voice or typed) is read
+// from the service and merged into its track's `sessions` on the way out, so
+// every screen reading a track sees both without knowing which is which.
 
-import { createContext, useContext, type FC, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type FC, type ReactNode } from "react";
 import { useState } from "react";
 import { PREP_TRACKS, createTrack, type NewTrackInput, type PrepSession, type PrepTrack, type RoundOutcome } from "@/app/lib/dashboard/prep-data";
 import { buildSessionReport, researchPanel, type SessionInput } from "@/app/lib/dashboard/prep-engine";
+import { mergeServerSessions } from "@/app/lib/voice/mapSession";
+import { usePrepSessions } from "@/hooks/queries/usePrepSessionQueries";
 
 interface PrepContextValue {
   tracks: PrepTrack[];
@@ -32,7 +37,21 @@ interface PrepContextValue {
 const PrepContext = createContext<PrepContextValue | null>(null);
 
 export const PrepProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [tracks, setTracks] = useState<PrepTrack[]>(PREP_TRACKS);
+  const [localTracks, setTracks] = useState<PrepTrack[]>(PREP_TRACKS);
+
+  // Every track's saved sessions in one read (the service's newest 50). Only
+  // scored ones join a track here, because the preparedness score averages
+  // them; the hub lists the rest (in flight, failed, locked) from its own
+  // per-track read. A failed read leaves the demo sessions as they were.
+  const { data: saved } = usePrepSessions();
+  const savedSessions = saved?.sessions;
+  const tracks = useMemo(() => {
+    if (!savedSessions || savedSessions.length === 0) return localTracks;
+    return localTracks.map((track) => {
+      const sessions = mergeServerSessions(track, savedSessions);
+      return sessions === track.sessions ? track : { ...track, sessions };
+    });
+  }, [localTracks, savedSessions]);
 
   function updateTrack(id: string, fn: (t: PrepTrack) => PrepTrack) {
     setTracks((prev) => prev.map((t) => (t.id === id ? fn(t) : t)));

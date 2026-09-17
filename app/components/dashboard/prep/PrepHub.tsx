@@ -8,7 +8,11 @@ import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import { computePreparedness } from "@/app/lib/dashboard/prep-engine";
 import { formatsLabel } from "@/app/lib/dashboard/prep-data";
-import type { PrepTrack, ReadinessStatus, RoundOutcome, SessionFormat } from "@/app/lib/dashboard/prep-data";
+import type { PrepSession, PrepTrack, ReadinessStatus, RoundOutcome, SessionFormat } from "@/app/lib/dashboard/prep-data";
+import { formatDuration } from "@/app/lib/voice/format";
+import { sessionBelongsTo } from "@/app/lib/voice/mapSession";
+import type { BillingState, PrepSessionMode, PrepSessionStatus, PrepSessionSummary } from "@/app/lib/voice/types";
+import { usePrepSessions } from "@/hooks/queries/usePrepSessionQueries";
 import type { ChipTone } from "./Chip";
 import Chip from "./Chip";
 import PrepEmptyState from "./PrepEmptyState";
@@ -26,6 +30,95 @@ const READINESS: Record<ReadinessStatus, { label: string; tone: ChipTone }> = {
   "needs-work": { label: "Needs work", tone: "red" },
   new: { label: "Not practised", tone: "white" },
 };
+
+/**
+ * A saved session's state as a chip, for the rows that have no score to show
+ * yet. Locked wins over ready: the report exists but can't be opened until it
+ * is paid for, which is the thing the user needs to act on.
+ */
+export function savedSessionChip(status: PrepSessionStatus, locked: boolean): { label: string; tone: ChipTone } {
+  if (locked) return { label: "Locked", tone: "red" };
+  switch (status) {
+    case "open":
+      return { label: "Recording", tone: "blue" };
+    case "uploading":
+      return { label: "Saving", tone: "blue" };
+    case "queued":
+    case "processing":
+      return { label: "Analysing", tone: "blue" };
+    case "delayed":
+      return { label: "Delayed", tone: "white" };
+    case "failed":
+      return { label: "Failed", tone: "red" };
+    case "deleting":
+      return { label: "Deleting", tone: "white" };
+    default:
+      return { label: "Ready", tone: "green" };
+  }
+}
+
+const MODE_LABEL: Record<PrepSessionMode, string> = { voice: "Voice interview", text: "Typed interview" };
+
+/**
+ * One line of the track's history. Saved sessions (from the service) and demo
+ * sessions (in memory) read differently, so both are reduced to what a row
+ * shows before they are listed together, newest first.
+ */
+interface HistoryRow {
+  id: string;
+  /** ISO. When it finished, or when it started if it hasn't. */
+  at: string;
+  title: string;
+  length: string;
+  /** Null when there is no score to show (too short, or not graded yet). */
+  score: number | null;
+  /** Null for a demo session, which is scored the moment it ends. */
+  status: PrepSessionStatus | null;
+  locked: boolean;
+  cost: string | null;
+}
+
+/** What the session cost, once that is settled; nothing while it isn't. */
+function costLabel(credits: number | null, state: BillingState | null): string | null {
+  if (state === "not-charged") return "No charge";
+  if ((state === "charged" || state === "unbilled") && credits !== null) return `${credits} ${credits === 1 ? "credit" : "credits"}`;
+  return null;
+}
+
+function savedRow(summary: PrepSessionSummary): HistoryRow {
+  return {
+    id: summary.id,
+    at: summary.completedAt ?? summary.createdAt,
+    title: MODE_LABEL[summary.mode],
+    length: summary.durationMs !== null ? formatDuration(summary.durationMs) : `${summary.lengthMinutes} min`,
+    score: summary.overallScore,
+    status: summary.status,
+    locked: summary.locked,
+    cost: costLabel(summary.billing.credits, summary.billing.state),
+  };
+}
+
+/** A demo session, or a saved one PrepProvider merged in before this track's own list arrived. */
+function memoryRow(session: PrepSession): HistoryRow {
+  return {
+    id: session.id,
+    at: session.completedAt,
+    title: session.formats.length === 0 && session.mode ? MODE_LABEL[session.mode] : formatsLabel(session.formats),
+    length: session.delivery ? formatDuration(session.delivery.durationMs) : `${session.lengthMinutes} min`,
+    score: session.tooShort ? null : session.overallScore,
+    status: session.status ?? null,
+    locked: session.locked ?? false,
+    cost: session.billing ? costLabel(session.billing.credits, session.billing.state) : null,
+  };
+}
+
+const timeOf = (iso: string) => {
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : 0;
+};
+
+/** Graded and readable: the row shows a score. */
+const isScored = (row: HistoryRow) => (row.status === null || row.status === "ready") && !row.locked;
 
 export interface PrepHubProps {
   track: PrepTrack;
@@ -51,15 +144,27 @@ const PrepHub: FC<PrepHubProps> = ({ track: trackProp, now, onBack, onStartSessi
   const doneActions = track.actions.filter((a) => a.done).length;
   const roundPassed = Boolean(track.roundDate && new Date(track.roundDate) < now);
   const showOutcomeBanner = roundPassed && track.outcome === null;
-  const lastSession = track.sessions[track.sessions.length - 1];
+
+  // Every session on this track, saved and demo, newest first. The track's own
+  // `sessions` holds only scored ones (the preparedness score averages them),
+  // so the saved sessions still being analysed, failed or locked come from
+  // this track's list. The company check keeps an older track's sessions off
+  // a new track that reused its id.
+  const { data: savedList } = usePrepSessions({ trackId: trackProp.id });
+  const savedSessions = preview === "empty" ? [] : (savedList?.sessions ?? []).filter((s) => s.status !== "deleting" && sessionBelongsTo(trackProp, s));
+  const savedIds = new Set(savedSessions.map((s) => s.id));
+  const history = [...savedSessions.map(savedRow), ...track.sessions.filter((s) => !savedIds.has(s.serverId ?? s.id)).map(memoryRow)].sort(
+    (a, b) => timeOf(b.at) - timeOf(a.at)
+  );
+  const lastSession = history[0];
 
   const state = trackState(track, now);
   const dateLabel = roundDateLabel(track);
 
   function handleResearch() {
     setResearching(true);
-    // Simulated latency, same convention as parse-jd.ts's parseJobUrl delay —
-    // the mutation itself (populating track.panel) is owned by the provider.
+    // Simulated latency: researching the panel is still a mock, and the
+    // mutation itself (populating track.panel) is owned by the provider.
     setTimeout(() => {
       setResearching(false);
       onResearchPanel();
@@ -70,7 +175,7 @@ const PrepHub: FC<PrepHubProps> = ({ track: trackProp, now, onBack, onStartSessi
     { id: "overview", label: "Overview" },
     { id: "panel", label: "Panel", count: track.panel.length },
     { id: "questions", label: "Questions", count: track.questions.length },
-    { id: "sessions", label: "Sessions", count: track.sessions.length },
+    { id: "sessions", label: "Sessions", count: history.length },
     { id: "actions", label: "Actions", count: track.actions.length },
   ];
 
@@ -275,7 +380,7 @@ const PrepHub: FC<PrepHubProps> = ({ track: trackProp, now, onBack, onStartSessi
               )}
             </div>
 
-            {track.sessions.length === 0 ? (
+            {!lastSession ? (
               <div className={cn(PANEL, "p-5")}>
                 <p className="text-sm font-bold text-primary mb-1">No sessions yet</p>
                 <p className="text-sm text-black/50 leading-relaxed mb-4">Your score stays at 0 until you run one. Six minutes gives you a scorecard and a first checklist.</p>
@@ -287,10 +392,15 @@ const PrepHub: FC<PrepHubProps> = ({ track: trackProp, now, onBack, onStartSessi
               <div className={cn(PANEL, "p-5")}>
                 <div className="flex items-baseline justify-between gap-3 mb-1">
                   <p className="text-sm font-bold text-primary">Last session</p>
-                  <span className="text-xs text-black/45">{formatsLabel(lastSession.formats)}</span>
+                  <span className="text-xs text-black/45">{lastSession.title}</span>
                 </div>
                 <p className="text-xs text-black/45 mb-4">
-                  {formatDate(new Date(lastSession.completedAt), "EEE d MMM")} · {lastSession.tooShort ? "not scored" : `${lastSession.overallScore}/100`}
+                  {formatDate(new Date(lastSession.at), "EEE d MMM")} ·{" "}
+                  {lastSession.status !== null && !isScored(lastSession)
+                    ? savedSessionChip(lastSession.status, lastSession.locked).label.toLowerCase()
+                    : lastSession.score === null
+                      ? "not scored"
+                      : `${lastSession.score}/100`}
                 </p>
                 <button type="button" onClick={() => onViewReport(lastSession.id)} className={BUTTON_OUTLINE}>
                   View full report
@@ -366,27 +476,35 @@ const PrepHub: FC<PrepHubProps> = ({ track: trackProp, now, onBack, onStartSessi
 
       {tab === "sessions" && (
         <div className={cn(PANEL, "overflow-hidden")}>
-          {track.sessions.length === 0 ? (
+          {history.length === 0 ? (
             <PrepEmptyState bare icon={Mic} title="No sessions yet" body="Run a mock interview to start building history here." ctaLabel="Start a session" onCta={() => onStartSession()} />
           ) : (
-            [...track.sessions].reverse().map((s) => (
-              <div key={s.id} className="flex items-center gap-4 px-5 py-3.5 border-b border-black/10 last:border-b-0 hover:bg-[#fbfbf7] transition-colors">
-                <button type="button" onClick={() => onViewReport(s.id)} className="min-w-0 flex-1 text-left cursor-pointer">
-                  <span className="block text-sm font-bold text-primary">{formatsLabel(s.formats)}</span>
-                  <span className="block text-xs text-black/45">
-                    {formatDate(new Date(s.completedAt), "EEE d MMM")} · {s.lengthMinutes} min
-                  </span>
-                </button>
-                <ScoreRing
-                  value={s.tooShort ? 0 : s.overallScore}
-                  size={34}
-                  label={<span className="text-[10.5px] font-bold text-primary tabular-nums">{s.tooShort ? "—" : s.overallScore}</span>}
-                />
-                <button type="button" onClick={() => onViewReport(s.id)} aria-label="View this session's report" className={ICON_BUTTON_PRESS}>
-                  <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
-                </button>
-              </div>
-            ))
+            history.map((s) => {
+              const chip = s.status !== null && !isScored(s) ? savedSessionChip(s.status, s.locked) : null;
+              return (
+                <div key={s.id} className="flex items-center gap-4 px-5 py-3.5 border-b border-black/10 last:border-b-0 hover:bg-[#fbfbf7] transition-colors">
+                  <button type="button" onClick={() => onViewReport(s.id)} className="min-w-0 flex-1 text-left cursor-pointer">
+                    <span className="block text-sm font-bold text-primary">{s.title}</span>
+                    <span className="block text-xs text-black/45">
+                      {formatDate(new Date(s.at), "EEE d MMM")} · {s.length}
+                      {s.cost && ` · ${s.cost}`}
+                    </span>
+                  </button>
+                  {chip ? (
+                    <Chip tone={chip.tone}>{chip.label}</Chip>
+                  ) : (
+                    <ScoreRing
+                      value={s.score ?? 0}
+                      size={34}
+                      label={<span className="text-[10.5px] font-bold text-primary tabular-nums">{s.score ?? "—"}</span>}
+                    />
+                  )}
+                  <button type="button" onClick={() => onViewReport(s.id)} aria-label="View this session's report" className={ICON_BUTTON_PRESS}>
+                    <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       )}

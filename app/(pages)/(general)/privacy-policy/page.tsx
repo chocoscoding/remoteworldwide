@@ -6,7 +6,7 @@ import { absoluteUrl, SITE_NAME, SITE_URL } from "@/app/lib/seo";
 const COMPANY = "Remote Worldwide";
 const CONTACT_EMAIL = "hello@remoteworldwide.net";
 const JURISDICTION = "Nigeria";
-const LAST_UPDATED = "8 September 2026";
+const LAST_UPDATED = "16 September 2026";
 
 const TITLE = `Privacy Policy — ${SITE_NAME}`;
 const DESCRIPTION = `What ${SITE_NAME} collects, why we collect it, who we share it with, and how to get it deleted.`;
@@ -127,6 +127,53 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
     ),
   },
   {
+    id: "voice-recordings",
+    title: "Voice recordings",
+    body: (
+      <>
+        <p>
+          Interview practice can be done out loud. <strong>We record only when you tick the recording box for that session.</strong> The box starts
+          unticked every time, and a typed practice session records nothing.
+        </p>
+        <p>When you record a session:</p>
+        <ul>
+          <li>
+            your microphone is recorded in your browser and uploaded in short pieces while you speak. It records whatever it picks up, including the
+            interviewer&rsquo;s questions if they play through your speakers, so headphones keep the recording to your answers;
+          </li>
+          <li>
+            <strong>Amazon Web Services (AWS) Transcribe</strong> turns the recording into the transcript in your report, and usually writes the live
+            captions you see while you speak;
+          </li>
+          <li>
+            the recording is stored in <strong>Amazon S3</strong>, in the AWS region we run the service in, so you can play it back from your
+            report;
+          </li>
+          <li>
+            our own delivery analysis service measures how you used your voice: your pace, pauses, filler words, pitch movement and loudness, each
+            compared with the rest of your own session. Our AI provider then writes the report from those numbers and the transcript; it never
+            receives the audio;
+          </li>
+          <li>
+            we do not use recordings to identify you, and nothing we run tries to read your mood or feelings, or to guess where you are from by the
+            way you speak.
+          </li>
+        </ul>
+        <p>
+          <strong>How long we keep them.</strong> A recording, its transcript and its report are kept until you delete that session (from its
+          report) or close your account; then they are removed from storage. The upload pieces and working copies made for transcription are
+          deleted automatically, within a week at most.
+        </p>
+        <p>
+          <strong>Dictation is different.</strong> The microphone button in the career coach, Ask about a job and typed interview practice uses
+          your browser&rsquo;s own speech service, and the live captions in a recorded session sometimes come from it instead of AWS. Audio sent
+          that way is not stored by us, but your browser may send it to its maker to turn into text: in Chrome, that is Google. Browsers without
+          a speech service don&rsquo;t show the button.
+        </p>
+      </>
+    ),
+  },
+  {
     id: "sharing",
     title: "Who we share it with",
     body: (
@@ -141,6 +188,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           <li>Google and GitHub, if you choose to sign in with them;</li>
           <li>Cloudinary, which stores images and files you upload;</li>
           <li>our AI provider, for the tools described above;</li>
+          <li>Amazon Web Services, which transcribes and stores the voice interview recordings you choose to make;</li>
           <li>analytics, to understand aggregate usage;</li>
           <li>email delivery, when we send you a guide or a newsletter.</li>
         </ul>
@@ -180,6 +228,10 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           <li>
             <strong>Account and content</strong> — until you delete it or close your account, then removed from live systems, with backups
             ageing out shortly after.
+          </li>
+          <li>
+            <strong>Voice recordings</strong> — until you delete the session or close your account, as described in{" "}
+            <a href="#voice-recordings">Voice recordings</a>.
           </li>
           <li>
             <strong>Email subscriptions</strong> — until you unsubscribe. We keep a record that you unsubscribed so we do not email you
