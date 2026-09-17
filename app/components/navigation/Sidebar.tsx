@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -61,6 +61,7 @@ const menuItemsForAdmin: MenuItem[] = [
     path: "/automation",
     section: "automation",
   },
+  { name: "STT lab", icon: AudioLines, path: "/stt-lab", section: "stt-lab" },
 ];
 const menuItemsForAuthor: MenuItem[] = [
   { name: "Home", icon: Home, path: "/", section: "home" },
