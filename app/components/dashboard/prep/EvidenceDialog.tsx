@@ -5,6 +5,7 @@ import { Lightbulb, Quote } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { EvidenceItem } from "@/app/lib/dashboard/prep-data";
+import TimestampChip from "./delivery/TimestampChip";
 
 /**
  * The drill-down behind a score or a stat.
@@ -50,7 +51,14 @@ const EvidenceDialog: FC<EvidenceDialogProps> = ({ open, onOpenChange, title, va
             </p>
             {evidence.map((e) => (
               <div key={e.id} className="rounded-xl border border-black/10 overflow-hidden">
-                {e.question && <p className="px-3.5 pt-3 text-xs font-bold text-black/45">On: {e.question}</p>}
+                {/* A timed line gets a chip that plays it. The dialog doesn't
+                    pause anything, so the recording keeps playing behind it. */}
+                {(e.question || e.atMs !== undefined) && (
+                  <div className="flex items-start justify-between gap-3 px-3.5 pt-3">
+                    {e.question ? <p className="text-xs font-bold text-black/45">On: {e.question}</p> : <span />}
+                    {e.atMs !== undefined && <TimestampChip atMs={e.atMs} endMs={e.endMs} />}
+                  </div>
+                )}
                 <div className="px-3.5 py-3">
                   <p className="flex gap-2 text-sm text-black/70 leading-relaxed">
                     <Quote className="h-3.5 w-3.5 flex-none text-black/25 mt-1" />
