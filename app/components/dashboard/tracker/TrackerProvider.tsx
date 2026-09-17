@@ -11,22 +11,36 @@
 // Mount order matters — this sits INSIDE ActivityProvider (every move is a
 // logged action) and inside WinProvider (landing in Offer offers the win log).
 //
-// Mock-only: in-memory, resets on reload. Every mutation here is the seam a
-// real applications table fills.
+// The source is the applications table (Part 2 Phase B). Columns and the
+// closed list are derived from one cached list, `useApplications()`, grouped
+// by status and ordered by position, so the tracker, Home's follow-ups and the
+// log dialog's duplicate check all read the same rows. Every mutation writes
+// that cache first and the server second (hooks/mutations/
+// useApplicationMutations.ts), and the rewards, toasts and Undo around each
+// move fire exactly where they always did.
 
-import { createContext, useContext, useRef, useState, type FC, type ReactNode } from "react";
-import { usePersistedState } from "@/app/lib/persist/usePersistedState";
+import { createContext, useContext, useEffect, useMemo, useRef, type FC, type ReactNode } from "react";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useWin } from "@/app/components/dashboard/win/WinProvider";
-import { TRACKER_CLOSED_CARDS, TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
-import type { JobOption } from "@/app/lib/dashboard/job-options";
+import { apiMessage } from "@/app/lib/api/core";
+import {
+  applicationInput,
+  compareByClosedAt,
+  compareByPosition,
+  isObjectId,
+  newClientId,
+  planDropPositions,
+  toTrackerCard,
+  topPosition,
+} from "@/app/lib/applications/api";
+import type { ApplicationItem } from "@/app/lib/applications/types";
+import type { JobSource } from "@/app/lib/jobs/types";
 import type { TrackerCard, TrackerClosedReason, TrackerColumn, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
-import { CLOSED_META, CLOSED_ORDER, COLUMN_LABELS, isClosedStatus } from "./tracker-meta";
-
-/** Bump to discard persisted boards whose shape predates a change. */
-const BOARD_VERSION = 1;
+import { useCreateApplication, useUpdateApplication } from "@/hooks/mutations/useApplicationMutations";
+import { useApplications } from "@/hooks/queries/useApplicationsQuery";
+import { CLOSED_META, CLOSED_ORDER, COLUMN_LABELS, STATUS_ORDER, isClosedStatus } from "./tracker-meta";
 
 /** One card plus where it currently sits — what every cross-screen reader wants. */
 export interface PlacedCard {
@@ -62,62 +76,81 @@ interface TrackerContextValue {
   moveCard: (cardId: string, to: TrackerColumnId) => void;
   closeCard: (cardId: string, reason: TrackerClosedReason) => void;
   reopenCard: (cardId: string) => void;
-  addCard: (job: JobOption) => AddCardResult;
+  addCard: (job: { company: string; role: string; source: JobSource }) => AddCardResult;
   /** Commits a dnd-kit drop: reorder within a column, or move between them. */
   commitDrop: (activeId: string, overId: string) => void;
   /** Marks an application touched today, restarting its silence clock. */
   touchCard: (cardId: string) => void;
 }
 
+/**
+ * What the tracker's job picker hands `addCard` beyond the three fields the
+ * context promises. Optional, so every caller of that signature still fits;
+ * read when present, so a picked job arrives with its link, its location and
+ * the saved job it came from.
+ */
+interface PickedJobExtras {
+  id?: string;
+  url?: string | null;
+  location?: string | null;
+}
+
 const TrackerContext = createContext<TrackerContextValue | null>(null);
 
+/** One empty list for every render with nothing loaded, so the derived board keeps its identity. */
+const NO_APPLICATIONS: ApplicationItem[] = [];
+
 export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { applications, recordAction, awardStrongEvent } = useActivity();
+  const { recordAction, awardStrongEvent } = useActivity();
   const { openWinLog } = useWin();
+  const applications = useApplications();
+  const createApplication = useCreateApplication();
+  const updateApplication = useUpdateApplication();
 
-  // Persisted: the board is the user's actual work, and losing ten minutes of
-  // dragging to a refresh is indefensible. Bump BOARD_VERSION whenever the card
-  // or column shape changes so an old payload is discarded rather than
-  // hydrated into components that no longer understand it. When the tracker
-  // moves onto React Query these two lines go back to plain useState and the
-  // query-cache persister takes over.
-  const [columns, setColumns] = usePersistedState<TrackerColumn[]>("tracker.board", BOARD_VERSION, () =>
-    TRACKER_COLUMNS.map((col) => ({ ...col, cards: [...col.cards] })),
-  );
-  const [closed, setClosed] = usePersistedState<TrackerCard[]>("tracker.closed", BOARD_VERSION, () => [...TRACKER_CLOSED_CARDS]);
-  const addSeq = useRef(0);
+  const items = applications.data ?? NO_APPLICATIONS;
+  // "Now" for every day count on the board is when the cache last changed.
+  // Reading the clock during render is impure, and every read and every
+  // optimistic write moves this forward anyway.
+  const now = applications.dataUpdatedAt;
 
-  // Applications logged anywhere in the app land here. Folded in during render
-  // using React's "adjust state when input changes" pattern — an effect would
-  // paint the stale board first, then correct it.
-  const [mergedIds, setMergedIds] = useState<string[]>([]);
-  const pending = applications.filter((a) => !mergedIds.includes(a.id));
-  if (pending.length > 0) {
-    setMergedIds(applications.map((a) => a.id));
-    setColumns((prev) =>
-      prev.map((col) =>
-        col.id === "applied"
-          ? {
-              ...col,
-              // `count` is the real total and is independent of `cards.length`,
-              // which is only a representative sample — so both have to move.
-              count: col.count + pending.length,
-              cards: [
-                ...pending.map((a) => ({
-                  id: a.id,
-                  title: a.role,
-                  company: a.company,
-                  daysAgo: 0,
-                  lastTouchedDaysAgo: 0,
-                  rww: a.source === "internal",
-                })),
-                ...col.cards,
-              ],
-            }
-          : col,
-      ),
-    );
-  }
+  // A failed read keeps the last board on screen (React Query holds on to the
+  // data) and says so once per outage, not once per retry or per move.
+  const { isError, error, refetch } = applications;
+  const hasBoard = applications.data !== undefined;
+  const errorShown = useRef(false);
+  useEffect(() => {
+    if (!isError) {
+      errorShown.current = false;
+      return;
+    }
+    if (errorShown.current) return;
+    errorShown.current = true;
+    toast.error(hasBoard ? "Your board couldn't refresh" : "Your board couldn't load", {
+      id: "tracker-board-load-failed",
+      description: hasBoard ? `${apiMessage(error)} This is the last copy we had.` : apiMessage(error),
+      action: { label: "Retry", onClick: () => void refetch() },
+    });
+  }, [isError, error, hasBoard, refetch]);
+
+  // Grouped by status, ordered by position. Loading shows five empty columns,
+  // never the old mock seed, and `count` is the real number of cards: it used
+  // to be a declared total that the seed's sample of cards never reached.
+  const { columns, closed } = useMemo(() => {
+    const byStatus = new Map<TrackerStatus, ApplicationItem[]>();
+    for (const item of items) {
+      const group = byStatus.get(item.status);
+      if (group) group.push(item);
+      else byStatus.set(item.status, [item]);
+    }
+    const open: TrackerColumn[] = STATUS_ORDER.map((id) => {
+      const cards = (byStatus.get(id) ?? []).sort(compareByPosition).map((item) => toTrackerCard(item, now));
+      return { id, label: COLUMN_LABELS[id], count: cards.length, cards };
+    });
+    const ended = CLOSED_ORDER.flatMap((reason) => byStatus.get(reason) ?? [])
+      .sort(compareByClosedAt)
+      .map((item) => toTrackerCard(item, now));
+    return { columns: open, closed: ended };
+  }, [items, now]);
 
   const placed: PlacedCard[] = columns.flatMap((col) => col.cards.map((card) => ({ card, columnId: col.id })));
 
@@ -129,14 +162,15 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }),
   ];
 
+  const rowOf = (cardId: string) => items.find((item) => item.id === cardId);
+
   function findColumnIdForCard(cardId: string): TrackerColumnId | null {
-    return columns.find((c) => c.cards.some((card) => card.id === cardId))?.id ?? null;
+    const status = rowOf(cardId)?.status;
+    return status && !isClosedStatus(status) ? status : null;
   }
 
   function statusOf(cardId: string): TrackerStatus | null {
-    const open = findColumnIdForCard(cardId);
-    if (open) return open;
-    return closed.find((c) => c.id === cardId)?.closedReason ?? null;
+    return rowOf(cardId)?.status ?? null;
   }
 
   /** Landing in Offer is the win-log's moment — offered, never forced. */
@@ -167,26 +201,17 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }
 
   function moveCard(cardId: string, to: TrackerColumnId) {
-    const from = findColumnIdForCard(cardId);
-    if (!from || from === to) return;
-    const card = columns.find((c) => c.id === from)!.cards.find((c) => c.id === cardId);
-    if (!card) return;
-
-    setColumns((prev) =>
-      prev.map((c) => {
-        if (c.id === from) return { ...c, cards: c.cards.filter((x) => x.id !== cardId), count: Math.max(0, c.count - 1) };
-        // Moving a card IS touching it, so the silence clock restarts.
-        if (c.id === to) return { ...c, cards: [{ ...card, lastTouchedDaysAgo: 0 }, ...c.cards], count: c.count + 1 };
-        return c;
-      }),
-    );
-    creditStageChange(cardId, card.company, to);
+    const row = rowOf(cardId);
+    if (!row || isClosedStatus(row.status) || row.status === to) return;
+    // On top of its new column, where a moved card has always landed. Moving a
+    // card IS touching it, so the server restarts the silence clock.
+    updateApplication(cardId, { status: to, position: topPosition(items, to) });
+    creditStageChange(cardId, row.company, to);
   }
 
   function touchCard(cardId: string) {
-    setColumns((prev) =>
-      prev.map((c) => ({ ...c, cards: c.cards.map((x) => (x.id === cardId ? { ...x, lastTouchedDaysAgo: 0 } : x)) })),
-    );
+    if (findColumnIdForCard(cardId) === null) return;
+    updateApplication(cardId, { touch: true });
   }
 
   /**
@@ -196,45 +221,28 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
    * the drawer — a mis-tap should cost one click to fix.
    */
   function closeCard(cardId: string, reason: TrackerClosedReason) {
-    const from = findColumnIdForCard(cardId);
-    if (!from) return;
-    const card = columns.find((c) => c.id === from)!.cards.find((c) => c.id === cardId);
-    if (!card) return;
-
-    setColumns((prev) =>
-      prev.map((c) => (c.id === from ? { ...c, cards: c.cards.filter((x) => x.id !== cardId), count: Math.max(0, c.count - 1) } : c)),
-    );
-    setClosed((prev) => [
-      // statusChip is dropped: "Follow up" on a rejected application is noise
-      // at best and a lie at worst.
-      { ...card, statusChip: undefined, closedReason: reason, closedDaysAgo: 0, closedFrom: from },
-      ...prev,
-    ]);
-    toast.success(`${card.company} closed`, {
+    const row = rowOf(cardId);
+    if (!row || isClosedStatus(row.status)) return;
+    const from = row.status;
+    updateApplication(cardId, { status: reason });
+    toast.success(`${row.company} closed`, {
       description: `Marked ${CLOSED_META[reason].label.toLowerCase()}. Your funnel just got more honest.`,
-      // Passes the card by value, not by id: `closed` hasn't committed yet, so
-      // an id lookup inside this closure would find nothing.
-      action: { label: "Undo", onClick: () => restoreCard(card, from) },
+      // The row as it was, by value: Undo puts back its stage AND its place in
+      // that column, and this copy is the only record left of the place.
+      action: { label: "Undo", onClick: () => restoreCard(row.id, from, row.position) },
     });
   }
 
-  /** Both setState calls stay pure — no cross-calls inside updaters. */
-  function restoreCard(card: TrackerCard, to: TrackerColumnId) {
-    const restored: TrackerCard = {
-      ...card,
-      closedReason: undefined,
-      closedDaysAgo: undefined,
-      closedFrom: undefined,
-      lastTouchedDaysAgo: 0,
-    };
-    setClosed((prev) => prev.filter((c) => c.id !== card.id));
-    setColumns((prev) => prev.map((c) => (c.id === to ? { ...c, cards: [restored, ...c.cards], count: c.count + 1 } : c)));
+  /** Back onto the board from an outcome, at `position`. The server clears the closed fields and restarts the silence clock. */
+  function restoreCard(cardId: string, to: TrackerColumnId, position: number) {
+    updateApplication(cardId, { status: to, position });
   }
 
   function reopenCard(cardId: string) {
-    const card = closed.find((c) => c.id === cardId);
-    if (!card) return;
-    restoreCard(card, card.closedFrom ?? "applied");
+    const row = rowOf(cardId);
+    if (!row || !isClosedStatus(row.status)) return;
+    const to = row.closedFrom ?? "applied";
+    restoreCard(cardId, to, topPosition(items, to));
   }
 
   /**
@@ -252,19 +260,19 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
       return;
     }
 
-    const card = closed.find((c) => c.id === cardId);
-    if (!card) return;
+    const row = rowOf(cardId);
+    if (!row) return;
     if (isClosedStatus(to)) {
       // Same card, different verdict — nothing moves, the reason is corrected.
-      setClosed((prev) => prev.map((c) => (c.id === cardId ? { ...c, closedReason: to } : c)));
+      updateApplication(cardId, { status: to });
       return;
     }
-    restoreCard(card, to);
-    creditStageChange(cardId, card.company, to);
+    restoreCard(cardId, to, topPosition(items, to));
+    creditStageChange(cardId, row.company, to);
   }
 
   /** Dedupes against the whole board; new jobs land in Saved. */
-  function addCard(job: JobOption): AddCardResult {
+  function addCard(job: { company: string; role: string; source: JobSource } & PickedJobExtras): AddCardResult {
     const existing = columns
       .flatMap((c) => c.cards)
       .find(
@@ -274,23 +282,35 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
       );
     if (existing) return { status: "duplicate", card: existing };
 
-    const card: TrackerCard = {
-      id: `trk-added-${++addSeq.current}`,
-      title: job.role,
-      company: job.company,
-      daysAgo: 0,
-      lastTouchedDaysAgo: 0,
-      rww: job.source === "platform",
-    };
-    setColumns((prev) => prev.map((c) => (c.id === "saved" ? { ...c, cards: [card, ...c.cards], count: c.count + 1 } : c)));
+    const id = newClientId("trk");
+    const rww = job.source === "platform";
+    createApplication({
+      clientId: id,
+      input: applicationInput({
+        company: job.company,
+        role: job.role,
+        location: job.location,
+        url: job.url,
+        // Every pick is one of the user's saved jobs, and the application
+        // remembers which.
+        savedJobId: isObjectId(job.id) ? job.id : null,
+        source: rww ? "internal" : "external",
+        status: "saved",
+      }),
+    });
+
+    const card: TrackerCard = { id, title: job.role, company: job.company, daysAgo: 0, lastTouchedDaysAgo: 0, rww };
     return { status: "added", card };
   }
 
   /**
    * Commits a drop. `overId` is either a column's own droppable id (dropped on
    * empty space) or another card's id (dropped onto a position). The reward
-   * side-effects are computed against pre-drop state and fired outside the
-   * updater, which must stay pure.
+   * side-effects are computed against pre-drop state.
+   *
+   * The column is laid out exactly as the board always laid out a drop, then
+   * the moved card's position is chosen to put it there: between its new
+   * neighbours, so a reorder is normally a single write.
    */
   function commitDrop(activeId: string, overId: string) {
     if (activeId === overId) return;
@@ -310,51 +330,30 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
       return;
     }
 
-    const preSource = source;
-    const preTarget = target as TrackerColumnId;
-    if (preSource !== preTarget) {
-      const moved = columns.find((c) => c.id === preSource)?.cards.find((c) => c.id === activeId);
-      if (moved) creditStageChange(activeId, moved.company, preTarget);
+    const moved = rowOf(activeId);
+    if (!moved) return;
+    const targetRows = items.filter((item) => item.status === target).sort(compareByPosition);
+    const isOverColumn = columns.some((c) => c.id === overId);
+
+    let order: ApplicationItem[];
+    if (source === target) {
+      // Same column — pure reorder.
+      const oldIndex = targetRows.findIndex((item) => item.id === activeId);
+      const newIndex = isOverColumn ? targetRows.length - 1 : targetRows.findIndex((item) => item.id === overId);
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+      order = arrayMove(targetRows, oldIndex, newIndex);
+    } else {
+      // Different column — in at the card it landed on, or at the end.
+      const overIndex = isOverColumn ? targetRows.length : targetRows.findIndex((item) => item.id === overId);
+      order = [...targetRows];
+      order.splice(overIndex === -1 ? targetRows.length : overIndex, 0, moved);
+      creditStageChange(activeId, moved.company, target);
     }
 
-    setColumns((prev) => {
-      const sourceColId = prev.find((c) => c.cards.some((card) => card.id === activeId))?.id ?? null;
-      if (!sourceColId) return prev;
-
-      const isOverColumn = prev.some((c) => c.id === overId);
-      const targetColId = isOverColumn
-        ? (overId as TrackerColumnId)
-        : (prev.find((c) => c.cards.some((card) => card.id === overId))?.id ?? null);
-      if (!targetColId) return prev;
-
-      // Same column — pure reorder.
-      if (sourceColId === targetColId) {
-        const col = prev.find((c) => c.id === sourceColId)!;
-        const oldIndex = col.cards.findIndex((c) => c.id === activeId);
-        const newIndex = isOverColumn ? col.cards.length - 1 : col.cards.findIndex((c) => c.id === overId);
-        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev;
-        return prev.map((c) => (c.id === sourceColId ? { ...c, cards: arrayMove(c.cards, oldIndex, newIndex) } : c));
-      }
-
-      // Different column — move the card and shift both counts.
-      const sourceCol = prev.find((c) => c.id === sourceColId)!;
-      const movedCard = sourceCol.cards.find((c) => c.id === activeId);
-      if (!movedCard) return prev;
-
-      return prev.map((c) => {
-        if (c.id === sourceColId) {
-          return { ...c, cards: c.cards.filter((card) => card.id !== activeId), count: Math.max(0, c.count - 1) };
-        }
-        if (c.id === targetColId) {
-          const overIndex = isOverColumn ? c.cards.length : c.cards.findIndex((card) => card.id === overId);
-          const insertAt = overIndex === -1 ? c.cards.length : overIndex;
-          const newCards = [...c.cards];
-          newCards.splice(insertAt, 0, { ...movedCard, lastTouchedDaysAgo: 0 });
-          return { ...c, cards: newCards, count: c.count + 1 };
-        }
-        return c;
-      });
-    });
+    for (const write of planDropPositions(order, activeId)) {
+      const input = write.id === activeId && source !== target ? { status: target, position: write.position } : { position: write.position };
+      updateApplication(write.id, input);
+    }
   }
 
   return (

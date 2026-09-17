@@ -10,9 +10,12 @@
 // `useStreak()` is preserved as a thin selector so `StreakPill`, `StreakPanel`,
 // `StreakCalendar`, `StreakRewards` and the pod screen keep working unchanged.
 //
-// Mock-only: nothing persists across a reload, by design.
+// Applications and goals are the server's: the applications table (Part 2
+// Phase B), read and written through React Query. Everything else here — the
+// streak, gifts, freezes, habits and the audit trail — is still browser state
+// that resets on reload, until it moves server-side too.
 
-import { createContext, useContext, useState, type FC, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, type FC, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   ACTION_KINDS,
@@ -52,6 +55,11 @@ import {
 } from "@/app/lib/dashboard/streak";
 import { FOLLOW_UP_AFTER_APPLY_DAYS } from "@/app/lib/dashboard/follow-up";
 import type { StreakDay, StreakMilestone, StreakState, TrackerColumnId } from "@/app/lib/dashboard/types";
+import { applicationInput, newClientId, toActivityApplication, wasApplied } from "@/app/lib/applications/api";
+import type { GoalsItem, UpdateGoalsInput } from "@/app/lib/applications/types";
+import { usePersistedState } from "@/app/lib/persist/usePersistedState";
+import { useCreateApplication, useUpdateGoals } from "@/hooks/mutations/useApplicationMutations";
+import { useApplications, useGoals } from "@/hooks/queries/useApplicationsQuery";
 
 // ---------------------------------------------------------------------------
 // Goals
@@ -68,6 +76,21 @@ export interface GoalsState {
 }
 
 const DEFAULT_GOALS: GoalsState = { weeklyTarget: 8, restDays: [5, 6], huntHour: 19, paused: false };
+
+function goalsStateOf(row: GoalsItem): GoalsState {
+  return { weeklyTarget: row.weeklyTarget, restDays: row.restDays, huntHour: row.huntHour, paused: row.paused };
+}
+
+/** What `update` changed, as a PATCH body: a save carries only the fields that moved. */
+function changedGoals(before: GoalsState, update: (g: GoalsState) => GoalsState): UpdateGoalsInput {
+  const after = update(before);
+  const patch: UpdateGoalsInput = {};
+  if (after.weeklyTarget !== before.weeklyTarget) patch.weeklyTarget = after.weeklyTarget;
+  if (after.huntHour !== before.huntHour) patch.huntHour = after.huntHour;
+  if (after.paused !== before.paused) patch.paused = after.paused;
+  if (after.restDays.join() !== before.restDays.join()) patch.restDays = after.restDays;
+  return patch;
+}
 
 // ---------------------------------------------------------------------------
 // Context shape
@@ -215,7 +238,11 @@ interface ActivityContextValue extends StreakState {
   /** Pauses the search for N days: streak held, prompts silenced. */
   pauseSearch: (days: number) => void;
   resumeSearch: () => void;
-  /** Days remaining on a pause, or null when not paused. */
+  /**
+   * Days remaining on a pause, or null when not paused. Also null when the
+   * pause was set in another browser, which knows its length: read
+   * `goals.paused` for whether the search is paused.
+   */
   pausedDaysLeft: number | null;
 
   // --- hired ---
@@ -238,14 +265,38 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Read once, lazily — calling Date during render violates the react-hooks
   // purity rule, and this also keeps "today" stable if a tab is left open.
   const [today] = useState(() => new Date());
-  const [goals, setGoals] = useState<GoalsState>(DEFAULT_GOALS);
+
+  // Goals are a row on the server. Until it loads the defaults stand in, the
+  // same numbers a user who never set any gets back.
+  const goalsQuery = useGoals();
+  const goals = useMemo(() => (goalsQuery.data ? goalsStateOf(goalsQuery.data) : DEFAULT_GOALS), [goalsQuery.data]);
+  const writeGoals = useUpdateGoals();
+
+  /**
+   * The old state setter's shape, so every goals setter below reads as it
+   * always has. The updater runs against the goals cached at the moment of the
+   * call, because press-and-hold keeps calling a setter captured on the render
+   * the hold began; only the fields it changed are saved.
+   */
+  function setGoals(update: (g: GoalsState) => GoalsState) {
+    writeGoals((current) => changedGoals(current ? goalsStateOf(current) : DEFAULT_GOALS, update));
+  }
 
   // Seeded from the default rest days so the calendar agrees with the "Sat &
   // Sun are rest days" copy. Changing rest days afterwards affects the daily
   // maths and future days but deliberately does not rewrite history —
   // retroactively re-colouring past days would be a lie.
   const [state, setState] = useState<StreakState>(() => buildInitialStreak(today, DEFAULT_GOALS.restDays));
-  const [applications, setApplications] = useState<Application[]>([]);
+  // The applications table, as `activity.ts` records. Saved jobs are left out:
+  // a job someone means to apply to is not an application yet, and counting one
+  // would lift the weekly number, the applications-sent total and the duplicate
+  // warning before anything was sent.
+  const applicationsQuery = useApplications();
+  const applications = useMemo(
+    () => (applicationsQuery.data ?? []).filter(wasApplied).map(toActivityApplication),
+    [applicationsQuery.data],
+  );
+  const createApplication = useCreateApplication();
   const [actions, setActions] = useState<QualifyingAction[]>([]);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [logDurations, setLogDurations] = useState<number[]>([]);
@@ -264,7 +315,11 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   /** Streak length at the moment it broke, so it can be bought back. */
   const [brokenStreak, setBrokenStreak] = useState<number | null>(null);
   const [atRiskDismissed, setAtRiskDismissed] = useState(false);
-  const [pausedDaysLeft, setPausedDaysLeft] = useState<number | null>(null);
+  // The day a pause ends. The server keeps only whether the search is paused
+  // (the goals row), so the length the user chose is kept in this browser.
+  // Without it a reload mid-pause brought back a paused search with no days
+  // left, which settings read as not paused, offering no way to resume.
+  const [pauseEndsOn, setPauseEndsOn] = usePersistedState<string | null>("activity.pauseEndsOn", 1, null);
   const [retiredStreak, setRetiredStreak] = useState<number | null>(null);
   // The gift inventory. Seeded with one waiting freeze so the modal has a
   // real row on first open — everything else is earned live.
@@ -278,6 +333,12 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   ]);
 
   const todayKey = dayKey(today);
+  // Whole days to the pause's end, never below zero. Null when the search isn't
+  // paused, and when it was paused somewhere this browser never saw.
+  const pausedDaysLeft =
+    goals.paused && pauseEndsOn !== null
+      ? Math.max(0, Math.round((fromDayKey(pauseEndsOn).getTime() - fromDayKey(todayKey).getTime()) / 86_400_000))
+      : null;
   const byKey = new Map(state.days.map((d) => [d.date, d]));
   const loggedToday = byKey.get(todayKey)?.status === "logged" || byKey.get(todayKey)?.status === "backfilled";
   const medianLogSeconds = logDurations.length >= 3 ? medianOf(logDurations) : DEFAULT_LOG_SECONDS;
@@ -443,7 +504,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const score = scoreApplication(input.resumeId ?? "res-master", input.jdText);
 
     const application: Application = {
-      id: nextId("app"),
+      id: newClientId("app"),
       company: input.company.trim(),
       role: input.role.trim(),
       location: input.location?.trim() || undefined,
@@ -456,7 +517,22 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       atsScore: score.score,
     };
 
-    setApplications((prev) => [application, ...prev]);
+    // Returned now, saved behind: the payoff panel never waits on a round trip.
+    // The id doubles as the idempotency key, so the failure toast's Retry saves
+    // this application once even if the first request did land.
+    createApplication({
+      clientId: application.id,
+      input: applicationInput({
+        company: application.company,
+        role: application.role,
+        location: application.location,
+        url: application.url,
+        source: application.source,
+        status: "applied",
+        duplicateOf: application.duplicateOf,
+        atsScore: application.atsScore,
+      }),
+    });
     if (input.startedAtMs) {
       const seconds = Math.round((at.getTime() - input.startedAtMs) / 1000);
       if (seconds > 0) setLogDurations((prev) => [...prev, seconds].slice(-20));
@@ -657,12 +733,12 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       // A pause is not a break: the count is held exactly where it is, and
       // every prompt goes quiet. People take time off; punishing that is how
       // you lose them for good.
-      setPausedDaysLeft(days);
+      setPauseEndsOn(dayKey(addDays(today, days)));
       setGoals((g) => ({ ...g, paused: true }));
       toast.success(`Search paused for ${days} days.`, { description: `Your ${state.current}-day streak is held.` });
     },
     resumeSearch: () => {
-      setPausedDaysLeft(null);
+      setPauseEndsOn(null);
       setGoals((g) => ({ ...g, paused: false }));
       toast.success("Welcome back.", { description: `Your ${state.current}-day streak is still yours.` });
     },

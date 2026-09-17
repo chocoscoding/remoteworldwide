@@ -3,7 +3,7 @@
 import { useMemo, useState, type FC } from "react";
 import { Search, SearchX } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
+import { useTracker } from "@/app/components/dashboard/tracker/TrackerProvider";
 import type { NewTrackInput, PrepTrack } from "@/app/lib/dashboard/prep-data";
 
 export interface AddTrackDialogProps {
@@ -23,9 +23,12 @@ export interface AddTrackDialogProps {
  */
 const AddTrackDialog: FC<AddTrackDialogProps> = ({ open, onOpenChange, onAdd, existingTracks }) => {
   const [query, setQuery] = useState("");
+  // The live board, not the seed: a track has to trace back to an application
+  // this user actually has.
+  const { columns } = useTracker();
+  const interviewing = useMemo(() => columns.find((c) => c.id === "interviewing")?.cards ?? [], [columns]);
 
   const candidates = useMemo(() => {
-    const interviewing = TRACKER_COLUMNS.find((c) => c.id === "interviewing")?.cards ?? [];
     const already = new Set(existingTracks.map((t) => t.company.toLowerCase()));
     const q = query.trim().toLowerCase();
     return interviewing.filter((card) => {
@@ -33,7 +36,7 @@ const AddTrackDialog: FC<AddTrackDialogProps> = ({ open, onOpenChange, onAdd, ex
       if (q && !`${card.company} ${card.title}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [query, existingTracks]);
+  }, [interviewing, query, existingTracks]);
 
   function handleSelect(company: string, role: string) {
     onAdd({ company, role });
@@ -70,7 +73,9 @@ const AddTrackDialog: FC<AddTrackDialogProps> = ({ open, onOpenChange, onAdd, ex
               <p className="text-sm text-black/50 leading-relaxed max-w-[280px]">
                 {query
                   ? "No interviewing-stage jobs match that search."
-                  : "Every job in your tracker's Interviewing column already has a prep track."}
+                  : interviewing.length === 0
+                    ? "Nothing is in your tracker's Interviewing column yet. Move an application there once an interview is booked."
+                    : "Every job in your tracker's Interviewing column already has a prep track."}
               </p>
             </div>
           ) : (

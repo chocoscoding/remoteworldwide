@@ -33,7 +33,9 @@ const ProofOfProgress: FC = () => {
   // The window is "since this streak began" — that's the span the user is
   // being asked to believe in, so it's the span the outcomes should cover.
   const windowDays = Math.max(current, 1);
-  const sent = Number(HOME_STATS.find((s) => s.id === "stat-applications")?.value ?? 0) + applications.length;
+  // Real applications only. The seed's headline total used to be added on top,
+  // so a brand-new account opened on dozens of applications it never sent.
+  const sent = applications.length;
   const replyRate = HOME_STATS.find((s) => s.id === "stat-reply-rate")?.value ?? "—";
   const interviews = HOME_STATS.find((s) => s.id === "stat-interviews")?.value ?? "0";
 
