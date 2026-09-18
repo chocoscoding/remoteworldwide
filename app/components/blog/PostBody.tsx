@@ -1,10 +1,12 @@
 import type { FC } from "react";
-import type { PostSegment } from "@/app/lib/blog/render";
+import { cn } from "@/lib/utils";
+import type { PostSegment, RenderedPost } from "@/app/lib/blog/render";
 import LeadMagnetCard, { type LeadMagnetSummary } from "./LeadMagnetCard";
 import CtaCard, { type CtaSummary } from "./CtaCard";
 
 export interface PostBodyProps {
   segments: PostSegment[];
+  spacing: RenderedPost["spacing"];
   blogSlug: string;
   leadMagnet: LeadMagnetSummary | null;
   magnetsBySlug: Record<string, LeadMagnetSummary>;
@@ -13,11 +15,11 @@ export interface PostBodyProps {
   nextStep?: { label: string; href: string };
 }
 
-const PostBody: FC<PostBodyProps> = ({ segments, blogSlug, leadMagnet, magnetsBySlug, cta, ctasByKey, nextStep }) => (
+const PostBody: FC<PostBodyProps> = ({ segments, spacing, blogSlug, leadMagnet, magnetsBySlug, cta, ctasByKey, nextStep }) => (
   <div>
     {segments.map((seg, i) => {
       if (seg.type === "html") {
-        return <div key={i} className="post-prose" dangerouslySetInnerHTML={{ __html: seg.html }} />;
+        return <div key={i} className={cn("post-prose", spacing === "as-written" && "post-prose--as-written")} dangerouslySetInnerHTML={{ __html: seg.html }} />;
       }
       if (seg.kind === "cta") {
         const chosen = seg.ref ? (ctasByKey[seg.ref] ?? null) : cta;

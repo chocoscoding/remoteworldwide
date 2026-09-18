@@ -432,6 +432,10 @@ body {
 .post-prose > :last-child {
   margin-bottom: 0;
 }
+/* The quote badge sits above the box, so a quote opening a segment still needs the room. */
+.post-prose > blockquote:first-child {
+  margin-top: 1.75rem;
+}
 /* Two segments touch when a marker's offer is missing (PostBody renders nothing). */
 .post-prose + .post-prose {
   margin-top: 1.75em;
@@ -545,30 +549,66 @@ body {
   background: #e1f073;
   border-color: #222325;
 }
+/* Pull quote: ink frame on a lime block shadow, with a quote-mark badge sitting
+   on the top border. Lines come in as <p>s (see joinQuotes); an optional source line
+   (the writer ends the quote with "— Name") gets a rule and mono caps. The top margin
+   leaves room for the badge, the bottom one for the shadow. */
 .post-prose blockquote {
-  margin: 1.75em 0;
-  padding: 0.9rem 1.15rem;
-  border: 2px solid #222325;
-  border-radius: 12px;
-  box-shadow: 2px 2px 0 0 #e1f073;
-  color: #222325;
-  font-size: 1rem;
+  position: relative;
+  margin: 2.25rem 0 1.75rem;
+  padding: 1.8rem 1.62rem 0.81rem 1.8rem;
+  border: 1.5px solid #222325;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 4px 4px 0 0 #e1f073;
+  color: #525356;
+  font-size: 0.9375rem;
   font-weight: 500;
   line-height: 1.65;
-  position: relative;
 }
 .post-prose blockquote::before {
-  content: "///";
-  display: block;
-  color: #cddd54;
+  content: "\201C";
+  position: absolute;
+  top: -1.125rem;
+  left: 1.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 4px;
+  background: #222325;
+  color: #e1f073;
+  font-size: 3.5rem;
   font-weight: 700;
-  letter-spacing: -0.12em;
-  line-height: 1px;
-  margin-bottom: 0.9rem;
-  font-size: 1.75rem;
+  line-height: 1;
+  text-align: center;
+  padding-top: 0.16rem;
 }
-.post-prose blockquote p:last-child {
-  margin-bottom: 0;
+.post-prose blockquote p {
+  margin: 0;
+}
+.post-prose blockquote .quote-source {
+  margin-top: 1rem;
+  color: #222325;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.post-prose blockquote .quote-source a {
+  text-decoration-line: none;
+}
+.post-prose blockquote .quote-source a:hover {
+  text-decoration-line: underline;
+}
+.post-prose blockquote .quote-source::before {
+  content: "";
+  display: inline-block;
+  width: 1.5rem;
+  height: 2px;
+  margin-right: 0.75rem;
+  background: currentColor;
+  vertical-align: middle;
 }
 .post-prose pre,
 .post-prose .ql-syntax {
@@ -660,11 +700,48 @@ body {
     font-size: 1.1875rem;
   }
   .post-prose blockquote {
-    padding: 0.8rem 1rem 0.9rem;
+    padding: 1.575rem 1.0125rem 0.675rem 1.125rem;
+    box-shadow: 3px 3px 0 0 #e1f073;
+    font-size: 0.875rem;
   }
   .post-prose blockquote::before {
-    font-size: 1.5rem;
+    top: -1rem;
+    left: 1rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 3rem;
+    padding-top: 0.18rem;
   }
+}
+
+/* Posts written with blank lines (see RenderedPost.spacing): the editor's spacing
+   exactly, so blank lines are the only gaps and a line with none sits on the next.
+   Boxed blocks keep a small gap so their borders don't touch text. Top/bottom only,
+   so checklist items keep their margin-left. */
+.post-prose--as-written p,
+.post-prose--as-written ul,
+.post-prose--as-written ol,
+.post-prose--as-written li,
+.post-prose--as-written li > ul,
+.post-prose--as-written li > ol,
+.post-prose--as-written img,
+.post-prose--as-written h2,
+.post-prose--as-written h3,
+.post-prose--as-written h4,
+.post-prose--as-written h5,
+.post-prose--as-written h6 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.post-prose--as-written :is(pre, .ql-syntax),
+.post-prose--as-written iframe.ql-video {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+/* Room for the quote badge above and the block shadow below. */
+.post-prose--as-written blockquote {
+  margin-top: 1.75rem;
+  margin-bottom: 1rem;
 }
 
 /* The blog editor (BlogForm): the same type as .post-prose, so writers see
@@ -672,7 +749,11 @@ body {
    spacing here, and one 28px blank line equals the 28px paragraph gap on the
    page. Selectors carry an extra class to beat quill.snow.css, which loads
    after this file. */
+/* Pinned to the top of the admin scroll area while the editor is on screen. */
 .post-editor .ql-toolbar.ql-snow {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   border: 1px solid #e5e5e5;
   border-radius: 12px 12px 0 0;
   background: #fff;
@@ -729,11 +810,55 @@ body {
   color: #222325;
   font-weight: 700;
 }
+/* Quotes, drawn like the page's pull quote. Quill keeps each quote line as its own
+   <blockquote>, so a run of them forms one box: sides and shadow on every line (each
+   line's background covers the shadow of the one above), top border and badge on the
+   first, bottom border on the last. A last line starting with "—" is the page's source. */
 .post-editor .ql-container .ql-editor blockquote {
+  position: relative;
   margin: 0;
-  padding-left: 1rem;
-  border-left: 3px solid #cddd54;
-  color: #222325;
+  padding: 0 1.62rem 0 1.8rem;
+  border: 1.5px solid #222325;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  background: #fff;
+  box-shadow: 4px 4px 0 0 #e1f073;
+  color: #525356;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.65;
+}
+.post-editor .ql-container .ql-editor :not(blockquote) + blockquote,
+.post-editor .ql-container .ql-editor blockquote:first-child {
+  margin-top: 1.75rem;
+  padding-top: 1.8rem;
+  border-top-width: 1.5px;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+}
+.post-editor .ql-container .ql-editor blockquote:not(:has(+ blockquote)) {
+  margin-bottom: 1rem;
+  padding-bottom: 0.81rem;
+  border-bottom-width: 1.5px;
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+.post-editor .ql-container .ql-editor :not(blockquote) + blockquote::before,
+.post-editor .ql-container .ql-editor blockquote:first-child::before {
+  content: "\201C";
+  position: absolute;
+  top: -1.125rem;
+  left: 1.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 4px;
+  background: #222325;
+  color: #e1f073;
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  padding-top: 0.16rem;
 }
 /* Posts render justified text left-aligned; show it the same way here. */
 .post-editor .ql-container .ql-editor .ql-align-justify {

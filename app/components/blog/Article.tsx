@@ -142,7 +142,7 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
 
             <TableOfContents entries={rendered.toc} className="mb-9 lg:hidden" />
 
-            <PostBody segments={rendered.segments} blogSlug={post.slug} leadMagnet={leadMagnet} magnetsBySlug={magnetsBySlug} cta={cta} ctasByKey={ctasByKey} nextStep={nextStep} />
+            <PostBody segments={rendered.segments} spacing={rendered.spacing} blogSlug={post.slug} leadMagnet={leadMagnet} magnetsBySlug={magnetsBySlug} cta={cta} ctasByKey={ctasByKey} nextStep={nextStep} />
 
             {cta && <CtaCard cta={cta} variant="end" placement="end" blogSlug={post.slug} />}
 
