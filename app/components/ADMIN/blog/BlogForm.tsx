@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Select from "react-select";
 import { CldUploadWidget } from "next-cloudinary";
-import { closeUploadWidget } from "./uploadWidget";
+import type { Quill, RangeStatic } from "react-quill-new";
+import { closeUploadWidget, hostInlineImages, uploadImage } from "./uploadWidget";
 import { TagsInput } from "react-tag-input-component";
 import { toast } from "react-toastify";
 import { ArrowDown, ArrowUp, Eye, PenLine, PlusCircle, X } from "lucide-react";
@@ -90,10 +91,60 @@ const ViewToggle: FC<{ view: "editor" | "preview"; loading: boolean; onChange: (
 
 const authorOption = (a: Author): Option => ({ value: a.id, label: a.name });
 
+/** Puts images on their own line at `range` (replacing any selected text) and moves the cursor past them. */
+function insertImages(quill: Quill, range: RangeStatic, urls: string[]) {
+  if (range.length > 0) quill.deleteText(range.index, range.length, "user");
+  let index = Math.min(range.index, quill.getLength() - 1);
+  if (quill.getLine(index)[1] > 0) {
+    quill.insertText(index, "\n", "user");
+    index += 1;
+  }
+  for (const url of urls) {
+    quill.insertEmbed(index, "image", url, "user");
+    index += 1;
+  }
+  if (quill.getText(index, 1) !== "\n") quill.insertText(index, "\n", "user");
+  quill.setSelection(Math.min(index + 1, quill.getLength() - 1), 0, "user");
+}
+
 const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
   const router = useRouter();
   const quillRef: QuillRef = useRef(null);
+  const imagePicker = useRef<HTMLButtonElement>(null);
+  const imageRange = useRef<RangeStatic | null>(null);
+  const hostedImages = useRef(new Map<string, string>());
   const byId = useMemo(() => new Map(authors.map((a) => [a.id, a])), [authors]);
+
+  // Memoised: react-quill rebuilds the editor whenever `modules` changes, and new handler
+  // functions each render would count as a change. Handlers only touch refs.
+  const quillModules = useMemo(
+    () => ({
+      toolbar: {
+        container: quillToolbarOptions,
+        handlers: {
+          // The same Cloudinary widget as the cover image: upload, paste a link, or search Unsplash.
+          image() {
+            const quill = quillRef.current?.getEditor();
+            if (!quill) return;
+            imageRange.current = quill.getSelection(true);
+            imagePicker.current?.click();
+          },
+        },
+      },
+      uploader: {
+        mimetypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+        // Pasted and dropped images go to Cloudinary; Quill's default inlines them as base64, which posts can't show.
+        handler(this: { quill: Quill }, range: RangeStatic, files: File[]) {
+          const quill = this.quill;
+          toast
+            .promise(Promise.all(files.map((file) => uploadImage(file))), { pending: "Uploading image…", success: "Image added", error: "Image upload failed" })
+            .then((urls) => insertImages(quill, range, urls))
+            .catch(() => undefined);
+        },
+      },
+    }),
+    [],
+  );
 
   const [title, setTitle] = useState(blog?.title ?? "");
   const [description, setDescription] = useState(blog?.description ?? "");
@@ -152,7 +203,8 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
     }
     setPreviewing(true);
     try {
-      setPreview(await previewBlog({ content: text, category: chosenCategory, tags, leadMagnetId: leadMagnetId || null, ctaKey: ctaKey || null, inlineOffers: offers.map(offerToken) }));
+      const content = await hostInlineImages(text, hostedImages.current);
+      setPreview(await previewBlog({ content, category: chosenCategory, tags, leadMagnetId: leadMagnetId || null, ctaKey: ctaKey || null, inlineOffers: offers.map(offerToken) }));
       setView("preview");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not build the preview");
@@ -179,7 +231,6 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
       title,
       description,
       tags,
-      content: normalizeEditorHtml(text),
       authorIds: allAuthors.map((a) => a.id),
       coverImage,
       slug: effectiveSlug,
@@ -193,7 +244,9 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
     };
     setBusy(true);
     try {
-      const res = blog ? await editBlog(blog.id, values) : await createBlog(values);
+      // Before the server action: base64 images would be dropped on the page, and can exceed its 1MB body limit.
+      const content = await hostInlineImages(normalizeEditorHtml(text), hostedImages.current);
+      const res = blog ? await editBlog(blog.id, { ...values, content }) : await createBlog({ ...values, content });
       toast.success(blog ? "Blog updated" : "Blog created");
       router.push(`/heroshima/blogs/${res.data.slug}`);
       router.refresh();
@@ -435,7 +488,21 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
 
         <div>
           <label className={ADMIN_LABEL}>Content</label>
-          <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={{ toolbar: quillToolbarOptions }} placeholder="Write the post" className="post-editor mt-1" />
+          <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={quillModules} placeholder="Write the post" className="post-editor mt-1" />
+          {/* Opened by the toolbar's image button. The widget keeps its first callbacks, so they read refs only. */}
+          <CldUploadWidget
+            options={{ sources: ["local", "url", "unsplash"], folder: "blogs", multiple: false }}
+            uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_PRESET}
+            onSuccess={(result) => {
+              const info = result?.info;
+              const quill = quillRef.current?.getEditor();
+              if (quill && imageRange.current && info && typeof info !== "string" && info.secure_url) insertImages(quill, imageRange.current, [info.secure_url]);
+            }}
+            onQueuesEnd={(_r, { widget }) => closeUploadWidget(widget)}>
+            {({ open, isLoading }) => (
+              <button type="button" ref={imagePicker} hidden onClick={() => (isLoading ? toast.info("The image picker is still loading. Try again in a moment.") : open())} />
+            )}
+          </CldUploadWidget>
         </div>
 
         <div className="flex justify-center">
