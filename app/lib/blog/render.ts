@@ -182,21 +182,53 @@ export interface RenderOptions {
   offers?: string[];
 }
 
+// Where the post's content starts and ends, ignoring blank lines at either edge.
+function contentBounds(html: string): [number, number] {
+  const start = html.length - html.replace(/^(?:\s*<p><br \/><\/p>)*\s*/, "").length;
+  const end = html.replace(/(?:\s*<p><br \/><\/p>)*\s*$/, "").length;
+  return [start, end];
+}
+
+// Positions of the section headings an offer may sit before: h2s (h3s when no h2
+// qualifies) with content above them, so an offer never opens the article.
+function sectionStarts(html: string): number[] {
+  const [start] = contentBounds(html);
+  for (const level of [2, 3]) {
+    const starts = [...html.matchAll(new RegExp(`<h${level}[\\s>]`, "gi"))].map((m) => m.index ?? 0).filter((i) => i > start);
+    if (starts.length > 0) return starts;
+  }
+  return [];
+}
+
+// For posts without headings: ends of text paragraphs with more content after them,
+// preferring those followed by a blank line (a visible break, not mid-passage).
+function paragraphBreaks(html: string, count: number): number[] {
+  const [, contentEnd] = contentBounds(html);
+  const breaks: number[] = [];
+  const ends: number[] = [];
+  for (const m of html.matchAll(/<\/p>/gi)) {
+    const end = (m.index ?? 0) + m[0].length;
+    if (end >= contentEnd || html.startsWith(BLANK_LINE, end - BLANK_LINE.length)) continue;
+    ends.push(end);
+    if (html.startsWith(BLANK_LINE, end)) breaks.push(end);
+  }
+  return breaks.length >= count ? breaks : ends;
+}
+
+// `count` of the positions, spread evenly; unique and in order whenever count <= positions.length.
+const spread = (positions: number[], count: number) => Array.from({ length: count }, (_, i) => positions[Math.floor((positions.length * (i + 1)) / (count + 1))]);
+
 export function placeOffers(html: string, markers: string[]): string {
   if (markers.length === 0) return html;
   if (hasPlacedMarker(html)) return html;
-  const closes: number[] = [];
-  for (const m of html.matchAll(/<\/p>/gi)) closes.push((m.index ?? 0) + m[0].length);
-  if (closes.length < markers.length + 2) return html + markers.map((m) => `<p>${m}</p>`).join("");
-  const slots = markers.map((_, i) => {
-    const raw = Math.round((closes.length * (i + 1)) / (markers.length + 1)) - 1;
-    return Math.min(closes.length - 2, Math.max(1, raw));
-  });
-  let out = html;
-  for (let i = markers.length - 1; i >= 0; i -= 1) {
-    const at = closes[slots[i]];
-    out = `${out.slice(0, at)}<p>${markers[i]}</p>${out.slice(at)}`;
-  }
+  const wrap = (m: string) => `<p>${m}</p>`;
+  const starts = sectionStarts(html);
+  const pool = starts.length > 0 ? starts : paragraphBreaks(html, markers.length);
+  const placed = Math.min(markers.length, pool.length);
+  const at = spread(pool, placed);
+  // Offers beyond the available slots go at the end, after the last section.
+  let out = html + markers.slice(placed).map(wrap).join("");
+  for (let i = placed - 1; i >= 0; i -= 1) out = `${out.slice(0, at[i])}${wrap(markers[i])}${out.slice(at[i])}`;
   return out;
 }
 

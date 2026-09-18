@@ -337,7 +337,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
           <div className="mt-4 rounded-md border border-gray-200 bg-white p-3" data-offers>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm font-semibold text-primary">Inside the article</p>
-              <p className="text-xs text-gray-500">{offers.length === 0 ? "Nothing in the body" : `${offers.length} spread evenly, top to bottom`}</p>
+              <p className="text-xs text-gray-500">{offers.length === 0 ? "Nothing in the body" : `${offers.length} placed before section headings`}</p>
             </div>
             {offers.length > 0 && (
               <ol className="mt-2 space-y-1.5">
