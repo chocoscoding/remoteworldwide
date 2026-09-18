@@ -435,7 +435,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
 
         <div>
           <label className={ADMIN_LABEL}>Content</label>
-          <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={{ toolbar: quillToolbarOptions }} placeholder="Write the post" className="mt-1 bg-white" />
+          <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={{ toolbar: quillToolbarOptions }} placeholder="Write the post" className="post-editor mt-1" />
         </div>
 
         <div className="flex justify-center">

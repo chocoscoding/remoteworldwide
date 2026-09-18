@@ -6,6 +6,6 @@ export const quillToolbarOptions = [
   [{ list: "ordered" }, { list: "bullet" }, { list: "check" }],
   [{ indent: "-1" }, { indent: "+1" }],
   ["link", "image", "video"],
-  [{ align: [] }],
+  [{ align: [false, "center", "right"] }], // No justify: posts render left-aligned.
   ["clean"],
 ];

@@ -667,6 +667,79 @@ body {
   }
 }
 
+/* The blog editor (BlogForm): the same type as .post-prose, so writers see
+   roughly what readers get. Block margins stay 0 because blank lines are the
+   spacing here, and one 28px blank line equals the 28px paragraph gap on the
+   page. Selectors carry an extra class to beat quill.snow.css, which loads
+   after this file. */
+.post-editor .ql-toolbar.ql-snow {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px 12px 0 0;
+  background: #fff;
+}
+.post-editor .ql-container.ql-snow {
+  border: 1px solid #e5e5e5;
+  border-radius: 0 0 12px 12px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+}
+.post-editor .ql-container .ql-editor {
+  min-height: 480px;
+  padding: 2rem max(1.5rem, calc((100% - 720px) / 2)) 4rem;
+  color: #5f6063;
+  line-height: 1.75;
+}
+.post-editor .ql-container .ql-editor.ql-blank::before {
+  left: max(1.5rem, calc((100% - 720px) / 2));
+  right: max(1.5rem, calc((100% - 720px) / 2));
+  color: #737373;
+  font-style: normal;
+}
+.post-editor .ql-container .ql-editor h2,
+.post-editor .ql-container .ql-editor h3,
+.post-editor .ql-container .ql-editor h4 {
+  color: #222325;
+  font-weight: 700;
+}
+.post-editor .ql-container .ql-editor h2 {
+  font-size: 1.625rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+.post-editor .ql-container .ql-editor h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+.post-editor .ql-container .ql-editor h4 {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+.post-editor .ql-container .ql-editor a {
+  color: #222325;
+  font-weight: 500;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: #cddd54;
+}
+.post-editor .ql-container .ql-editor :is(h2, h3, h4, strong) a {
+  font-weight: inherit;
+}
+.post-editor .ql-container .ql-editor strong {
+  color: #222325;
+  font-weight: 700;
+}
+.post-editor .ql-container .ql-editor blockquote {
+  margin: 0;
+  padding-left: 1rem;
+  border-left: 3px solid #cddd54;
+  color: #222325;
+}
+/* Posts render justified text left-aligned; show it the same way here. */
+.post-editor .ql-container .ql-editor .ql-align-justify {
+  text-align: left;
+}
+
 /* The Home nudge rail. Halved because the track is rendered twice end to end,
    so the reset lands exactly where the first copy started. */
 @keyframes marquee-scroll {
