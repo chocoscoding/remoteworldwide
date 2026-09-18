@@ -27,7 +27,11 @@ const HAS_MARKER_RE: Record<MarkerKind, RegExp> = {
 const PLACED_MARKER_RE = new RegExp(MARKER_RE.source, "i");
 const STRAY_MARKER_RE = new RegExp(String.raw`\[\[\s*(?:${MARKER_WORDS})\s*(?::\s*[a-z0-9][a-z0-9-]*)?\s*\]\]`, "gi");
 
-const EMPTY_BLOCK_RE = new RegExp(String.raw`<(p|h[1-6])(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*/?>)*</\1>\s*`, "gi");
+// A blank line in the editor: <p></p> from Quill 2, <p><br></p> in older posts, or an
+// empty heading. Each becomes one uniform blank paragraph (one line tall on the page).
+const BLANK_BLOCK_RE = new RegExp(String.raw`<(p|h[1-6])(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*/?>)*</\1>`, "gi");
+const BLANK_LINE = "<p><br /></p>";
+const EDGE_BLANKS_RE = /^(?:\s*<p><br \/><\/p>)+\s*|\s*(?:<p><br \/><\/p>\s*)+$/g;
 
 // Justify is left out on purpose: posts render left-aligned, like the editor now shows.
 const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video)$/;
@@ -72,7 +76,7 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
 export function sanitizePostHtml(html: string): string {
   return (
     normalizeEditorHtml(sanitizeHtml(html, SANITIZE_OPTIONS))
-      .replace(EMPTY_BLOCK_RE, "")
+      .replace(BLANK_BLOCK_RE, BLANK_LINE)
       // Quill wraps an indented list in a bare <li> (<ul><li><ul>…); tag it so it draws no bullet.
       // An empty item with a sub-list saves identically, so it is hidden (and uncounted) too.
       .replace(/<li>(?=<(?:ul|ol)>)/g, '<li class="list-wrap">')
@@ -170,6 +174,8 @@ export interface RenderedPost {
   readingMinutes: number;
   words: number;
   excerpt: string;
+  /** "as-written": the writer's blank lines are the only gaps, as in the editor. "auto": a post with no blank lines, spaced for them. */
+  spacing: "as-written" | "auto";
 }
 
 export interface RenderOptions {
@@ -199,11 +205,19 @@ export function renderPost(rawHtml: string, opts: RenderOptions = {}): RenderedP
   html = placeOffers(html, opts.offers ?? []);
   const withIds = addHeadingIds(html);
   const words = wordCount(withIds.html);
+  // Blank lines at a segment's edges would double the gap a card or the article edge already
+  // gives; trim them (after stray markers go, which can leave a blank line behind).
+  const segments = splitAtMarkers(withIds.html).flatMap((s): PostSegment[] => {
+    if (s.type !== "html") return [s];
+    const body = s.html.replace(STRAY_MARKER_RE, "").replace(BLANK_BLOCK_RE, BLANK_LINE).replace(EDGE_BLANKS_RE, "");
+    return body.trim() ? [{ ...s, html: body }] : [];
+  });
   return {
-    segments: splitAtMarkers(withIds.html).map((s) => (s.type === "html" ? { ...s, html: s.html.replace(STRAY_MARKER_RE, "") } : s)),
+    segments,
     toc: withIds.toc,
     readingMinutes: Math.max(1, Math.round(words / 220)),
     words,
     excerpt: stripTags(withIds.html).slice(0, 200),
+    spacing: segments.some((s) => s.type === "html" && s.html.includes(BLANK_LINE)) ? "as-written" : "auto",
   };
 }

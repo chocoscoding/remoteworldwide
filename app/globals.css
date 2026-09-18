@@ -667,6 +667,32 @@ body {
   }
 }
 
+/* Posts written with blank lines (see RenderedPost.spacing): the editor's spacing
+   exactly, so blank lines are the only gaps and a line with none sits on the next.
+   Boxed blocks keep a small gap so their borders don't touch text. Top/bottom only,
+   so checklist items keep their margin-left. */
+.post-prose--as-written p,
+.post-prose--as-written ul,
+.post-prose--as-written ol,
+.post-prose--as-written li,
+.post-prose--as-written li > ul,
+.post-prose--as-written li > ol,
+.post-prose--as-written img,
+.post-prose--as-written h2,
+.post-prose--as-written h3,
+.post-prose--as-written h4,
+.post-prose--as-written h5,
+.post-prose--as-written h6 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.post-prose--as-written blockquote,
+.post-prose--as-written :is(pre, .ql-syntax),
+.post-prose--as-written iframe.ql-video {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
 /* The blog editor (BlogForm): the same type as .post-prose, so writers see
    roughly what readers get. Block margins stay 0 because blank lines are the
    spacing here, and one 28px blank line equals the 28px paragraph gap on the
