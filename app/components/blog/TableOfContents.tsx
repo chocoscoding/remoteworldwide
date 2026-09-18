@@ -55,8 +55,8 @@ const TableOfContents: FC<{ entries: TocEntry[]; className?: string }> = ({ entr
                 type="button"
                 onClick={() => jumpTo(e.id)}
                 aria-current={active ? "true" : undefined}
-                className="group flex w-full items-start gap-3 py-1.5 text-left cursor-pointer">
-                <span aria-hidden className="relative mt-[7px] flex h-[11px] w-[11px] flex-none items-center justify-center">
+                className="group flex w-full items-start gap-3 py-1 text-left cursor-pointer">
+                <span aria-hidden className="relative mt-[6px] flex h-[11px] w-[11px] flex-none items-center justify-center">
                   <span
                     className={cn(
                       "block rounded-full border-2 border-primary transition-all duration-200",
@@ -66,8 +66,8 @@ const TableOfContents: FC<{ entries: TocEntry[]; className?: string }> = ({ entr
                 </span>
                 <span
                   className={cn(
-                    "text-sm leading-snug transition-colors",
-                    active ? "font-bold text-primary" : "font-medium text-primary/60 group-hover:text-primary",
+                    "text-[13px] leading-snug transition-colors",
+                    active ? "font-bold text-primary" : "font-medium text-primary/65 group-hover:text-primary",
                   )}>
                   {e.text}
                 </span>

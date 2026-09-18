@@ -225,7 +225,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
       </div>
 
       {view === "preview" && preview && (
-        <div className="mb-6 overflow-hidden rounded-[20px] border-2 border-[#222325] shadow-[6px_6px_0_0_#e1f073]" data-preview>
+        <div className="mb-6 overflow-clip rounded-[20px] border-2 border-[#222325] shadow-[2px_2px_0_0_#e1f073]" data-preview>
           <div className="flex items-center gap-3 border-b-2 border-[#222325] bg-[#222325] px-4 py-2 text-white">
             <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#e1f073]">Preview</span>
             <span className="text-xs text-white/60">Exactly what readers see, conversions included. Nothing is saved until you publish.</span>

@@ -89,6 +89,10 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
   const isSidebar = variant === "sidebar";
   const horizontal = variant === "inline" || variant === "category";
   const inputId = `lm-${variant}-${placement}-${magnet.slug}`;
+  // The hero sits on a page of bigger shadows; in articles everything stays at 2px.
+  const buttonShadow = isHero
+    ? "shadow-[4px_4px_0_0_#e1f073] hover:shadow-[2px_2px_0_0_#e1f073]"
+    : "shadow-[2px_2px_0_0_#e1f073] hover:shadow-[1px_1px_0_0_#e1f073]";
 
   return (
     <aside
@@ -96,8 +100,10 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
       className={cn(
         "relative rounded-[20px] border-2 border-primary",
         isHero && "bg-white p-6 md:p-8 shadow-[6px_6px_0_0_#e1f073]",
-        isSidebar && "bg-secondary p-5 shadow-[4px_4px_0_0_#222325]",
-        horizontal && "not-prose my-10 bg-secondary p-5 md:p-6 shadow-[5px_5px_0_0_#222325]",
+        isSidebar && "bg-secondary p-5 shadow-[2px_2px_0_0_#222325]",
+        horizontal && "not-prose bg-secondary p-5 md:p-6",
+        variant === "inline" && "my-8 shadow-[2px_2px_0_0_#222325]",
+        variant === "category" && "my-10 shadow-[5px_5px_0_0_#222325]",
         className,
       )}>
       <div className={cn(horizontal && "md:flex md:items-start md:gap-6")}>
@@ -108,7 +114,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
         )}
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary/70">Free download</p>
-          <h3 className={cn("mt-1.5 font-extrabold leading-tight text-primary", isHero ? "text-2xl md:text-3xl" : "text-xl")}>{magnet.title}</h3>
+          <h3 className={cn("mt-1.5 font-extrabold leading-tight text-primary", isHero ? "text-2xl md:text-3xl" : "text-lg")}>{magnet.title}</h3>
           <p className={cn("mt-2 text-primary/75", isHero ? "text-base" : "text-sm")}>{magnet.hook}</p>
           {magnet.bullets.length > 0 && !isSidebar && (
             <ul className="mt-3 space-y-1.5 text-sm text-primary/85">
@@ -135,7 +141,10 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                   download={download.fileName}
                   target="_blank"
                   rel="noopener"
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white shadow-[4px_4px_0_0_#e1f073] transition-[transform,box-shadow] duration-100 hover:shadow-[2px_2px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+                  className={cn(
+                    "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+                    buttonShadow,
+                  )}>
                   <Download className="h-4 w-4" />
                   Download the PDF
                 </a>
@@ -170,7 +179,10 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                 <button
                   type="submit"
                   disabled={status === "submitting"}
-                  className="h-11 w-full flex-none rounded-lg bg-primary px-5 text-sm font-bold text-white sm:w-auto shadow-[4px_4px_0_0_#e1f073] transition-[transform,box-shadow] duration-100 hover:shadow-[2px_2px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-default disabled:opacity-70 cursor-pointer">
+                  className={cn(
+                    "h-11 w-full flex-none rounded-lg bg-primary px-5 text-sm font-bold text-white sm:w-auto transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-default disabled:opacity-70 cursor-pointer",
+                    buttonShadow,
+                  )}>
                   {status === "submitting" ? "Unlocking…" : magnet.buttonLabel}
                 </button>
               </form>
