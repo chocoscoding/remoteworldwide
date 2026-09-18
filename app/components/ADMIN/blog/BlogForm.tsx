@@ -489,6 +489,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
         <div>
           <label className={ADMIN_LABEL}>Content</label>
           <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={quillModules} placeholder="Write the post" className="post-editor mt-1" />
+          <p className={ADMIN_HINT}>Quotes: to credit a source, end the quote with a line starting with “—” (e.g. “— Jane Doe”). It can be a link. Leave it out for no source.</p>
           {/* Opened by the toolbar's image button. The widget keeps its first callbacks, so they read refs only. */}
           <CldUploadWidget
             options={{ sources: ["local", "url", "unsplash"], folder: "blogs", multiple: false }}

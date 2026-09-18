@@ -73,13 +73,31 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   exclusiveFilter: (frame) => (frame.tag === "iframe" || frame.tag === "img") && !frame.attribs.src,
 };
 
+const QUOTE_LINE_RE = /<blockquote(?:\s[^>]*)?>([\s\S]*?)<\/blockquote>/gi;
+const QUOTE_RUN_RE = /<blockquote(?:\s[^>]*)?>[\s\S]*?<\/blockquote>(?:\s*<blockquote(?:\s[^>]*)?>[\s\S]*?<\/blockquote>)*/gi;
+const SOURCE_DASH_RE = /^((?:<[^>]+>)*)\s*(?:—|–|--?)\s*/;
+
+// Quill saves each line of a quote as its own <blockquote>. Join a run into one quote with a
+// <p> per line; a last line starting with a dash ("— Jane Doe") becomes its source line.
+function joinQuotes(html: string): string {
+  return html.replace(QUOTE_RUN_RE, (run) => {
+    const lines = Array.from(run.matchAll(QUOTE_LINE_RE), (m) => m[1].trim()).filter((l) => stripTags(l) !== "" || /<img\s/i.test(l));
+    if (lines.length === 0) return "";
+    const last = lines[lines.length - 1];
+    const hasSource = lines.length > 1 && SOURCE_DASH_RE.test(last);
+    const body = (hasSource ? lines.slice(0, -1) : lines).map((l) => `<p>${l}</p>`).join("");
+    const source = hasSource ? `<p class="quote-source">${last.replace(SOURCE_DASH_RE, "$1")}</p>` : "";
+    return `<blockquote>${body}${source}</blockquote>`;
+  });
+}
+
 export function sanitizePostHtml(html: string): string {
-  return (
+  return joinQuotes(
     normalizeEditorHtml(sanitizeHtml(html, SANITIZE_OPTIONS))
       .replace(BLANK_BLOCK_RE, BLANK_LINE)
       // Quill wraps an indented list in a bare <li> (<ul><li><ul>…); tag it so it draws no bullet.
       // An empty item with a sub-list saves identically, so it is hidden (and uncounted) too.
-      .replace(/<li>(?=<(?:ul|ol)>)/g, '<li class="list-wrap">')
+      .replace(/<li>(?=<(?:ul|ol)>)/g, '<li class="list-wrap">'),
   );
 }
 
