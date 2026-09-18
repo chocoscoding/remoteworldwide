@@ -52,7 +52,7 @@ const SIDEBAR_SIDE = "right" as "left" | "right";
 // so the title lines up with the text.
 const GRID =
   SIDEBAR_SIDE === "right"
-    ? "mx-auto w-full max-w-[720px] lg:grid lg:max-w-none lg:grid-cols-[minmax(0,720px)_260px] lg:justify-center lg:gap-10 xl:grid-cols-[minmax(0,720px)_380px] xl:gap-16"
+    ? "mx-auto w-full max-w-[720px] lg:grid lg:max-w-none lg:grid-cols-[minmax(0,720px)_260px] lg:justify-center lg:gap-10 xl:grid-cols-[minmax(0,720px)_310px] xl:gap-16"
     : "mx-auto w-full max-w-[720px] lg:grid lg:max-w-none lg:grid-cols-[260px_minmax(0,720px)] lg:justify-center lg:gap-10 xl:grid-cols-[380px_minmax(0,720px)] xl:gap-16";
 const TEXT_COLUMN = SIDEBAR_SIDE === "left" ? "lg:col-start-2 lg:row-start-1" : undefined;
 
@@ -92,7 +92,9 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
           "@type": "BreadcrumbList",
           itemListElement: [
             { "@type": "ListItem", position: 1, name: "Blog", item: absoluteUrl("/blogs") },
-            ...(category ? [{ "@type": "ListItem", position: 2, name: category.name, item: absoluteUrl(`/blogs/category/${category.slug}`) }] : []),
+            ...(category
+              ? [{ "@type": "ListItem", position: 2, name: category.name, item: absoluteUrl(`/blogs/category/${category.slug}`) }]
+              : []),
             { "@type": "ListItem", position: category ? 3 : 2, name: post.title, item: url },
           ],
         },
@@ -101,32 +103,55 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
 
   return (
     <div className="min-h-screen bg-white">
-      {structured && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structured) }} />}
+      {structured && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structured) }}
+        />
+      )}
       {toolbar}
 
       <header className="border-b-2 border-primary/10 bg-primary2 min-[1500px]:rounded-b-md">
         <div className="px-4 pb-7 pt-7 md:pb-8 md:pt-8">
           <div className={GRID}>
             <div className={cn("min-w-0", TEXT_COLUMN)}>
-              <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-primary/55">
-                <Link href="/blogs" className="hover:text-primary">
+              <nav
+                aria-label="Breadcrumb"
+                className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-primary/55">
+                <Link
+                  href="/blogs"
+                  className="hover:text-primary">
                   Blog
                 </Link>
                 {category && (
                   <>
                     <span aria-hidden>/</span>
-                    <Link href={`/blogs/category/${category.slug}`} className="rounded-full bg-secondary px-2.5 py-1 text-[11px] text-primary hover:bg-secondary2">
+                    <Link
+                      href={`/blogs/category/${category.slug}`}
+                      className="rounded-full bg-secondary px-2.5 py-1 text-[11px] text-primary hover:bg-secondary2">
                       {category.name}
                     </Link>
                   </>
                 )}
-                {post.status !== "PUBLISHED" && <span className="rounded-full bg-[#fdeae6] px-2.5 py-1 text-[11px] text-[#b23c26]">Draft preview</span>}
+                {post.status !== "PUBLISHED" && (
+                  <span className="rounded-full bg-[#fdeae6] px-2.5 py-1 text-[11px] text-[#b23c26]">Draft preview</span>
+                )}
               </nav>
-              <h1 className="mt-3 text-[1.75rem] font-bold leading-[1.15] tracking-[-0.02em] text-primary md:text-[2.25rem] lg:text-[2.5rem]">{post.title}</h1>
+              <h1 className="mt-3 text-[1.75rem] font-bold leading-[1.15] tracking-[-0.02em] text-primary md:text-[2.25rem] lg:text-[2.5rem]">
+                {post.title}
+              </h1>
               <p className="mt-3 text-base leading-relaxed text-primary/65">{post.description}</p>
               <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
-                <AuthorStack authors={post.authors} size="md" meta={`${formatPostDate(published)} · ${rendered.readingMinutes} min read`} />
-                <ShareRow url={url} title={post.title} className="sm:ml-auto" />
+                <AuthorStack
+                  authors={post.authors}
+                  size="md"
+                  meta={`${formatPostDate(published)} · ${rendered.readingMinutes} min read`}
+                />
+                <ShareRow
+                  url={url}
+                  title={post.title}
+                  className="sm:ml-auto"
+                />
               </div>
             </div>
           </div>
@@ -137,19 +162,49 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
         <div className={GRID}>
           <main className={cn("min-w-0", TEXT_COLUMN)}>
             <figure className="relative mb-7 aspect-[3/2] overflow-hidden rounded-[20px] border-2 border-primary">
-              <Image src={post.coverImage} alt={post.title} fill priority sizes="(min-width: 768px) 720px, 100vw" className="object-cover" />
+              <Image
+                src={post.coverImage}
+                alt={post.title}
+                fill
+                priority
+                sizes="(min-width: 768px) 720px, 100vw"
+                className="object-cover"
+              />
             </figure>
 
-            <TableOfContents entries={rendered.toc} className="mb-9 lg:hidden" />
+            <TableOfContents
+              entries={rendered.toc}
+              className="mb-9 lg:hidden"
+            />
 
-            <PostBody segments={rendered.segments} spacing={rendered.spacing} blogSlug={post.slug} leadMagnet={leadMagnet} magnetsBySlug={magnetsBySlug} cta={cta} ctasByKey={ctasByKey} nextStep={nextStep} />
+            <PostBody
+              segments={rendered.segments}
+              spacing={rendered.spacing}
+              blogSlug={post.slug}
+              leadMagnet={leadMagnet}
+              magnetsBySlug={magnetsBySlug}
+              cta={cta}
+              ctasByKey={ctasByKey}
+              nextStep={nextStep}
+            />
 
-            {cta && <CtaCard cta={cta} variant="end" placement="end" blogSlug={post.slug} />}
+            {cta && (
+              <CtaCard
+                cta={cta}
+                variant="end"
+                placement="end"
+                blogSlug={post.slug}
+              />
+            )}
 
             {post.tags.length > 0 && (
-              <ul className="mt-8 flex flex-wrap gap-2" aria-label="Tags">
+              <ul
+                className="mt-8 flex flex-wrap gap-2"
+                aria-label="Tags">
                 {post.tags.map((tag) => (
-                  <li key={tag} className="rounded-full border border-primary/15 bg-white px-3 py-1 text-xs font-semibold text-primary/70">
+                  <li
+                    key={tag}
+                    className="rounded-full border border-primary/15 bg-white px-3 py-1 text-xs font-semibold text-primary/70">
                     {tag}
                   </li>
                 ))}
@@ -158,12 +213,25 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
 
             <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t-2 border-primary/10 pt-6">
               <p className="text-sm text-primary/55">Found this useful? Pass it on.</p>
-              <ShareRow url={url} title={post.title} />
+              <ShareRow
+                url={url}
+                title={post.title}
+              />
             </div>
 
-            {publisher && <AuthorCard author={publisher} className="mt-8" />}
+            {publisher && (
+              <AuthorCard
+                author={publisher}
+                className="mt-8"
+              />
+            )}
             {coauthors.map((a) => (
-              <AuthorCard key={a.slug} author={a} label="Co-written by" className="mt-4" />
+              <AuthorCard
+                key={a.slug}
+                author={a}
+                label="Co-written by"
+                className="mt-4"
+              />
             ))}
           </main>
 
@@ -175,15 +243,31 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
               SIDEBAR_SIDE === "left" && "lg:col-start-1 lg:row-start-1",
             )}
             aria-label="Sidebar">
-            <TableOfContents entries={rendered.toc} className="mb-6 hidden max-h-[min(36vh,320px)] overflow-y-auto scrollbar-neo pr-1 lg:block" />
-            {leadMagnet && <LeadMagnetCard magnet={leadMagnet} variant="sidebar" placement="sidebar" blogSlug={post.slug} nextStep={nextStep} />}
+            <TableOfContents
+              entries={rendered.toc}
+              className="mb-6 hidden max-h-[min(36vh,320px)] overflow-y-auto scrollbar-neo pr-1 lg:block"
+            />
+            {leadMagnet && (
+              <LeadMagnetCard
+                magnet={leadMagnet}
+                variant="sidebar"
+                placement="sidebar"
+                blogSlug={post.slug}
+                nextStep={nextStep}
+              />
+            )}
             {featured.length > 0 && (
-              <section className="mt-6 rounded-[20px] border-2 border-primary bg-primary2 p-4" aria-label="Start here">
+              <section
+                className="mt-6 rounded-[20px] border-2 border-primary bg-primary2 p-4"
+                aria-label="Start here">
                 <p className="px-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary/60">Start here</p>
                 <ul className="mt-2">
                   {featured.map((p) => (
                     <li key={p.slug}>
-                      <PostCard post={p} variant="compact" />
+                      <PostCard
+                        post={p}
+                        variant="compact"
+                      />
                     </li>
                   ))}
                 </ul>
@@ -193,16 +277,23 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
         </div>
 
         {related.length > 0 && (
-          <section className="mx-auto mt-12 border-t-2 border-primary/10 pt-10 lg:max-w-[1020px] xl:max-w-[1164px]" aria-label="Keep reading">
+          <section
+            className="mx-auto mt-12 border-t-2 border-primary/10 pt-10 lg:max-w-[1020px] xl:max-w-[1164px]"
+            aria-label="Keep reading">
             <div className="flex items-end justify-between gap-4">
               <h2 className="text-2xl font-extrabold tracking-tight text-primary md:text-3xl">Keep reading</h2>
-              <Link href={category ? `/blogs/category/${category.slug}` : "/blogs"} className="text-sm font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
+              <Link
+                href={category ? `/blogs/category/${category.slug}` : "/blogs"}
+                className="text-sm font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
                 {category ? `More in ${category.name}` : "All posts"}
               </Link>
             </div>
             <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {related.map((p) => (
-                <PostCard key={p.slug} post={p} />
+                <PostCard
+                  key={p.slug}
+                  post={p}
+                />
               ))}
             </div>
           </section>
