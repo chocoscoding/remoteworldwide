@@ -16,6 +16,7 @@ import { previewBlog } from "@/libs/blog-admin";
 import { quillToolbarOptions } from "@/libs/quillconfig";
 import { BLOG_CATEGORIES, categoryBySlug, inferCategory } from "@/app/lib/blog/categories";
 import { slugifyTitle } from "@/app/lib/blog/slug";
+import { normalizeEditorHtml } from "@/app/lib/blog/editorHtml";
 import { AUTO, DEFAULT_INLINE_OFFERS, effectiveInlineOffers, offerToken, parseOfferToken, type OfferRef } from "@/app/lib/blog/offers";
 import Article from "@/app/components/blog/Article";
 import QuillEditor, { type QuillRef } from "./QuillEditor";
@@ -120,7 +121,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
   const coauthorOptions = authors.filter((a) => a.id !== publisher?.id).map(authorOption);
   const suggested = useMemo(() => (category ? null : inferCategory(tags)), [category, tags]);
   const chosenCategory = category || suggested?.slug || "job-search";
-  const markers = useMemo(() => markerSummary(text), [text]);
+  const markers = useMemo(() => markerSummary(normalizeEditorHtml(text)), [text]);
   const effectiveSlug = useMemo(() => {
     if (!slugTouched) return blog?.slug ?? slugifyTitle(title || "post");
     return slug.trim() ? slugifyTitle(slug) : slugifyTitle(title || "post");
@@ -178,7 +179,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
       title,
       description,
       tags,
-      content: text,
+      content: normalizeEditorHtml(text),
       authorIds: allAuthors.map((a) => a.id),
       coverImage,
       slug: effectiveSlug,
