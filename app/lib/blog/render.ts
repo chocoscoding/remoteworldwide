@@ -37,6 +37,13 @@ const EDGE_BLANKS_RE = /^(?:\s*<p><br \/><\/p>)+\s*|\s*(?:<p><br \/><\/p>\s*)+$/
 const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video)$/;
 const VIDEO_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/;
 
+// Off-site links open in a new tab and pass no ranking.
+function externalLinkAttribs(href: string): Record<string, string> {
+  const site = process.env.NEXT_PUBLIC_SITE_URL;
+  const external = /^https?:\/\//i.test(href) && !(site && href.startsWith(site));
+  return external ? { target: "_blank", rel: "noopener noreferrer nofollow" } : {};
+}
+
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
     "h1", "h2", "h3", "h4", "h5", "h6", "p", "br", "hr",
@@ -58,15 +65,7 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedClasses: { "*": [ALLOWED_QL_CLASS] },
   transformTags: {
     h1: "h2",
-    a: (tagName, attribs) => {
-      const href = attribs.href ?? "";
-      const site = process.env.NEXT_PUBLIC_SITE_URL;
-      const external = /^https?:\/\//i.test(href) && !(site && href.startsWith(site));
-      return {
-        tagName,
-        attribs: external ? { ...attribs, target: "_blank", rel: "noopener noreferrer nofollow" } : attribs,
-      };
-    },
+    a: (tagName, attribs) => ({ tagName, attribs: { ...attribs, ...externalLinkAttribs(attribs.href ?? "") } }),
     iframe: (tagName, attribs) => (VIDEO_HOSTS.test(attribs.src ?? "") ? { tagName, attribs: { ...attribs, loading: "lazy" } } : { tagName, attribs: {} }),
     img: (tagName, attribs) => ({ tagName, attribs: { ...attribs, loading: "lazy", decoding: "async" } }),
   },
@@ -76,6 +75,18 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
 const QUOTE_LINE_RE = /<blockquote(?:\s[^>]*)?>([\s\S]*?)<\/blockquote>/gi;
 const QUOTE_RUN_RE = /<blockquote(?:\s[^>]*)?>[\s\S]*?<\/blockquote>(?:\s*<blockquote(?:\s[^>]*)?>[\s\S]*?<\/blockquote>)*/gi;
 const SOURCE_DASH_RE = /^((?:<[^>]+>)*)\s*(?:—|–|--?)\s*/;
+// "Jane Doe[https://…]": the address goes straight into an href, so only http(s) or site
+// paths, with no spaces, quotes or brackets.
+const SOURCE_LINK_RE = /^(.*?\S)\s*\[\s*((?:https?:\/\/|\/(?!\/))[^\s"'<>[\]]*)\s*\]$/i;
+
+// A source line's name, linked when the writer put an address in brackets after it.
+function sourceHtml(line: string): string {
+  const name = line.replace(SOURCE_DASH_RE, "$1");
+  const m = SOURCE_LINK_RE.exec(stripTags(name));
+  if (!m) return name;
+  const attrs = Object.entries({ href: m[2], ...externalLinkAttribs(m[2]) }).map(([k, v]) => `${k}="${v}"`);
+  return `<a ${attrs.join(" ")}>${m[1]}</a>`;
+}
 
 // Quill saves each line of a quote as its own <blockquote>. Join a run into one quote with a
 // <p> per line; a last line starting with a dash ("— Jane Doe") becomes its source line.
@@ -86,7 +97,7 @@ function joinQuotes(html: string): string {
     const last = lines[lines.length - 1];
     const hasSource = lines.length > 1 && SOURCE_DASH_RE.test(last);
     const body = (hasSource ? lines.slice(0, -1) : lines).map((l) => `<p>${l}</p>`).join("");
-    const source = hasSource ? `<p class="quote-source">${last.replace(SOURCE_DASH_RE, "$1")}</p>` : "";
+    const source = hasSource ? `<p class="quote-source">${sourceHtml(last)}</p>` : "";
     return `<blockquote>${body}${source}</blockquote>`;
   });
 }
