@@ -52,8 +52,8 @@ const SIDEBAR_SIDE = "right" as "left" | "right";
 // so the title lines up with the text.
 const GRID =
   SIDEBAR_SIDE === "right"
-    ? "mx-auto w-full max-w-[720px] lg:grid lg:max-w-none lg:grid-cols-[minmax(0,720px)_260px] lg:justify-center lg:gap-10 xl:grid-cols-[minmax(0,720px)_300px] xl:gap-16"
-    : "mx-auto w-full max-w-[720px] lg:grid lg:max-w-none lg:grid-cols-[260px_minmax(0,720px)] lg:justify-center lg:gap-10 xl:grid-cols-[300px_minmax(0,720px)] xl:gap-16";
+    ? "mx-auto w-full max-w-[720px] lg:grid lg:max-w-none lg:grid-cols-[minmax(0,720px)_260px] lg:justify-center lg:gap-10 xl:grid-cols-[minmax(0,720px)_380px] xl:gap-16"
+    : "mx-auto w-full max-w-[720px] lg:grid lg:max-w-none lg:grid-cols-[260px_minmax(0,720px)] lg:justify-center lg:gap-10 xl:grid-cols-[380px_minmax(0,720px)] xl:gap-16";
 const TEXT_COLUMN = SIDEBAR_SIDE === "left" ? "lg:col-start-2 lg:row-start-1" : undefined;
 
 const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
@@ -193,7 +193,7 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
         </div>
 
         {related.length > 0 && (
-          <section className="mx-auto mt-12 border-t-2 border-primary/10 pt-10 lg:max-w-[1020px] xl:max-w-[1084px]" aria-label="Keep reading">
+          <section className="mx-auto mt-12 border-t-2 border-primary/10 pt-10 lg:max-w-[1020px] xl:max-w-[1164px]" aria-label="Keep reading">
             <div className="flex items-end justify-between gap-4">
               <h2 className="text-2xl font-extrabold tracking-tight text-primary md:text-3xl">Keep reading</h2>
               <Link href={category ? `/blogs/category/${category.slug}` : "/blogs"} className="text-sm font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
