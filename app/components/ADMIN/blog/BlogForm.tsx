@@ -16,6 +16,7 @@ import { previewBlog } from "@/libs/blog-admin";
 import { quillToolbarOptions } from "@/libs/quillconfig";
 import { BLOG_CATEGORIES, categoryBySlug, inferCategory } from "@/app/lib/blog/categories";
 import { slugifyTitle } from "@/app/lib/blog/slug";
+import { normalizeEditorHtml } from "@/app/lib/blog/editorHtml";
 import { AUTO, DEFAULT_INLINE_OFFERS, effectiveInlineOffers, offerToken, parseOfferToken, type OfferRef } from "@/app/lib/blog/offers";
 import Article from "@/app/components/blog/Article";
 import QuillEditor, { type QuillRef } from "./QuillEditor";
@@ -120,7 +121,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
   const coauthorOptions = authors.filter((a) => a.id !== publisher?.id).map(authorOption);
   const suggested = useMemo(() => (category ? null : inferCategory(tags)), [category, tags]);
   const chosenCategory = category || suggested?.slug || "job-search";
-  const markers = useMemo(() => markerSummary(text), [text]);
+  const markers = useMemo(() => markerSummary(normalizeEditorHtml(text)), [text]);
   const effectiveSlug = useMemo(() => {
     if (!slugTouched) return blog?.slug ?? slugifyTitle(title || "post");
     return slug.trim() ? slugifyTitle(slug) : slugifyTitle(title || "post");
@@ -178,7 +179,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
       title,
       description,
       tags,
-      content: text,
+      content: normalizeEditorHtml(text),
       authorIds: allAuthors.map((a) => a.id),
       coverImage,
       slug: effectiveSlug,
@@ -224,7 +225,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
       </div>
 
       {view === "preview" && preview && (
-        <div className="mb-6 overflow-hidden rounded-[20px] border-2 border-[#222325] shadow-[6px_6px_0_0_#e1f073]" data-preview>
+        <div className="mb-6 overflow-clip rounded-[20px] border-2 border-[#222325] shadow-[2px_2px_0_0_#e1f073]" data-preview>
           <div className="flex items-center gap-3 border-b-2 border-[#222325] bg-[#222325] px-4 py-2 text-white">
             <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#e1f073]">Preview</span>
             <span className="text-xs text-white/60">Exactly what readers see, conversions included. Nothing is saved until you publish.</span>
@@ -434,7 +435,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
 
         <div>
           <label className={ADMIN_LABEL}>Content</label>
-          <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={{ toolbar: quillToolbarOptions }} placeholder="Write the post" className="mt-1 bg-white" />
+          <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={{ toolbar: quillToolbarOptions }} placeholder="Write the post" className="post-editor mt-1" />
         </div>
 
         <div className="flex justify-center">

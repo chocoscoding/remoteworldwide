@@ -28,39 +28,57 @@ export function ctaHref(key: string, placement: string, blogSlug?: string): stri
   return `/go/${encodeURIComponent(key)}?${params.toString()}`;
 }
 
+// Shadows come in two sizes: the full ones for the index/category bands, and 2px
+// ones for cards inside an article, where they sit next to body text.
 const TONE: Record<
   CtaSummary["tone"],
   {
     card: string;
+    shadow: string;
+    shadowSm: string;
     eyebrow: string;
     text: string;
     sub: string;
     button: string;
+    buttonShadow: string;
+    buttonShadowSm: string;
     frame: string;
   }
 > = {
   INK: {
-    card: "bg-primary shadow-[5px_5px_0_0_#e1f073]",
+    card: "bg-primary",
+    shadow: "shadow-[5px_5px_0_0_#e1f073]",
+    shadowSm: "shadow-[2px_2px_0_0_#e1f073]",
     eyebrow: "text-secondary",
     text: "text-white",
     sub: "text-white/70",
-    button: "bg-secondary text-primary shadow-[4px_4px_0_0_#ffffff] hover:shadow-[2px_2px_0_0_#ffffff]",
+    button: "bg-secondary text-primary",
+    buttonShadow: "shadow-[4px_4px_0_0_#ffffff] hover:shadow-[2px_2px_0_0_#ffffff]",
+    buttonShadowSm: "shadow-[2px_2px_0_0_#ffffff] hover:shadow-[1px_1px_0_0_#ffffff]",
     frame: "border-secondary",
   },
   LIME: {
-    card: "bg-secondary shadow-[5px_5px_0_0_#222325]",
+    card: "bg-secondary",
+    shadow: "shadow-[5px_5px_0_0_#222325]",
+    shadowSm: "shadow-[2px_2px_0_0_#222325]",
     eyebrow: "text-primary/70",
     text: "text-primary",
     sub: "text-primary/75",
-    button: "bg-primary text-white shadow-[4px_4px_0_0_#ffffff] hover:shadow-[2px_2px_0_0_#ffffff]",
+    button: "bg-primary text-white",
+    buttonShadow: "shadow-[4px_4px_0_0_#ffffff] hover:shadow-[2px_2px_0_0_#ffffff]",
+    buttonShadowSm: "shadow-[2px_2px_0_0_#ffffff] hover:shadow-[1px_1px_0_0_#ffffff]",
     frame: "border-primary",
   },
   PAPER: {
-    card: "bg-primary2 shadow-[5px_5px_0_0_#222325]",
+    card: "bg-primary2",
+    shadow: "shadow-[5px_5px_0_0_#222325]",
+    shadowSm: "shadow-[2px_2px_0_0_#222325]",
     eyebrow: "text-primary/60",
     text: "text-primary",
     sub: "text-primary/70",
-    button: "bg-primary text-white shadow-[4px_4px_0_0_#e1f073] hover:shadow-[2px_2px_0_0_#e1f073]",
+    button: "bg-primary text-white",
+    buttonShadow: "shadow-[4px_4px_0_0_#e1f073] hover:shadow-[2px_2px_0_0_#e1f073]",
+    buttonShadowSm: "shadow-[2px_2px_0_0_#e1f073] hover:shadow-[1px_1px_0_0_#e1f073]",
     frame: "border-primary",
   },
 };
@@ -68,6 +86,7 @@ const TONE: Record<
 const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, className }) => {
   const t = TONE[cta.tone] ?? TONE.INK;
   const band = variant === "band";
+  const inArticle = variant === "inline" || variant === "end";
   const hasImage = Boolean(cta.imageUrl);
   const imageLeft = hasImage && cta.imageSide === "LEFT";
 
@@ -78,9 +97,9 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
         className={cn(
           "mt-1.5 font-extrabold leading-tight",
           t.text,
-          variant === "inline" && "text-xl md:text-2xl",
-          variant === "side" && "text-lg md:text-xl",
-          (variant === "end" || variant === "band") && "text-2xl md:text-3xl",
+          (variant === "inline" || variant === "side") && "text-lg md:text-xl",
+          variant === "end" && "text-xl md:text-2xl",
+          band && "text-2xl md:text-3xl",
         )}>
         {cta.headline}
       </h3>
@@ -91,6 +110,7 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
           "mt-5 inline-flex flex-none items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
           variant === "side" && "mt-4 px-4 py-2.5",
           t.button,
+          inArticle ? t.buttonShadowSm : t.buttonShadow,
         )}>
         {cta.buttonLabel}
         <ArrowRight className="h-4 w-4" />
@@ -105,8 +125,9 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
       className={cn(
         "not-prose rounded-[20px] border-2 border-primary",
         t.card,
+        inArticle ? t.shadowSm : t.shadow,
         variant === "inline" && "my-8 p-5 md:p-6",
-        variant === "end" && "mt-10 p-6 md:p-8",
+        variant === "end" && "mt-8 p-6 md:p-8",
         band && "p-7 md:p-10",
         variant === "side" && "rounded-2xl p-5 shadow-[3px_3px_0_0_#222325]",
         className,
@@ -145,6 +166,7 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
             className={cn(
               "mt-5 inline-flex flex-none items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none md:mt-0",
               t.button,
+              t.buttonShadow,
             )}>
             {cta.buttonLabel}
             <ArrowRight className="h-4 w-4" />

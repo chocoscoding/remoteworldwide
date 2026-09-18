@@ -20,7 +20,7 @@ const ShareRow: FC<{ url: string; title: string; className?: string }> = ({ url,
     }
   };
   const btn =
-    "grid h-10 w-10 place-content-center rounded-full border-2 border-primary bg-white text-primary transition-[transform,box-shadow,background-color] duration-100 hover:bg-secondary shadow-[2px_2px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer";
+    "grid h-9 w-9 place-content-center rounded-full border-2 border-primary bg-white text-primary transition-[transform,box-shadow,background-color] duration-100 hover:bg-secondary shadow-[2px_2px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer";
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <span className="mr-1 text-xs font-extrabold uppercase tracking-[0.12em] text-primary/55">Share</span>

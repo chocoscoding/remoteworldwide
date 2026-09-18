@@ -416,45 +416,59 @@ body {
   }
 }
 
+/* Blog post body (also the legal pages). One 28px rhythm between blocks, gray
+   body text under dark headings, after the Cloudflare blog. Manrope is loaded
+   at 400/500/700 only, so no 600/800 here. */
 .post-prose {
-  color: #222325;
-  font-size: 1.0625rem;
-  line-height: 1.7;
+  color: #5f6063;
+  font-size: 1rem;
+  line-height: 1.75;
+  overflow-wrap: break-word;
 }
-.post-prose > :first-child {
+.post-prose > :first-child,
+.post-prose > :first-child > :first-child {
   margin-top: 0;
 }
 .post-prose > :last-child {
   margin-bottom: 0;
 }
+/* Two segments touch when a marker's offer is missing (PostBody renders nothing). */
+.post-prose + .post-prose {
+  margin-top: 1.75em;
+}
 .post-prose p {
-  margin: 0 0 0.1em;
+  margin: 0 0 1.75em;
+}
+.post-prose h2,
+.post-prose h3,
+.post-prose h4,
+.post-prose h5,
+.post-prose h6 {
+  color: #222325;
+  font-weight: 700;
+  scroll-margin-top: 96px;
 }
 .post-prose h2 {
-  font-size: 1.5rem;
-  line-height: 1.2;
-  font-weight: 800;
+  font-size: 1.625rem;
+  line-height: 1.25;
   letter-spacing: -0.015em;
-  margin: 1.85em 0 0.5em;
-  scroll-margin-top: 96px;
+  margin: 2em 0 0.55em;
 }
 .post-prose h3 {
   font-size: 1.25rem;
   line-height: 1.3;
-  font-weight: 800;
-  margin: 1.55em 0 0.4em;
-  scroll-margin-top: 96px;
+  margin: 1.6em 0 0.45em;
 }
 .post-prose h4,
 .post-prose h5,
 .post-prose h6 {
-  font-size: 1.125rem;
-  font-weight: 800;
+  font-size: 1.0625rem;
+  line-height: 1.4;
   margin: 1.5em 0 0.4em;
 }
 .post-prose a {
   color: #222325;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
@@ -463,14 +477,19 @@ body {
 .post-prose a:hover {
   text-decoration-color: #222325;
 }
+/* Quill nests links innermost, so bold links and linked headings keep their weight. */
+.post-prose :is(h2, h3, h4, h5, h6, strong, b, th) a {
+  font-weight: inherit;
+}
 .post-prose strong,
 .post-prose b {
-  font-weight: 600;
+  color: #222325;
+  font-weight: 700;
 }
 .post-prose ul,
 .post-prose ol {
-  margin: 0 0 1.4em;
-  padding-left: 1.6em;
+  margin: 0 0 1.75em;
+  padding-left: 1.5em;
 }
 .post-prose ul {
   list-style: disc;
@@ -482,82 +501,104 @@ body {
   list-style: disc;
 }
 .post-prose li {
-  margin: 0.35em 0;
+  margin: 0 0 0.5em;
   padding-left: 0.15em;
+}
+.post-prose ul > li::marker {
+  color: #9a9b9e;
+}
+.post-prose li > ul,
+.post-prose li > ol {
+  margin: 0.5em 0 0;
+}
+/* Quill's wrapper around an indented list (see sanitizePostHtml): not a list
+   item, so it draws no bullet and doesn't count in an <ol>. */
+.post-prose li.list-wrap {
+  display: block;
+  margin: 0;
+  padding-left: 0;
+}
+.post-prose li.list-wrap > ul,
+.post-prose li.list-wrap > ol {
+  margin: 0;
 }
 .post-prose li[data-list="checked"],
 .post-prose li[data-list="unchecked"] {
   list-style: none;
-  margin-left: -1.6em;
-  padding-left: 1.9em;
+  margin-left: -1.5em;
+  padding-left: 1.75em;
   position: relative;
 }
 .post-prose li[data-list="checked"]::before,
 .post-prose li[data-list="unchecked"]::before {
   content: "";
   position: absolute;
-  left: 0.1em;
-  top: 0.45em;
-  width: 0.9em;
-  height: 0.9em;
-  border: 2px solid #222325;
+  left: 0;
+  top: 0.375em;
+  width: 1em;
+  height: 1em;
+  border: 1.5px solid #8e8f92;
   border-radius: 4px;
   background: #fff;
 }
 .post-prose li[data-list="checked"]::before {
   background: #e1f073;
+  border-color: #222325;
 }
 .post-prose blockquote {
-  margin: 1.4em 0;
-  padding: 0.7rem 1.15rem;
+  margin: 1.75em 0;
+  padding: 0.9rem 1.15rem;
   border: 2px solid #222325;
   border-radius: 12px;
-  box-shadow: 3px 3px 0 0 #e1f073;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  line-height: 1.55;
+  box-shadow: 2px 2px 0 0 #e1f073;
+  color: #222325;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.65;
   position: relative;
 }
 .post-prose blockquote::before {
   content: "///";
   display: block;
   color: #cddd54;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.12em;
   line-height: 1px;
-  margin-bottom: 1.1rem;
-  font-size: 2.5rem;
+  margin-bottom: 0.9rem;
+  font-size: 1.75rem;
 }
 .post-prose blockquote p:last-child {
   margin-bottom: 0;
 }
 .post-prose pre,
 .post-prose .ql-syntax {
-  margin: 1.5em 0;
+  margin: 1.75em 0;
   padding: 1rem 1.25rem;
   background: #222325;
   color: #f6f6f6;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow-x: auto;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   line-height: 1.6;
 }
 .post-prose code {
-  font-size: 0.9em;
+  font-size: 0.875em;
+  color: #222325;
   background: #f0f0ea;
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
 .post-prose pre code {
   background: none;
+  color: inherit;
   padding: 0;
 }
 .post-prose img {
   display: block;
   width: 100%;
   height: auto;
-  margin: 1.15em 0;
-  border-radius: 16px;
+  margin: 1.75em 0;
+  border-radius: 14px;
   border: 2px solid #222325;
 }
 .post-prose iframe.ql-video {
@@ -566,29 +607,31 @@ body {
   aspect-ratio: 16 / 9;
   height: auto;
   margin: 1.75em 0;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 2px solid #222325;
 }
 .post-prose hr {
   border: 0;
-  border-top: 2px solid #222325;
+  border-top: 1px solid rgba(34, 35, 37, 0.15);
   margin: 2em 0;
 }
 .post-prose table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1.5em 0;
-  font-size: 0.95rem;
+  margin: 0 0 1.75em;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 .post-prose th,
 .post-prose td {
   border: 1px solid #d9d9d2;
-  padding: 0.6em 0.8em;
+  padding: 0.5em 0.75em;
   text-align: left;
   vertical-align: top;
 }
 .post-prose th {
-  background: #f0f0ea;
+  background: #f6f6f1;
+  color: #222325;
   font-weight: 700;
 }
 .post-prose .ql-align-center {
@@ -597,21 +640,6 @@ body {
 .post-prose .ql-align-right {
   text-align: right;
 }
-.post-prose .ql-align-justify {
-  text-align: justify;
-}
-@media (min-width: 1024px) {
-  .post-prose {
-    font-size: 1.125rem;
-  }
-  .post-prose h2 {
-    font-size: 1.625rem;
-  }
-  .post-prose h3 {
-    font-size: 1.3125rem;
-  }
-}
-
 .post-prose .ql-indent-1 {
   padding-left: 2em;
 }
@@ -623,22 +651,93 @@ body {
 }
 @media (max-width: 767px) {
   .post-prose {
-    font-size: 1.0625rem;
     line-height: 1.7;
   }
   .post-prose h2 {
-    font-size: 1.5rem;
+    font-size: 1.375rem;
   }
   .post-prose h3 {
-    font-size: 1.25rem;
+    font-size: 1.1875rem;
   }
   .post-prose blockquote {
-    font-size: 1rem;
     padding: 0.8rem 1rem 0.9rem;
   }
   .post-prose blockquote::before {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
   }
+}
+
+/* The blog editor (BlogForm): the same type as .post-prose, so writers see
+   roughly what readers get. Block margins stay 0 because blank lines are the
+   spacing here, and one 28px blank line equals the 28px paragraph gap on the
+   page. Selectors carry an extra class to beat quill.snow.css, which loads
+   after this file. */
+.post-editor .ql-toolbar.ql-snow {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px 12px 0 0;
+  background: #fff;
+}
+.post-editor .ql-container.ql-snow {
+  border: 1px solid #e5e5e5;
+  border-radius: 0 0 12px 12px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+}
+.post-editor .ql-container .ql-editor {
+  min-height: 480px;
+  padding: 2rem max(1.5rem, calc((100% - 720px) / 2)) 4rem;
+  color: #5f6063;
+  line-height: 1.75;
+}
+.post-editor .ql-container .ql-editor.ql-blank::before {
+  left: max(1.5rem, calc((100% - 720px) / 2));
+  right: max(1.5rem, calc((100% - 720px) / 2));
+  color: #737373;
+  font-style: normal;
+}
+.post-editor .ql-container .ql-editor h2,
+.post-editor .ql-container .ql-editor h3,
+.post-editor .ql-container .ql-editor h4 {
+  color: #222325;
+  font-weight: 700;
+}
+.post-editor .ql-container .ql-editor h2 {
+  font-size: 1.625rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+.post-editor .ql-container .ql-editor h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+.post-editor .ql-container .ql-editor h4 {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+.post-editor .ql-container .ql-editor a {
+  color: #222325;
+  font-weight: 500;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: #cddd54;
+}
+.post-editor .ql-container .ql-editor :is(h2, h3, h4, strong) a {
+  font-weight: inherit;
+}
+.post-editor .ql-container .ql-editor strong {
+  color: #222325;
+  font-weight: 700;
+}
+.post-editor .ql-container .ql-editor blockquote {
+  margin: 0;
+  padding-left: 1rem;
+  border-left: 3px solid #cddd54;
+  color: #222325;
+}
+/* Posts render justified text left-aligned; show it the same way here. */
+.post-editor .ql-container .ql-editor .ql-align-justify {
+  text-align: left;
 }
 
 /* The Home nudge rail. Halved because the track is rendered twice end to end,

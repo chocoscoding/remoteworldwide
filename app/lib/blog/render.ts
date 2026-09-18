@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { normalizeEditorHtml } from "./editorHtml";
 
 export const MARKERS = {
   cta: "[[cta]]",
@@ -28,7 +29,8 @@ const STRAY_MARKER_RE = new RegExp(String.raw`\[\[\s*(?:${MARKER_WORDS})\s*(?::\
 
 const EMPTY_BLOCK_RE = new RegExp(String.raw`<(p|h[1-6])(?:\s[^>]*)?>(?:\s|&nbsp;|<br\s*/?>)*</\1>\s*`, "gi");
 
-const ALLOWED_QL_CLASS = /^ql-(align-(center|right|justify)|indent-[1-8]|syntax|video)$/;
+// Justify is left out on purpose: posts render left-aligned, like the editor now shows.
+const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video)$/;
 const VIDEO_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/;
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
@@ -69,10 +71,11 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
 
 export function sanitizePostHtml(html: string): string {
   return (
-    sanitizeHtml(html, SANITIZE_OPTIONS)
-      .replace(/&nbsp;(?=\S)/g, " ")
-      .replace(/(\S)&nbsp;/g, "$1 ")
+    normalizeEditorHtml(sanitizeHtml(html, SANITIZE_OPTIONS))
       .replace(EMPTY_BLOCK_RE, "")
+      // Quill wraps an indented list in a bare <li> (<ul><li><ul>…); tag it so it draws no bullet.
+      // An empty item with a sub-list saves identically, so it is hidden (and uncounted) too.
+      .replace(/<li>(?=<(?:ul|ol)>)/g, '<li class="list-wrap">')
   );
 }
 
@@ -98,9 +101,11 @@ export function addHeadingIds(html: string): { html: string; toc: TocEntry[] } {
   const toc: TocEntry[] = [];
   const seen = new Map<string, number>();
   const out = html.replace(/<h([23])(\s[^>]*)?>([\s\S]*?)<\/h\1>/gi, (whole, lvl: string, attrs: string | undefined, inner: string) => {
-    const text = inner.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
-    if (!text) return whole;
-    const base = slugifyHeading(text);
+    const raw = inner.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+    if (!raw) return whole;
+    // Slug from the escaped text so existing #anchors keep working; the TOC shows it decoded.
+    const text = raw.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const base = slugifyHeading(raw);
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);
     const id = n === 1 ? base : `${base}-${n}`;

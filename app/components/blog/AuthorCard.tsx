@@ -38,7 +38,7 @@ const AuthorCard: FC<{ author: AuthorSummary; variant?: "full" | "mini"; label?:
   }
 
   return (
-    <section aria-label="About the author" className={cn("not-prose rounded-[20px] border-2 border-primary bg-white p-6 shadow-[4px_4px_0_0_#222325]", className)}>
+    <section aria-label="About the author" className={cn("not-prose rounded-[20px] border-2 border-primary bg-white p-6 shadow-[2px_2px_0_0_#222325]", className)}>
       <div className="flex items-start gap-4">
         <span className="relative h-16 w-16 flex-none overflow-hidden rounded-full border-2 border-primary">
           <Image src={author.profileImage} alt="" fill sizes="64px" className="object-cover" />
