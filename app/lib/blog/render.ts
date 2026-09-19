@@ -74,7 +74,8 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
 
 const QUOTE_LINE_RE = /<blockquote(?:\s[^>]*)?>([\s\S]*?)<\/blockquote>/gi;
 const QUOTE_RUN_RE = /<blockquote(?:\s[^>]*)?>[\s\S]*?<\/blockquote>(?:\s*<blockquote(?:\s[^>]*)?>[\s\S]*?<\/blockquote>)*/gi;
-const SOURCE_DASH_RE = /^((?:<[^>]+>)*)\s*(?:—|–|--?)\s*/;
+// The source marker: a last quote line starting with three hyphens ("--- Jane Doe").
+const SOURCE_DASH_RE = /^((?:<[^>]+>)*)\s*-{3,}\s*/;
 // "Jane Doe[https://…]": the address goes straight into an href, so only http(s) or site
 // paths, with no spaces, quotes or brackets.
 const SOURCE_LINK_RE = /^(.*?\S)\s*\[\s*((?:https?:\/\/|\/(?!\/))[^\s"'<>[\]]*)\s*\]$/i;
@@ -89,7 +90,7 @@ function sourceHtml(line: string): string {
 }
 
 // Quill saves each line of a quote as its own <blockquote>. Join a run into one quote with a
-// <p> per line; a last line starting with a dash ("— Jane Doe") becomes its source line.
+// <p> per line; a last line starting with "---" ("--- Jane Doe") becomes its source line.
 function joinQuotes(html: string): string {
   return html.replace(QUOTE_RUN_RE, (run) => {
     const lines = Array.from(run.matchAll(QUOTE_LINE_RE), (m) => m[1].trim()).filter((l) => stripTags(l) !== "" || /<img\s/i.test(l));

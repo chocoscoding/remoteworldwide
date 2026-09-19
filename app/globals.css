@@ -551,7 +551,7 @@ body {
 }
 /* Pull quote: ink frame on a lime block shadow, with a quote-mark badge sitting
    on the top border. Lines come in as <p>s (see joinQuotes); an optional source line
-   (the writer ends the quote with "— Name") gets a rule and mono caps. The top margin
+   (the writer ends the quote with "--- Name") gets a rule and mono caps. The top margin
    leaves room for the badge, the bottom one for the shadow. */
 .post-prose blockquote {
   position: relative;
@@ -600,6 +600,7 @@ body {
 }
 .post-prose blockquote .quote-source a:hover {
   text-decoration-line: underline;
+  text-decoration-color: #cddd54;
 }
 .post-prose blockquote .quote-source::before {
   content: "";
@@ -813,7 +814,7 @@ body {
 /* Quotes, drawn like the page's pull quote. Quill keeps each quote line as its own
    <blockquote>, so a run of them forms one box: sides and shadow on every line (each
    line's background covers the shadow of the one above), top border and badge on the
-   first, bottom border on the last. A last line starting with "—" is the page's source. */
+   first, bottom border on the last. A last line starting with "---" is the page's source. */
 .post-editor .ql-container .ql-editor blockquote {
   position: relative;
   margin: 0;
