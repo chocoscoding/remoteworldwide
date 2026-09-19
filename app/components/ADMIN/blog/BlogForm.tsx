@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type FC, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FC, type FormEvent, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Select from "react-select";
@@ -91,6 +91,51 @@ const ViewToggle: FC<{ view: "editor" | "preview"; loading: boolean; onChange: (
 
 const authorOption = (a: Author): Option => ({ value: a.id, label: a.name });
 
+// A quote, list or code block that starts or ends the post has no plain line beyond it, so
+// the cursor can't leave it. These add one: arrow Up/Down at its edge, or a click below it.
+const BLOCK_FORMATS = ["blockquote", "list", "code-block"];
+const PLAIN_LINE = { blockquote: false, list: false, "code-block": false };
+
+function addPlainLine(quill: Quill, at: "start" | "end") {
+  const index = at === "start" ? 0 : quill.getLength() - 1;
+  quill.insertText(index, "\n", "user");
+  const line = at === "start" ? 0 : index + 1;
+  quill.formatLine(line, 1, PLAIN_LINE, "user");
+  quill.setSelection(line, 0, "user");
+}
+
+function exitTrailingBlock(quill: Quill, e: MouseEvent<HTMLDivElement>) {
+  const last = quill.root.lastElementChild;
+  if (e.target !== quill.root || !last || e.clientY <= last.getBoundingClientRect().bottom) return;
+  const format = quill.getFormat(quill.getLength() - 1, 1);
+  if (!BLOCK_FORMATS.some((f) => format[f])) return;
+  e.preventDefault();
+  addPlainLine(quill, "end");
+}
+
+type LineContext = { offset: number; line: { length(): number } };
+
+// Arrow bindings: return true to let the caret move normally (a line exists beyond, or the
+// caret isn't on the block's first/last visual row of a wrapped line).
+function leaveBlockUp(this: { quill: Quill }, range: RangeStatic, context: LineContext) {
+  if (range.index - context.offset !== 0) return true;
+  const caret = this.quill.getBounds(range.index);
+  const top = this.quill.getBounds(0);
+  if (!caret || !top || caret.top > top.top + 2) return true;
+  addPlainLine(this.quill, "start");
+  return false;
+}
+
+function leaveBlockDown(this: { quill: Quill }, range: RangeStatic, context: LineContext) {
+  const end = range.index - context.offset + context.line.length() - 1;
+  if (end !== this.quill.getLength() - 1) return true;
+  const caret = this.quill.getBounds(range.index);
+  const bottom = this.quill.getBounds(end);
+  if (!caret || !bottom || caret.top < bottom.top - 2) return true;
+  addPlainLine(this.quill, "end");
+  return false;
+}
+
 /** Puts images on their own line at `range` (replacing any selected text) and moves the cursor past them. */
 function insertImages(quill: Quill, range: RangeStatic, urls: string[]) {
   if (range.length > 0) quill.deleteText(range.index, range.length, "user");
@@ -129,6 +174,12 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
             imageRange.current = quill.getSelection(true);
             imagePicker.current?.click();
           },
+        },
+      },
+      keyboard: {
+        bindings: {
+          "leave block up": { key: "ArrowUp", collapsed: true, format: BLOCK_FORMATS, handler: leaveBlockUp },
+          "leave block down": { key: "ArrowDown", collapsed: true, format: BLOCK_FORMATS, handler: leaveBlockDown },
         },
       },
       uploader: {
@@ -488,8 +539,16 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
 
         <div>
           <label className={ADMIN_LABEL}>Content</label>
-          <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={quillModules} placeholder="Write the post" className="post-editor mt-1" />
-          <p className={ADMIN_HINT}>Quotes: to credit a source, end the quote with a line starting with “—” (e.g. “— Jane Doe[link here]”). It can be a link. Leave it out for no source.</p>
+          <div
+            onMouseDown={(e) => {
+              const quill = quillRef.current?.getEditor();
+              if (quill) exitTrailingBlock(quill, e);
+            }}>
+            <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={quillModules} placeholder="Write the post" className="post-editor mt-1" />
+          </div>
+          <p className={ADMIN_HINT}>
+            Quotes: to credit a source, end the quote with a line starting with “---” (e.g. “--- Jane Doe[link here]”). It can be a link. Leave it out for no source. Press Enter on an empty quote line, or click below the quote, to carry on with normal text.
+          </p>
           {/* Opened by the toolbar's image button. The widget keeps its first callbacks, so they read refs only. */}
           <CldUploadWidget
             options={{ sources: ["local", "url", "unsplash"], folder: "blogs", multiple: false }}
