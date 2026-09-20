@@ -22,17 +22,20 @@ export interface NewResumeDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Label of the document this dialog would duplicate from, shown in the "Duplicate" option's helper text. */
   currentDocLabel: string;
+  /** The document is being created in the library — the dialog waits on it rather than closing on a guess. */
+  creating: boolean;
   onCreate: (label: string, mode: NewResumeMode) => void;
 }
 
-const NewResumeDialog: FC<NewResumeDialogProps> = ({ open, onOpenChange, currentDocLabel, onCreate }) => {
+const NewResumeDialog: FC<NewResumeDialogProps> = ({ open, onOpenChange, currentDocLabel, creating, onCreate }) => {
   const [label, setLabel] = useState("");
   const [mode, setMode] = useState<NewResumeMode>("blank");
 
+  // Nothing is reset here: creating can fail, and the name they typed should
+  // still be there when it does. A success remounts the whole screen on the
+  // new document, which clears this along with everything else.
   const handleCreate = () => {
-    onCreate(label, mode);
-    setLabel("");
-    setMode("blank");
+    if (!creating) onCreate(label, mode);
   };
 
   return (
@@ -61,6 +64,10 @@ const NewResumeDialog: FC<NewResumeDialogProps> = ({ open, onOpenChange, current
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreate();
+              }}
+              maxLength={80}
               placeholder="e.g. Stripe — Senior Designer"
               className="rounded-xl border border-black/12 bg-[#fbfbf7] px-4 py-3 text-sm text-primary placeholder:text-black/35 outline-none focus:border-black/30 transition-colors"
             />
@@ -94,9 +101,9 @@ const NewResumeDialog: FC<NewResumeDialogProps> = ({ open, onOpenChange, current
           <StickerButton type="button" variant="outline" size="md" onClick={() => onOpenChange(false)}>
             Cancel
           </StickerButton>
-          <StickerButton type="button" variant="primary" size="md" onClick={handleCreate}>
+          <StickerButton type="button" variant="primary" size="md" disabled={creating} onClick={handleCreate}>
             <FilePlus2 className="h-4 w-4" />
-            Create
+            {creating ? "Creating…" : "Create"}
           </StickerButton>
         </div>
       </DialogContent>

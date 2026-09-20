@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import { pickQuestionsForSession, type SessionInput } from "@/app/lib/dashboard/prep-engine";
 import { formatsLabel, type PrepTrack, type QuestionBankEntry, type TranscriptTurn } from "@/app/lib/dashboard/prep-data";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import { PREP_BILLING_HREF, insufficientCreditsOf, limitedOf, openSessionOf } from "@/app/lib/voice/api";
+import { PREP_BILLING_HREF, getQuestionSpeech, insufficientCreditsOf, limitedOf, openSessionOf } from "@/app/lib/voice/api";
 import { formatClock as formatRecordingClock } from "@/app/lib/voice/format";
 import { PREP_LIMITS, type CreatePrepSessionInput, type CreatePrepSessionResult, type EndReason, type PrepSessionMode, type PrepSnapshot, type TurnSource } from "@/app/lib/voice/types";
 import { questionPresetFor, type SessionConfig } from "./PrepSetup";
@@ -277,6 +277,21 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
   // A start still waiting on the mic prompt can be called off with the same button.
   const requesting = micStatus === "requesting";
   const currentQuestion = questions[questionIndex];
+
+  /**
+   * Where the interviewer's voice comes from for one question: the service
+   * synthesizes it once and serves it from storage. Null — no session of ours
+   * to ask, or no provider configured — leaves the browser to speak it, which
+   * is also what a local (unsaved) session gets.
+   */
+  const resolveQuestionAudio = useCallback(
+    (questionId: string) => async (): Promise<string | null> => {
+      if (start.kind !== "saved") return null;
+      const link = await getQuestionSpeech(start.serverId, questionId).catch(() => null);
+      return link?.url ?? null;
+    },
+    [start],
+  );
   const totalSeconds = config.lengthMinutes * 60;
   const interim = recording ? capture.interim : dictationInterim;
   const finalizing = recording ? capture.finalizing : dictationFinalizing;
@@ -468,7 +483,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
   // starts, it is a moment at the time the question went up.
   useEffect(() => {
     if (phase !== "active" || !currentQuestion) return;
-    speak(currentQuestion.text);
+    speak(currentQuestion.text, resolveQuestionAudio(currentQuestion.id));
     const turnId = aiTurnRef.current;
     if (!turnId) return;
     if (!voiceOn) {
@@ -784,7 +799,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
     const next = !voiceOn;
     setVoiceOn(next);
     if (!next) cancelSpeech();
-    else if (currentQuestion && phase === "active") speak(currentQuestion.text);
+    else if (currentQuestion && phase === "active") speak(currentQuestion.text, resolveQuestionAudio(currentQuestion.id));
   }
 
   // ---------------------------------------------------------------------------

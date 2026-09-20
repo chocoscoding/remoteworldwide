@@ -17,16 +17,20 @@
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type FC, type SetStateAction } from "react";
 import { ArrowLeft, Download, Plus } from "lucide-react";
+import TimeAgo from "timeago-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import DownloadModal from "@/app/components/dashboard/modals/DownloadModal";
 import { ResumePaper, PageGuides } from "@/app/components/dashboard/resume/paper";
 import { useResumeDesign } from "@/app/components/dashboard/resume/useResumeDesign";
-import { DEFAULT_DESIGN, DEFAULT_SECTIONS } from "@/app/lib/dashboard/resume/design-defaults";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
+import { apiMessage } from "@/app/lib/api/core";
+import { createResumeDocument } from "@/app/lib/resume/api";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
-import { cloneContent, createBlankContent, generalScoreFor, type ResumeDocument } from "./resume-document";
+import { cloneContent, createBlankContent, fromStored, generalScoreFor, isBlankContent, type ResumeDocument } from "./resume-document";
+import { useResumeAutosave } from "./useResumeAutosave";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import DocumentSwitcher from "./DocumentSwitcher";
 import NewResumeDialog, { type NewResumeMode } from "./NewResumeDialog";
@@ -92,9 +96,6 @@ const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
 const ZOOM_BUTTON_CLASS =
   "grid h-6 w-6 place-content-center rounded-full border border-black/15 bg-white text-sm font-semibold leading-none text-black/70 transition-[transform,box-shadow,background-color,border-color,color] duration-100 ease-out hover:border-[#222325] hover:bg-[#f7f7f7] hover:text-primary hover:shadow-[0.5px_0.5px_0_0_#222325] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none cursor-pointer";
 
-const TAILORED_SUMMARY =
-  "Product designer with 6 years shipping design systems and developer-experience-focused workflow tools for distributed teams across four time zones.";
-
 // What Tailor and the ATS card's "Against a job" read from a picked job. Skills
 // and requirements are asked for but never required: a pasted posting may name
 // none. One constant feeds both the pick and the type, so they cannot drift.
@@ -107,22 +108,31 @@ export interface ResumeScreenBodyProps {
   activeDoc: ResumeDocument;
   setDocuments: Dispatch<SetStateAction<ResumeDocument[]>>;
   setActiveDocId: Dispatch<SetStateAction<string | null>>;
+  /** Every save that lands, including the one flushed as this component unmounts — see `useResumeAutosave`. */
+  onSaved: (id: string, updatedAt: Date) => void;
 }
 
-const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, activeDoc, setDocuments, setActiveDocId }) => {
+const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, activeDoc, setDocuments, setActiveDocId, onSaved }) => {
   const { design, sections, dispatch } = useResumeDesign();
   const { collapsed: sidebarCollapsed } = useSidebarCollapse();
 
   const [docTab, setDocTab] = useState<DocTab>("content");
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [newResumeOpen, setNewResumeOpen] = useState(false);
+  const [creatingResume, setCreatingResume] = useState(false);
 
   // The active document's live content — captured here for the same reason
   // design/sections live in the provider: it must be readable at the moment
   // of an explicit save-before-switch (see `switchTo`/`createNewResume`).
   const [content, setContent] = useState<ResumeContent>(() => activeDoc.content);
 
-  const [summarySuggestion, setSummarySuggestion] = useState<SummarySuggestionState>(() => (activeDoc.isBlank ? "dismissed" : "pending"));
+  // Whether there is anything to accept is `suggestions` below; this is only
+  // what the user has done about it.
+  const [summarySuggestion, setSummarySuggestion] = useState<SummarySuggestionState>("pending");
+
+  // Everything a resume IS — content, design, sections — saved as it changes.
+  // The ATS state further down is deliberately not part of it.
+  const autosave = useResumeAutosave({ id: activeDocId, content, design, sections, savedAt: activeDoc.updatedAt, onSaved });
 
   const [aiRunning, setAiRunning] = useState<string | null>(null);
   const [aiDone, setAiDone] = useState<Set<string>>(new Set());
@@ -190,6 +200,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   }, []);
 
   const displayScore = Math.min(97, activeDoc.score + keywordsAdded.size * 4);
+  const isBlank = isBlankContent(content);
+  // A job check's findings stand only while the check does — Remove takes the
+  // "to match this posting" rewrite away with the posting it was matched to.
+  const suggestions = activeDoc.scan?.kind === "job" ? (activeDoc.suggestions ?? null) : null;
   const downloadFileName = content.name.trim() ? `${content.name.trim().replace(/\s+/g, "-")}-Resume` : "Resume";
   const previewScale = Math.max(0.45, Math.min(1.8, fit.scale * (zoomPercent / 100)));
 
@@ -199,7 +213,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   // Document switch / create — explicit save-then-swap, not a reactive
   // effect. `design`/`sections` come from the hook (live provider state);
   // `content` is this component's own local state. Both get written back
-  // onto the OUTGOING document before the id changes.
+  // onto the OUTGOING document before the id changes. That stash is only the
+  // in-memory copy the switcher and the landing read; the save to the library
+  // is `useResumeAutosave` flushing as this component unmounts.
   // -------------------------------------------------------------------------
 
   const switchTo = useCallback(
@@ -219,26 +235,28 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   }, [activeDocId, design, sections, content, setDocuments, setActiveDocId]);
 
   const createNewResume = useCallback(
-    (label: string, mode: NewResumeMode) => {
-      const id = `res-new-${Date.now()}`;
-      const newDoc: ResumeDocument = {
-        id,
-        label: label.trim() || "New resume",
+    async (label: string, mode: NewResumeMode) => {
+      setCreatingResume(true);
+      try {
         // A fresh document always starts at the base design/sections — even
         // "duplicate" only copies CONTENT, never the outgoing document's
         // customization, so every new document genuinely starts at the real
-        // default look.
-        content: mode === "duplicate" ? cloneContent(content) : createBlankContent(),
-        design: DEFAULT_DESIGN,
-        sections: DEFAULT_SECTIONS,
-        score: 0,
-        before: null,
-        scan: null,
-        isBlank: mode === "blank",
-      };
-      setDocuments((prev) => [...prev.map((d) => (d.id === activeDocId ? { ...d, design, sections, content } : d)), newDoc]);
-      setActiveDocId(id);
-      setNewResumeOpen(false);
+        // default look (which the library stores as no design at all).
+        const stored = await createResumeDocument({
+          label: label.trim() || "New resume",
+          content: mode === "duplicate" ? cloneContent(content) : createBlankContent(),
+        });
+        const newDoc = fromStored(stored);
+        setDocuments((prev) => [newDoc, ...prev.map((d) => (d.id === activeDocId ? { ...d, design, sections, content } : d))]);
+        setActiveDocId(newDoc.id);
+        setNewResumeOpen(false);
+      } catch (error) {
+        // The dialog stays open on what they typed: nothing was created, so
+        // there is nothing to switch to.
+        toast.error(apiMessage(error));
+      } finally {
+        setCreatingResume(false);
+      }
     },
     [activeDocId, design, sections, content, setDocuments, setActiveDocId],
   );
@@ -459,7 +477,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   };
 
   const acceptSummarySuggestion = () => {
-    setContent((prev) => ({ ...prev, summary: TAILORED_SUMMARY }));
+    if (!suggestions) return;
+    const { text } = suggestions.summary;
+    setContent((prev) => ({ ...prev, summary: text }));
     setSummarySuggestion("accepted");
   };
   const dismissSummarySuggestion = () => setSummarySuggestion("dismissed");
@@ -552,8 +572,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
                   <ContentForm
                     content={content}
                     setContent={setContent}
-                    isBlank={activeDoc.isBlank ?? false}
-                    docLabel={activeDoc.label}
+                    suggestionReason={suggestions?.summary.reason ?? null}
                     summarySuggestion={summarySuggestion}
                     onAcceptSummarySuggestion={acceptSummarySuggestion}
                     onDismissSummarySuggestion={dismissSummarySuggestion}
@@ -583,8 +602,33 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
           {/* CENTER — resume document preview, identical across every tab */}
           <section className="min-w-0">
             <div className="mb-2 flex items-center justify-between gap-3 px-1 text-xs text-black/45">
-              <p>
-                {pageCount} page{pageCount === 1 ? "" : "s"} · {content.experience.length} roles · last edited 2 minutes ago.
+              <p aria-live="polite">
+                {pageCount} page{pageCount === 1 ? "" : "s"} · {content.experience.length} role{content.experience.length === 1 ? "" : "s"} ·{" "}
+                {autosave.status.kind === "saved" && (
+                  <>
+                    saved · last edited <TimeAgo datetime={autosave.savedAt} opts={{ minInterval: 10 }} />
+                  </>
+                )}
+                {autosave.status.kind === "saving" && "saving…"}
+                {/* Two different failures. One that may pass on its own is
+                    retried for them, so the copy says that and nothing about
+                    why — the upstream's own sentence already says "try again",
+                    and it is us doing the trying. A refusal is theirs to fix,
+                    so it gets the server's sentence, which names the field. */}
+                {autosave.status.kind === "error" && (
+                  <span className="font-semibold text-[#b23c26]">
+                    {autosave.status.retrying ? (
+                      "not saved yet — we'll keep trying. Your changes are safe on this page."
+                    ) : (
+                      <>
+                        not saved — {autosave.status.message}{" "}
+                        <button type="button" onClick={autosave.flush} className="cursor-pointer underline decoration-2 underline-offset-2">
+                          Try again
+                        </button>
+                      </>
+                    )}
+                  </span>
+                )}
               </p>
 
               {/* Zoom — a quiet pill that only comes forward on hover. */}
@@ -653,7 +697,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
               <CustomizePanelsRail flashItem={flashCustomizeItem} registerRef={registerCustomizeRef} />
             ) : (
               <AiAssistRail
-                isBlank={activeDoc.isBlank ?? false}
+                isBlank={isBlank}
+                hasSuggestions={suggestions !== null}
                 displayScore={displayScore}
                 before={activeDoc.before}
                 scan={activeDoc.scan}
@@ -678,7 +723,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
       </main>
 
       <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="resume" fileName={downloadFileName} />
-      <NewResumeDialog open={newResumeOpen} onOpenChange={setNewResumeOpen} currentDocLabel={activeDoc.label} onCreate={createNewResume} />
+      <NewResumeDialog
+        open={newResumeOpen}
+        onOpenChange={setNewResumeOpen}
+        currentDocLabel={activeDoc.label}
+        creating={creatingResume}
+        onCreate={(label, mode) => void createNewResume(label, mode)}
+      />
     </div>
   );
 };

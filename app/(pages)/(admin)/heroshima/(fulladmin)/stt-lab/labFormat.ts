@@ -3,12 +3,11 @@
 
 import type { LabProvider, LabRun, LiveSttProvider } from "@/app/lib/voice/types";
 
-export const LAB_PROVIDER_ORDER: readonly LabProvider[] = ["aws-transcribe", "web-speech", "aws-transcribe-batch"];
+export const LAB_PROVIDER_ORDER: readonly LabProvider[] = ["aws-transcribe", "web-speech"];
 
 export const PROVIDER_LABELS: Record<LabProvider, { name: string; detail: string }> = {
   "aws-transcribe": { name: "AWS streaming", detail: "Live captions through the voice gateway" },
   "web-speech": { name: "Web Speech", detail: "The browser's own recognizer" },
-  "aws-transcribe-batch": { name: "AWS batch", detail: "What every report transcript uses" },
 };
 
 export const LIVE_PROVIDER_LABELS: Record<LiveSttProvider, string> = {

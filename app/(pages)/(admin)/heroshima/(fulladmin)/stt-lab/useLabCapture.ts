@@ -6,8 +6,8 @@ import { createLabCapture, type LabCapture, type LabCaptureSnapshot } from "./la
 /**
  * The lab's capture engine for one page. The engine is created once and
  * outlives re-renders; React sees its snapshot. Unmounting drops a clip still
- * recording (nothing is uploaded), while an upload or poll already under way
- * finishes by itself. The engine stays usable afterwards, so StrictMode's
+ * recording (nothing is uploaded), while an upload already under way finishes
+ * by itself. The engine stays usable afterwards, so StrictMode's
  * mount, unmount, mount does no harm.
  */
 export function useLabCapture(): { snapshot: LabCaptureSnapshot; engine: LabCapture } {

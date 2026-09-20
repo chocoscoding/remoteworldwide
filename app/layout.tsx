@@ -12,7 +12,10 @@ import "react-toastify/dist/ReactToastify.css";
 import Script from "next/script";
 import SiteJsonLd from "./components/SiteJsonLd";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "./lib/seo";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Downtime from "./components/Downtime";
+
 const font = Manrope({
   subsets: ["latin-ext"],
   weight: ["200", "300", "400", "500", "700"],
@@ -51,8 +54,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script strategy="afterInteractive" src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_TOKEN}`} />
-        <Script strategy="afterInteractive" id="google-analytics">
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_TOKEN}`}
+        />
+        <Script
+          strategy="afterInteractive"
+          id="google-analytics">
           {`
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
@@ -60,7 +68,9 @@ export default function RootLayout({
 
   gtag('config', '${process.env.GOOGLE_ANALYTICS_TOKEN}');`}
         </Script>
-        <Script strategy="afterInteractive" id="hotjar">
+        <Script
+          strategy="afterInteractive"
+          id="hotjar">
           {`(function(h,o,t,j,a,r){
         h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
         h._hjSettings={hjid:6481023,hjsv:6};
@@ -72,8 +82,14 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`${font.className} antialiased`}>
+        <Analytics />
+        <SpeedInsights />
         <SiteJsonLd />
-        <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
+        <NextTopLoader
+          color="#000000"
+          shadow="0 0 10px #000000,0 0 5px #000000"
+          showSpinner={false}
+        />
         <Downtime />
         <ToastContainer
           className={"z-50"}

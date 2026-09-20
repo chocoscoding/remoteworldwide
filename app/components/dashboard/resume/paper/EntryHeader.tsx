@@ -117,8 +117,15 @@ export interface EntryBulletsProps {
   design: ResumeDesign;
 }
 
-/** `bulletGlyph: "none"` hides the marker entirely and left-aligns the text (no reserved indent). */
-export const EntryBullets: FC<EntryBulletsProps> = ({ items, design }) => {
+/**
+ * `bulletGlyph: "none"` hides the marker entirely and left-aligns the text (no reserved indent).
+ *
+ * Blank bullets are skipped: the Content form keeps an empty row in the content
+ * while it is being typed into, and a marker with nothing beside it is not
+ * something a resume should print.
+ */
+export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design }) => {
+  const items = allItems.filter((item) => item.trim());
   if (items.length === 0) return null;
   const { bulletGlyph, indentBullets } = design.entries;
   const showGlyph = bulletGlyph !== "none";

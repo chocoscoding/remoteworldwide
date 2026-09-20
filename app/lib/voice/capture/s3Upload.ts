@@ -1,4 +1,4 @@
-// One recording part to S3 by presigned POST.
+// One recording part to storage by presigned PUT.
 //
 // The browser talks to S3 directly: audio never passes through Next (Vercel
 // caps request bodies and bills every second a function holds one) nor through
@@ -91,23 +91,24 @@ export function classifyS3Error(status: number, code: string | null, message: st
 }
 
 /**
- * Sends one part. Resolves once S3 has stored it (200, 201 or 204). Rejects
- * with an S3UploadError, or with the AbortError itself when `signal` aborted,
- * so the queue can tell a cancel from a failure.
+ * Sends one part. Resolves once storage has stored it (200, 201 or 204).
+ * Rejects with an S3UploadError, or with the AbortError itself when `signal`
+ * aborted, so the queue can tell a cancel from a failure.
+ *
+ * A PUT with the part as the body: R2 does not implement POST object, so the
+ * multipart form this used to send could never have uploaded anything. The
+ * headers come from the signer and must be sent exactly — Content-Type is
+ * signed, and a mismatch is a 403 that looks nothing like a type error.
  */
-export async function postPart(partUrl: PartUrl, part: Blob, signal?: AbortSignal): Promise<void> {
-  const form = new FormData();
-  // Every policy field first: S3 ignores anything after the file.
-  for (const [name, value] of Object.entries(partUrl.fields)) form.append(name, value);
-  form.append("file", part, "part.bin");
-
+export async function putPart(partUrl: PartUrl, part: Blob, signal?: AbortSignal): Promise<void> {
   let res: Response;
   try {
     res = await fetch(partUrl.url, {
-      method: "POST",
-      body: form,
+      method: "PUT",
+      body: part,
+      headers: partUrl.headers,
       signal,
-      // S3 needs no cookie of ours, and must not be sent one.
+      // Storage needs no cookie of ours, and must not be sent one.
       credentials: "omit",
       cache: "no-store",
       referrerPolicy: "no-referrer",

@@ -10,9 +10,12 @@
 import type { ChangeEvent, FC } from "react";
 import { cn } from "@/lib/utils";
 
-const FIELD_CLASS = "rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors";
+// Exported for the two editors that need a bare element instead of these
+// wrappers — the bullets rows (a ref per textarea) and the skills input (key
+// handling) — so they wear the same field without restating it.
+export const FIELD_CLASS = "rounded-none border px-2.5 py-1.5 text-sm outline-none transition-colors";
 
-const FIELD_TONE = {
+export const FIELD_TONE = {
   active: "border-black/20 bg-[#d9d9d3] text-primary placeholder:text-black/45 focus:border-[#222325]",
   idle: "border-black/40 bg-white text-primary placeholder:text-black/40 focus:border-[#222325]",
 } as const;

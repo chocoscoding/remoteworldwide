@@ -1,6 +1,5 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
 import type { LabProviderResult, LabRun } from "@/app/lib/voice/types";
 import { formatDuration } from "@/app/lib/voice/format";
 import { bestProvider, formatLatency, formatPct, formatUsd, formatWhen, LAB_PROVIDER_ORDER, PROVIDER_LABELS } from "./labFormat";
@@ -35,7 +34,6 @@ export default function LabScorecard({ run }: LabScorecardProps) {
   const best = bestProvider(run);
   const byProvider = new Map(run.results.map((result) => [result.provider, result]));
   const rows = LAB_PROVIDER_ORDER.map((provider) => ({ provider, result: byProvider.get(provider) ?? null }));
-  const batchPending = run.status === "processing" && !byProvider.has("aws-transcribe-batch");
   const scored = run.reference !== null;
 
   return (
@@ -53,15 +51,13 @@ export default function LabScorecard({ run }: LabScorecardProps) {
       {run.error && <p className={`px-5 py-3 text-sm ${run.status === "failed" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{run.error}</p>}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[46rem] text-sm">
+        <table className="w-full min-w-[34rem] text-sm">
           <thead>
             <tr className="text-left font-mono text-[11px] uppercase tracking-wider text-gray-500">
               <th scope="col" className="px-5 py-2 font-medium">Engine</th>
               <th scope="col" className="px-3 py-2 font-medium">WER</th>
               <th scope="col" className="px-3 py-2 text-right font-medium" title="Counting casing and punctuation">Raw WER</th>
-              <th scope="col" className="px-3 py-2 text-right font-medium" title="Share of the clip covered by word timings">Timings</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">First result</th>
-              <th scope="col" className="px-3 py-2 text-right font-medium" title="From starting the batch job to the transcript">Turnaround</th>
               <th scope="col" className="px-5 py-2 text-right font-medium">Est. cost</th>
             </tr>
           </thead>
@@ -75,20 +71,7 @@ export default function LabScorecard({ run }: LabScorecardProps) {
                   </span>
                   <span className="block text-xs text-gray-500">{PROVIDER_LABELS[provider].detail}</span>
                 </th>
-                {result ? (
-                  <ResultCells result={result} />
-                ) : (
-                  <td colSpan={6} className="px-3 py-3 text-xs text-gray-500">
-                    {provider === "aws-transcribe-batch" && batchPending ? (
-                      <span className="inline-flex items-center gap-2">
-                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                        AWS batch is transcribing the clip…
-                      </span>
-                    ) : (
-                      "Not measured for this clip."
-                    )}
-                  </td>
-                )}
+                {result ? <ResultCells result={result} /> : <td colSpan={4} className="px-3 py-3 text-xs text-gray-500">Not measured for this clip.</td>}
               </tr>
             ))}
           </tbody>
@@ -98,7 +81,7 @@ export default function LabScorecard({ run }: LabScorecardProps) {
       <div className="grid gap-3 border-t border-primary/10 p-5 lg:grid-cols-2">
         {run.reference && <Transcript title="Reference" text={run.reference} open />}
         {rows.map(({ provider, result }) =>
-          result ? <Transcript key={provider} title={PROVIDER_LABELS[provider].name} text={result.text} open={!run.reference && provider === "aws-transcribe-batch"} /> : null,
+          result ? <Transcript key={provider} title={PROVIDER_LABELS[provider].name} text={result.text} open={!run.reference && provider === "aws-transcribe"} /> : null,
         )}
       </div>
     </section>
@@ -113,9 +96,7 @@ function ResultCells({ result }: { result: LabProviderResult }) {
         <WerBar value={result.normalizedWer} />
       </td>
       <td className={numeric}>{formatPct(result.wer)}</td>
-      <td className={numeric}>{formatPct(result.timingCoverage, 0)}</td>
       <td className={numeric}>{formatLatency(result.firstPartialMs)}</td>
-      <td className={numeric}>{formatLatency(result.turnaroundMs)}</td>
       <td className={`${numeric} pr-5`}>{formatUsd(result.estimatedUsd)}</td>
     </>
   );

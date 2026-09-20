@@ -97,7 +97,10 @@ const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
       {photoBlock}
       <div className={cn("min-w-0 flex-1", alignCenter && "flex flex-col items-center")}>
         <p className="font-[family-name:var(--r-font-name)] text-[length:var(--r-fs-name)] font-bold leading-tight text-[color:var(--r-c-name)]">
-          {content.name}
+          {/* Same role as the sections' "No experience added yet." lines: a
+              hint at what goes here, not content. Faded off the name's own
+              colour so it reads on every chrome, band and sidebar included. */}
+          {content.name || <span className="opacity-35">Your name</span>}
         </p>
         {content.title && (
           <p className="mt-[2pt] text-[length:var(--r-fs-title)] leading-tight text-[color:var(--r-c-title)]">{content.title}</p>

@@ -8,27 +8,44 @@
 // Projects/Education "editing" wrote into a local array nobody rendered from;
 // this one is bound directly to the content the paper reads).
 //
+// Every section the paper renders has a group here — a resume started from
+// scratch has no other way to acquire an Experience entry or a skill. The
+// groups run in the paper's own default order, so the form reads top to bottom
+// the way the page does.
+//
 // Owns its own mini jump-list + scroll/flash-highlight, same mechanic as the
 // old screen's `focusSection`, just repointed at these field groups instead
-// of the old inline-preview sections (there's nowhere else for it to point —
-// Experience/Skills stay display-only, matching current behaviour, so they
-// have no group here to jump to).
+// of the old inline-preview sections.
+//
+// New entries start EMPTY and lean on their inputs' placeholders. A starter
+// value ("New school", "Degree") is on the page the moment it is created, and
+// stays there for anyone who fills in one field and not the other.
 
 import { useRef, useState, type Dispatch, type FC, type SetStateAction } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ResumeCertEntry, ResumeContent, ResumeEducationEntry, ResumeProjectEntry } from "@/app/lib/dashboard/types";
+import type {
+  ResumeCertEntry,
+  ResumeContent,
+  ResumeEducationEntry,
+  ResumeExperienceEntry,
+  ResumeProjectEntry,
+} from "@/app/lib/dashboard/types";
 import { TextField, TextAreaField } from "./FormField";
 import LinksEditor from "./LinksEditor";
 import EntryListEditor from "./EntryListEditor";
+import BulletsEditor from "./BulletsEditor";
+import SkillsEditor from "./SkillsEditor";
 
-type ContentGroupId = "personal" | "summary" | "links" | "education" | "projects" | "certifications";
+type ContentGroupId = "personal" | "summary" | "links" | "experience" | "education" | "skills" | "projects" | "certifications";
 
 const CONTENT_GROUPS: { id: ContentGroupId; label: string }[] = [
   { id: "personal", label: "Personal details" },
   { id: "summary", label: "Summary" },
   { id: "links", label: "Links" },
+  { id: "experience", label: "Experience" },
   { id: "education", label: "Education" },
+  { id: "skills", label: "Skills" },
   { id: "projects", label: "Projects" },
   { id: "certifications", label: "Certifications" },
 ];
@@ -36,8 +53,11 @@ const CONTENT_GROUPS: { id: ContentGroupId; label: string }[] = [
 export interface ContentFormProps {
   content: ResumeContent;
   setContent: Dispatch<SetStateAction<ResumeContent>>;
-  isBlank: boolean;
-  docLabel: string;
+  /**
+   * Why the standing job check proposes a new Summary, or null when no check
+   * has proposed one — which is every resume the user started or imported.
+   */
+  suggestionReason: string | null;
   summarySuggestion: "pending" | "accepted" | "dismissed";
   onAcceptSummarySuggestion: () => void;
   onDismissSummarySuggestion: () => void;
@@ -45,7 +65,9 @@ export interface ContentFormProps {
 
 function groupMeta(id: ContentGroupId, content: ResumeContent): number | null {
   if (id === "links") return content.links.length;
+  if (id === "experience") return content.experience.length;
   if (id === "education") return content.education.length;
+  if (id === "skills") return content.skills.length;
   if (id === "projects") return content.projects.length;
   if (id === "certifications") return content.certifications.length;
   return null;
@@ -54,8 +76,7 @@ function groupMeta(id: ContentGroupId, content: ResumeContent): number | null {
 const ContentForm: FC<ContentFormProps> = ({
   content,
   setContent,
-  isBlank,
-  docLabel,
+  suggestionReason,
   summarySuggestion,
   onAcceptSummarySuggestion,
   onDismissSummarySuggestion,
@@ -96,7 +117,7 @@ const ContentForm: FC<ContentFormProps> = ({
                   : "font-medium text-black/60 hover:bg-[#f6f6f6]",
               )}>
               <span className="flex min-w-0 items-center gap-2">
-                {group.id === "summary" && !isBlank && summarySuggestion === "pending" && (
+                {group.id === "summary" && suggestionReason !== null && summarySuggestion === "pending" && (
                   <span className="h-1.5 w-1.5 rounded-full bg-secondary flex-none" />
                 )}
                 <span className="truncate">{group.label}</span>
@@ -131,12 +152,17 @@ const ContentForm: FC<ContentFormProps> = ({
           }}
           className={cn("flex flex-col gap-2 p-1", flashClass("summary"))}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Summary</p>
-          <TextAreaField value={content.summary} onChange={(v) => setField("summary", v)} placeholder="A short summary…" rows={5} />
-          {!isBlank && summarySuggestion === "pending" && (
+          <TextAreaField
+            value={content.summary}
+            onChange={(v) => setField("summary", v)}
+            placeholder="A short summary of your experience and what you're looking for next."
+            rows={5}
+          />
+          {suggestionReason !== null && summarySuggestion === "pending" && (
             <div className="rounded-lg bg-secondary/25 px-3 py-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
               <Sparkles className="h-3 w-3 text-black/50 flex-none" />
               <span className="text-black/55">
-                AI suggestion — leads with &quot;developer experience&quot; to match {docLabel}&apos;s JD.
+                AI suggestion — {suggestionReason}
               </span>
               <button
                 type="button"
@@ -153,7 +179,9 @@ const ContentForm: FC<ContentFormProps> = ({
               </button>
             </div>
           )}
-          {!isBlank && summarySuggestion === "accepted" && <p className="text-xs font-semibold text-[#6c7a1e]">AI-tailored — accepted</p>}
+          {suggestionReason !== null && summarySuggestion === "accepted" && (
+            <p className="text-xs font-semibold text-[#6c7a1e]">AI-tailored — accepted</p>
+          )}
         </div>
 
         {/* Links */}
@@ -166,6 +194,45 @@ const ContentForm: FC<ContentFormProps> = ({
           <LinksEditor links={content.links} onChange={(links) => setField("links", links)} />
         </div>
 
+        {/* Experience */}
+        <div
+          ref={(el) => {
+            groupRefs.current.experience = el;
+          }}
+          className={cn("flex flex-col gap-2 p-1", flashClass("experience"))}>
+          <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Experience</p>
+          <EntryListEditor<ResumeExperienceEntry>
+            items={content.experience}
+            onChange={(items) => setField("experience", items)}
+            // One empty bullet, so a new role opens with somewhere to type.
+            createItem={() => ({ id: `exp-${Date.now()}`, role: "", company: "", dates: "", bullets: [""] })}
+            addLabel="Add a role"
+            emptyLabel="No experience added yet."
+            renderFields={(item, update, isActive) => (
+              <>
+                <TextField value={item.role} onChange={(v) => update({ role: v })} placeholder="Role" isActive={isActive} />
+                <div className="flex gap-2">
+                  <TextField
+                    value={item.company}
+                    onChange={(v) => update({ company: v })}
+                    placeholder="Company"
+                    className="flex-1"
+                    isActive={isActive}
+                  />
+                  <TextField
+                    value={item.dates}
+                    onChange={(v) => update({ dates: v })}
+                    placeholder="2021–Present"
+                    className="w-32 flex-none"
+                    isActive={isActive}
+                  />
+                </div>
+                <BulletsEditor bullets={item.bullets} onChange={(bullets) => update({ bullets })} isActive={isActive} />
+              </>
+            )}
+          />
+        </div>
+
         {/* Education */}
         <div
           ref={(el) => {
@@ -176,7 +243,7 @@ const ContentForm: FC<ContentFormProps> = ({
           <EntryListEditor<ResumeEducationEntry>
             items={content.education}
             onChange={(items) => setField("education", items)}
-            createItem={() => ({ id: `edu-${Date.now()}`, school: "New school", degree: "Degree", dates: "" })}
+            createItem={() => ({ id: `edu-${Date.now()}`, school: "", degree: "", dates: "" })}
             addLabel="Add education"
             emptyLabel="No education added yet."
             renderFields={(item, update, isActive) => (
@@ -215,6 +282,16 @@ const ContentForm: FC<ContentFormProps> = ({
           />
         </div>
 
+        {/* Skills */}
+        <div
+          ref={(el) => {
+            groupRefs.current.skills = el;
+          }}
+          className={cn("flex flex-col gap-2 p-1", flashClass("skills"))}>
+          <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55 px-1">Skills</p>
+          <SkillsEditor skills={content.skills} onChange={(skills) => setField("skills", skills)} />
+        </div>
+
         {/* Projects */}
         <div
           ref={(el) => {
@@ -225,7 +302,7 @@ const ContentForm: FC<ContentFormProps> = ({
           <EntryListEditor<ResumeProjectEntry>
             items={content.projects}
             onChange={(items) => setField("projects", items)}
-            createItem={() => ({ id: `proj-${Date.now()}`, name: "New project", detail: "One line about the impact you had." })}
+            createItem={() => ({ id: `proj-${Date.now()}`, name: "", detail: "" })}
             addLabel="Add a project"
             emptyLabel="No projects added yet."
             renderFields={(item, update, isActive) => (
@@ -254,7 +331,7 @@ const ContentForm: FC<ContentFormProps> = ({
           <EntryListEditor<ResumeCertEntry>
             items={content.certifications}
             onChange={(items) => setField("certifications", items)}
-            createItem={() => ({ id: `cert-${Date.now()}`, name: "New certification" })}
+            createItem={() => ({ id: `cert-${Date.now()}`, name: "" })}
             addLabel="Add certification"
             emptyLabel="No certifications added yet."
             renderFields={(item, update, isActive) => (

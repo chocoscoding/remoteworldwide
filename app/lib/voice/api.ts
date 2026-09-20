@@ -8,7 +8,7 @@
 // first-party.
 //
 // Audio never comes through here. Recording parts go straight to S3 on the
-// presigned POSTs these calls hand out (capture/s3Upload.ts), and live audio
+// presigned PUTs these calls hand out (capture/s3Upload.ts), and live audio
 // goes to the voice gateway (capture/relayStream.ts).
 //
 // Two things differ from the plain client:
@@ -170,6 +170,15 @@ export async function createPrepSession(input: CreatePrepSessionInput): Promise<
 export function getPartUrls(id: string, from: number) {
   const body: PartUrlsInput = { from };
   return apiPost<PartUrlsResult>(`${sessionPath(id)}/parts/urls`, body);
+}
+
+/**
+ * The interviewer's voice for one question, synthesized server-side and served
+ * from storage. `null` is a normal answer, not a failure: text-to-speech is
+ * optional, and the caller falls back to the browser's own `speechSynthesis`.
+ */
+export function getQuestionSpeech(id: string, questionId: string) {
+  return apiPost<PlaybackLink | null>(`${sessionPath(id)}/speech`, { questionId });
 }
 
 /**

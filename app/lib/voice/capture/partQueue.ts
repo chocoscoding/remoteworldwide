@@ -1,5 +1,5 @@
 // The recording's way to storage: MediaRecorder chunks, cut into numbered
-// parts, each sent to S3 by its own presigned POST.
+// parts, each sent to storage by its own presigned PUT.
 //
 // Pure: no DOM, no fetch, no timers of its own beyond the injectable sleep.
 // Blob and Web Crypto are the only platform pieces, and Node has both, which

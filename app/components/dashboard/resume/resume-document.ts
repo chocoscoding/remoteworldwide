@@ -1,19 +1,24 @@
 // Per-document state for the resume screen.
 //
-// Each resume version (Linear / Deel / Master / any "+ New resume") owns its
-// OWN content AND its own design/section customization — unlike the old
-// screen's single shared `docContent`/local-settings that leaked across
-// every role in the dropdown. `ResumeDesignProvider` (chunk A3a) is
-// uncontrolled internally, so switching the active document is an explicit
-// "read the live design/sections out of the hook, stash them on the
-// outgoing document, then swap" rather than anything reactive — see
+// Each resume owns its OWN content AND its own design/section customization —
+// unlike the old screen's single shared `docContent`/local-settings that
+// leaked across every role in the dropdown. `ResumeDesignProvider` (chunk A3a)
+// is uncontrolled internally, so switching the active document is an explicit
+// "read the live design/sections out of the hook, stash them on the outgoing
+// document, then swap" rather than anything reactive — see
 // `ResumeScreenBody.tsx`'s `switchTo`/`createNewResume`.
+//
+// Documents are real now: they come from the AI service's library and are
+// autosaved back to it (`useResumeAutosave`). What is NOT saved is the ATS
+// state below — `score`, `before`, `scan`, `suggestions`. The scorer behind it
+// is still a stub, and a made-up number should not outlive the session that
+// made it up; those fields start empty on every load until a real scan owns them.
 
-import { RESUME } from "@/app/lib/dashboard/mock-data";
 import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
-import { DEFAULT_DESIGN, DEFAULT_SECTIONS } from "@/app/lib/dashboard/resume/design-defaults";
+import { hydrateDesign, hydrateSections } from "@/app/lib/dashboard/resume/hydrate-design";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
+import type { StoredResumeDocument } from "@/app/lib/resume/api";
 
 /**
  * The ATS check currently standing on a document. `null` means none — the
@@ -23,50 +28,71 @@ import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/des
  */
 export type ResumeScan = { kind: "general"; at: Date } | { kind: "job"; at: Date; job: string };
 
+/**
+ * What a job check proposed changing. Only a check that actually read THIS
+ * resume against a posting can produce one, so it is absent on everything a
+ * user starts or imports: offering them a rewrite nothing derived from their
+ * resume means offering them someone else's summary. Nothing produces one
+ * yet — this is the shape the real scorer's findings arrive in.
+ */
+export interface ResumeSuggestions {
+  /** A rewritten Summary, and the one-line reason shown beside Accept. */
+  summary: { text: string; reason: string };
+}
+
 export interface ResumeDocument {
   id: string;
   label: string;
   content: ResumeContent;
   design: ResumeDesign;
   sections: SectionConfig[];
+  /** When the library last took a save of this document. */
+  updatedAt: Date;
   /** The ATS score the card shows while `scan` stands, 0-100. */
   score: number;
   /** The general baseline a job check moved from — null for a general check. */
   before: number | null;
   /** The standing ATS check; null once removed or never run. */
   scan: ResumeScan | null;
-  /** True for a freshly created blank "+ New resume" document. */
-  isBlank?: boolean;
+  /** What the standing job check proposed — see `ResumeSuggestions`. */
+  suggestions?: ResumeSuggestions;
 }
+
+/**
+ * Whether a resume has nothing on it yet for a check or a suggestion to read.
+ * Derived from the content rather than stamped on the document at creation: a
+ * resume started from scratch stops being blank the moment it is written, and
+ * an import the parser found nothing in is blank however it arrived.
+ */
+export const isBlankContent = (content: ResumeContent): boolean =>
+  !content.summary.trim() &&
+  content.skills.length === 0 &&
+  // A role just added and not yet typed into is a row in the form, not content.
+  content.experience.every((entry) => !entry.role.trim() && !entry.company.trim() && entry.bullets.every((bullet) => !bullet.trim()));
 
 /** The same general number the ATS screen reports for an id — the two surfaces agree. */
 export const generalScoreFor = (id: string) => scoreApplication(id, undefined).score;
 
-// Seed stamps live at module scope (not render) so the purity rule stays
-// happy; timeago-react re-renders itself on an interval after mount, so any
-// server/client drift self-corrects.
-const SCANNED_HOURS_AGO = new Date(Date.now() - 3 * 60 * 60 * 1000);
-const SCANNED_DAYS_AGO = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
-const SCANNED_2_DAYS_AGO = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-
 /**
  * Starter content for a brand-new, not-yet-written resume — same shell as
- * `RESUME`, empty lists and placeholder copy. `portfolio` is set to an empty
- * string and never rendered: `HeaderBlock` (chunk A2) intentionally doesn't
- * read `content.portfolio` — `content.links` is the real header-link source
- * now, which is why the Content form below doesn't surface a portfolio field
- * either.
+ * `RESUME`, every field empty. The "Your name" / "you@email.com" prompts are
+ * the Content form's input placeholders, never values: anything stored here is
+ * on the page, and a resume that prints "you@email.com" is worse than one that
+ * prints nothing. `portfolio` is never rendered: `HeaderBlock` (chunk A2)
+ * intentionally doesn't read `content.portfolio` — `content.links` is the real
+ * header-link source now, which is why the Content form doesn't surface a
+ * portfolio field either.
  */
 export function createBlankContent(): ResumeContent {
   return {
-    name: "Your name",
-    title: "Your title",
-    location: "Your location",
-    email: "you@email.com",
+    name: "",
+    title: "",
+    location: "",
+    email: "",
     phone: "",
     portfolio: "",
     links: [],
-    summary: "Write a short summary of your experience and what you're looking for next.",
+    summary: "",
     experience: [],
     education: [],
     projects: [],
@@ -85,70 +111,27 @@ export function cloneContent(content: ResumeContent): ResumeContent {
 }
 
 /**
- * The landing's "start from a resume you have" path — an uploaded file
- * becomes an editable draft. There's no real parser at the UI-only stage, so
- * the draft opens pre-filled with the shared mock content; the label comes
- * from the file name so the document reads as theirs.
+ * The name an imported resume starts with — its file name, read as words, so
+ * the document reads as theirs.
  */
-export function createImportedDocument(fileName: string): ResumeDocument {
-  const label = fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "Imported resume";
-  const id = `res-import-${Date.now()}`;
+export const importLabel = (fileName: string): string =>
+  fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim().slice(0, 80) || "Imported resume";
+
+/**
+ * A stored document -> the one the editor runs on. The saved look is a patch
+ * (see `hydrate-design.ts`); everything about ATS starts empty — the card opens
+ * on the two ways to run a check.
+ */
+export function fromStored(stored: StoredResumeDocument): ResumeDocument {
   return {
-    id,
-    label,
-    content: cloneContent(RESUME),
-    design: DEFAULT_DESIGN,
-    sections: DEFAULT_SECTIONS,
-    score: generalScoreFor(id),
+    id: stored.id,
+    label: stored.label,
+    content: stored.content,
+    design: hydrateDesign(stored.template, stored.design),
+    sections: hydrateSections(stored.template, stored.sections),
+    updatedAt: stored.updatedAt,
+    score: 0,
     before: null,
-    // Nothing has checked it yet — the card opens on the two ways to run one.
     scan: null,
   };
 }
-
-/**
- * Seeds the 3 starting documents from the same shared `RESUME` mock content —
- * there is no distinct mock dataset per role today, so all 3 start identical
- * and only diverge once the user edits one of them. `design`/`sections` start
- * at the shared `DEFAULT_DESIGN`/`DEFAULT_SECTIONS` module references for all
- * 3; sharing the reference is safe because nothing ever mutates them in
- * place — every update flows through the design reducer (which returns new
- * objects on change) or through `setDocuments` (ditto).
- */
-// Seeded scores derive from the same general baseline a fresh check returns,
-// so "remove, then check again" lands on a number the user has already seen.
-const LINEAR_GENERAL = generalScoreFor("res-linear");
-const DEEL_GENERAL = generalScoreFor("res-deel");
-
-export const INITIAL_DOCUMENTS: ResumeDocument[] = [
-  {
-    id: "res-linear",
-    label: "Linear — Sr PD",
-    content: RESUME,
-    design: DEFAULT_DESIGN,
-    sections: DEFAULT_SECTIONS,
-    score: Math.min(97, LINEAR_GENERAL + 18),
-    before: LINEAR_GENERAL,
-    scan: { kind: "job", at: SCANNED_HOURS_AGO, job: "Linear — Senior Product Designer" },
-  },
-  {
-    id: "res-deel",
-    label: "Deel — Sr Designer",
-    content: RESUME,
-    design: DEFAULT_DESIGN,
-    sections: DEFAULT_SECTIONS,
-    score: Math.min(97, DEEL_GENERAL + 4),
-    before: DEEL_GENERAL,
-    scan: { kind: "job", at: SCANNED_DAYS_AGO, job: "Deel — Senior Designer" },
-  },
-  {
-    id: "res-master",
-    label: "Master resume",
-    content: RESUME,
-    design: DEFAULT_DESIGN,
-    sections: DEFAULT_SECTIONS,
-    score: generalScoreFor("res-master"),
-    before: null,
-    scan: { kind: "general", at: SCANNED_2_DAYS_AGO },
-  },
-];

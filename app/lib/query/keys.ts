@@ -123,6 +123,13 @@ export const qk = {
     all: ["jobThreads"] as const,
     forSavedJob: (savedJobId: string) => [...qk.jobThreads.all, "savedJob", savedJobId] as const,
   },
+  // The resume editor's documents, from the AI service. One key: the list
+  // carries every document whole. Kept out of the disk persister — it is
+  // someone's CV, contact details and all.
+  resumes: {
+    all: ["resumes"] as const,
+    list: () => [...qk.resumes.all, "list"] as const,
+  },
 } as const;
 
 /** Every domain's root segment — the persister's allowlist is keyed on these. */
@@ -152,6 +159,7 @@ export const STALE_TIME: Record<QueryDomain, number> = {
   platformJobs: 5 * 60_000, // admins post a few listings a day; a search minutes old is still true
   jobImports: 0, // a progress snapshot is stale the moment it lands, so a poll must always ask
   jobThreads: 5 * 60_000, // only this user writes it, each answer lands in the cache directly, and every refetch spends a rate-limited open
+  resumes: 0, // the editor is seeded from it once per visit and autosaves past it, so a cached copy is always behind
 };
 
 /**

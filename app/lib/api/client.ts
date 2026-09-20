@@ -20,6 +20,12 @@ interface RequestInit_ {
   /** Passed through from React Query so a superseded query aborts its fetch. */
   signal?: AbortSignal;
   body?: unknown;
+  /**
+   * Lets the request outlive the page — for a save fired as the tab closes.
+   * Not a default: the browser caps keepalive bodies at 64KB in flight across
+   * the whole page and rejects the fetch outright past it.
+   */
+  keepalive?: boolean;
 }
 
 async function request<T>(method: string, path: string, init: RequestInit_ = {}): Promise<T> {
@@ -37,6 +43,7 @@ async function request<T>(method: string, path: string, init: RequestInit_ = {})
     credentials: "same-origin",
     cache: "no-store",
     signal: init.signal,
+    keepalive: init.keepalive,
   });
   return unwrapResponse<T>(res);
 }
@@ -44,5 +51,6 @@ async function request<T>(method: string, path: string, init: RequestInit_ = {})
 export const apiGet = <T,>(path: string, signal?: AbortSignal) => request<T>("GET", path, { signal });
 export const apiPost = <T,>(path: string, body?: unknown) => request<T>("POST", path, { body });
 export const apiPut = <T,>(path: string, body?: unknown) => request<T>("PUT", path, { body });
-export const apiPatch = <T,>(path: string, body?: unknown) => request<T>("PATCH", path, { body });
+export const apiPatch = <T,>(path: string, body?: unknown, options: { keepalive?: boolean } = {}) =>
+  request<T>("PATCH", path, { body, keepalive: options.keepalive });
 export const apiDelete = <T,>(path: string) => request<T>("DELETE", path);

@@ -50,7 +50,7 @@ import { createPartQueue, type PartQueue } from "@/app/lib/voice/capture/partQue
 import { pcmTap, pcmTapSupported, type PcmTap } from "@/app/lib/voice/capture/pcmTap";
 import { createRecorder, recorderSupported, type Recorder } from "@/app/lib/voice/capture/recorder";
 import { connectRelay, type Relay } from "@/app/lib/voice/capture/relayStream";
-import { postPart } from "@/app/lib/voice/capture/s3Upload";
+import { putPart } from "@/app/lib/voice/capture/s3Upload";
 import { formatClock } from "@/app/lib/voice/format";
 import {
   PREP_LIMITS,
@@ -943,7 +943,7 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
       partMaxBytes: config.partMaxBytes > 0 ? config.partMaxBytes : undefined,
       urls: config.partUrls,
       getUrls: (from) => getPartUrls(id, from),
-      upload: postPart,
+      upload: putPart,
     });
     queue = partQueue;
     unsubscribeQueue = partQueue.subscribe(() => {

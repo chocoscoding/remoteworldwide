@@ -2,10 +2,14 @@
 
 // The live session's audio layer.
 //
-// Everything here is real browser capability, no backend:
+// Everything here is real browser capability. The one thing it does not own is
+// where the interviewer's audio comes from: `speak` takes a resolver from the
+// caller and only plays what it returns, so this file still makes no requests.
 //   - mic level  -> Web Audio AnalyserNode, for the user's waveform
 //   - dictation  -> SpeechRecognition (webkit-prefixed in Chrome and Safari)
-//   - AI voice   -> speechSynthesis
+//   - AI voice   -> an <audio> element when the caller resolves a URL for the
+//                   line (synthesized server-side and cached), and the browser's
+//                   own speechSynthesis otherwise, or whenever that fails
 //
 // Dictation is the browser's Web Speech API and nothing else, on every screen
 // that has it (the career coach, Ask about a job, prep's typed answers). No
@@ -103,7 +107,13 @@ export interface VoiceSession {
   finalizing: boolean;
   startDictation: () => void;
   stopDictation: () => void;
-  speak: (text: string) => void;
+  /**
+   * Says `text` out loud. With `resolveUrl`, the audio it returns is played
+   * instead of the browser's own voice — the caller does the fetching, this
+   * hook only owns playback. Falls back to `speechSynthesis` whenever that
+   * returns null or fails, so a provider outage costs quality, not the session.
+   */
+  speak: (text: string, resolveUrl?: () => Promise<string | null>) => void;
   cancelSpeech: () => void;
   /**
    * Subscribes a callback to the mic's amplitude, 0-1, on every animation
@@ -151,6 +161,13 @@ export function useVoiceSession({ onTranscript, voiceEnabled }: UseVoiceSessionO
   // navigation keeps talking on the next screen.
   const liveRef = useRef(true);
   const loudFramesRef = useRef(0);
+  // The interviewer's audio, when a question is played from storage rather than
+  // spoken by the browser. Held in a ref for the same reason as the utterance
+  // guard above: it outlives a render and has to be stoppable from anywhere.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Bumped by every speak(). A URL that arrives after the next question has
+  // started belongs to a question nobody is on any more.
+  const speechAttemptRef = useRef(0);
   // Held in a ref so the recognition handler always sees the latest callback
   // without having to tear down and rebuild recognition on every render.
   const onTranscriptRef = useRef(onTranscript);
@@ -315,10 +332,20 @@ export function useVoiceSession({ onTranscript, voiceEnabled }: UseVoiceSessionO
           // cough or a keyboard knock from cutting them off.
           if (level > 0.22) {
             loudFramesRef.current += 1;
-            if (loudFramesRef.current > 6 && typeof window !== "undefined" && window.speechSynthesis.speaking) {
-              window.speechSynthesis.resume();
-              window.speechSynthesis.cancel();
-              setAiSpeaking(false);
+            if (loudFramesRef.current > 6 && typeof window !== "undefined") {
+              // Either voice may be the one talking: a question played from
+              // storage is an <audio> element, not an utterance.
+              const audio = audioRef.current;
+              if (audio && !audio.paused) {
+                audio.pause();
+                audioRef.current = null;
+                setAiSpeaking(false);
+              }
+              if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.resume();
+                window.speechSynthesis.cancel();
+                setAiSpeaking(false);
+              }
             }
           } else {
             loudFramesRef.current = 0;
@@ -360,36 +387,103 @@ export function useVoiceSession({ onTranscript, voiceEnabled }: UseVoiceSessionO
     setMicStatus("idle");
   }, [teardownAudio]);
 
+  /** Stops the audio element, if one is playing, and releases it. */
+  const stopAudio = useCallback(() => {
+    const audio = audioRef.current;
+    audioRef.current = null;
+    if (!audio) return;
+    // Handlers first: pause() fires nothing, but src="" makes some browsers
+    // raise an error event, which would otherwise look like a failed question
+    // and start the fallback voice on top of the next one.
+    audio.onplaying = null;
+    audio.onended = null;
+    audio.onerror = null;
+    audio.pause();
+  }, []);
+
   const cancelSpeech = useCallback(() => {
+    stopAudio();
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     // resume() first: a paused queue in Chrome ignores cancel() outright, and
     // a half-spoken utterance then resurfaces later.
     window.speechSynthesis.resume();
     window.speechSynthesis.cancel();
     setAiSpeaking(false);
+  }, [stopAudio]);
+
+  /** The browser's own voice. The fallback, and what speaks when no URL is offered. */
+  const speakInBrowser = useCallback((text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    if (!liveRef.current) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 1.02;
+    utter.pitch = 1;
+    utter.onstart = () => {
+      // The session can end between queueing and starting.
+      if (!liveRef.current) {
+        window.speechSynthesis.cancel();
+        return;
+      }
+      setAiSpeaking(true);
+    };
+    utter.onend = () => setAiSpeaking(false);
+    utter.onerror = () => setAiSpeaking(false);
+    window.speechSynthesis.speak(utter);
   }, []);
 
   const speak = useCallback(
-    (text: string) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-      window.speechSynthesis.cancel();
+    (text: string, resolveUrl?: () => Promise<string | null>) => {
+      cancelSpeech();
       if (!voiceEnabled || !liveRef.current) return;
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = 1.02;
-      utter.pitch = 1;
-      utter.onstart = () => {
-        // The session can end between queueing and starting.
-        if (!liveRef.current) {
-          window.speechSynthesis.cancel();
-          return;
-        }
-        setAiSpeaking(true);
-      };
-      utter.onend = () => setAiSpeaking(false);
-      utter.onerror = () => setAiSpeaking(false);
-      window.speechSynthesis.speak(utter);
+      if (!resolveUrl) {
+        speakInBrowser(text);
+        return;
+      }
+
+      // Every speak() invalidates the one before it: a question the user has
+      // already moved past must not start talking when its URL finally lands.
+      speechAttemptRef.current += 1;
+      const attempt = speechAttemptRef.current;
+      const stale = () => attempt !== speechAttemptRef.current || !liveRef.current;
+
+      void resolveUrl()
+        .then((url) => {
+          if (stale()) return;
+          if (!url) {
+            speakInBrowser(text);
+            return;
+          }
+          const audio = new Audio(url);
+          audioRef.current = audio;
+          audio.onplaying = () => {
+            if (stale()) {
+              audio.pause();
+              return;
+            }
+            setAiSpeaking(true);
+          };
+          audio.onended = () => {
+            if (audioRef.current === audio) audioRef.current = null;
+            setAiSpeaking(false);
+          };
+          // A 403 means the presigned URL expired; the browser's voice covers
+          // this question and the next one asks for a fresh URL anyway.
+          audio.onerror = () => {
+            if (audioRef.current === audio) audioRef.current = null;
+            if (!stale()) speakInBrowser(text);
+          };
+          void audio.play().catch(() => {
+            // Autoplay refused, or the element was torn down mid-play.
+            if (audioRef.current === audio) audioRef.current = null;
+            if (!stale()) speakInBrowser(text);
+          });
+        })
+        .catch(() => {
+          if (!stale()) speakInBrowser(text);
+        });
     },
-    [voiceEnabled]
+    [cancelSpeech, speakInBrowser, voiceEnabled]
   );
 
   // Release the mic and silence the voice if the screen goes away mid-session.
@@ -399,6 +493,10 @@ export function useVoiceSession({ onTranscript, voiceEnabled }: UseVoiceSessionO
     // unmount alone doesn't fire on a bfcache navigation.
     const silence = () => {
       liveRef.current = false;
+      // Invalidates any URL still in flight, so a question cannot start
+      // talking on the next screen.
+      speechAttemptRef.current += 1;
+      stopAudio();
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.resume();
         window.speechSynthesis.cancel();
@@ -416,7 +514,7 @@ export function useVoiceSession({ onTranscript, voiceEnabled }: UseVoiceSessionO
       recognition?.abort();
       teardownAudio();
     };
-  }, [teardownAudio]);
+  }, [stopAudio, teardownAudio]);
 
   const finalizing = interim.trim() !== "";
 

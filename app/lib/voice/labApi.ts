@@ -29,7 +29,7 @@ const runOf = (run: LabRun): LabRun => ({ ...run, createdAt: isoOf(run.createdAt
 
 /**
  * Starts a run (201): a single-use `lab` ticket for live AWS captions (null
- * when no gateway is configured), one presigned POST for the whole clip, the
+ * when no gateway is configured), one presigned PUT for the whole clip, the
  * longest clip the day's lab minutes allow, and what is left today. 429 when
  * the lab's minutes are used up.
  */
@@ -38,18 +38,13 @@ export function createLabRun(input: LabRunCreateInput = {}) {
 }
 
 /**
- * The clip is uploaded: scores the live engines and starts AWS batch. 202
- * with the run `processing`; poll `getLabRun` for the rest. 409 while S3 does
- * not have the clip yet, 429 when the batch minutes are not there. A repeat
- * answers with the run as it stands.
+ * The clip is uploaded: scores both live engines and finishes the run, 200 with
+ * it `ready`. Nothing is started and nothing is polled — the engines captioned
+ * the clip while it was recording. 409 while storage does not have the clip
+ * yet; a repeat answers with the run as it stands.
  */
 export async function finishLabRun(id: string, body: LabRunFinishInput): Promise<LabRun> {
   return runOf(await apiPost<LabRun>(`${runPath(id)}/finish`, body));
-}
-
-/** One run. Reading a `processing` run is what moves its batch job along, so poll this. */
-export async function getLabRun(id: string, signal?: AbortSignal): Promise<LabRun> {
-  return runOf(await apiGet<LabRun>(runPath(id), signal));
 }
 
 /** This admin's latest 50 runs, newest first. */

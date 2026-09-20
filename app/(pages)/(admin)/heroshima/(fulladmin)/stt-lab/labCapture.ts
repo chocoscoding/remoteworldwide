@@ -4,7 +4,7 @@
 // MediaStream:
 //   - MediaRecorder -> the whole clip, kept in memory (at most 10 minutes of
 //     24 kbps Opus, under 2 MB) -> ONE presigned POST to S3 when it stops ->
-//     `finish` -> AWS batch, polled until scored.
+//     `finish` -> scored from what both engines already heard.
 //   - the PCM tap -> the voice gateway on the run's `lab` ticket -> AWS
 //     streaming captions (channel 1).
 //   - the browser's SpeechRecognition on the same microphone (channel 2).
@@ -25,8 +25,8 @@ import { createMicLevel, type MicLevel } from "@/app/lib/voice/capture/micLevel"
 import { pcmTap, pcmTapSupported, type PcmTap } from "@/app/lib/voice/capture/pcmTap";
 import { createRecorder, pickRecorderMime, recorderSupported, type Recorder } from "@/app/lib/voice/capture/recorder";
 import { connectRelay, type Relay, type RelayErrorCode } from "@/app/lib/voice/capture/relayStream";
-import { postPart, S3UploadError } from "@/app/lib/voice/capture/s3Upload";
-import { createLabRun, finishLabRun, getLabRun } from "@/app/lib/voice/labApi";
+import { putPart, S3UploadError } from "@/app/lib/voice/capture/s3Upload";
+import { createLabRun, finishLabRun } from "@/app/lib/voice/labApi";
 import type { LabLiveResult, LabRun, LabRunCreateResult } from "@/app/lib/voice/types";
 import { startWebSpeech, webSpeechSupported, type WebSpeechSession } from "./webSpeech";
 
@@ -34,10 +34,9 @@ import { startWebSpeech, webSpeechSupported, type WebSpeechSession } from "./web
  * - `starting`: asking for the mic and the run.
  * - `recording`: both channels live (or explained).
  * - `stopping` / `uploading`: collecting the last captions, then sending the clip.
- * - `processing`: AWS batch is working; the run is polled.
  * - `done` / `failed`: `run` (and `error`) say how it went.
  */
-export type LabPhase = "idle" | "starting" | "recording" | "stopping" | "uploading" | "processing" | "done" | "failed";
+export type LabPhase = "idle" | "starting" | "recording" | "stopping" | "uploading" | "done" | "failed";
 
 /**
  * - `off`: not attempted (no gateway configured).
@@ -88,7 +87,7 @@ export interface LabCapture {
   subscribe(listener: () => void): () => void;
   getSnapshot(): LabCaptureSnapshot;
   start(options: LabStartOptions): Promise<void>;
-  /** Stops recording, uploads, finishes and polls until the run is scored. */
+  /** Stops recording, uploads the clip and finishes the run, which comes back scored. */
   stop(): Promise<void>;
   /** Drops the clip without uploading. */
   cancel(): void;
@@ -99,14 +98,11 @@ export interface LabCapture {
   dispose(): void;
 }
 
-/** AWS batch refuses anything shorter. */
+/** Shorter than this is not worth scoring. */
 export const LAB_MIN_CLIP_MS = 500;
 /** The service allows this much past the run's limit, for a recorder that stops a beat late. */
 const DURATION_GRACE_MS = 5_000;
 const TICK_MS = 200;
-const POLL_MS = 2_500;
-/** A batch job for a 10-minute clip is done well inside this; the service fails it at its own timeout anyway. */
-const POLL_LIMIT_MS = 30 * 60_000;
 const FINISH_RETRIES = 3;
 const FINISH_RETRY_MS = 1_500;
 
@@ -181,7 +177,7 @@ export function createLabCapture(): LabCapture {
 
   const fail = (message: string) => set({ phase: "failed", error: message });
 
-  /** Releases every capture resource of the current clip; the upload and polling are not resources. */
+  /** Releases every capture resource of the current clip; the upload is not a resource. */
   const release = () => {
     if (ticker !== null) clearInterval(ticker);
     ticker = null;
@@ -296,7 +292,7 @@ export function createLabCapture(): LabCapture {
   const upload = async (created: LabRunCreateResult, clip: Blob) => {
     for (let attempt = 0; ; attempt++) {
       try {
-        await postPart(created.upload, clip);
+        await putPart(created.upload, clip);
         return;
       } catch (error) {
         const kind = error instanceof S3UploadError ? error.kind : "retryable";
@@ -324,31 +320,6 @@ export function createLabCapture(): LabCapture {
     }
   };
 
-  const poll = async (mine: number, current: LabRun) => {
-    const deadline = Date.now() + POLL_LIMIT_MS;
-    let latest = current;
-    while (latest.status === "processing" && mine === generation) {
-      if (Date.now() > deadline) {
-        fail("AWS is taking unusually long. The run stays in the list; check it later.");
-        return;
-      }
-      await sleep(POLL_MS);
-      if (mine !== generation) return;
-      try {
-        latest = await getLabRun(latest.id);
-        set({ run: latest });
-      } catch (error) {
-        if (error instanceof BackendError && error.status === 404) {
-          fail("The run disappeared.");
-          return;
-        }
-        // A blip; the next poll tries again.
-      }
-    }
-    if (mine !== generation) return;
-    if (latest.status === "ready") set({ phase: "done", run: latest, error: latest.error });
-    else set({ phase: "failed", run: latest, error: latest.error ?? "The run failed." });
-  };
 
   const engine: LabCapture = {
     subscribe(listener) {
@@ -474,8 +445,10 @@ export function createLabCapture(): LabCapture {
           keepAudio,
         });
         if (mine !== generation) return;
-        set({ phase: "processing", run: scored });
-        await poll(mine, scored);
+        // Both engines transcribed the clip as it recorded, so `finish` comes
+        // back scored: there is nothing to poll for.
+        if (scored.status === "ready") set({ phase: "done", run: scored, error: scored.error });
+        else set({ phase: "failed", run: scored, error: scored.error ?? "The run failed." });
       } catch (error) {
         if (mine === generation) fail(apiMessage(error));
       }
@@ -506,7 +479,7 @@ export function createLabCapture(): LabCapture {
     },
 
     dispose() {
-      // A clip in flight is dropped; an upload or poll already under way finishes on its own.
+      // A clip in flight is dropped; an upload already under way finishes on its own.
       if (snapshot.phase === "starting" || snapshot.phase === "recording") engine.cancel();
       else if (snapshot.phase === "stopping") release();
     },

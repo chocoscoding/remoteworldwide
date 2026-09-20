@@ -188,14 +188,18 @@ export interface CreatePrepSessionInput {
 }
 
 /**
- * One presigned S3 POST for recording part `seq`: `multipart/form-data` with
- * every entry of `fields` first and the part as the `file` field last.
- * `expiresAt` is when to ask for a fresh one.
+ * One presigned PUT for recording part `seq`: the part is the whole request
+ * body, sent with exactly the headers in `headers` — the Content-Type is part
+ * of the signature, so a different one is refused. `expiresAt` is when to ask
+ * for a fresh one.
+ *
+ * A PUT rather than a POST policy because storage is Cloudflare R2, which
+ * presigns GET, HEAD, PUT and DELETE and does not implement POST object.
  */
 export interface PartUrl {
   seq: number;
   url: string;
-  fields: Record<string, string>;
+  headers: Record<string, string>;
   expiresAt: string;
 }
 
@@ -649,11 +653,20 @@ export type StreamCloseCode = (typeof STREAM_CLOSE)[keyof typeof STREAM_CLOSE];
 // The admin STT lab (/api/ai/voice/lab/*, ADMIN only)
 // ---------------------------------------------------------------------------
 
-/** Every engine the lab compares. Web Speech runs in the admin's browser and its text is posted back. */
-export const LAB_PROVIDERS = ["aws-transcribe", "web-speech", "aws-transcribe-batch"] as const;
+/**
+ * Every engine the lab compares; Web Speech runs in the admin's browser and its
+ * text is posted back. Identical to `LIVE_STT_PROVIDERS` since the
+ * batch engine went: the lab scores what the browser and the gateway heard
+ * while the clip was recorded, and nothing transcribes it a second time.
+ */
+export const LAB_PROVIDERS = ["aws-transcribe", "web-speech"] as const;
 export type LabProvider = (typeof LAB_PROVIDERS)[number];
 
-export const LAB_RUN_STATUSES = ["recording", "processing", "ready", "failed"] as const;
+/**
+ * A run records, then is scored in the same request that finishes it — there is
+ * no longer anything to wait for, so nothing is ever `processing`.
+ */
+export const LAB_RUN_STATUSES = ["recording", "ready", "failed"] as const;
 export type LabRunStatus = (typeof LAB_RUN_STATUSES)[number];
 
 /** `POST /api/ai/voice/lab/runs` body. */
@@ -667,7 +680,7 @@ export interface LabRunCreateResult {
   runId: string;
   gatewayUrl: string | null;
   streamTicket: string | null;
-  /** A single presigned POST for the whole clip (`seq` is 0). */
+  /** A single presigned PUT for the whole clip (`seq` is 0). */
   upload: PartUrl;
   maxMs: number;
   /** Lab minutes left today, platform-wide. */
@@ -698,11 +711,8 @@ export interface LabProviderResult {
   /** Null without a reference transcript. */
   wer: number | null;
   normalizedWer: number | null;
-  /** Share of the audio covered by word timings, 0-1; null for Web Speech, which has none. */
-  timingCoverage: number | null;
+  /** Milliseconds from the clip starting to this engine's first partial result. */
   firstPartialMs: number | null;
-  /** Batch only: upload to transcript. */
-  turnaroundMs: number | null;
   estimatedUsd: number | null;
 }
 

@@ -21,6 +21,8 @@ const SUGGESTION_ITEMS = ATS_FIX_ITEMS.filter((f) => f.id === "fix-keyword" || f
 
 export interface AiAssistRailProps {
   isBlank: boolean;
+  /** Whether the standing job check found anything to change — the fix cards are its findings, never a default. */
+  hasSuggestions: boolean;
   displayScore: number;
   /** The general baseline a job check moved from — null for a general check. */
   before: number | null;
@@ -44,6 +46,7 @@ export interface AiAssistRailProps {
 
 const AiAssistRail: FC<AiAssistRailProps> = ({
   isBlank,
+  hasSuggestions,
   displayScore,
   before,
   scan,
@@ -171,47 +174,57 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
         )}
       </DashCard>
 
-      {/* Suggestion cards */}
-      <div className="flex flex-col gap-3">
-        {SUGGESTION_ITEMS.map((item) => {
-          const applied = appliedSuggestions.has(item.id);
-          const expanded = expandedSuggestions.has(item.id);
-          return (
-            <DashCard key={item.id} className="border-2 border-[#222325] p-3.5">
-              <p className="text-sm font-bold text-primary">{item.label}</p>
-              <p className="text-xs text-black/60 leading-relaxed mt-1">{item.detail}</p>
-              {expanded && (
-                <div className="mt-2.5 rounded-lg bg-[#f6f6f6] px-3 py-2.5 text-xs text-black/55 leading-relaxed">
-                  Jump to the {item.id === "fix-keyword" ? "Summary" : "Skills"} section to see exactly what changes.
+      {/* Suggestion cards — a job check's findings. Without one there is
+          nothing to claim about this resume, so the rail says how to get some. */}
+      {hasSuggestions ? (
+        <div className="flex flex-col gap-3">
+          {SUGGESTION_ITEMS.map((item) => {
+            const applied = appliedSuggestions.has(item.id);
+            const expanded = expandedSuggestions.has(item.id);
+            return (
+              <DashCard key={item.id} className="border-2 border-[#222325] p-3.5">
+                <p className="text-sm font-bold text-primary">{item.label}</p>
+                <p className="text-xs text-black/60 leading-relaxed mt-1">{item.detail}</p>
+                {expanded && (
+                  <div className="mt-2.5 rounded-lg bg-[#f6f6f6] px-3 py-2.5 text-xs text-black/55 leading-relaxed">
+                    Jump to the {item.id === "fix-keyword" ? "Summary" : "Skills"} section to see exactly what changes.
+                  </div>
+                )}
+                <div className="flex items-center gap-3 mt-3">
+                  <StickerButton
+                    type="button"
+                    variant={applied ? "outline" : "primary"}
+                    size="sm"
+                    disabled={applied}
+                    onClick={() => onApplySuggestion(item.id)}>
+                    {applied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        Applied
+                      </>
+                    ) : (
+                      item.action
+                    )}
+                  </StickerButton>
+                  <button
+                    type="button"
+                    onClick={() => onToggleExpandedSuggestion(item.id)}
+                    className="text-xs font-semibold text-black/60 hover:text-primary cursor-pointer">
+                    Show me
+                  </button>
                 </div>
-              )}
-              <div className="flex items-center gap-3 mt-3">
-                <StickerButton
-                  type="button"
-                  variant={applied ? "outline" : "primary"}
-                  size="sm"
-                  disabled={applied}
-                  onClick={() => onApplySuggestion(item.id)}>
-                  {applied ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" />
-                      Applied
-                    </>
-                  ) : (
-                    item.action
-                  )}
-                </StickerButton>
-                <button
-                  type="button"
-                  onClick={() => onToggleExpandedSuggestion(item.id)}
-                  className="text-xs font-semibold text-black/60 hover:text-primary cursor-pointer">
-                  Show me
-                </button>
-              </div>
-            </DashCard>
-          );
-        })}
-      </div>
+              </DashCard>
+            );
+          })}
+        </div>
+      ) : (
+        <DashCard className="border-2 border-[#222325] p-3.5">
+          <p className="text-sm font-bold text-primary">Nothing to suggest yet</p>
+          <p className="text-xs text-black/60 leading-relaxed mt-1">
+            Check this resume against a job and we&apos;ll surface what to strengthen for it here.
+          </p>
+        </DashCard>
+      )}
 
       {/* Ask for a rewrite */}
       <DashCard className="border-2 border-[#222325] p-3.5">

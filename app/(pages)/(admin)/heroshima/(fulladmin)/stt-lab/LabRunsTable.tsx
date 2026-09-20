@@ -7,7 +7,6 @@ import { formatPct, formatWhen, LAB_PROVIDER_ORDER, PROVIDER_LABELS } from "./la
 
 const STATUS: Record<LabRunStatus, { label: string; className: string; Icon: typeof Mic }> = {
   recording: { label: "Not finished", className: "bg-gray-100 text-gray-600", Icon: Mic },
-  processing: { label: "Transcribing", className: "bg-amber-50 text-amber-800", Icon: LoaderCircle },
   ready: { label: "Scored", className: "bg-green-50 text-green-700", Icon: CheckCircle2 },
   failed: { label: "Failed", className: "bg-red-50 text-red-700", Icon: XCircle },
 };
@@ -37,7 +36,7 @@ export default function LabRunsTable({ runs, error, selectedId, onSelect }: LabR
         <p className="px-5 py-8 text-sm text-gray-500">No runs yet. Record a clip above.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-sm">
+          <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="text-left font-mono text-[11px] uppercase tracking-wider text-gray-500">
                 <th scope="col" className="px-5 py-2 font-medium">When</th>
@@ -65,7 +64,7 @@ export default function LabRunsTable({ runs, error, selectedId, onSelect }: LabR
                     <td className="px-3 py-2.5 text-gray-600">{run.durationMs > 0 ? formatDuration(run.durationMs) : "–"}</td>
                     <td className="px-3 py-2.5">
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
-                        <status.Icon className={`h-3 w-3 ${run.status === "processing" ? "animate-spin" : ""}`} aria-hidden />
+                        <status.Icon className="h-3 w-3" aria-hidden />
                         {status.label}
                       </span>
                     </td>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { toast } from "react-toastify";
 import { signIn } from "@/app/lib/authClient";
+import { signInErrorMessage } from "@/app/lib/auth/sign-in-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,7 +54,9 @@ export default function LoginForm({
     try {
       const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) {
-        toast.error("Wrong email or password");
+        // `code` carries the only reason worth distinguishing — an account with no password,
+        // because it signs in through Google or GitHub. See app/lib/auth/sign-in-error.
+        toast.error(signInErrorMessage(result.code));
         return;
       }
       toast.success("Signed in successfully");

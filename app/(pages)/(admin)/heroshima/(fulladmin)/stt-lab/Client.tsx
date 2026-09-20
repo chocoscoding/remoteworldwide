@@ -5,8 +5,8 @@
 // Web Speech cannot run in Node, so this is where it gets compared: one clip
 // recorded here is captioned live by AWS streaming (through the voice gateway,
 // on the run's `lab` ticket) and by the browser's SpeechRecognition side by
-// side, then transcribed by AWS batch; with a pasted reference each engine
-// gets a WER. Runs are kept 30 days; the audio only when "Save to bake-off
+// side; with a pasted reference each engine gets a WER. Both transcribe the
+// clip as it records, so stopping scores it — nothing runs afterwards. Runs are kept 30 days; the audio only when "Save to bake-off
 // set" is ticked, in the format `npm run bakeoff` reads.
 //
 // Data is plain local state, the pattern the other full-admin pages use: the
@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Circle, LoaderCircle, RotateCcw, Square, Trash2 } from "lucide-react";
 import { apiMessage } from "@/app/lib/api/core";
 import { formatClock } from "@/app/lib/voice/format";
-import { getLabRun, getLabStats, listLabRuns } from "@/app/lib/voice/labApi";
+import { getLabStats, listLabRuns } from "@/app/lib/voice/labApi";
 import type { LabRun, LabStats } from "@/app/lib/voice/types";
 import ChannelPane from "./ChannelPane";
 import LabRunsTable from "./LabRunsTable";
@@ -30,16 +30,12 @@ import { formatBytes, PROVIDER_LABELS } from "./labFormat";
 import { useLabCapture } from "./useLabCapture";
 import { WEB_SPEECH_LANGUAGES } from "./webSpeech";
 
-/** How often runs still transcribing in the list are looked at again (the one being recorded polls itself). */
-const LIST_POLL_MS = 5_000;
-
 const PHASE_LABEL: Record<LabPhase, string> = {
   idle: "Ready",
   starting: "Opening the microphone",
   recording: "Recording",
   stopping: "Collecting the last captions",
   uploading: "Uploading the clip",
-  processing: "AWS batch is transcribing",
   done: "Scored",
   failed: "Stopped",
 };
@@ -90,26 +86,9 @@ export default function SttLabClient() {
     return () => controller.abort();
   }, [showRuns]);
 
-  // Runs left transcribing (say, by a reload mid-run) only move on when read.
-  const activeRunId = snapshot.run?.id ?? null;
-  useEffect(() => {
-    const pending = (runs ?? []).filter((run) => run.status === "processing" && run.id !== activeRunId);
-    if (pending.length === 0) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      const updated = await Promise.all(pending.map((run) => getLabRun(run.id).catch(() => run)));
-      if (cancelled) return;
-      setRuns((current) => current?.map((run) => updated.find((entry) => entry.id === run.id) ?? run) ?? null);
-    }, LIST_POLL_MS);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [runs, activeRunId]);
-
   const { phase } = snapshot;
   const recording = phase === "recording";
-  const busy = phase === "starting" || phase === "stopping" || phase === "uploading" || phase === "processing";
+  const busy = phase === "starting" || phase === "stopping" || phase === "uploading";
   const canStart = phase === "idle" || phase === "done" || phase === "failed";
 
   const start = () => {
@@ -127,9 +106,9 @@ export default function SttLabClient() {
           <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-gray-500">Admin · Speech to text</p>
           <h1 className="text-3xl font-bold tracking-tight text-primary">STT lab</h1>
           <p className="max-w-3xl text-sm text-gray-600">
-            Record a clip and watch AWS streaming and the browser&apos;s Web Speech caption it side by side; AWS batch, which writes every report transcript, runs
-            when you stop. Paste what you will say first to get a word error rate for each engine. Clips use the lab&apos;s daily minutes, and a clip with live
-            AWS captions uses them twice (stream and batch).
+            Record a clip and watch AWS streaming and the browser&apos;s Web Speech caption it side by side; stopping scores them both. Paste what you will say
+            first to get a word error rate for each engine. Only the AWS stream spends the lab&apos;s daily minutes — Web Speech runs in this browser and costs
+            nothing.
           </p>
         </header>
 
@@ -282,7 +261,7 @@ export default function SttLabClient() {
           </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-primary/15 px-5 py-8 text-center text-sm text-gray-500">
-            Stop a clip to see the three engines scored here, or open one of your runs below.
+            Stop a clip to see both engines scored here, or open one of your runs below.
           </p>
         )}
 
