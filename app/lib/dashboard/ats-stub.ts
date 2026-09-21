@@ -1,14 +1,23 @@
-// ATS scoring seam.
+// ATS scoring seam — for the screens that are not the ATS screen.
 //
-// The brief marks the ATS model out of scope and says to consume it "via its
-// existing interface". There is no existing interface: `ATS_SCORE` is the
-// constant `79` and no `scoreResume()` function exists anywhere in the repo.
+// THE REAL SCORER HAS LANDED. `/dashboard/ats` no longer comes anywhere near
+// this file: it calls `app/lib/ats/api.ts`, which streams a real scan from the
+// AI service — requirements read out of the posting, evidence retrieved from
+// the resume's own bullets, a weighted score and a grounded write-up.
 //
-// So this file is the interface. It returns the real `AtsMetric` / `AtsKeyword`
-// shapes the ATS screen already renders, computed by a crude but deterministic
-// keyword overlap so the payoff panel reacts to what the user actually pasted
-// instead of showing 79 every time. When a genuine scorer lands, replacing the
-// body of `scoreApplication` is the whole migration.
+// What is left here is the estimate the OTHER surfaces still run on, where a
+// number is wanted but a charged scan is not: the resume card's general score,
+// the payoff panel's banding, `fit.ts`. A real scan costs a credit, so a
+// screen that wants a figure for every resume it lists cannot have one, and
+// these callers each need their own decision about that — either to show
+// nothing until scanned, the way the ATS screen now does, or to read a stored
+// score once one is persisted. Until then they keep the keyword overlap below,
+// which at least reacts to what the user actually pasted.
+//
+// `scoreTier` is the exception and is NOT an estimate: it is the banding the
+// whole dashboard shares, mirrored by `scanTier` in `app/lib/ats/api.ts` and
+// by `ScoringService.scoreTier` in the AI service, with a contract test over
+// all three.
 
 import { ATS_KEYWORDS, ATS_METRICS } from "./mock-data";
 import type { AtsKeyword, AtsMetric } from "./types";

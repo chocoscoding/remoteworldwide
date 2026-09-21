@@ -3,7 +3,6 @@
 import { FC, useRef, useState } from "react";
 import { FileText, Link2, ScanSearch, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { Lottie } from "lottie-react";
@@ -14,13 +13,22 @@ import { Lottie } from "lottie-react";
  */
 export interface AtsLandingProps {
   resumes: VaultDoc[];
+  /**
+   * General scores from scans run this session, by document id.
+   *
+   * Only ever what has actually been scored. A score costs a credit, so this
+   * screen cannot put a number beside every resume the way a mock could —
+   * rendering twelve cards would have meant twelve charged scans. A resume
+   * nobody has scored says so.
+   */
+  scores: ReadonlyMap<string, number>;
   /** Registers the upload and returns the new entry so it can be selected. */
   onUpload: (file: File) => Promise<VaultDoc | null>;
   onScoreGeneral: (resumeId: string) => void;
   onScoreVsJob: (resumeId: string) => void;
 }
 
-const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, onScoreVsJob }) => {
+const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, onUpload, onScoreGeneral, onScoreVsJob }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -55,7 +63,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
         {resumes.map((r) => {
           const selected = r.id === selectedId;
           const badge = sourceBadgeLabel(r.source);
-          const general = scoreApplication(r.id, undefined).score;
+          const general = scores.get(r.id);
           return (
             <button
               key={r.id}
@@ -83,8 +91,14 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, onUpload, onScoreGeneral, on
                 <span className="block truncate text-xs text-black/45">{r.updatedLabel}</span>
               </span>
               <span className="flex-none text-right">
-                <span className="block text-base font-bold text-primary tabular-nums">{general}</span>
-                <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">General</span>
+                {general == null ? (
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/30">Not scored</span>
+                ) : (
+                  <>
+                    <span className="block text-base font-bold text-primary tabular-nums">{general}</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">General</span>
+                  </>
+                )}
               </span>
             </button>
           );

@@ -3,17 +3,31 @@
 // ATS scorer — one flow, not three destinations.
 //
 // Pick a resume (stored, created, or uploaded) -> optionally attach a job ->
-// results. "General score" and "Against a job" used to be separate top-level
-// modes with a hardcoded 79 in both; they're now outcomes of the same scan,
-// computed live by scoreApplication() — the seam a real scorer replaces.
+// results. "General score" and "Against a job" are outcomes of the same scan,
+// which now runs against the real scorer in the AI service: requirements read
+// out of the posting, evidence retrieved from the resume's own bullets, a
+// weighted score, and a grounded write-up behind it.
+//
+// Two ids, and they are not the same id. The picker lists VAULT DOCUMENTS
+// (files in My documents); the scorer names an INGESTED RESUME (a CV that has
+// been parsed, chunked and embedded). `useScanResume` bridges them: it prefers
+// a resume already ingested for that file and imports it on demand when there
+// is none. That is why the first scan of a document says "Reading your
+// resume" and later ones do not.
+//
+// A scan costs a credit, so nothing here scores speculatively. `generalScores`
+// remembers only what was actually run, which is what the landing cards and
+// the resumes table show in place of a number they have not earned.
 
-import { FC, useState } from "react";
+import { FC, useCallback, useState } from "react";
 import { FilePlus2 } from "lucide-react";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import type { PickedJob } from "@/app/lib/jobs/fields";
 import { useDocuments, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
+import { useScanResume } from "@/hooks/mutations/useScanResume";
 import AtsLanding from "@/app/components/dashboard/ats/AtsLanding";
 import AtsResults from "@/app/components/dashboard/ats/AtsResults";
 import AtsResumesTable from "@/app/components/dashboard/ats/AtsResumesTable";
@@ -34,31 +48,51 @@ type AtsJob = PickedJob<typeof ATS_JOB_SPEC>;
 const AtsClient: FC = () => {
   const { docs, addUploads, toggleArchive } = useDocuments();
   const { pickJob } = useJobPicker();
+  // The bridge's left-hand side. An empty list is not an error: it only means
+  // every scan on this screen starts with an import.
+  const { data: ingested } = useIngestedResumesQuery();
+  const scan = useScanResume();
 
   const [view, setView] = useState<AtsView>("score");
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [job, setJob] = useState<AtsJob | null>(null);
   const [fixedIds, setFixedIds] = useState<Set<string>>(new Set());
-  // When the current report was produced — drives the live "scanned X ago"
-  // stamp on the results, and resets with every fresh scan.
-  const [scannedAt, setScannedAt] = useState<Date | null>(null);
-  const [queuedKeywordIds, setQueuedKeywordIds] = useState<Set<string>>(new Set());
+  /** General scores actually run this session, by document id. */
+  const [generalScores, setGeneralScores] = useState<ReadonlyMap<string, number>>(new Map());
 
   const resumes = docs.filter((d) => d.kind === "resume");
   const activeResumes = resumes.filter((r) => !r.archived);
 
-  // A new resume or a new job is a new scan — applied fixes belong to the old report.
-  function resetReport() {
-    setFixedIds(new Set());
-    setQueuedKeywordIds(new Set());
-    setScannedAt(new Date());
-  }
+  /**
+   * Runs one scan and shows it.
+   *
+   * Every path into results goes through here, so there is exactly one place
+   * that spends a credit and exactly one set of state a new report resets.
+   */
+  const startScan = useCallback(
+    async (docId: string, forJob: AtsJob | null) => {
+      const doc = docs.find((d) => d.id === docId);
+      if (!doc) return;
+
+      // Applied fixes belong to the report that suggested them.
+      setFixedIds(new Set());
+      setResumeId(docId);
+      setJob(forJob);
+      setView("score");
+
+      const report = await scan.run({ doc, job: forJob, ingested: ingested ?? [] });
+
+      // The general score is what the landing cards and the resumes table
+      // show, so it is remembered per document. A job-specific score is about
+      // a posting rather than about the resume, and belongs only to the report
+      // on screen.
+      if (report && !forJob) setGeneralScores((prev) => new Map(prev).set(docId, report.score));
+    },
+    [docs, ingested, scan],
+  );
 
   function scoreGeneral(id: string) {
-    setResumeId(id);
-    setJob(null);
-    resetReport();
-    setView("score");
+    void startScan(id, null);
   }
 
   function scoreVsJob(id: string) {
@@ -74,10 +108,9 @@ const AtsClient: FC = () => {
   async function chooseJob(forResumeId: string | null) {
     const result = await pickJob(ATS_JOB_SPEC);
     if (result.status !== "picked") return;
-    setJob(result.job);
-    if (forResumeId) setResumeId(forResumeId);
-    resetReport();
-    setView("score");
+    const target = forResumeId ?? resumeId;
+    if (!target) return;
+    await startScan(target, result.job);
   }
 
   /** Uploads land in the shared documents store (forced kind "resume", since
@@ -96,21 +129,11 @@ const AtsClient: FC = () => {
     });
   }
 
-  function toggleKeyword(id: string) {
-    setQueuedKeywordIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   function backToLanding() {
     setResumeId(null);
     setJob(null);
     setFixedIds(new Set());
-    setQueuedKeywordIds(new Set());
-    setScannedAt(null);
+    scan.reset();
     setView("score");
   }
 
@@ -145,31 +168,35 @@ const AtsClient: FC = () => {
         {view === "resumes" ? (
           <AtsResumesTable
             resumes={resumes}
+            scores={generalScores}
             onToggleArchive={toggleArchive}
             onGeneral={scoreGeneral}
             onVsJob={scoreVsJob}
           />
         ) : !activeResume ? (
-          <AtsLanding resumes={activeResumes} onUpload={handleUpload} onScoreGeneral={scoreGeneral} onScoreVsJob={scoreVsJob} />
+          <AtsLanding
+            resumes={activeResumes}
+            scores={generalScores}
+            onUpload={handleUpload}
+            onScoreGeneral={scoreGeneral}
+            onScoreVsJob={scoreVsJob}
+          />
         ) : (
           <AtsResults
             resume={activeResume}
-            scannedAt={scannedAt}
+            report={scan.report}
+            status={scan.status}
+            failure={scan.failure}
+            unexplained={scan.unexplained}
+            scannedAt={scan.scannedAt}
             resumes={activeResumes}
             job={job}
             fixedIds={fixedIds}
-            queuedKeywordIds={queuedKeywordIds}
             onToggleFix={toggleFix}
-            onToggleKeyword={toggleKeyword}
-            onChangeResume={(id) => {
-              setResumeId(id);
-              resetReport();
-            }}
+            onChangeResume={(id) => void startScan(id, job)}
             onChangeJob={() => void chooseJob(null)}
-            onRemoveJob={() => {
-              setJob(null);
-              resetReport();
-            }}
+            onRemoveJob={() => void startScan(activeResume.id, null)}
+            onRetry={() => void startScan(activeResume.id, job)}
             onExit={backToLanding}
           />
         )}
