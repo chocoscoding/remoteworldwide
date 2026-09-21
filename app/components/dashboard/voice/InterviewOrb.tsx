@@ -114,6 +114,8 @@ export interface InterviewOrbProps {
   signal?: OrbSignal;
   /** Shown under the orb — the interviewer's name. */
   label?: string;
+  /** What clicking the orb starts and stops, in its accessible name: "interview", "call". */
+  controlNoun?: string;
   /**
    * Overrides the caption. Defaults to what the state means; pass this to say
    * something more specific ("Reconnecting…", "Out of minutes").
@@ -131,7 +133,7 @@ export interface InterviewOrbProps {
   className?: string;
 }
 
-const InterviewOrb: FC<InterviewOrbProps> = ({ adapter, signal, label, caption, captionEmphasis, size = 200, tone = "light", className }) => {
+const InterviewOrb: FC<InterviewOrbProps> = ({ adapter, signal, label, controlNoun = "interview", caption, captionEmphasis, size = 200, tone = "light", className }) => {
   // Decorated once per adapter: rebuilding it would drop the subscription and
   // lose the state it needs to tell a hang-up from a drop.
   const guarded = useMemo(() => (adapter ? withConnectionLoss(adapter) : null), [adapter]);
@@ -152,7 +154,7 @@ const InterviewOrb: FC<InterviewOrbProps> = ({ adapter, signal, label, caption, 
         // status surface, and labelling it "start or stop" would promise a
         // button that is not there.
         {...(guarded
-          ? { "aria-label": label ? `${label} — start or stop the interview` : "Start or stop the interview" }
+          ? { "aria-label": label ? `${label} — start or stop the ${controlNoun}` : `Start or stop the ${controlNoun}` }
           : { interactive: false })}
         slotProps={{
           // The caption is rendered below rather than inside, so it can say

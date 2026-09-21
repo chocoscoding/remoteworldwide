@@ -48,6 +48,8 @@ export interface CoachMessageItem {
   card: CoachMessageCard | null;
   proposal: CoachProposalItem | null;
   createdAt: Date;
+  /** "voice" when it was spoken in talk mode. */
+  channel?: "text" | "voice";
 }
 
 export interface CoachUsage {

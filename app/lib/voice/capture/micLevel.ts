@@ -12,6 +12,8 @@
 // an interviewer they cannot see); a Firefox auto-send that must keep counting
 // there should use pause.ts on the PCM blocks instead.
 
+import { voiceSpectrumBins } from "@/app/lib/voice/frequencyBars";
+
 /** The analyser settings useVoiceSession uses. */
 export const LEVEL_FFT_SIZE = 512;
 export const LEVEL_SMOOTHING = 0.75;
@@ -49,6 +51,18 @@ export interface MicLevel {
   onLevel(listener: (level: number) => void): () => void;
   /** The latest level. */
   readonly level: number;
+  /**
+   * The spectrum the level is read from, cut to 0-8000 Hz for the voice
+   * visualizer (frequencyBars); null once stopped. The buffer every frame
+   * fills, so one analyser read serves the level, barge-in and the bars.
+   */
+  frequencyData(): Uint8Array | null;
+  /**
+   * Resumes a context that started suspended. The one at creation is a no-op
+   * without a user gesture on the page (a hard reload, a session that starts
+   * itself), and a suspended context reads silence; call this from a press.
+   */
+  resume(): void;
   /** Stops the loop and disconnects; listeners hear a final 0. Safe to call twice. */
   stop(): void;
 }
@@ -89,6 +103,7 @@ export function createMicLevel(stream: MediaStream, options: MicLevelOptions = {
 
   const listeners = new Set<(level: number) => void>();
   const data = new Uint8Array(analyser.frequencyBinCount);
+  const voiceBins = data.subarray(0, voiceSpectrumBins(ctx.sampleRate, analyser.frequencyBinCount));
   let level = 0;
   let loudFrames = 0;
   let stopped = false;
@@ -138,6 +153,12 @@ export function createMicLevel(stream: MediaStream, options: MicLevelOptions = {
     },
     get level() {
       return level;
+    },
+    frequencyData() {
+      return stopped ? null : voiceBins;
+    },
+    resume() {
+      if (!stopped && ctx.state === "suspended") void ctx.resume().catch(() => {});
     },
     stop() {
       if (stopped) return;

@@ -18,9 +18,10 @@
 // Not persisted to disk (see PERSISTED_DOMAINS in app/lib/query/keys.ts):
 // answers quote the user's resume back to them.
 
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, type QueryClient } from "@tanstack/react-query";
 import { BackendError, shouldRetry } from "@/app/lib/api/core";
-import { openJobThread } from "@/app/lib/jobs/ask";
+import { getJobThread, openJobThread } from "@/app/lib/jobs/ask";
+import type { JobThreadItem } from "@/app/lib/jobs/types";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
 
 export const jobThreadQuery = (savedJobId: string) =>
@@ -39,4 +40,14 @@ export const jobThreadQuery = (savedJobId: string) =>
 /** The thread for `savedJobId`. Idle while no job is picked. */
 export function useJobThread(savedJobId: string | null) {
   return useQuery({ ...jobThreadQuery(savedJobId ?? ""), enabled: savedJobId !== null });
+}
+
+/**
+ * Writes the thread as it stands now into `savedJobId`'s entry, read by thread
+ * id. Never an invalidate: that refetch would open the thread again, which is
+ * rate limited. An entry that has moved on to another thread is left alone.
+ */
+export async function refreshJobThread(queryClient: QueryClient, savedJobId: string, threadId: string): Promise<void> {
+  const fresh = await getJobThread(threadId);
+  queryClient.setQueryData<JobThreadItem>(qk.jobThreads.forSavedJob(savedJobId), (thread) => (thread && thread.id === fresh.id ? fresh : thread));
 }
