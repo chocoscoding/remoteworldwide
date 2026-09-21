@@ -130,6 +130,15 @@ export const qk = {
     all: ["resumes"] as const,
     list: () => [...qk.resumes.all, "list"] as const,
   },
+  // The ATS scorer. `ingested()` is the list of CVs that have been parsed and
+  // embedded — what a scan can name, which is NOT the same set as `documents`
+  // (files) or `resumes` (things being written in the editor). A report is not
+  // cached here: the screen holds the one on show, and the AI service caches
+  // the scan itself against the resume version and the posting.
+  ats: {
+    all: ["ats"] as const,
+    ingested: () => [...qk.ats.all, "ingested"] as const,
+  },
 } as const;
 
 /** Every domain's root segment — the persister's allowlist is keyed on these. */
@@ -160,6 +169,7 @@ export const STALE_TIME: Record<QueryDomain, number> = {
   jobImports: 0, // a progress snapshot is stale the moment it lands, so a poll must always ask
   jobThreads: 5 * 60_000, // only this user writes it, each answer lands in the cache directly, and every refetch spends a rate-limited open
   resumes: 0, // the editor is seeded from it once per visit and autosaves past it, so a cached copy is always behind
+  ats: 2 * 60_000, // grows only when a CV is imported, which is the same cadence as documents
 };
 
 /**
@@ -172,7 +182,8 @@ export const STALE_TIME: Record<QueryDomain, number> = {
  * reason: other people write it, so a disk-warm feed would present someone
  * else's stale activity as current. `documents` is excluded on the same
  * grounds as billing — a list of someone's CV, passport and work-permit
- * filenames has no business sitting on disk. The job picker's domains
+ * filenames has no business sitting on disk, and `ats` is excluded for exactly
+ * the same reason: it is the same filenames, one store further along. The job picker's domains
  * (`savedJobs`, `platformJobs`, `jobImports`) stay out too: a saved job carries
  * the full text of postings someone is applying to, and an import snapshot
  * means nothing to anyone but the modal polling it. `prep` stays out as well:
