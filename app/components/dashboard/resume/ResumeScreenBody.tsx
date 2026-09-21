@@ -15,7 +15,7 @@
 // "reset a dozen states" cleanup is needed the way the old screen's
 // `createNewResume` required.
 
-import { useCallback, useEffect, useRef, useState, type Dispatch, type FC, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type FC, type SetStateAction } from "react";
 import { ArrowLeft, Download, Plus } from "lucide-react";
 import TimeAgo from "timeago-react";
 import { toast } from "sonner";
@@ -29,9 +29,17 @@ import { apiMessage } from "@/app/lib/api/core";
 import { createResumeDocument } from "@/app/lib/resume/api";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
-import { cloneContent, createBlankContent, fromStored, generalScoreFor, isBlankContent, type ResumeDocument } from "./resume-document";
+import {
+  cloneContent,
+  createBlankContent,
+  fromStored,
+  isBlankContent,
+  isStaleCheck,
+  type CheckPosting,
+  type ResumeCheck,
+  type ResumeDocument,
+} from "./resume-document";
 import { useResumeAutosave } from "./useResumeAutosave";
-import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import DocumentSwitcher from "./DocumentSwitcher";
 import NewResumeDialog, { type NewResumeMode } from "./NewResumeDialog";
 import ContentForm from "./content/ContentForm";
@@ -56,6 +64,7 @@ import {
   tailorToJob,
 } from "@/app/lib/resume/ai";
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
+import { useCheckResume } from "@/hooks/mutations/useCheckResume";
 
 type DocTab = "overview" | "content" | "customize" | "ai";
 type SummarySuggestionState = "pending" | "accepted" | "dismissed";
@@ -152,7 +161,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   // scores against it.
   const { pickJob } = useJobPicker();
 
-  const [keywordsAdded, setKeywordsAdded] = useState<Set<string>>(new Set());
+  // The ATS card's check — a real scan of the document on screen.
+  const checker = useCheckResume();
   const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
   const [expandedSuggestions, setExpandedSuggestions] = useState<Set<string>>(new Set());
   const [askInput, setAskInput] = useState("");
@@ -206,11 +216,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
     return () => observer.disconnect();
   }, []);
 
-  const displayScore = Math.min(97, activeDoc.score + keywordsAdded.size * 4);
   const isBlank = isBlankContent(content);
+  // Against the LIVE content, not `activeDoc.content`: that copy is only
+  // written back on a document switch, so it would call a check current while
+  // the user was typing past it.
+  const checkIsStale = useMemo(() => isStaleCheck({ check: activeDoc.check, content }), [activeDoc.check, content]);
   // A job check's findings stand only while the check does — Remove takes the
   // "to match this posting" rewrite away with the posting it was matched to.
-  const suggestions = activeDoc.scan?.kind === "job" ? (activeDoc.suggestions ?? null) : null;
+  const suggestions = activeDoc.check?.job ? (activeDoc.suggestions ?? null) : null;
   const downloadFileName = content.name.trim() ? `${content.name.trim().replace(/\s+/g, "-")}-Resume` : "Resume";
   const previewScale = Math.max(0.45, Math.min(1.8, fit.scale * (zoomPercent / 100)));
 
@@ -415,11 +428,6 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
     );
     if (!result) return;
 
-    // Stamped here, outside the setState updater — updaters may run twice.
-    const stampedAt = new Date();
-    const general = generalScoreFor(activeDocId);
-    const jobLabel = `${job.company} — ${job.role}`;
-
     landAiTool("tailor", `Tailored to ${job.role} at ${job.company} — wove ${quote(result.woven)} in.`, () => {
       // Only the two fields the service actually rewrote, folded onto the
       // content as it is NOW. `tailorToJob` used to be a pure function this
@@ -429,62 +437,61 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
       // diff — a summary and a skills list — precisely so the rest of the
       // document never has to travel, and this is the other half of that deal.
       setContent((prev) => ({ ...prev, summary: result.content.summary, skills: result.content.skills }));
-      // Tailoring IS a job check — the ATS card names the job and the lift.
-      setDocuments((prev) =>
-        prev.map((d) =>
-          d.id === activeDocId
-            ? { ...d, before: general, score: Math.min(97, d.score + 13), scan: { kind: "job", at: stampedAt, job: jobLabel } }
-            : d,
-        ),
-      );
+      // Deliberately NOT a check. This used to stamp a job check with a score
+      // 13 points up, which reported a measurement nobody had taken. Tailoring
+      // changes the text, so any standing check goes stale by itself and the
+      // card offers to run it again — which is the only way to know whether
+      // the tailor actually moved the number.
     });
   };
 
   // -------------------------------------------------------------------------
-  // The ATS card's own checks — score only, never a content rewrite. Same
-  // stub the ATS screen uses, so the two surfaces agree on the numbers.
+  // The ATS card's own checks — score only, never a content rewrite. A real
+  // scan of the document as it stands, through the same scorer the ATS screen
+  // uses, so the two surfaces report the same number for the same text.
   // -------------------------------------------------------------------------
 
-  const scanGeneral = () => {
-    const at = new Date();
-    const general = generalScoreFor(activeDocId);
-    setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, before: null, score: general, scan: { kind: "general", at } } : d)));
+  /**
+   * Runs one check and puts it on the document it was run for.
+   *
+   * The document id is captured before the await, not read after it: a check
+   * that lands after a switch belongs to the resume it scored. (In practice a
+   * switch remounts this component and aborts the stream first; this is what
+   * keeps the write correct if that ever stops being true.)
+   */
+  const runCheck = async (posting: CheckPosting | null) => {
+    const docId = activeDocId;
+    const putCheck = (check: ResumeCheck) => setDocuments((prev) => prev.map((d) => (d.id === docId ? { ...d, check } : d)));
+    const settled = await checker.run({ content, label: activeDoc.label, job: posting }, putCheck);
+    if (settled) putCheck(settled);
   };
 
-  const handleScanJob = (job: ResumeJob) => {
-    const at = new Date();
-    const general = generalScoreFor(activeDocId);
-    const { score } = scoreApplication(activeDocId, job.description);
-    const jobLabel = `${job.company} — ${job.role}`;
-    setDocuments((prev) =>
-      prev.map((d) => (d.id === activeDocId ? { ...d, before: general, score, scan: { kind: "job", at, job: jobLabel } } : d)),
-    );
-  };
+  const checkGeneral = () => void runCheck(null);
+
+  const checkAgainstJob = (job: ResumeJob) =>
+    void runCheck({ id: job.id, company: job.company, role: job.role, description: job.description });
+
+  /** The same check again — same posting (or none), the text as it is now. */
+  const recheck = () => void runCheck(activeDoc.check?.posting ?? null);
 
   /** Every reason starts from the same pick; cancelling it leaves the document as it was. */
   const pickJobFor = async (use: "tailor" | "keywords" | "scan") => {
     const result = await pickJob(RESUME_JOB_SPEC);
     if (result.status !== "picked") return;
-    if (use === "scan") handleScanJob(result.job);
+    if (use === "scan") checkAgainstJob(result.job);
     else if (use === "keywords") await handleKeywordsJob(result.job);
     else await handleTailorJob(result.job);
   };
 
   /**
    * Removes the standing check — the card offers the two ways to run another.
-   * Score resets to the general baseline so nothing compounds; the Tailor tool
-   * goes back to "Run". Content edits stay: woven keywords are the user's
-   * resume now, not part of the scorecard.
+   * Only the check goes: the scan itself is still on file in the AI service,
+   * and nothing a tool did to the content is undone. Tailoring is not a check
+   * any more, so removing one no longer resets the Tailor tool either.
    */
-  const removeScan = () => {
-    const general = generalScoreFor(activeDocId);
-    setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, before: null, score: general, scan: null } : d)));
-    setAiDone((prev) => {
-      const next = new Set(prev);
-      next.delete("tailor");
-      return next;
-    });
-    setAiCaptions((prev) => ({ ...prev, tailor: undefined }));
+  const removeCheck = () => {
+    setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, check: null } : d)));
+    checker.clearFailure();
   };
 
   const useRewriteVariant = (index: number) => {
@@ -507,15 +514,6 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
     setContent((prev) => quantifyList.reduce((acc, sg, i) => (quantifyApplied.has(i) ? acc : applyQuantify(acc, sg)), prev));
     setQuantifyApplied(new Set(quantifyList.map((_, i) => i)));
     setAiCaptions((prev) => ({ ...prev, quantify: `All ${quantifyList.length} bullets now carry a number.` }));
-  };
-
-  const toggleKeyword = (id: string) => {
-    setKeywordsAdded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   };
 
   const acceptSummarySuggestion = () => {
@@ -555,7 +553,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
   const handleAskSubmit = () => {
     if (!askInput.trim()) return;
-    setAskStatus(`Rewrite requested: "${askInput.trim()}" — 1 credit used. We'll apply it to your ${activeDoc.label} draft.`);
+    // Nothing is behind this box yet — no route takes a free-form rewrite
+    // instruction. It used to say a credit had been spent and the rewrite
+    // would be applied, and neither was true.
+    setAskStatus(`Noted: "${askInput.trim()}". Free-form rewrites aren't available yet — the AI Tools tab has the ones that are.`);
     setAskInput("");
     window.setTimeout(() => setAskStatus(null), 4000);
   };
@@ -741,14 +742,15 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
               <AiAssistRail
                 isBlank={isBlank}
                 hasSuggestions={suggestions !== null}
-                displayScore={displayScore}
-                before={activeDoc.before}
-                scan={activeDoc.scan}
-                onRemoveScan={removeScan}
-                onScanGeneral={scanGeneral}
-                onScanAgainstJob={() => void pickJobFor("scan")}
-                keywordsAdded={keywordsAdded}
-                onToggleKeyword={toggleKeyword}
+                check={activeDoc.check}
+                stale={checkIsStale}
+                checkStatus={checker.status}
+                checkFailure={checker.failure}
+                onRemoveCheck={removeCheck}
+                onCheckGeneral={checkGeneral}
+                onCheckAgainstJob={() => void pickJobFor("scan")}
+                onRecheck={recheck}
+                onDismissCheckFailure={checker.clearFailure}
                 appliedSuggestions={appliedSuggestions}
                 expandedSuggestions={expandedSuggestions}
                 onApplySuggestion={applySuggestion}

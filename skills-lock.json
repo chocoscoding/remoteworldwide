@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "speech-engine": {
+      "source": "elevenlabs/skills",
+      "sourceType": "github",
+      "skillPath": "speech-engine/SKILL.md",
+      "computedHash": "de2964a7301bb12e81f1ca3cbf11c9954be296a1be7cbc9e7cdc0b7a08fe4e78"
+    }
+  }
+}

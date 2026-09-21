@@ -5,14 +5,22 @@
 // AI service — requirements read out of the posting, evidence retrieved from
 // the resume's own bullets, a weighted score and a grounded write-up.
 //
-// What is left here is the estimate the OTHER surfaces still run on, where a
-// number is wanted but a charged scan is not: the resume card's general score,
-// the payoff panel's banding, `fit.ts`. A real scan costs a credit, so a
-// screen that wants a figure for every resume it lists cannot have one, and
-// these callers each need their own decision about that — either to show
-// nothing until scanned, the way the ATS screen now does, or to read a stored
-// score once one is persisted. Until then they keep the keyword overlap below,
-// which at least reacts to what the user actually pasted.
+// Nor does the resume editor any more. Its ATS card runs a real scan of the
+// document on screen — the content rendered to text, ingested through
+// `POST /api/ai/resume/imports/text`, scored by the same `streamScan` — and
+// shows nothing until one has been run (`hooks/mutations/useCheckResume.ts`).
+// That was the "show nothing until scanned" answer, and it is the right one
+// for a card whose checks the user starts on purpose: a credit spent at a
+// click is a price the button can state.
+//
+// What is left here is the estimate the surfaces that are NOT started on
+// purpose still run on: logging an application stamps one on it
+// (`ActivityProvider.logApplication`), which the payoff panel then bands, and
+// `fit.ts` borrows `hash01`. Those fire as a side effect of something else, so
+// charging a credit for each would be a charge the user never chose; they each
+// still owe the other answer — read a stored score once one is persisted.
+// Until then they keep the keyword overlap below, which at least reacts to
+// what the user actually pasted.
 //
 // `scoreTier` is the exception and is NOT an estimate: it is the banding the
 // whole dashboard shares, mirrored by `scanTier` in `app/lib/ats/api.ts` and

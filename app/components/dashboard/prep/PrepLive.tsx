@@ -34,8 +34,10 @@ import { questionPresetFor, type SessionConfig } from "./PrepSetup";
 import RecordingConsent, { clearConsentHandoff, peekConsentHandoff } from "./RecordingConsent";
 import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
 import { useInterviewCapture, type CapEndReason, type CaptureCaption, type CaptureTurn } from "@/app/components/dashboard/voice/useInterviewCapture";
-import VoiceOrb from "@/app/components/dashboard/voice/VoiceOrb";
-import MicWaveform from "@/app/components/dashboard/voice/MicWaveform";
+import type { OrbState } from "orb-ui";
+import PrepOrb from "./PrepOrb";
+import InterviewTranscript, { type TranscriptEntry } from "./InterviewTranscript";
+import TypeAnswerPanel from "./TypeAnswerPanel";
 import { usePrepSessionMutations } from "@/hooks/mutations/usePrepSessionMutations";
 import { usePrepVoiceConfig } from "@/hooks/queries/usePrepVoiceConfig";
 
@@ -192,6 +194,10 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
   const [transcript, setTranscript] = useState<LiveTurn[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [voiceOn, setVoiceOn] = useState(true);
+  // Open by default: in a spoken interview this is the only record of what
+  // was actually heard, and a misheard answer has to be visible without
+  // going looking for it.
+  const [transcriptOpen, setTranscriptOpen] = useState(true);
   const [draft, setDraft] = useState("");
   const [start, setStart] = useState<StartState>({ kind: "idle" });
   const [startAsked, setStartAsked] = useState(false);
@@ -201,7 +207,6 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
 
   const idSeq = useRef(0);
   const nextTurnId = () => `turn-${idSeq.current++}`;
-  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Mirrors of state for callbacks that outlive a render (timers, the mic
   // level loop, the capture's own calls back into this screen).
@@ -526,12 +531,6 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
     return () => clearInterval(id);
   }, [phase, recording]);
 
-  // Keep the newest turn in view as the conversation grows.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [transcript, interim]);
-
   function buildInput(finalTranscript: TranscriptTurn[]): SessionInput {
     return { trackId: track.id, formats: config.formats, difficulty: config.difficulty, lengthMinutes: config.lengthMinutes, transcript: finalTranscript, elapsedSeconds };
   }
@@ -601,9 +600,18 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
     else onEnd(buildInput(finalTranscript));
   }
 
+  /**
+   * Send the answer on the table. `submitAnswer` is wired straight to onClick,
+   * so it must take no argument — a React MouseEvent would arrive as the text.
+   * Anything with its own text (the typed composer) calls `commitAnswer`.
+   */
   function submitAnswer() {
+    commitAnswer(draft);
+  }
+
+  function commitAnswer(raw: string) {
     if (phase !== "active" || finishingRef.current) return;
-    const text = draft.trim();
+    const text = raw.trim();
     const live = liveTextRef.current.trim();
     // A spoken answer needs no text: the recording is the answer, and the
     // transcript fills it in. A typed session moves on without one, as before.
@@ -842,6 +850,57 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
   const uploadBacklog = recording && failedParts === 0 && pendingParts > 1;
   const micLost = recording && (capture.micStatus === "unavailable" || capture.error !== null);
   const refusal = start.kind === "refused" ? start : null;
+
+  // What the orb shows. Derived from the session this screen already runs
+  // rather than from a provider, because this screen still owns it — see
+  // PrepOrb. Order matters: a lost mic outranks whatever else is true, and the
+  // interviewer speaking outranks the mic being open, because the candidate is
+  // meant to be listening then.
+  /** The mic that is actually open: the recorder's in a voice session, dictation's otherwise. */
+  const micOpen = recording ? capture.micStatus === "live" : listening;
+  const orbState: OrbState = micLost
+    ? "error"
+    : phase === "connecting" || phase === "saving"
+      ? "connecting"
+      : aiSpeaking
+        ? "speaking"
+        : phase === "thinking"
+          ? "thinking"
+          : micOpen
+            ? "listening"
+            : "idle";
+
+  // The one line under the orb that says what is happening. It used to share
+  // the job with a second status line below the question, which repeated
+  // "Listening" a few hundred pixels further down; that line is gone and its
+  // cases live here. Order is precedence: a lost mic outranks everything, and
+  // an answer about to send outranks the state it is sending from.
+  const orbCaption = micLost
+    ? "Your mic stopped — the recording is paused"
+    : phase === "saving"
+      ? "Saving your session…"
+      : autoSend?.kind === "countdown"
+        ? `Sending in ${autoSend.seconds}…`
+        : autoSend || pausing
+          ? "Sending when you stop…"
+          : aiSpeaking
+            ? "Talk over them if you want — they'll stop"
+            : phase === "thinking"
+              ? "Thinking of a follow-up…"
+              : micOpen
+                ? "Listening to you"
+                : "Your mic is off";
+  // Something is about to happen on its own: the caption has to be read.
+  const orbCaptionEmphasis = Boolean(autoSend) || pausing;
+
+  /** The transcript, in the shape the panel takes. */
+  const transcriptEntries: TranscriptEntry[] = transcript.map((turn, i) => ({
+    id: turn.id,
+    who: turn.who,
+    text: turn.text,
+    speaking: aiSpeaking && turn.who === "ai" && i === transcript.length - 1,
+  }));
+
   // The service has voice interviews switched off; a create would only be refused.
   const voiceOff = voiceConfig.data?.interviewsEnabled === false;
   const needsConsent = handoffVersion === null || refusal?.problem === "consent";
@@ -1025,7 +1084,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
         </div>
       ) : phase === "connecting" ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
-          <VoiceOrb speaking={false} />
+          <PrepOrb state="connecting" size={150} />
           <p className="text-[15px] font-bold">{voiceMode && start.kind === "starting" ? "Starting your recording…" : "Connecting to your interviewer…"}</p>
           <p className="text-sm text-white/50">This is a practice session — keep this tab open.</p>
           {voiceMode && (
@@ -1037,52 +1096,39 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
         </div>
       ) : (
         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-          {/* Left — the conversation so far */}
-          <div className="flex-1 min-w-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/10">
-            <p className="px-6 pt-5 pb-3 text-[10.5px] font-bold uppercase tracking-[0.1em] text-white/35 flex-none">Transcript</p>
-            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 pb-5 flex flex-col gap-4">
-              {transcript.map((t, i) => {
-                const isLive = aiSpeaking && t.who === "ai" && i === transcript.length - 1;
-                return (
-                <div key={t.id} className={cn("max-w-[78%]", t.who === "user" ? "self-end" : "self-start")}>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-white/30 mb-1.5 flex items-center gap-1.5">
-                    {t.who === "user" ? "You" : "Interviewer"}
-                    {isLive && (
-                      <span className="inline-flex items-center gap-1 text-[#e1f073]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#e1f073] animate-pulse" />
-                        speaking
-                      </span>
-                    )}
-                  </p>
-                  <p
-                    className={cn(
-                      "text-sm leading-relaxed rounded-xl px-3.5 py-2.5",
-                      t.who === "user" ? "bg-[#e1f073] text-[#222325] font-medium" : "bg-white/8 text-white/80",
-                      t.who === "user" && !t.text && "italic font-normal"
-                    )}>
-                    {t.text || "Answered out loud. Your report will show what you said."}
-                  </p>
-                </div>
-                );
-              })}
-              {interim && (
-                <div className="max-w-[78%] self-end">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.07em] text-white/30 mb-1.5">You · live</p>
-                  <p className="text-sm leading-relaxed rounded-xl px-3.5 py-2.5 bg-[#e1f073]/25 text-white/70 italic">{interim}</p>
-                </div>
-              )}
-              {phase === "thinking" && (
-                <p className="text-xs text-white/35 italic inline-flex items-center gap-1.5 self-start">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Thinking of a follow-up…
-                </p>
-              )}
-            </div>
+          {/* Left — the conversation so far. Collapsible: on a phone it stacks
+              above the interviewer, and someone who wants the orb and the
+              question full-height should be able to fold it away. */}
+          <div
+            className={cn(
+              "flex min-w-0 flex-col border-b border-white/10 lg:border-b-0 lg:border-r",
+              transcriptOpen ? "min-h-0 flex-1" : "flex-none"
+            )}>
+            <InterviewTranscript
+              entries={transcriptEntries}
+              interim={interim}
+              pending={phase === "thinking" ? "Thinking of a follow-up…" : undefined}
+              open={transcriptOpen}
+              onOpenChange={setTranscriptOpen}
+              tone="dark"
+              fill
+              className="min-h-0 flex-1"
+            />
           </div>
 
           {/* Right — the interviewer, and the question on the table */}
           <div className="w-full lg:w-[42%] lg:max-w-[520px] flex-none flex flex-col items-center justify-center gap-7 px-8 py-10">
-            <VoiceOrb speaking={aiSpeaking} label="Your interviewer" sublabel={formatsLabel(config.formats)} />
+            <div className="flex flex-col items-center">
+              <PrepOrb
+                state={orbState}
+                onLevel={recording ? onCaptureLevel : dictationLevel}
+                micActive={micOpen}
+                label="Your interviewer"
+                caption={orbCaption}
+                captionEmphasis={orbCaptionEmphasis}
+              />
+              <p className="mt-1 text-xs text-white/30">{formatsLabel(config.formats)}</p>
+            </div>
 
             {currentQuestion && (
               <div className="text-center">
@@ -1092,35 +1138,18 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
               </div>
             )}
 
-            {recording ? (
-              <div className="w-full">
-                <MicWaveform onLevel={onCaptureLevel} active={capture.micStatus === "live"} />
-                <p className={cn("text-center text-xs mt-2", autoSend ? "text-white" : capture.micStatus === "live" ? "text-[#e1f073]" : "text-white/35")}>
-                  {autoSend?.kind === "countdown"
-                    ? `Sending in ${autoSend.seconds}…`
-                    : autoSend
-                      ? "Sending when you stop…"
-                      : capture.micStatus === "live"
-                        ? "Listening to you"
-                        : "Your mic is off"}
-                </p>
-                <p className="text-center text-[11px] text-white/35 mt-3">
+            {recording && (
+              <div className="flex flex-col items-center gap-1.5 text-center text-[11px] text-white/35">
+                <p>
                   {captionsLive
                     ? capture.liveProvider === "web-speech"
                       ? "Live captions by your browser's speech service."
                       : "Live captions on."
                     : "No live captions here. Your answers are still recorded and transcribed for the report."}
                 </p>
-                <p className="flex items-center justify-center gap-1.5 text-[11px] text-white/35 mt-1.5">
+                <p className="flex items-center gap-1.5">
                   <Headphones className="h-3 w-3 flex-none" />
                   Headphones keep the interviewer out of your recording.
-                </p>
-              </div>
-            ) : (
-              <div className="w-full">
-                <MicWaveform onLevel={dictationLevel} active={listening} />
-                <p className={cn("text-center text-xs mt-2", pausing ? "text-white" : listening ? "text-[#e1f073]" : "text-white/35")}>
-                  {pausing ? "Sending when you stop…" : listening ? "Listening to you" : "Your mic is off"}
                 </p>
               </div>
             )}
@@ -1133,27 +1162,22 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
         <div className="border-t border-white/10 px-6 py-4 flex-none">
           {recording ? (
             <>
-              <div className="flex items-end gap-3 max-w-[1100px] mx-auto">
-                <div className="flex-1 min-w-0">
-                  <textarea
-                    value={draft}
-                    onChange={(e) => {
-                      setDraft(e.target.value);
-                      typedAtRef.current = performance.now();
-                    }}
-                    disabled={phase !== "active"}
-                    rows={2}
-                    aria-label="Your answer"
-                    placeholder={captionsLive ? "Your words appear here as you speak. Fix any the captions got wrong." : "Answer out loud. You can jot notes here too."}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        submitAnswer();
-                      }
-                    }}
-                    className="w-full rounded-xl border border-white/15 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/40 disabled:opacity-40 resize-none"
-                  />
-                </div>
+              <div className="mx-auto flex max-w-[1100px] items-center gap-3">
+                {/* Speaking is the session. Typing is one icon that opens a
+                    composer, and it warns once that a typed answer is left out
+                    of the delivery scoring — which is measured from the voice. */}
+                <TypeAnswerPanel
+                  onSend={(text) => {
+                    typedAtRef.current = performance.now();
+                    commitAnswer(text);
+                  }}
+                  disabled={phase !== "active"}
+                  // No label on the composer's submit: the button beside it
+                  // already says "Next question", and both do the same thing.
+                  hint={voiceHint}
+                  tone="dark"
+                  className="flex-1"
+                />
                 <button
                   type="button"
                   onClick={submitAnswer}
@@ -1166,9 +1190,6 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, onEnd, onSaved, onExit, on
                   {lastQuestion ? "Finish" : "Next question"}
                 </button>
               </div>
-              <p className="text-xs text-white/35 mt-2.5 max-w-[1100px] mx-auto" aria-live="polite">
-                {voiceHint}
-              </p>
             </>
           ) : (
             <>

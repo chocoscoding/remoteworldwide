@@ -1,7 +1,35 @@
 "use client";
 
-import { FC, useState } from "react";
-import { Check, ChevronDown, Copy, Download, FileSignature, Link2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
+// The cover letter screen.
+//
+// The letter is written by the AI service (`POST /api/ai/cover`, through the
+// session proxy) from the user's own ingested resume and the posting they
+// picked. Everything on this screen that is NOT the letter — theme, font,
+// spacing, letterhead — is a user control, persisted nowhere but the session
+// and never generated: the service emits words and says so in its own header,
+// because a generated theme would silently override a choice the user already
+// made and would arrive again with every regenerate.
+//
+// ── Two things here are deliberate and easy to get wrong ───────────────────
+//
+// 1. TONE COSTS A CREDIT, AND THE SCREEN SAYS SO. Tone is not a filter over one
+//    letter: each tone is a separate letter at a separate LENGTH (the service
+//    states the paragraph count in the prompt and truncates past it). So a tone
+//    the user has not seen yet has to be written. `useCoverLetter` keeps the
+//    ones already written, so flicking back to a tone is free and the
+//    comparison the control invites is one they can actually make.
+//
+// 2. NOTHING ON THIS PAGE CLAIMS TO HAVE READ THE LETTER. The previous build
+//    drew inline "your strongest line" highlights and a panel of rows headed
+//    "pulled from your profile, matched to this JD" — both authored by hand
+//    against one fixed letter. Against a real one they would be decoration
+//    asserting an analysis nobody ran. What replaced them is the handful of
+//    things that are true and checkable: which resume it was written from, the
+//    live word count, and the tone's own paragraph target.
+
+import { useCallback, useMemo, useState, type FC } from "react";
+import { Check, ChevronDown, Copy, Download, FileSignature, FileWarning, Link2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
@@ -12,26 +40,25 @@ import SplitButton from "@/app/components/dashboard/ui/SplitButton";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import type { PickedJob } from "@/app/lib/jobs/fields";
-import { COVER_LETTER, RESUME } from "@/app/lib/dashboard/mock-data";
+import { COVER_BILLING_HREF, COVER_CREDITS, TONE_PARAGRAPHS, type CoverLetterContent, type CoverTone } from "@/app/lib/cover/api";
+import { useCoverLetter } from "@/hooks/mutations/useCoverLetter";
+import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
+import { useProfileSettings } from "@/hooks/queries/useSettingsQuery";
 import { Lottie } from "lottie-react";
-// ---------------------------------------------------------------------------
-// Local content that isn't shared with any other screen yet — kept here
-// rather than in mock-data.ts, mirroring the pattern in dashboard/Client.tsx.
-// ---------------------------------------------------------------------------
 
-type ToneId = "warm" | "formal" | "story" | "short";
 type ThemeId = "ats" | "bordered" | "warm";
 type FontId = "manrope" | "serif" | "mono";
 type SpacingId = "tight" | "normal" | "airy";
 type LetterheadId = "off" | "name" | "full";
 
-// What a letter needs from a picked job. The posting and its requirements are
-// asked for but optional: a letter can be written for a job nobody pasted the
-// description of. One constant feeds both the pick and the type.
+// What a letter needs from a picked job. The posting is asked for but optional:
+// a letter can be written for a job nobody pasted the description of, and the
+// service treats a missing JD as "write from the resume alone" rather than as a
+// refusal. One constant feeds both the pick and the type.
 const COVER_JOB_SPEC = "company, role, description?, requirements?";
 type CoverJob = PickedJob<typeof COVER_JOB_SPEC>;
 
-const TONE_OPTIONS: { id: ToneId; label: string }[] = [
+const TONE_OPTIONS: { id: CoverTone; label: string }[] = [
   { id: "warm", label: "Warm & direct" },
   { id: "formal", label: "Formal" },
   { id: "story", label: "Story-led" },
@@ -62,132 +89,28 @@ const LETTERHEAD_OPTIONS: { id: LetterheadId; label: string }[] = [
   { id: "full", label: "Full contact" },
 ];
 
-/**
- * Tone genuinely rewrites the letter — same facts, different register and
- * length. Previously these chips only moved a highlight, which made the
- * control a lie: picking "Short" left a four-paragraph letter on screen.
- */
-const TONE_LETTERS: Record<ToneId, { greeting: string; paragraphs: string[] }> = {
-  warm: {
-    greeting: "Hi Deel team,",
-    paragraphs: [
-      "I've spent the last three years designing payment and compliance flows for merchants across 30+ countries at Paystack — work that only exists because someone has to make cross-border money movement feel simple, which is exactly the problem Deel is solving for global teams.",
-      "Most recently I led a checkout redesign that cut failed-payment support tickets by 31%, and I built the internal design-system documentation that 40+ engineers now rely on weekly. Both projects meant translating regulatory and technical constraints into interfaces regular people trust with their money — the same tension I imagine shows up constantly in global payroll.",
-      "I work async by default, across a four-hour overlap with most US teams, and I'd love to bring that discipline to Deel's design team.",
-    ],
-  },
-  formal: {
-    greeting: "Dear Hiring Manager,",
-    paragraphs: [
-      "I am writing to apply for the Senior Designer position at Deel. For the past three years I have designed payment and compliance flows serving merchants in more than 30 countries at Paystack, work closely aligned with the cross-border challenges Deel addresses for distributed organisations.",
-      "In my current role I led a checkout redesign that reduced failed-payment support tickets by 31%, and I established the internal design-system documentation now used weekly by over 40 engineers. Both required translating regulatory and technical constraints into interfaces that customers trust with their money.",
-      "I work asynchronously across a four-hour overlap with US-based teams and would welcome the opportunity to discuss how that experience could serve Deel's design function.",
-      "Thank you for your consideration.",
-    ],
-  },
-  story: {
-    greeting: "Hi Deel team,",
-    paragraphs: [
-      "A merchant in Accra once told me she'd stopped trusting her own checkout page. She couldn't tell which payments had failed, or why. That conversation reshaped three years of my work at Paystack.",
-      "I rebuilt that flow end to end. Failed-payment support tickets dropped 31%, and the pattern became the reference other teams copied — which is how I ended up writing the design-system documentation 40+ engineers now open every week.",
-      "What stayed with me is that the hard part was never the interface. It was carrying regulatory and technical constraints without passing the confusion on to the person holding the money. That's the tension I see in global payroll, and it's why Deel is the team I want to do this next to.",
-      "I work async by default, across a four-hour overlap with most US teams.",
-    ],
-  },
-  short: {
-    greeting: "Hi Deel team,",
-    paragraphs: [
-      "Three years designing payment and compliance flows at Paystack, for merchants across 30+ countries — the same cross-border problem Deel solves for global teams.",
-      "I led a checkout redesign that cut failed-payment tickets 31%, and wrote the design-system docs 40+ engineers use weekly. I work async across a four-hour US overlap.",
-      "I'd welcome a conversation.",
-    ],
-  },
-};
+/** A blank draft, for someone writing their own with no job attached. */
+const BLANK_GREETING = "Hi there,";
+const BLANK_BODY = ["Start writing your cover letter here…"];
 
-const STRONG_TITLE = "Your strongest line: a decision, a number and an outcome";
-const SUGG_TITLE = "Consider a plainer connector than the em dash";
+const escapeHtml = (value: string): string =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/**
- * Inline markers, the way Grammarly draws them: the strongest line gets a
- * lime highlight, and em-dash constructions get a green underline with the
- * suggestion on hover. Baked into the seeded HTML so the marks live inside
- * the editable text and survive editing around them.
- */
-function decorateParagraph(p: string): string {
-  return p
-    .split(/(?<=[.!?])\s+/)
-    .map((sent) => {
-      let out = sent.replace(/(\S+ — \S+)/g, `<span class="sugg" title="${SUGG_TITLE}">$1</span>`);
-      if (sent.includes("31%")) out = `<mark title="${STRONG_TITLE}">${out}</mark>`;
-      return out;
-    })
-    .join(" ");
-}
-
-/**
- * The tone letters are authored against Deel; swap the company (and, in the
- * formal letter, the role title) for whichever job is linked so the draft
- * reads coherently. The surrounding facts stay Amara's — a real generator is
- * the seam this stands in for.
- */
-function personalize(text: string, company: string, role: string): string {
-  return text.replace(/Deel/g, company).replace("Senior Designer position", `${role} position`);
-}
-
-/** Paragraphs -> the HTML the editor loads. */
+/** Paragraphs -> the HTML the editor loads. Escaped: this is the model's text, not markup. */
 function lettersToHtml(greeting: string, paragraphs: string[], signOff: string): string {
   const body = paragraphs
     .filter((p) => p.trim())
-    .map((p) => `<p>${decorateParagraph(p)}</p>`)
+    .map((p) => `<p>${escapeHtml(p)}</p>`)
     .join("");
-  return `<p>${greeting}</p>${body}<p><strong>${signOff}</strong></p>`;
+  // The sign-off is one field carrying two lines ("Best,\nJordan"), which is
+  // how the service asks for it and how a letter is actually laid out.
+  const closing = signOff
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => `<p><strong>${escapeHtml(line)}</strong></p>`)
+    .join("");
+  return `<p>${escapeHtml(greeting)}</p>${body}${closing}`;
 }
-
-interface ProfileJdPull {
-  id: string;
-  label: string;
-  profile: string;
-  jd: string;
-}
-
-const PROFILE_JD_PULLS: ProfileJdPull[] = [
-  {
-    id: "pull-experience",
-    label: "Relevant experience",
-    profile: "3 years designing payment & compliance flows at Paystack",
-    jd: "Deel needs someone comfortable with global payroll compliance flows",
-  },
-  {
-    id: "pull-outcome",
-    label: "Quantified outcome",
-    profile: "Checkout redesign cut failed-payment tickets by 31%",
-    jd: "JD asks for measurable impact on customer-facing money flows",
-  },
-  {
-    id: "pull-systems",
-    label: "Systems thinking",
-    profile: "Built design-system docs used by 40+ engineers weekly",
-    jd: "Deel's design team values documentation other teams can self-serve",
-  },
-  {
-    id: "pull-async",
-    label: "Way of working",
-    profile: "Works async across a four-hour overlap with most US teams",
-    jd: "Deel is a fully distributed team spanning many time zones",
-  },
-];
-
-// A brand-new, blank draft that isn't tied to any job — used when the user
-// starts "+ New cover letter" instead of tailoring the linked one.
-const BLANK_LETTER: typeof COVER_LETTER = {
-  company: "",
-  role: "",
-  draftLabel: "Untitled",
-  greeting: "Hi there,",
-  paragraphs: ["Start writing your cover letter here…", "", ""],
-  signOff: RESUME.name,
-  wordCount: 6,
-};
 
 const FONT_CLASS: Record<FontId, string> = {
   manrope: "",
@@ -231,17 +154,12 @@ const ToolbarSelect: FC<{
 );
 
 const CoverClient: FC = () => {
-  // JD link row
-  const [tailoring, setTailoring] = useState(false);
-  const [justTailored, setJustTailored] = useState(false);
-
-  // Blank draft — true when the user started "+ New cover letter" instead of
-  // using the JD-tailored letter. Local mock state only.
+  // Blank draft — true when the user started "Write your own" instead of
+  // creating a letter from a job. Nothing is generated on that path.
   const [isBlankDraft, setIsBlankDraft] = useState(false);
 
-  // Disclosure + tone
   const [builtOpen, setBuiltOpen] = useState(false);
-  const [tone, setTone] = useState<ToneId>("warm");
+  const [tone, setTone] = useState<CoverTone>("warm");
 
   // Style controls
   const [theme, setTheme] = useState<ThemeId>("ats");
@@ -249,67 +167,111 @@ const CoverClient: FC = () => {
   const [spacing, setSpacing] = useState<SpacingId>("normal");
   const [letterhead, setLetterhead] = useState<LetterheadId>("off");
 
-  // Letter canvas interactions
-
-  // Footer
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  // Download modal
   const [downloadOpen, setDownloadOpen] = useState(false);
 
   // The job this letter is written for. Picking one is the only way in —
   // pasting a JD now happens inside the picker, alongside the platform's own
   // listings, instead of behind a separate "New cover letter" button.
   const { pickJob } = useJobPicker();
-  // Nobody arrives with a letter. The default state is the choice: write
-  // your own, or create one from a job — nothing pre-linked, nothing assumed.
   const [linkedJob, setLinkedJob] = useState<CoverJob | null>(null);
 
-  // Live editor contents. Seeded from the tone, then owned by the user.
+  // Live editor contents. Seeded from the generated letter, then owned by the
+  // user — every keystroke after that is theirs, and a regenerate replaces it
+  // only because they asked for one.
   const [letterText, setLetterText] = useState("");
 
-  // Either path counts as having begun; until then the page shows the choice.
-  const started = isBlankDraft || linkedJob !== null;
+  const { letter, writing, failure, run, show, reset, isUnwritten } = useCoverLetter();
 
-  const activeLetter = isBlankDraft ? BLANK_LETTER : COVER_LETTER;
-  const toneLetter = TONE_LETTERS[tone];
-  // Changing tone or starting a blank draft loads new content into the editor;
-  // anything else leaves the user's typing alone.
-  const docKey = isBlankDraft ? "blank" : `${tone}-${linkedJob?.id ?? "none"}`;
-  const letterCompany = linkedJob?.company ?? COVER_LETTER.company;
-  const letterRole = linkedJob?.role ?? COVER_LETTER.role;
+  // Bumped every time a letter lands on the page, whether freshly written or
+  // recalled from a tone already written. It is what `docKey` counts on, and it
+  // has to be a counter rather than anything derived from the letter: a rewrite
+  // can legitimately come back the same length, and a `docKey` that did not
+  // move would leave the previous draft in the editor with no sign that the
+  // rewrite the user paid for had arrived.
+  const [draftSeq, setDraftSeq] = useState(0);
+
+  // The resume the letter is written from. The service needs an INGESTED
+  // resume — one that has been parsed — and this screen has no picker, so it
+  // uses the most recent one that parsed cleanly and names it on the page. That
+  // is the same resume the user last uploaded, which is the one they are
+  // applying with; naming it is what makes the default checkable rather than
+  // invisible.
+  const { data: ingested, isPending: resumesPending } = useIngestedResumesQuery();
+  const resume = useMemo(() => (ingested ?? []).find((row) => row.status === "ready") ?? null, [ingested]);
+
+  // The letterhead prints the USER's name and contacts, so they come from
+  // settings — the letter itself carries neither, and the service is explicit
+  // that presentation is not its to set.
+  const { data: settings } = useProfileSettings();
+  const profile = settings?.profile ?? null;
+
+  const started = isBlankDraft || linkedJob !== null;
+  const paragraphTarget = TONE_PARAGRAPHS[tone];
+
+  const draftLabel = isBlankDraft ? "Untitled" : (letter?.draftLabel ?? "Draft");
+  const docKey = isBlankDraft ? "blank" : `${linkedJob?.id ?? "none"}-${tone}-${draftSeq}`;
   const initialHtml = isBlankDraft
-    ? lettersToHtml(BLANK_LETTER.greeting, BLANK_LETTER.paragraphs, BLANK_LETTER.signOff)
-    : lettersToHtml(
-        personalize(toneLetter.greeting, letterCompany, letterRole),
-        toneLetter.paragraphs.map((para) => personalize(para, letterCompany, letterRole)),
-        COVER_LETTER.signOff,
-      );
-  const liveWordCount = letterText.trim() ? letterText.trim().split(/\s+/).length : 0;
+    ? lettersToHtml(BLANK_GREETING, BLANK_BODY, profile?.fullName ?? "")
+    : letter
+      ? lettersToHtml(letter.greeting, letter.paragraphs, letter.signOff)
+      : "";
+
+  // `letterText` is only written once the editor reports a change, so a letter
+  // that has landed but not been touched has none. Its own count stands in —
+  // the service counts the paragraphs it is about to return, so the two agree
+  // by construction, and the footer never reads "0 words" under a full page.
+  const editedWordCount = letterText.trim() ? letterText.trim().split(/\s+/).length : 0;
+  const liveWordCount = editedWordCount || (isBlankDraft ? 0 : (letter?.wordCount ?? 0));
   const spacingCfg = SPACING_CLASS[spacing];
+  const downloadFileName = profile?.fullName?.trim() ? `${profile.fullName.trim().replace(/\s+/g, "-")}-Cover-Letter` : "Cover-Letter";
+
+  /** Writes (or rewrites) the letter for one tone, against the linked job. Null when it did not land. */
+  const write = useCallback(
+    async (job: CoverJob, nextTone: CoverTone): Promise<CoverLetterContent | null> => {
+      if (!resume) return null;
+      const written = await run({
+        resumeId: resume.resumeId,
+        company: job.company,
+        role: job.role,
+        jdText: job.description ?? null,
+        // The picker's own id, passed through the way `useScanResume` passes
+        // it: the service treats it as an opaque key on the requirement cache,
+        // so a letter and a scan for the same posting share the extraction.
+        jobId: job.id ?? null,
+        tone: nextTone,
+      });
+      if (written) setDraftSeq((seq) => seq + 1);
+      return written;
+    },
+    [resume, run],
+  );
 
   const composeLetterText = () => {
     const lines: string[] = [];
-    if (letterhead !== "off") {
-      lines.push(RESUME.name);
-      if (letterhead === "full") lines.push(`${RESUME.email} · ${RESUME.portfolio} · ${RESUME.location}`);
+    if (letterhead !== "off" && profile) {
+      lines.push(profile.fullName);
+      if (letterhead === "full") lines.push([profile.email, profile.portfolio, profile.location].filter(Boolean).join(" · "));
       lines.push("");
     }
-    // What's actually on the page — the editor owns the body once mounted.
+    // Same reason as `liveWordCount`: an untouched letter has no editor text
+    // yet, and copying an empty string would be the worst possible answer to
+    // pressing Copy on a letter that is visibly on the page.
     const body = letterText.trim()
       ? letterText
-      : [activeLetter.greeting, "", ...toneLetter.paragraphs.flatMap((para) => [para, ""]), activeLetter.signOff].join("\n");
+      : letter && !isBlankDraft
+        ? [letter.greeting, "", ...letter.paragraphs.flatMap((para) => [para, ""]), letter.signOff].join("\n")
+        : "";
     lines.push(body);
     return lines.join("\n");
   };
 
   const handleCopy = async () => {
-    const text = composeLetterText();
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(composeLetterText());
     } catch {
       // Clipboard permission may be unavailable in some environments —
       // still show the confirmed state since there's nothing else to do.
@@ -321,25 +283,60 @@ const CoverClient: FC = () => {
   const handlePickJob = async () => {
     const result = await pickJob(COVER_JOB_SPEC);
     if (result.status !== "picked") return;
+    // A new job's letters are not the old job's letters, so the kept drafts go.
+    reset();
+    setLetterText("");
+    setDraftSeq((seq) => seq + 1);
     setLinkedJob(result.job);
     setIsBlankDraft(false);
+    await write(result.job, tone);
   };
 
-  const handleTailor = () => {
-    setTailoring(true);
-    window.setTimeout(() => {
-      setTailoring(false);
-      setJustTailored(true);
-      window.setTimeout(() => setJustTailored(false), 2200);
-    }, 900);
+  /**
+   * Switching tone shows the letter already written for it, or writes one.
+   *
+   * The tone moves either way: a failed write leaves the previous letter on
+   * screen, which is a tone that did not change rather than a page that went
+   * blank, so the control has to go back with it.
+   */
+  const handleToneChange = async (next: CoverTone) => {
+    const previous = tone;
+    setTone(next);
+    if (isBlankDraft || !linkedJob) return;
+    // Already written, so this is free and instant.
+    if (show(next)) {
+      setDraftSeq((seq) => seq + 1);
+      return;
+    }
+
+    if (await write(linkedJob, next)) return;
+    // Nothing was written and the previous letter is still on the page, so the
+    // control goes back to the tone that letter actually is. Leaving it on the
+    // tone that failed would label the letter as something it is not.
+    setTone(previous);
+  };
+
+  /** Rewrites the current tone from scratch — a genuinely different letter, and another credit. */
+  const handleRewrite = async () => {
+    if (!linkedJob) return;
+    await write(linkedJob, tone);
   };
 
   const handleAiSubmit = () => {
     const prompt = aiPrompt.trim();
     if (!prompt) return;
-    // No model behind this — acknowledge the ask honestly instead of faking a rewrite.
-    setAiStatus(`Noted: "${prompt}". AI rewriting isn't wired up in this build — edit the letter directly above.`);
+    // There is no free-form rewrite route behind this — the service writes a
+    // letter for a tone, not to an instruction. Acknowledge the ask honestly
+    // rather than faking one.
+    setAiStatus(`Noted: "${prompt}". Free-form rewriting isn't available yet — pick a tone above, or edit the letter directly.`);
     setAiPrompt("");
+  };
+
+  const startBlank = () => {
+    reset();
+    setLetterText("");
+    setDraftSeq((seq) => seq + 1);
+    setIsBlankDraft(true);
   };
 
   return (
@@ -356,7 +353,7 @@ const CoverClient: FC = () => {
           </h1>
           {started && (
             <Pill variant="neutral" className="flex-none">
-              {activeLetter.draftLabel}
+              {draftLabel}
             </Pill>
           )}
         </div>
@@ -402,28 +399,45 @@ const CoverClient: FC = () => {
               <button
                 type="button"
                 onClick={handlePickJob}
-                className="group rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-5 text-left text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#e1f073] hover:shadow-[4px_4px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
+                disabled={!resume}
+                className="group rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-5 text-left text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#e1f073] hover:shadow-[4px_4px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:active:translate-x-0 disabled:active:translate-y-0">
                 <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
                   <Link2 className="h-4 w-4 text-[#e1f073]" />
                 </span>
                 <span className="mt-3 block text-sm font-bold">Create from a job</span>
                 <span className="mt-1 block text-xs leading-relaxed text-white/55">
-                  Pick a Remote Worldwide listing or paste any posting — we draft it tailored.
+                  Pick a Remote Worldwide listing or paste any posting — we write it from your resume. {COVER_CREDITS} credit.
                 </span>
               </button>
               <button
                 type="button"
-                onClick={() => setIsBlankDraft(true)}
+                onClick={startBlank}
                 className="group rounded-2xl border-[1.5px] border-black/15 bg-white p-5 text-left cursor-pointer transition-[transform,box-shadow,border-color] duration-100 ease-out hover:border-[#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
                 <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
                   <FileSignature className="h-4 w-4 text-primary" />
                 </span>
                 <span className="mt-3 block text-sm font-bold text-primary">Write your own</span>
                 <span className="mt-1 block text-xs leading-relaxed text-black/50">
-                  A blank page, no job attached. You can link one later.
+                  A blank page, no job attached. Free, and nothing is generated.
                 </span>
               </button>
             </div>
+
+            {/* A letter is written FROM a resume, so there is nothing to write
+                from until one has been imported. Said here rather than on the
+                other side of a click that could only fail. */}
+            {!resume && !resumesPending && (
+              <div className="mt-5 flex max-w-[560px] items-start gap-2.5 rounded-xl border border-black/12 bg-white px-4 py-3 text-left">
+                <FileWarning className="mt-0.5 h-4 w-4 flex-none text-black/40" />
+                <p className="text-xs leading-relaxed text-black/60">
+                  We write the letter from a resume you&apos;ve imported — there isn&apos;t one yet.{" "}
+                  <Link href="/dashboard/resume" className="font-bold text-primary underline decoration-2 underline-offset-2">
+                    Import a resume
+                  </Link>{" "}
+                  and come back. You can still write your own in the meantime.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -440,36 +454,65 @@ const CoverClient: FC = () => {
                       <Pill variant="active">
                         {linkedJob.company} · {linkedJob.role}
                       </Pill>
-                      {justTailored && <span className="text-xs font-semibold text-[#6c7a1e]">Retailored ✓</span>}
                     </>
                   ) : (
-                    <span className="text-sm text-black/50">Not linked to a job — pick one to tailor this letter.</span>
+                    <span className="text-sm text-black/50">Not linked to a job — pick one to have a letter written.</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-none">
                   {!isBlankDraft && (
-                    <StickerButton
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setIsBlankDraft(true);
-                        setLetterText("");
-                      }}>
+                    <StickerButton variant="outline" size="sm" onClick={startBlank}>
                       <FileSignature className="h-3.5 w-3.5" />
                       Write from scratch
                     </StickerButton>
                   )}
-                  <StickerButton variant="outline" size="sm" onClick={handlePickJob}>
+                  <StickerButton variant="outline" size="sm" onClick={handlePickJob} disabled={writing || !resume}>
                     <Link2 className="h-3.5 w-3.5" />
                     {linkedJob && !isBlankDraft ? "Change job" : "Pick a job"}
                   </StickerButton>
-                  <StickerButton variant="primary" size="sm" onClick={handleTailor} disabled={tailoring || !linkedJob || isBlankDraft}>
-                    <RefreshCw className={cn("h-3.5 w-3.5", tailoring && "animate-spin")} />
-                    {tailoring ? "Tailoring…" : "Tailor letter"}
+                  <StickerButton variant="primary" size="sm" onClick={handleRewrite} disabled={writing || !linkedJob || isBlankDraft}>
+                    <RefreshCw className={cn("h-3.5 w-3.5", writing && "animate-spin")} />
+                    {writing ? "Writing…" : "Rewrite"}
                   </StickerButton>
                 </div>
               </div>
             </DashCard>
+
+            {/* A refusal, where the letter would have been. Shown inline rather
+                than as a toast: the thing that failed is on this card, and the
+                way forward differs by reason. */}
+            {failure && (
+              <DashCard className="flex items-start gap-3 border-2 border-[#222325] p-4">
+                <FileWarning className="mt-0.5 h-4 w-4 flex-none text-black/50" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-primary leading-relaxed">{failure.message}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {failure.kind === "credits" && (
+                      <Link
+                        href={COVER_BILLING_HREF}
+                        className="text-xs font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
+                        Top up credits
+                      </Link>
+                    )}
+                    {failure.kind === "resume" && (
+                      <Link
+                        href="/dashboard/resume"
+                        className="text-xs font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
+                        Import a resume
+                      </Link>
+                    )}
+                    {failure.retryable && failure.kind !== "credits" && (
+                      <button
+                        type="button"
+                        onClick={handleRewrite}
+                        className="cursor-pointer text-xs font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
+                        Try again
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </DashCard>
+            )}
 
             {/* Disclosure toggle + tone chips */}
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -480,38 +523,67 @@ const CoverClient: FC = () => {
                   type="button"
                   onClick={() => setBuiltOpen((v) => !v)}
                   className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline cursor-pointer">
-                  Built from your profile + this job
+                  What this was written from
                   <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", builtOpen && "rotate-180")} />
                 </button>
               )}
 
-              <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={setTone} />
+              {/* Tone only means something for a generated letter: on a blank
+                  draft there is nothing to rewrite, so the control is not shown
+                  rather than shown and inert. */}
+              {!isBlankDraft && (
+                <div className="flex items-center gap-2">
+                  {isUnwritten(tone) && (
+                    <Pill variant="outline-dashed" className="flex-none">
+                      {COVER_CREDITS} credit per tone
+                    </Pill>
+                  )}
+                  <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={(next) => void handleToneChange(next as CoverTone)} />
+                </div>
+              )}
             </div>
 
-            {/* Expandable disclosure panel */}
+            {/* Expandable disclosure panel — only facts, and only ones this
+                screen can stand behind. */}
             <div
               className={cn(
                 "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
                 builtOpen && !isBlankDraft ? "max-h-[1400px] opacity-100" : "max-h-0 opacity-0",
               )}>
-              <DashCard className="p-6 flex flex-col gap-6">
-                <div>
-                  <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-3">
-                    Pulled from your profile, matched to this JD
-                  </p>
-                  <div className="flex flex-col divide-y divide-black/8">
-                    {PROFILE_JD_PULLS.map((pull) => (
-                      <div
-                        key={pull.id}
-                        className="grid grid-cols-1 sm:grid-cols-[120px_1fr_1fr] gap-x-4 gap-y-1 py-3 first:pt-0 last:pb-0">
-                        <p className="text-xs font-bold text-black/40 sm:pt-0.5">{pull.label}</p>
-                        <p className="text-sm text-primary">{pull.profile}</p>
-                        <p className="text-sm text-black/50">{pull.jd}</p>
-                      </div>
-                    ))}
+              {/* Rendered only for a real letter. A collapsed panel is still in
+                  the document — a screen reader reads it, and a find-in-page
+                  finds it — so a blank draft must not carry a description of a
+                  letter that was never written. */}
+              {!isBlankDraft && (
+              <DashCard className="p-6">
+                <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-3">What this was written from</p>
+                <div className="flex flex-col divide-y divide-black/8">
+                  <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 first:pt-0">
+                    <p className="text-xs font-bold text-black/40 sm:pt-0.5">Your resume</p>
+                    <p className="text-sm text-primary">{resume?.fileName ?? "—"}</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3">
+                    <p className="text-xs font-bold text-black/40 sm:pt-0.5">The posting</p>
+                    <p className="text-sm text-primary">
+                      {linkedJob?.description
+                        ? `${linkedJob.company} — ${linkedJob.role}`
+                        : `${linkedJob?.company ?? "—"} — no description, so the letter is written from your resume alone`}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 last:pb-0">
+                    <p className="text-xs font-bold text-black/40 sm:pt-0.5">Tone</p>
+                    <p className="text-sm text-primary">
+                      {TONE_OPTIONS.find((option) => option.id === tone)?.label} — {paragraphTarget} paragraph
+                      {paragraphTarget === 1 ? "" : "s"}
+                    </p>
                   </div>
                 </div>
+                <p className="mt-4 text-xs leading-relaxed text-black/45">
+                  Every employer, date and number in the letter comes from that resume. If something reads wrong, it is in the resume — fix it
+                  there and rewrite.
+                </p>
               </DashCard>
+              )}
             </div>
 
             {/* The letter itself. Formatting lives in the editor's own toolbar,
@@ -536,27 +608,17 @@ const CoverClient: FC = () => {
                 </div>
               }
               pageHeader={
-                letterhead !== "off" ? (
+                letterhead !== "off" && profile ? (
                   <div className="border-b border-black/10 px-8 pb-5 pt-7">
-                    <p className={cn("text-lg font-bold text-primary", FONT_CLASS[font])}>{RESUME.name}</p>
+                    <p className={cn("text-lg font-bold text-primary", FONT_CLASS[font])}>{profile.fullName}</p>
                     {letterhead === "full" && (
-                      <p className="mt-0.5 text-xs text-black/45">
-                        {RESUME.email} · {RESUME.portfolio} · {RESUME.location}
-                      </p>
+                      <p className="mt-0.5 text-xs text-black/45">{[profile.email, profile.portfolio, profile.location].filter(Boolean).join(" · ")}</p>
                     )}
                   </div>
                 ) : undefined
               }
               surfaceClassName={THEME_CANVAS_CLASS[theme]}
-              contentClassName={cn(
-                FONT_CLASS[font],
-                spacingCfg.text,
-                "text-primary [&>p]:mb-4 last:[&>p]:mb-0",
-                // Inline markers, Grammarly-style: highlight for the strongest
-                // line, green underline for a suggested change.
-                "[&_mark]:bg-[#e1f073]/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_mark]:cursor-help",
-                "[&_.sugg]:underline [&_.sugg]:decoration-[#3fa66a] [&_.sugg]:decoration-2 [&_.sugg]:underline-offset-4 [&_.sugg]:cursor-help",
-              )}
+              contentClassName={cn(FONT_CLASS[font], spacingCfg.text, "text-primary [&>p]:mb-4 last:[&>p]:mb-0")}
             />
 
             {/* Footer: word count, details, AI rewrite */}
@@ -583,9 +645,13 @@ const CoverClient: FC = () => {
                     </>
                   ) : (
                     <>
-                      <Pill variant="neutral">≈55 sec read</Pill>
-                      <Pill variant="neutral">92% match to {COVER_LETTER.company}&apos;s JD keywords</Pill>
-                      <Pill variant="neutral">Strongest line: paragraph 2, the 31% stat</Pill>
+                      {/* Reading pace at ~200 words a minute — arithmetic on
+                          the text on screen, not a claim about the letter. */}
+                      <Pill variant="neutral">≈{Math.max(5, Math.round((liveWordCount / 200) * 60))} sec read</Pill>
+                      <Pill variant="neutral">
+                        {paragraphTarget} paragraph{paragraphTarget === 1 ? "" : "s"} at this tone
+                      </Pill>
+                      {resume && <Pill variant="neutral">From {resume.fileName}</Pill>}
                     </>
                   )}
                 </div>
@@ -605,9 +671,6 @@ const CoverClient: FC = () => {
                       placeholder="Make it warmer, shorter, more specific…"
                       className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/35 outline-none"
                     />
-                    <Pill variant="outline-dashed" className="flex-none">
-                      1 credit
-                    </Pill>
                   </div>
                   <StickerButton variant="primary" size="md" onClick={handleAiSubmit} disabled={!aiPrompt.trim()}>
                     <Send className="h-4 w-4" />
@@ -631,7 +694,7 @@ const CoverClient: FC = () => {
         )}
       </main>
 
-      <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="cover letter" fileName="Amara-Okafor-Cover-Letter" />
+      <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="cover letter" fileName={downloadFileName} />
     </div>
   );
 };

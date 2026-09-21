@@ -26,7 +26,6 @@ import { initialsOf } from "@/app/components/dashboard/ui/Avatar";
 import PlanPanel from "@/app/components/dashboard/plan/PlanPanel";
 import ProposalCard from "@/app/components/dashboard/coach/ProposalCard";
 import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
-import MicWaveform from "@/app/components/dashboard/voice/MicWaveform";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import { apiMessage } from "@/app/lib/api/core";
 import { COACH_BILLING_HREF, coachCardHref, describeReplyDone, describeUsage, fresherUsage, type CoachFailure } from "@/app/lib/coach/api";
@@ -262,7 +261,7 @@ const CoachClient: FC = () => {
     setDraft((prev) => (prev ? `${prev.trimEnd()} ${text.trim()}` : text.trim()).slice(0, COACH_LIMITS.messageMax));
   }, []);
   // The coach doesn't talk back out loud — this is dictation only.
-  const { micStatus, dictationSupported, interim, startDictation, stopDictation, onLevel } = useVoiceSession({
+  const { micStatus, dictationSupported, interim, startDictation, stopDictation } = useVoiceSession({
     onTranscript: handleTranscript,
     voiceEnabled: false,
   });
@@ -524,21 +523,6 @@ const CoachClient: FC = () => {
                     "flex-1 flex items-center gap-2 h-11 rounded-lg border bg-[#f6f6f6] pl-4 pr-2 transition-colors",
                     listening ? "border-[#222325]" : "border-black/12 focus-within:border-black/30",
                   )}>
-                  {listening ? (
-                    // While dictating the field shows the voice itself — the
-                    // words land in the input the moment they're recognised.
-                    <MicWaveform
-                      onLevel={onLevel}
-                      active
-                      bars={18}
-                      barWidth={2}
-                      gap={2}
-                      height="h-5"
-                      activeClassName="bg-[#222325]"
-                      idleClassName="bg-black/20"
-                      className="flex-none w-[92px]"
-                    />
-                  ) : null}
                   <input
                     type="text"
                     value={draft}

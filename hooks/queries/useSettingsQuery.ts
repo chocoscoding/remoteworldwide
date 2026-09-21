@@ -47,3 +47,24 @@ export function prefetchSettings(queryClient: QueryClient, load: () => Promise<S
     staleTime: STALE_TIME.settings,
   });
 }
+
+/**
+ * The same settings, for a screen the layout did not prefetch them for.
+ *
+ * Same key as `useSettingsQuery`, so the two share one cache entry and one
+ * refetch — this is a second reader, not a second copy. It exists because a
+ * screen that needs the user's NAME on a page it prints (the cover letter's
+ * letterhead) should not be plumbing a server prefetch through a route it
+ * otherwise renders entirely client-side, and must certainly not be printing
+ * the mock resume's name instead.
+ *
+ * `settings` is in `PERSISTED_DOMAINS`, so this is usually served warm from
+ * disk and the letterhead does not flash.
+ */
+export function useProfileSettings() {
+  return useQuery({
+    queryKey: qk.settings.me(),
+    queryFn: ({ signal }) => fetchSettings(signal),
+    staleTime: STALE_TIME.settings,
+  });
+}

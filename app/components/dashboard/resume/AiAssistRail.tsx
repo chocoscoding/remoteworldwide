@@ -2,37 +2,66 @@
 
 // The match-score / suggestion-cards / ask-for-rewrite right rail, shown on
 // the Overview, Content and AI Tools tabs (Customize gets the settings rail
-// instead — see ResumeScreenBody). Unchanged in spirit from the old screen;
-// only the data source moved from a single shared `docContent`/`currentRole`
-// to explicit props off the active `ResumeDocument`.
+// instead — see ResumeScreenBody).
+//
+// ── The score is a real scan ───────────────────────────────────────────────
+// "General score" and "Against a job" run the same scorer `/dashboard/ats`
+// does, on the document as it stands, and cost what a scan costs — which the
+// card says on the buttons rather than after. Everything the card shows is
+// read out of that one report: the number, its band, the keywords the posting
+// wanted. Nothing adds to it. The editor used to add 13 after a tailor and 4
+// per keyword chip, which is the difference between a score and a claim.
+//
+// A check describes the text it scored. Once the resume reads differently —
+// any edit, any AI tool — the card greys the number and says so, and offers
+// the same check again, rather than presenting an old score as this resume's.
 
 import type { FC } from "react";
-import { Check, Plus, Send, Sparkles, X } from "lucide-react";
+import Link from "next/link";
+import { Check, Loader2, Send, Sparkles, TriangleAlert, X } from "lucide-react";
 import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { ATS_FIX_ITEMS, ATS_KEYWORDS } from "@/app/lib/dashboard/mock-data";
-import type { ResumeScan } from "./resume-document";
+import { ATS_BILLING_HREF, SCAN_CREDITS, keywordLabel, missingGaps, scanTier, type ScanFailure } from "@/app/lib/ats/api";
+import { ATS_FIX_ITEMS } from "@/app/lib/dashboard/mock-data";
+import type { CheckStatus } from "@/hooks/mutations/useCheckResume";
+import type { ResumeCheck } from "./resume-document";
 
 const SUGGESTION_ITEMS = ATS_FIX_ITEMS.filter((f) => f.id === "fix-keyword" || f.id === "fix-skills");
+
+/** More chips than this is a list, not a glance. The ATS screen has the whole report. */
+const MAX_GAP_CHIPS = 6;
+
+const TIER_CLASS: Record<ReturnType<typeof scanTier>["tone"], string> = {
+  positive: "text-[#6c7a1e]",
+  neutral: "text-primary",
+  urgent: "text-[#b23c26]",
+};
+
+const PHASE_COPY: Partial<Record<CheckStatus, string>> = {
+  preparing: "Reading your resume…",
+  scoring: "Scoring…",
+};
 
 export interface AiAssistRailProps {
   isBlank: boolean;
   /** Whether the standing job check found anything to change — the fix cards are its findings, never a default. */
   hasSuggestions: boolean;
-  displayScore: number;
-  /** The general baseline a job check moved from — null for a general check. */
-  before: number | null;
-  /** The standing ATS check; null shows the two ways to run one instead. */
-  scan: ResumeScan | null;
-  onRemoveScan: () => void;
-  onScanGeneral: () => void;
-  onScanAgainstJob: () => void;
-  keywordsAdded: Set<string>;
-  onToggleKeyword: (id: string) => void;
+  /** The standing check; null shows the two ways to run one instead. */
+  check: ResumeCheck | null;
+  /** The resume has been edited since `check` ran. */
+  stale: boolean;
+  checkStatus: CheckStatus;
+  checkFailure: ScanFailure | null;
+  onRemoveCheck: () => void;
+  onCheckGeneral: () => void;
+  onCheckAgainstJob: () => void;
+  /** Runs the standing check again — same posting, current text. */
+  onRecheck: () => void;
+  onDismissCheckFailure: () => void;
   appliedSuggestions: Set<string>;
   expandedSuggestions: Set<string>;
   onApplySuggestion: (id: string) => void;
@@ -44,17 +73,29 @@ export interface AiAssistRailProps {
   onDismissAskStatus: () => void;
 }
 
+/** A text button in the card's house style, carrying its price when it has one. */
+const CheckButton: FC<{ onClick: () => void; disabled?: boolean; children: string }> = ({ onClick, disabled, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2 transition-colors hover:decoration-[#6c7a1e] disabled:cursor-default disabled:opacity-40">
+    {children}
+  </button>
+);
+
 const AiAssistRail: FC<AiAssistRailProps> = ({
   isBlank,
   hasSuggestions,
-  displayScore,
-  before,
-  scan,
-  onRemoveScan,
-  onScanGeneral,
-  onScanAgainstJob,
-  keywordsAdded,
-  onToggleKeyword,
+  check,
+  stale,
+  checkStatus,
+  checkFailure,
+  onRemoveCheck,
+  onCheckGeneral,
+  onCheckAgainstJob,
+  onRecheck,
+  onDismissCheckFailure,
   appliedSuggestions,
   expandedSuggestions,
   onApplySuggestion,
@@ -65,7 +106,10 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   askStatus,
   onDismissAskStatus,
 }) => {
-  const missingKeywords = ATS_KEYWORDS.filter((k) => !k.present).slice(0, 2);
+  const checking = checkStatus === "preparing" || checkStatus === "scoring";
+  const report = check?.report ?? null;
+  const tier = report ? scanTier(report.score) : null;
+  const gaps = report ? missingGaps(report).slice(0, MAX_GAP_CHIPS) : [];
 
   if (isBlank) {
     return (
@@ -97,57 +141,87 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
       <DashCard className="border-2 border-[#222325] p-4">
         <div className="flex items-center justify-between mb-1">
           <p className="text-[13px] font-bold text-primary">ATS score</p>
-          {scan && (
+          {check && !checking && (
             <button
               type="button"
-              onClick={onRemoveScan}
+              onClick={onRemoveCheck}
               className="cursor-pointer text-[11px] font-bold text-black/45 underline decoration-2 underline-offset-2 transition-colors hover:text-[#b23c26]">
               Remove
             </button>
           )}
         </div>
 
-        {scan ? (
+        {report && check && tier ? (
           <>
             <div className="flex items-baseline gap-2 mt-3 mb-2.5">
-              <span className="text-[32px] font-bold text-primary leading-none">{displayScore}</span>
+              <span className={cn("text-[32px] font-bold leading-none tabular-nums", stale ? "text-black/30" : "text-primary")}>{report.score}</span>
               <span className="text-sm text-black/50">/ 100</span>
+              {!stale && <span className={cn("ml-auto text-xs font-bold", TIER_CLASS[tier.tone])}>{tier.label}</span>}
             </div>
-            <ProgressBar value={displayScore} />
-            <p className="mt-2 text-xs font-semibold text-primary">
-              {scan.kind === "job" ? `Against ${scan.job}` : "General score — how it reads for your niche"}
-            </p>
-            <p className="mt-0.5 text-xs text-black/50">
-              {scan.kind === "job" && before !== null && (
-                <span className={cn("font-semibold", displayScore >= before ? "text-[#6c7a1e]" : "text-[#b23c26]")}>
-                  {displayScore >= before ? "up from" : "down from"} {before} general ·{" "}
-                </span>
-              )}
-              scanned <TimeAgo datetime={scan.at} opts={{ minInterval: 10 }} />
-            </p>
+            <ProgressBar value={report.score} />
+            <p className="mt-2 text-xs font-semibold text-primary">{check.job ? `Against ${check.job}` : "General score — how it reads for your niche"}</p>
+
+            {stale ? (
+              <div className="mt-1.5 rounded-lg bg-[#f6f6f6] px-2.5 py-2 text-xs leading-relaxed text-black/60">
+                You&apos;ve edited this resume since it was scanned, so this is the score of an earlier draft.{" "}
+                {checking ? (
+                  <span className="inline-flex items-center gap-1 font-semibold text-primary">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {PHASE_COPY[checkStatus]}
+                  </span>
+                ) : (
+                  <CheckButton onClick={onRecheck}>{`Check again · ${SCAN_CREDITS} credit`}</CheckButton>
+                )}
+              </div>
+            ) : (
+              <p className="mt-0.5 text-xs text-black/50">
+                scanned <TimeAgo datetime={check.at} opts={{ minInterval: 10 }} />
+              </p>
+            )}
+
+            {/* Scored on the reduced path when a provider was down. Still a
+                real score — the service says which part it could not run. */}
+            {report.degraded && (
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-black/50">
+                <TriangleAlert className="mt-px h-3 w-3 flex-none" />
+                {report.degradedReason ?? "Scored on a reduced path — part of the scorer was unavailable."}
+              </p>
+            )}
 
             <div className="mt-4 pt-4 border-t border-black/15">
               <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/50 mb-2">Missing keywords</p>
-              <div className="flex flex-wrap gap-1.5">
-                {missingKeywords.map((kw) => {
-                  const added = keywordsAdded.has(kw.id);
-                  return (
-                    <button
-                      key={kw.id}
-                      type="button"
-                      onClick={() => onToggleKeyword(kw.id)}
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-colors",
-                        added ? "bg-secondary text-primary" : "border border-dashed border-black/25 text-black/50 hover:border-black/45"
-                      )}>
-                      {added ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                      {kw.label}
-                    </button>
-                  );
-                })}
-              </div>
+              {!check.job ? (
+                // A general check has no posting, so there is nothing to be
+                // missing from — said, rather than shown as an empty list.
+                <p className="text-xs leading-relaxed text-black/55">Check it against a job to see which keywords that posting wants.</p>
+              ) : gaps.length === 0 ? (
+                <p className="text-xs leading-relaxed text-black/55">None — this resume covers what the posting asked for.</p>
+              ) : (
+                <>
+                  {/* Read-only: what the scan found missing. Adding them is the
+                      AI rail's job — it works each one into your summary in
+                      your own voice, where a chip could only append a word. */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {gaps.map((gap) => (
+                      <span
+                        key={gap.id}
+                        className="inline-flex items-center rounded-full border border-dashed border-black/25 px-2.5 py-1 text-xs font-semibold text-black/55">
+                        {keywordLabel(gap.label)}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] leading-snug text-black/45">
+                    Work them in with <span className="font-semibold text-black/60">Add missing keywords</span> in AI Tools.
+                  </p>
+                </>
+              )}
             </div>
           </>
+        ) : checking ? (
+          <div className="flex items-center gap-2 mt-3 mb-1 text-sm text-black/55">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            {PHASE_COPY[checkStatus]}
+          </div>
         ) : (
           <>
             <div className="flex items-baseline gap-2 mt-3 mb-2.5">
@@ -156,21 +230,32 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
             </div>
             <p className="text-xs leading-relaxed text-black/55">No check standing. See how this resume reads to applicant tracking systems:</p>
             <div className="mt-2.5 flex items-center gap-3 text-xs">
-              <button
-                type="button"
-                onClick={onScanGeneral}
-                className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2 transition-colors hover:decoration-[#6c7a1e]">
-                General score
-              </button>
+              <CheckButton onClick={onCheckGeneral}>General score</CheckButton>
               <span className="text-black/40">or</span>
-              <button
-                type="button"
-                onClick={onScanAgainstJob}
-                className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2 transition-colors hover:decoration-[#6c7a1e]">
-                Against a job
-              </button>
+              <CheckButton onClick={onCheckAgainstJob}>Against a job</CheckButton>
+              <Pill variant="outline-dashed" className="ml-auto flex-none">
+                {SCAN_CREDITS} credit
+              </Pill>
             </div>
           </>
+        )}
+
+        {/* A refusal, where the score would have been. Inline rather than a
+            toast: the way forward depends on why, and it belongs to this card. */}
+        {checkFailure && !checking && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-black/15 bg-[#fbfbf7] px-2.5 py-2">
+            <p className="flex-1 text-xs leading-relaxed text-primary">
+              {checkFailure.message}{" "}
+              {checkFailure.kind === "credits" && (
+                <Link href={ATS_BILLING_HREF} className="font-bold underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
+                  Top up credits
+                </Link>
+              )}
+            </p>
+            <button type="button" onClick={onDismissCheckFailure} className="flex-none cursor-pointer text-black/35 hover:text-black/60" aria-label="Dismiss">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         )}
       </DashCard>
 
@@ -242,9 +327,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
               className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/45 outline-none"
             />
           </div>
-          <Pill variant="outline-dashed" className="flex-none">
-            1 credit
-          </Pill>
         </div>
         <button
           type="button"

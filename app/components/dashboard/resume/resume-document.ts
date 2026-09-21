@@ -10,23 +10,53 @@
 //
 // Documents are real now: they come from the AI service's library and are
 // autosaved back to it (`useResumeAutosave`). What is NOT saved is the ATS
-// state below — `score`, `before`, `scan`, `suggestions`. The scorer behind it
-// is still a stub, and a made-up number should not outlive the session that
-// made it up; those fields start empty on every load until a real scan owns them.
+// state below — `check` and `suggestions`. The check is a real scan now (see
+// `ResumeCheck`), but it is a record of one moment of one document and the
+// library has nowhere to keep it; it starts empty on every load, and the card
+// offers the two ways to run one. The scan itself is not lost — the AI service
+// stores it, and re-checking an unedited document is served from its cache.
 
-import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
+import type { ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+import { resumeContentToText } from "@/app/lib/resume/api";
 import { hydrateDesign, hydrateSections } from "@/app/lib/dashboard/resume/hydrate-design";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { StoredResumeDocument } from "@/app/lib/resume/api";
 
 /**
- * The ATS check currently standing on a document. `null` means none — the
- * card offers the two ways to run one instead of a number. A job check
- * carries the job it was scored against, which is what the card names (never
- * the document's own label).
+ * The ATS check standing on a document: one real scan, from the AI service.
+ *
+ * Every number the card shows comes out of `report`. Nothing on this screen
+ * adds to it, and in particular nothing moves it because a tool ran — the
+ * editor used to add 13 after a tailor and 4 per keyword chip, which reported
+ * a measurement nobody had taken. A check describes the text it scored and
+ * only that text, which is why it carries `text`: the moment the document
+ * reads differently, the card says the check is out of date and offers to run
+ * it again, rather than quietly presenting an old score as the current one.
  */
-export type ResumeScan = { kind: "general"; at: Date } | { kind: "job"; at: Date; job: string };
+/** What a job check needs from a picked posting. */
+export interface CheckPosting {
+  id?: string;
+  company: string;
+  role: string;
+  description: string;
+}
+
+export interface ResumeCheck {
+  report: ScanReport;
+  /** When the score landed — drives the "scanned X ago" stamp. */
+  at: Date;
+  /** The posting it was scored against, as the card names it ("Linear — Senior Designer"). Null for a general check. */
+  job: string | null;
+  /**
+   * The posting itself, held so a check the resume has outgrown can be run
+   * again against the same job without picking it a second time. In memory
+   * only, like the rest of the check.
+   */
+  posting: CheckPosting | null;
+  /** Exactly the text that was scored (`resumeContentToText`). Compared against the document to tell a stale check. */
+  text: string;
+}
 
 /**
  * What a job check proposed changing. Only a check that actually read THIS
@@ -48,15 +78,24 @@ export interface ResumeDocument {
   sections: SectionConfig[];
   /** When the library last took a save of this document. */
   updatedAt: Date;
-  /** The ATS score the card shows while `scan` stands, 0-100. */
-  score: number;
-  /** The general baseline a job check moved from — null for a general check. */
-  before: number | null;
   /** The standing ATS check; null once removed or never run. */
-  scan: ResumeScan | null;
+  check: ResumeCheck | null;
   /** What the standing job check proposed — see `ResumeSuggestions`. */
   suggestions?: ResumeSuggestions;
 }
+
+/**
+ * True when the document no longer reads the way it did when its check ran —
+ * an edit by hand, a tool from the AI rail, anything. The check stays on the
+ * card (it is still what that text scored) but stops being presented as this
+ * resume's score.
+ *
+ * Compared on the rendered TEXT rather than the content object, because the
+ * text is what was scored: a change the text does not show (an entry id, a
+ * link label) cannot have moved the score and does not make the check stale.
+ */
+export const isStaleCheck = (doc: Pick<ResumeDocument, "check" | "content">): boolean =>
+  doc.check !== null && doc.check.text !== resumeContentToText(doc.content);
 
 /**
  * Whether a resume has nothing on it yet for a check or a suggestion to read.
@@ -69,9 +108,6 @@ export const isBlankContent = (content: ResumeContent): boolean =>
   content.skills.length === 0 &&
   // A role just added and not yet typed into is a row in the form, not content.
   content.experience.every((entry) => !entry.role.trim() && !entry.company.trim() && entry.bullets.every((bullet) => !bullet.trim()));
-
-/** The same general number the ATS screen reports for an id — the two surfaces agree. */
-export const generalScoreFor = (id: string) => scoreApplication(id, undefined).score;
 
 /**
  * Starter content for a brand-new, not-yet-written resume — same shell as
@@ -119,8 +155,8 @@ export const importLabel = (fileName: string): string =>
 
 /**
  * A stored document -> the one the editor runs on. The saved look is a patch
- * (see `hydrate-design.ts`); everything about ATS starts empty — the card opens
- * on the two ways to run a check.
+ * (see `hydrate-design.ts`); the ATS check starts empty — the card opens on
+ * the two ways to run one.
  */
 export function fromStored(stored: StoredResumeDocument): ResumeDocument {
   return {
@@ -130,8 +166,6 @@ export function fromStored(stored: StoredResumeDocument): ResumeDocument {
     design: hydrateDesign(stored.template, stored.design),
     sections: hydrateSections(stored.template, stored.sections),
     updatedAt: stored.updatedAt,
-    score: 0,
-    before: null,
-    scan: null,
+    check: null,
   };
 }

@@ -88,6 +88,121 @@ export async function importResume(file: File): Promise<ImportedResume> {
 }
 
 // ---------------------------------------------------------------------------
+// A resume that was never a file — the one open in the editor
+// ---------------------------------------------------------------------------
+
+/**
+ * The editor's content as the plain text a scan can read.
+ *
+ * A scan names an INGESTED resume — parsed, chunked, embedded — and the editor
+ * holds a `ResumeContent` object, not a file, so there is nothing for
+ * `/api/ats/resume-for-doc` to fetch. This is the other half of the bridge:
+ * render the document the way a CV is laid out and hand the text to the same
+ * importer an upload goes through.
+ *
+ * The layout is not a style choice. It mirrors the fixture the AI service's
+ * chunker is tested against (`tests/helpers/fixtures.ts`): upper-case section
+ * headings it recognises, "Role — Company" on one line with the dates on the
+ * next so every bullet below inherits its role, and skills on one comma line
+ * so they are not split word by word. A layout the chunker has never seen
+ * would still import, and would then score against evidence with no role
+ * attached.
+ *
+ * Deterministic on purpose: the service dedupes on a hash of the normalized
+ * text, so the same document rendered twice lands on the row that already
+ * exists and is not embedded again — which is what makes checking an unedited
+ * resume a second time cheap, and a re-scan of it free.
+ */
+export function resumeContentToText(content: ResumeContent): string {
+  const lines: string[] = [];
+  const push = (...values: Array<string | undefined>) => {
+    for (const value of values) if (value !== undefined) lines.push(value);
+  };
+  const section = (heading: string) => push("", heading);
+  const clean = (value: string | undefined) => (value ?? "").trim();
+
+  // The name as the user wrote it, not upper-cased the way a printed CV often
+  // is: the ingested content is what the cover letter is written from, and a
+  // name round-tripped in capitals comes back as the letter's sign-off.
+  push(clean(content.name), clean(content.title));
+  const contact = [content.location, content.email, content.phone].map(clean).filter(Boolean);
+  if (contact.length > 0) push(contact.join(" · "));
+  const links = content.links.map((link) => clean(link.url)).filter(Boolean);
+  if (links.length > 0) push(links.join(" · "));
+
+  if (clean(content.summary)) {
+    section("SUMMARY");
+    push(clean(content.summary));
+  }
+
+  const experience = content.experience.filter((entry) => clean(entry.role) || clean(entry.company) || entry.bullets.some((b) => clean(b)));
+  if (experience.length > 0) {
+    section("EXPERIENCE");
+    for (const entry of experience) {
+      push("", [clean(entry.role), clean(entry.company)].filter(Boolean).join(" — "));
+      if (clean(entry.dates)) push(clean(entry.dates));
+      for (const bullet of entry.bullets) if (clean(bullet)) push(`- ${clean(bullet)}`);
+    }
+  }
+
+  const education = content.education.filter((entry) => clean(entry.school) || clean(entry.degree));
+  if (education.length > 0) {
+    section("EDUCATION");
+    for (const entry of education) {
+      push([clean(entry.degree), clean(entry.school)].filter(Boolean).join(", "));
+      if (clean(entry.dates)) push(clean(entry.dates));
+      if (clean(entry.detail)) push(clean(entry.detail));
+    }
+  }
+
+  const skills = content.skills.map(clean).filter(Boolean);
+  if (skills.length > 0) {
+    section("SKILLS");
+    push(skills.join(", "));
+  }
+
+  const projects = content.projects.filter((entry) => clean(entry.name));
+  if (projects.length > 0) {
+    section("PROJECTS");
+    for (const entry of projects) push([clean(entry.name), clean(entry.detail)].filter(Boolean).join(" — "));
+  }
+
+  const certifications = content.certifications.filter((entry) => clean(entry.name));
+  if (certifications.length > 0) {
+    section("CERTIFICATIONS");
+    for (const entry of certifications) {
+      const issuer = clean(entry.issuer);
+      push(`${clean(entry.name)}${issuer ? ` (${issuer})` : ""}${clean(entry.year) ? `, ${clean(entry.year)}` : ""}`);
+    }
+  }
+
+  return lines.join("\n").trim();
+}
+
+/** The label an ingested row carries. The service caps it at 120 characters. */
+const MAX_IMPORT_LABEL = 120;
+
+/**
+ * Ingests the editor's content so it can be scored, and answers with its
+ * resume id.
+ *
+ * Every edit is new text and therefore a new ingested row — which is correct,
+ * because a scan is a record of what the resume said when it ran, and a row
+ * that changed under it would make an old score describe a new document. An
+ * unedited document is deduped by the service and costs nothing.
+ *
+ * The row is labelled with the document's own name, so the screens that list
+ * ingested resumes (the cover letter's "written from") name it the way the
+ * user does.
+ */
+export function importResumeContent(content: ResumeContent, label: string): Promise<ImportedResume> {
+  return apiPost<ImportedResume>("/api/ai/resume/imports/text", {
+    text: resumeContentToText(content),
+    label: label.trim().slice(0, MAX_IMPORT_LABEL) || null,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Documents — the library the editor works on
 // ---------------------------------------------------------------------------
 

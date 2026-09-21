@@ -7,7 +7,7 @@ import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { RESUME_ACCEPT } from "@/app/lib/resume/api";
-import type { ResumeDocument } from "./resume-document";
+import { isStaleCheck, type ResumeDocument } from "./resume-document";
 
 export interface ResumeLandingProps {
   /**
@@ -207,10 +207,10 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold text-primary">{d.label}</span>
                         <span className="block truncate text-xs text-black/45">
-                          {d.scan ? (
+                          {d.check ? (
                             <>
-                              {d.scan.kind === "job" ? `against ${d.scan.job}` : "general"} · scanned{" "}
-                              <TimeAgo datetime={d.scan.at} opts={{ minInterval: 10 }} />
+                              {d.check.job ? `against ${d.check.job}` : "general"} ·{" "}
+                              {isStaleCheck(d) ? "edited since it was scanned" : <>scanned <TimeAgo datetime={d.check.at} opts={{ minInterval: 10 }} /></>}
                             </>
                           ) : (
                             <>
@@ -219,10 +219,14 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                           )}
                         </span>
                       </span>
-                      {/* A score only where a check stands — a column of dashes says nothing. */}
-                      {d.scan && !confirming && (
+                      {/* A score only where a check stands — a column of dashes says nothing.
+                          Greyed once the resume has been edited past it: it is still
+                          the score that text got, but no longer this resume's. */}
+                      {d.check && !confirming && (
                         <span className="flex-none text-right">
-                          <span className="block text-base font-bold text-primary tabular-nums">{d.score}</span>
+                          <span className={cn("block text-base font-bold tabular-nums", isStaleCheck(d) ? "text-black/30" : "text-primary")}>
+                            {d.check.report.score}
+                          </span>
                           <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">ATS</span>
                         </span>
                       )}
