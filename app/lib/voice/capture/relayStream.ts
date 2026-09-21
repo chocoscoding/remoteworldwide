@@ -41,7 +41,6 @@ import {
   type LiveSttProvider,
   type StreamClientMessage,
   type StreamErrorCode,
-  type StreamTicketResult,
 } from "@/app/lib/voice/types";
 
 /** Audio held while a socket opens. */
@@ -97,8 +96,9 @@ export interface RelayEnd {
   audioSeconds: number | null;
 }
 
-/** A fresh ticket for the one reconnect: the stream-ticket route's result, a bare ticket, or null when none can be had. */
-export type RelayTicketSource = () => Promise<StreamTicketResult | string | null>;
+/** A fresh ticket for the one reconnect: a ticket with the gateway to use, a bare ticket, or null when none can be had. */
+export type RelayTicket = { gatewayUrl: string | null; streamTicket: string | null } | string | null;
+export type RelayTicketSource = () => Promise<RelayTicket>;
 
 /** The parts of WebSocket the relay uses, so tests can stand in for it. */
 export interface RelaySocket {
@@ -115,7 +115,7 @@ export interface RelaySocket {
 export type RelaySocketCtor = new (url: string, protocols: string[]) => RelaySocket;
 
 export interface RelayOptions {
-  /** `CreatePrepSessionResult.gatewayUrl` (or the lab's). */
+  /** `LabRunCreateResult.gatewayUrl`. */
   gatewayUrl: string;
   /** The single-use ticket for the first socket. */
   ticket: string;
@@ -396,7 +396,7 @@ export function connectRelay(options: RelayOptions): Relay {
     reconnectUsed = true;
     state = "reconnecting";
     call(options.onReconnect, undefined);
-    let pending: Promise<StreamTicketResult | string | null>;
+    let pending: Promise<RelayTicket>;
     try {
       pending = Promise.resolve(getTicket());
     } catch {

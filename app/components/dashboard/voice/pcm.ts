@@ -1,4 +1,4 @@
-// PCM helpers for live interview captions on AWS Transcribe streaming. Pure:
+// PCM helpers for the admin STT lab's AWS Transcribe streaming captions. Pure:
 // no DOM, no React.
 //
 // AWS Transcribe streaming takes mono, 16 kHz, signed 16-bit little-endian PCM

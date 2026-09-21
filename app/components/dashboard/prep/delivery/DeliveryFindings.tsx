@@ -24,13 +24,16 @@ export interface DeliveryFindingsProps {
   metrics: DeliveryMetrics;
   /** Names the answer each finding sits in ("Answer 3"). */
   turns?: readonly DeliveryTurn[];
+  /** The report transcript has no word timings, so pace and fillers could not be measured. */
+  noWordTimings?: boolean;
   className?: string;
 }
 
 /** Below this change per answer, energy reads as steady. */
 const STEADY_DB = 0.5;
 
-const DeliveryFindings: FC<DeliveryFindingsProps> = ({ flags, metrics, turns = [], className }) => {
+const DeliveryFindings: FC<DeliveryFindingsProps> = ({ flags, metrics, turns = [], noWordTimings = false, className }) => {
+  const untimed = noWordTimings ? NO_WORD_TIMINGS : undefined;
   const numbers = numberAnswers(turns);
   const groups = groupFlags(flags);
 
@@ -45,7 +48,7 @@ const DeliveryFindings: FC<DeliveryFindingsProps> = ({ flags, metrics, turns = [
       </header>
 
       <div className="grid grid-cols-1 gap-2.5 px-5 pb-5 xs:grid-cols-2 sm:px-6 lg:grid-cols-5">
-        <PaceTile wpm={metrics.wpmMean} band={metrics.wpmReferenceBand} />
+        <PaceTile wpm={metrics.wpmMean} band={metrics.wpmReferenceBand} missing={untimed} />
         <MetricTile
           label="Long pauses"
           value={String(metrics.longPauses)}
@@ -62,6 +65,7 @@ const DeliveryFindings: FC<DeliveryFindingsProps> = ({ flags, metrics, turns = [
           value={metrics.fillersPer100Words === null ? null : metrics.fillersPer100Words.toFixed(1)}
           unit="per 100 words"
           note="“Um”, “uh”, “you know” and the like. A short pause does the same job without the sound."
+          missing={untimed}
         />
         <MetricTile
           label="Pitch variation"
@@ -75,7 +79,7 @@ const DeliveryFindings: FC<DeliveryFindingsProps> = ({ flags, metrics, turns = [
       <div className="border-t border-black/10">
         {groups.length === 0 ? (
           <p className="px-5 py-5 text-sm leading-relaxed text-black/55 sm:px-6">
-            Nothing stood out. Your pace, pauses and energy stayed close to your own averages all the way through.
+            Nothing stood out. Your {noWordTimings ? "pauses" : "pace, pauses"} and energy stayed close to your own averages all the way through.
           </p>
         ) : (
           groups.map(({ kind, items }) => (
@@ -134,10 +138,11 @@ function groupFlags(flags: readonly DeliveryFlag[]): Array<{ kind: DeliveryFlagK
 const TILE = "flex flex-col rounded-xl border border-black/10 bg-[#fbfbf7] p-3.5";
 
 const NOT_MEASURED = "Not enough speech in the recording to measure this.";
+const NO_WORD_TIMINGS = "Measured from word timings, which this report doesn't have.";
 
 const TileValue: FC<{ value: string | null; unit: string }> = ({ value, unit }) =>
   value === null ? (
-    <p className="text-[26px] font-bold leading-none text-black/30">—</p>
+    <p className="text-[18px] font-bold leading-[26px] text-black/35">Unavailable</p>
   ) : (
     <p className="flex flex-wrap items-baseline gap-x-1.5 leading-none">
       <span className="text-[26px] font-bold text-primary">{value}</span>
@@ -145,11 +150,11 @@ const TileValue: FC<{ value: string | null; unit: string }> = ({ value, unit }) 
     </p>
   );
 
-const MetricTile: FC<{ label: string; value: string | null; unit: string; note: ReactNode }> = ({ label, value, unit, note }) => (
+const MetricTile: FC<{ label: string; value: string | null; unit: string; note: ReactNode; missing?: string }> = ({ label, value, unit, note, missing = NOT_MEASURED }) => (
   <div className={TILE}>
     <p className="mb-2 text-[11.5px] font-medium text-black/50">{label}</p>
     <TileValue value={value} unit={unit} />
-    <p className="mt-2.5 text-xs leading-relaxed text-black/50">{value === null ? NOT_MEASURED : note}</p>
+    <p className="mt-2.5 text-xs leading-relaxed text-black/50">{value === null ? missing : note}</p>
   </div>
 );
 
@@ -158,7 +163,7 @@ const SCALE_HI = 200;
 const toScale = (wpm: number) => ((Math.min(SCALE_HI, Math.max(SCALE_LO, wpm)) - SCALE_LO) / (SCALE_HI - SCALE_LO)) * 100;
 
 /** Pace with its reference band drawn: where the average sat against 140–160, on a 100–200 scale. */
-const PaceTile: FC<{ wpm: number | null; band: DeliveryMetrics["wpmReferenceBand"] }> = ({ wpm, band }) => {
+const PaceTile: FC<{ wpm: number | null; band: DeliveryMetrics["wpmReferenceBand"]; missing?: string }> = ({ wpm, band, missing = NOT_MEASURED }) => {
   const where = wpm === null ? null : wpm < band.low ? "Slower than" : wpm > band.high ? "Faster than" : "Inside";
   return (
     <div className={TILE}>
@@ -173,7 +178,7 @@ const PaceTile: FC<{ wpm: number | null; band: DeliveryMetrics["wpmReferenceBand
         </div>
       )}
       <p className="mt-2.5 text-xs leading-relaxed text-black/50">
-        {where === null ? NOT_MEASURED : `${where} the ${band.low}–${band.high} range many listeners find easy to follow. The range is context, not a score.`}
+        {where === null ? missing : `${where} the ${band.low}–${band.high} range many listeners find easy to follow. The range is context, not a score.`}
       </p>
     </div>
   );

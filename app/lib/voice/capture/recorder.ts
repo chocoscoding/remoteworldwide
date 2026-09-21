@@ -1,10 +1,10 @@
 // The recording tap: MediaRecorder on the interview's one MediaStream.
 //
 // What it records is what the report is built from. The AI service stitches
-// the chunks back into one file, AWS batch transcribes it, and the prosody
-// service measures it, so the container has to be one both accept. Chrome and
-// Firefox record WebM/Opus; Safari only MP4 (AAC or Opus inside). AWS batch
-// takes both, and the playback copy is transcoded to AAC either way.
+// the chunks back into one file, Scribe transcribes it after the interview, and
+// the prosody service measures it, so the container has to be one both accept.
+// Chrome and Firefox record WebM/Opus; Safari only MP4 (AAC or Opus inside).
+// Scribe takes both, and the playback copy is transcoded to AAC either way.
 //
 // 24 kbps Opus is plenty for a single voice (Opus is transparent for speech
 // well below that) and keeps a 40-minute interview near 7 MB, which matters

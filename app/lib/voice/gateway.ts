@@ -1,7 +1,7 @@
 // Where the live-caption socket goes, and how it says who it is.
 //
 // The AI service hands the browser the voice gateway's public URL
-// (`CreatePrepSessionResult.gatewayUrl`). Operators may write it as http(s) or
+// (`LabRunCreateResult.gatewayUrl`). Operators may write it as http(s) or
 // ws(s), so the scheme is normalised here rather than trusted: a page served
 // over https can only open `wss:`, and the browser refuses the socket outright
 // otherwise.

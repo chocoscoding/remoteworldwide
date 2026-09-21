@@ -11,6 +11,7 @@ export const PROVIDER_LABELS: Record<LabProvider, { name: string; detail: string
 };
 
 export const LIVE_PROVIDER_LABELS: Record<LiveSttProvider, string> = {
+  elevenlabs: "ElevenLabs",
   "aws-transcribe": "AWS streaming",
   "web-speech": "Web Speech",
 };

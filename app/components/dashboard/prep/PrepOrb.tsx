@@ -4,9 +4,8 @@
 //
 // orb-ui runs in controlled mode here rather than through a provider adapter:
 // PrepLive holds the mic, the recording and the interviewer's voice itself, so
-// it already knows the state. When the ElevenLabs Speech Engine takes the
-// session over, this becomes `<InterviewOrb adapter={…} />` and the state
-// derivation below goes away.
+// it already knows the state. On the ElevenLabs Speech Engine it still does;
+// the engine only adds its real levels, read here every frame.
 //
 // It owns the level subscription instead of PrepLive doing it, and that is the
 // whole point of the component: `onLevel` fires at animation rate, and lifting
@@ -23,6 +22,9 @@ export interface PrepOrbProps {
   onLevel?: (cb: (level: number) => void) => () => void;
   /** Whether the mic subscription should be running at all. */
   micActive?: boolean;
+  /** The engine interviewer's real levels, 0-1, read every frame. Given both, they replace `onLevel` and the assumed output level. */
+  getInputVolume?: () => number;
+  getOutputVolume?: () => number;
   label?: string;
   caption?: string;
   /** See InterviewOrb — for captions about to cause something. */
@@ -38,18 +40,31 @@ export interface PrepOrbProps {
  * from `speechSynthesis` or a pre-synthesized MP3, and neither exposes a level.
  * A steady value is the honest answer — the orb still reads as speaking,
  * because `speaking` has its own motion, and nothing here pretends to be a
- * waveform it did not measure. The ElevenLabs adapter supplies a real envelope
- * when it lands.
+ * waveform it did not measure. An engine interview passes its real levels
+ * instead.
  */
 const ASSUMED_OUTPUT_LEVEL = 0.55;
 
-const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, label, caption, captionEmphasis, size = 190, className }) => {
+const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, getInputVolume, getOutputVolume, label, caption, captionEmphasis, size = 190, className }) => {
   const [input, setInput] = useState(0);
+  const [output, setOutput] = useState(0);
+  const measured = Boolean(getInputVolume && getOutputVolume);
 
   useEffect(() => {
-    if (!onLevel || !micActive) return;
+    if (!onLevel || !micActive || measured) return;
     return onLevel(setInput);
-  }, [onLevel, micActive]);
+  }, [onLevel, micActive, measured]);
+
+  // The engine's client exposes its levels only as reads: sampled once per frame.
+  useEffect(() => {
+    if (!getInputVolume || !getOutputVolume) return;
+    let frame = requestAnimationFrame(function read() {
+      setInput(getInputVolume());
+      setOutput(getOutputVolume());
+      frame = requestAnimationFrame(read);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [getInputVolume, getOutputVolume]);
 
   // Masked rather than reset: zeroing the last level from inside the effect
   // would be state synchronisation, and the stale value is unreachable anyway
@@ -61,7 +76,7 @@ const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, label, caption, 
       signal={{
         state,
         inputVolume,
-        outputVolume: state === "speaking" ? ASSUMED_OUTPUT_LEVEL : 0,
+        outputVolume: state === "speaking" ? (measured ? output : ASSUMED_OUTPUT_LEVEL) : 0,
       }}
       label={label}
       caption={caption}
