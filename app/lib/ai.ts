@@ -27,6 +27,17 @@ export interface AiInit {
   signal?: AbortSignal;
   /** Generation can take seconds; a scan's deterministic phase should not. */
   timeoutMs?: number;
+  /**
+   * The signed-in user, for the service's user-scoped routes.
+   *
+   * Sent as `x-user-id`, which is the ONLY identity the AI service reads — see
+   * the note in its `middleware/userIdentity.ts`. Callers must resolve it from
+   * the session themselves (`auth()`), never from anything a client sent;
+   * `app/api/ai/[...path]/route.ts` does exactly this for browser traffic.
+   * Omitting it is correct only for routes that need no user, and any
+   * `requireUser` route answers 401 without it.
+   */
+  userId?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -43,6 +54,7 @@ export async function ai<T>(path: string, init: AiInit = {}): Promise<T> {
     "x-service-token": AI_TOKEN,
   };
   if (init.body !== undefined) headers["content-type"] = "application/json";
+  if (init.userId) headers["x-user-id"] = init.userId;
 
   // The service bounds its own provider calls, but a hung socket here would
   // hold a Next render open, so this side gets its own ceiling too.
