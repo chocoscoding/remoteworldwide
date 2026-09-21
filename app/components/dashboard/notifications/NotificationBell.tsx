@@ -1,16 +1,13 @@
 "use client";
 
-// The bell, in the sidebar header beside the logo.
+// The bell, at the extreme right of the page header.
 //
-// It lives there because the sidebar is the only chrome mounted on every
-// dashboard screen — `DashboardShell` renders a sidebar and a page, and each
-// screen draws its own header, so there is no topbar to put this in.
+// Each dashboard screen draws its own header, so each one renders this as the
+// LAST item of that header — whatever actions a screen adds sit to its left.
+// A header with nothing on the right passes `className="ml-auto"`.
 //
 // Micro-interactions: the bell swings once when a new unread arrives (not on
 // first paint, which would ring on every navigation), and the badge counts up.
-// Collapsed to the 76px rail the count has nowhere to go, so it degrades to a
-// pulsing dot on the icon — the same treatment StreakPill uses for an unlogged
-// day.
 
 import { useEffect, useRef, useState, type FC } from "react";
 import Link from "next/link";
@@ -24,10 +21,10 @@ import { useMarkAllRead, useMarkRead } from "@/hooks/mutations/useNotificationMu
 import type { NotificationItem } from "@/app/lib/notifications/types";
 
 export interface NotificationBellProps {
-  collapsed: boolean;
+  className?: string;
 }
 
-const NotificationBell: FC<NotificationBellProps> = ({ collapsed }) => {
+const NotificationBell: FC<NotificationBellProps> = ({ className }) => {
   const { data } = useNotificationsQuery();
   const markAllRead = useMarkAllRead();
   const markRead = useMarkRead();
@@ -66,10 +63,10 @@ const NotificationBell: FC<NotificationBellProps> = ({ collapsed }) => {
           type="button"
           aria-label={unread > 0 ? `Notifications — ${unread} unread` : "Notifications"}
           className={cn(
-            "relative grid flex-none place-content-center rounded-lg text-black/40 transition-colors cursor-pointer",
-            "hover:bg-[#f3f3ef] hover:text-black/70",
-            open && "bg-[#f0f0ea] text-black/70",
-            collapsed ? "h-7 w-7" : "h-7 w-7",
+            "relative grid h-9 w-9 flex-none place-content-center rounded-lg text-black/55 transition-colors cursor-pointer",
+            "hover:bg-[#f3f3ef] hover:text-black/80",
+            open && "bg-[#f0f0ea] text-black/80",
+            className,
           )}>
           <motion.span
             aria-hidden
@@ -77,30 +74,22 @@ const NotificationBell: FC<NotificationBellProps> = ({ collapsed }) => {
             transition={{ duration: 0.7, ease: "easeInOut" }}
             style={{ originY: 0.1 }}
             className="inline-flex">
-            <Bell className="h-4 w-4" />
+            <Bell className="h-[18px] w-[18px]" />
           </motion.span>
 
-          {unread > 0 &&
-            (collapsed ? (
-              // No room for a number on the rail, so the dot carries it.
-              <motion.span
-                aria-hidden
-                animate={reduceMotion ? undefined : { opacity: [1, 0.3, 1] }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#222325] ring-2 ring-white"
-              />
-            ) : (
-              <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-content-center rounded-full bg-[#222325] px-1 text-[10px] font-extrabold text-[#e1f073] ring-2 ring-white tabular-nums">
-                {unread > 9 ? "9+" : unread}
-              </span>
-            ))}
+          {unread > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-content-center rounded-full bg-[#222325] px-1 text-[10px] font-extrabold text-[#e1f073] ring-2 ring-white tabular-nums">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
         </button>
       </PopoverTrigger>
 
+      {/* Hangs down from the header, right-aligned so it never runs off the edge. */}
       <PopoverContent
-        align="start"
-        side="right"
-        sideOffset={12}
+        align="end"
+        side="bottom"
+        sideOffset={10}
         className="w-[340px] rounded-xl border-[1.5px] border-black/12 bg-white p-0 shadow-[4px_4px_0_0_rgba(34,35,37,0.12)]">
         <div className="flex items-center justify-between border-b border-black/8 px-4 py-3">
           <p className="text-[13px] font-bold text-primary">Notifications</p>

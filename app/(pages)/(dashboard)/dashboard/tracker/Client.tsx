@@ -28,6 +28,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import type { PickedJob } from "@/app/lib/jobs/fields";
@@ -238,6 +239,8 @@ const TrackerClient: FC = () => {
             className="inline-flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-primary transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[3px_3px_0_0_#e1f073] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none">
             <ChartNoAxesColumn className="h-4 w-4" />
           </button>
+
+          <NotificationBell />
         </div>
       </header>
 

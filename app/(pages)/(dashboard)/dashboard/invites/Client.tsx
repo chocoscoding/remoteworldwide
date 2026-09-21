@@ -6,6 +6,7 @@ import { Check, Copy, Share2, UserPlus } from "lucide-react";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import SplitButton from "@/app/components/dashboard/ui/SplitButton";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import DashPagination, { type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import type { PillProps } from "@/app/components/dashboard/ui/Pill";
@@ -63,6 +64,7 @@ const InvitesClient: FC<InvitesClientProps> = ({ invites, inviteUrl }) => {
     <div className="min-h-screen bg-[#f6f6f6]">
       <header className="sticky top-0 z-10 flex h-16 items-center border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
         <h1 className="whitespace-nowrap text-[17px] font-bold text-primary">Invite friends</h1>
+        <NotificationBell className="ml-auto" />
       </header>
 
       <main className="mx-auto flex max-w-[820px] flex-col gap-5 px-8 py-7 pb-14">

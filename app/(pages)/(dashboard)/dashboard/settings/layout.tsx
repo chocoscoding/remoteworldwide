@@ -1,4 +1,5 @@
 import SettingsNav from "@/app/components/dashboard/settings/SettingsNav";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 
 /**
  * Shared shell for /dashboard/settings/**: one header and a section nav.
@@ -13,6 +14,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
           <h1 className="text-[17px] font-bold text-primary">Settings</h1>
           <span className="hidden text-sm text-black/45 sm:inline">Your profile, preferences and plan</span>
+          <NotificationBell className="ml-auto" />
         </header>
 
         <main className="mx-auto max-w-[1100px] px-8 py-7 pb-14">
