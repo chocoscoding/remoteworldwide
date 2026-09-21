@@ -16,31 +16,13 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/app/lib/api/client";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+import { MAX_RESUME_BYTES, RESUME_TYPES_HINT, isReadableMime, mimeForFileName } from "./mime";
 
-/**
- * The AI service accepts a 10MB JSON body and base64 costs four bytes for
- * every three, so 7MB of file is 9.4MB of body. Checked here as well as there
- * because a refusal after a 9MB upload is a slow way to learn a fast fact.
- */
-export const MAX_RESUME_BYTES = 7 * 1024 * 1024;
-
-/**
- * What the parser can read. `.doc` is deliberately absent: the extractor uses
- * mammoth, which reads the XML format only, so a legacy `.doc` would be
- * accepted by the picker and then refused by the server.
- */
-const TYPES_BY_EXTENSION: Record<string, string> = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  txt: "text/plain",
-  md: "text/markdown",
-  markdown: "text/markdown",
-};
-
-export const RESUME_ACCEPT = ".pdf,.docx,.txt,.md";
-
-/** The copy every refusal here shares, so the picker and the toast agree. */
-export const RESUME_TYPES_HINT = "Upload a PDF, DOCX, TXT or MD file";
+// The accepted types, the size ceiling and the copy live in `./mime.ts` so the
+// server-side ingest bridge shares them. The ceiling is checked here as well as
+// in the service because a refusal after a 9MB upload is a slow way to learn a
+// fast fact.
+export { MAX_RESUME_BYTES, RESUME_ACCEPT, RESUME_TYPES_HINT } from "./mime";
 
 /**
  * The type to declare for a file.
@@ -50,11 +32,10 @@ export const RESUME_TYPES_HINT = "Upload a PDF, DOCX, TXT or MD file";
  * fallback. Null means the picker let through something the parser cannot read.
  */
 export const resumeMimeType = (file: File): string | null => {
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  const byExtension = TYPES_BY_EXTENSION[extension];
+  const byExtension = mimeForFileName(file.name);
   if (byExtension) return byExtension;
   const declared = file.type.split(";")[0].toLowerCase().trim();
-  return Object.values(TYPES_BY_EXTENSION).includes(declared) ? declared : null;
+  return isReadableMime(declared) ? declared : null;
 };
 
 /**
