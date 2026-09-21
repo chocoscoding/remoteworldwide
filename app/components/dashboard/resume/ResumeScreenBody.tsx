@@ -41,18 +41,21 @@ import AiAssistRail from "./AiAssistRail";
 import AiToolsList from "./AiToolsList";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import type { PickedJob } from "@/app/lib/jobs/fields";
-import { ATS_KEYWORDS } from "@/app/lib/dashboard/mock-data";
+// `applyQuantify` is the one tool function still executed in the browser, and
+// deliberately so: committing a chosen suggestion substitutes one string at one
+// index. It is an array update, it has to feel instant, and a round trip could
+// only make it slower and occasionally fail. Everything that needs judgment —
+// or a credit — now runs in the AI service through `app/lib/resume/ai.ts`.
+import { applyQuantify, type QuantifySuggestion, type RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
 import {
-  applyQuantify,
   fixToneAndGrammar,
   injectKeywords,
   quantifySuggestions,
   rewriteVariants as buildRewriteVariants,
   shortenToOnePage,
   tailorToJob,
-  type QuantifySuggestion,
-  type RewriteVariant,
-} from "@/app/lib/dashboard/resume/ai-tools";
+} from "@/app/lib/resume/ai";
+import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
 
 type DocTab = "overview" | "content" | "customize" | "ai";
 type SummarySuggestionState = "pending" | "accepted" | "dismissed";
@@ -134,15 +137,19 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   // The ATS state further down is deliberately not part of it.
   const autosave = useResumeAutosave({ id: activeDocId, content, design, sections, savedAt: activeDoc.updatedAt, onSaved });
 
-  const [aiRunning, setAiRunning] = useState<string | null>(null);
+  // Which tool is out, and why the last one came back empty-handed. Owned by
+  // the hook rather than by this component: a run can now fail, and "one at a
+  // time" has to hold across an await rather than across a timeout.
+  const { running: aiRunning, run: runSuggestion } = useResumeSuggestion();
   const [aiDone, setAiDone] = useState<Set<string>>(new Set());
   // Live per-tool result captions + the two tools with inline pickers.
   const [aiCaptions, setAiCaptions] = useState<Record<string, string | undefined>>({});
   const [rewriteOptions, setRewriteOptions] = useState<RewriteVariant[] | null>(null);
   const [quantifyList, setQuantifyList] = useState<QuantifySuggestion[] | null>(null);
   const [quantifyApplied, setQuantifyApplied] = useState<Set<number>>(new Set());
-  // One job picker, two reasons to open it: the Tailor tool rewrites content
-  // against the job; the ATS card's "Against a job" only scores against it.
+  // One job picker, three reasons to open it: Tailor and Add missing keywords
+  // rewrite content against the job; the ATS card's "Against a job" only
+  // scores against it.
   const { pickJob } = useJobPicker();
 
   const [keywordsAdded, setKeywordsAdded] = useState<Set<string>>(new Set());
@@ -281,122 +288,156 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   };
 
   // -------------------------------------------------------------------------
-  // AI assist rail / AI tools tab — mocked, local state only.
+  // AI assist rail / AI tools tab.
+  //
+  // Every tool now runs in the AI service. Four of them reach a model and cost
+  // a credit; `shorten` and `tone` are deterministic and cost nothing, but they
+  // go over the wire too so that what a tool does has one definition rather
+  // than two that drift.
+  //
+  // What did NOT move is where the caption comes from. The service returns the
+  // facts — which terms were added, how many words were cut, what was fixed —
+  // and the sentence is still written here, because it is copy rather than
+  // data, and a model is never asked to count its own edits.
   // -------------------------------------------------------------------------
 
   /**
-   * The real engine. Every tool computes its transform from the CURRENT
-   * content in the handler (never in render), then lands it after a short
-   * beat so "Running…" reads as work rather than a flicker. Tailor is the
-   * exception — it opens the job picker first; the transform runs on pick.
+   * Lands a finished run: apply the edit, mark the tool done, write its caption.
+   *
+   * `apply` runs inside the same handler the await returned to, so the edit is
+   * made against the content as it is NOW rather than as it was when the button
+   * was pressed — which matters because a tool's round trip is long enough for
+   * the user to have typed.
    */
-  const finishAiTool = (id: string, caption: string, apply?: () => void) => {
-    window.setTimeout(() => {
-      apply?.();
-      setAiRunning(null);
-      setAiDone((prev) => new Set(prev).add(id));
-      setAiCaptions((prev) => ({ ...prev, [id]: caption }));
-    }, 700);
+  const landAiTool = (id: string, caption: string, apply?: () => void) => {
+    apply?.();
+    setAiDone((prev) => new Set(prev).add(id));
+    setAiCaptions((prev) => ({ ...prev, [id]: caption }));
   };
 
+  const quote = (terms: string[]) => terms.map((term) => `"${term}"`).join(" and ");
+
   const runAiTool = (id: string) => {
-    if (id === "tailor") {
-      void pickJobFor("tailor");
+    // The two tools that need a posting open the picker first; the run happens
+    // on pick. Neither can be answered from the document alone, and the screen
+    // does not keep a job description around — a standing check stores the
+    // job's LABEL, not its text — so the posting is fetched fresh each time
+    // rather than remembered and quietly going stale.
+    if (id === "tailor" || id === "keywords") {
+      void pickJobFor(id);
       return;
     }
-    setAiRunning(id);
 
     if (id === "rewrite") {
-      const variants = buildRewriteVariants(content);
-      finishAiTool(id, "3 fresh takes on your Summary — pick one below.", () => setRewriteOptions(variants));
-      return;
-    }
-
-    if (id === "keywords") {
-      const wanted = ATS_KEYWORDS.filter((k) => !k.present).map((k) => k.label);
-      const result = injectKeywords(content, wanted);
-      if (result.added.length === 0) {
-        finishAiTool(id, "Nothing missing — every tracked keyword is already in.");
-        return;
-      }
-      finishAiTool(id, `Added ${result.added.map((w) => `"${w}"`).join(" and ")} to your Summary and Skills.`, () => {
-        setContent(result.content);
-        // Keep the match-score card's chips in sync — same keywords, one state.
-        setKeywordsAdded((prev) => {
-          const next = new Set(prev);
-          for (const k of ATS_KEYWORDS.filter((x) => !x.present)) next.add(k.id);
-          return next;
-        });
-      });
+      void (async () => {
+        const variants = await runSuggestion("rewrite", () => buildRewriteVariants({ content }));
+        if (!variants) return;
+        landAiTool(id, "3 fresh takes on your Summary — pick one below.", () => setRewriteOptions(variants));
+      })();
       return;
     }
 
     if (id === "quantify") {
-      const suggestions = quantifySuggestions(content);
-      if (suggestions.length === 0) {
-        finishAiTool(id, "Every bullet already carries a number. Nothing to do.");
-        return;
-      }
-      finishAiTool(id, `${suggestions.length} bullet${suggestions.length === 1 ? "" : "s"} could carry a number — apply below.`, () => {
-        setQuantifyList(suggestions);
-        setQuantifyApplied(new Set());
-      });
+      void (async () => {
+        const suggestions = await runSuggestion("quantify", () => quantifySuggestions({ content }));
+        if (!suggestions) return;
+        if (suggestions.length === 0) {
+          landAiTool(id, "Every bullet already carries a number. Nothing to do.");
+          return;
+        }
+        landAiTool(id, `${suggestions.length} bullet${suggestions.length === 1 ? "" : "s"} could carry a number — apply below.`, () => {
+          setQuantifyList(suggestions);
+          setQuantifyApplied(new Set());
+        });
+      })();
       return;
     }
 
     if (id === "shorten") {
-      const result = shortenToOnePage(content);
-      if (result.removedWords === 0) {
-        finishAiTool(id, "Already tight — nothing worth cutting.");
-        return;
-      }
-      finishAiTool(
-        id,
-        `Trimmed ${result.removedWords} words (${result.trimmedBullets} lower-impact bullet${result.trimmedBullets === 1 ? "" : "s"}).`,
-        () => setContent(result.content),
-      );
+      void (async () => {
+        const result = await runSuggestion("shorten", () => shortenToOnePage({ content }));
+        if (!result) return;
+        if (result.removedWords === 0) {
+          landAiTool(id, "Already tight — nothing worth cutting.");
+          return;
+        }
+        landAiTool(
+          id,
+          `Trimmed ${result.removedWords} words (${result.trimmedBullets} lower-impact bullet${result.trimmedBullets === 1 ? "" : "s"}).`,
+          () => setContent(result.content),
+        );
+      })();
       return;
     }
 
     if (id === "tone") {
-      const result = fixToneAndGrammar(content);
-      if (result.fixes.length === 0) {
-        finishAiTool(id, "No issues found — your resume reads clean.");
-        return;
-      }
-      finishAiTool(id, `Fixed ${result.fixes.join(", ")}.`, () => setContent(result.content));
+      void (async () => {
+        const result = await runSuggestion("tone", () => fixToneAndGrammar({ content }));
+        if (!result) return;
+        if (result.fixes.length === 0) {
+          landAiTool(id, "No issues found — your resume reads clean.");
+          return;
+        }
+        landAiTool(id, `Fixed ${result.fixes.join(", ")}.`, () => setContent(result.content));
+      })();
       return;
     }
   };
 
-  /** Tailor lands here from the job picker — score moves like a real tailoring pass. */
-  const handleTailorJob = (job: ResumeJob) => {
-    setAiRunning("tailor");
-    const target = { company: job.company, role: job.role, jdText: job.description };
-    const result = tailorToJob(content, target);
+  /**
+   * Add missing keywords, against a posting the user just picked.
+   *
+   * WHICH terms are missing is decided in the service from the resume itself —
+   * the same filter this screen used to run locally — so `added` is a fact
+   * about the document rather than a model's claim, and an empty `added` is the
+   * honest "nothing missing" rather than a model declining to answer.
+   */
+  const handleKeywordsJob = async (job: ResumeJob) => {
+    const result = await runSuggestion("keywords", () =>
+      injectKeywords({ content, jdText: job.description, company: job.company, role: job.role }),
+    );
+    if (!result) return;
+
+    if (result.added.length === 0) {
+      landAiTool("keywords", `Nothing missing — your resume already covers what ${job.company} asked for.`);
+      return;
+    }
+    // The same narrow diff as `tailor`, for the same reason — see the note there.
+    landAiTool("keywords", `Added ${quote(result.added)} to your Summary and Skills.`, () =>
+      setContent((prev) => ({ ...prev, summary: result.content.summary, skills: result.content.skills })),
+    );
+  };
+
+  /** Tailor lands here from the job picker. */
+  const handleTailorJob = async (job: ResumeJob) => {
+    const result = await runSuggestion("tailor", () =>
+      tailorToJob({ content, jdText: job.description, company: job.company, role: job.role }),
+    );
+    if (!result) return;
+
     // Stamped here, outside the setState updater — updaters may run twice.
     const stampedAt = new Date();
     const general = generalScoreFor(activeDocId);
     const jobLabel = `${job.company} — ${job.role}`;
-    finishAiTool(
-      "tailor",
-      `Tailored to ${job.role} at ${job.company} — wove ${result.woven.map((w) => `"${w}"`).join(" and ")} in.`,
-      () => {
-        // Tailored against the content as it is when this lands, not as it was
-        // when Tailor was clicked: this handler now runs after an awaited pick,
-        // and another tool that finished while the picker was open must not be
-        // overwritten. `tailorToJob` is pure, so a doubled updater is harmless.
-        setContent((prev) => tailorToJob(prev, target).content);
-        // Tailoring IS a job check — the ATS card names the job and the lift.
-        setDocuments((prev) =>
-          prev.map((d) =>
-            d.id === activeDocId
-              ? { ...d, before: general, score: Math.min(97, d.score + 13), scan: { kind: "job", at: stampedAt, job: jobLabel } }
-              : d,
-          ),
-        );
-      },
-    );
+
+    landAiTool("tailor", `Tailored to ${job.role} at ${job.company} — wove ${quote(result.woven)} in.`, () => {
+      // Only the two fields the service actually rewrote, folded onto the
+      // content as it is NOW. `tailorToJob` used to be a pure function this
+      // screen could simply re-run against `prev`; it is a round trip now, and
+      // writing `result.content` back whole would silently discard anything the
+      // user typed while it was out. The service asks the model for a narrow
+      // diff — a summary and a skills list — precisely so the rest of the
+      // document never has to travel, and this is the other half of that deal.
+      setContent((prev) => ({ ...prev, summary: result.content.summary, skills: result.content.skills }));
+      // Tailoring IS a job check — the ATS card names the job and the lift.
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === activeDocId
+            ? { ...d, before: general, score: Math.min(97, d.score + 13), scan: { kind: "job", at: stampedAt, job: jobLabel } }
+            : d,
+        ),
+      );
+    });
   };
 
   // -------------------------------------------------------------------------
@@ -420,12 +461,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
     );
   };
 
-  /** Both reasons start from the same pick; cancelling it leaves the document as it was. */
-  const pickJobFor = async (use: "tailor" | "scan") => {
+  /** Every reason starts from the same pick; cancelling it leaves the document as it was. */
+  const pickJobFor = async (use: "tailor" | "keywords" | "scan") => {
     const result = await pickJob(RESUME_JOB_SPEC);
     if (result.status !== "picked") return;
     if (use === "scan") handleScanJob(result.job);
-    else handleTailorJob(result.job);
+    else if (use === "keywords") await handleKeywordsJob(result.job);
+    else await handleTailorJob(result.job);
   };
 
   /**

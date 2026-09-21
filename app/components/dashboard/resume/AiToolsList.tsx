@@ -1,19 +1,26 @@
 "use client";
 
-// AI Tools tab's left-sidebar action list. No longer theater: every Run is
-// wired to a real transform in `lib/dashboard/resume/ai-tools` and the paper
-// preview changes the moment one lands. Two tools open inline pickers —
-// Rewrite offers three takes to choose from, Quantify lists per-bullet
-// upgrades to apply one by one.
+// AI Tools tab's left-sidebar action list. Every Run is wired to the AI
+// service through `lib/resume/ai`, and the paper preview changes the moment one
+// lands. Two tools open inline pickers — Rewrite offers three takes to choose
+// from, Quantify lists per-bullet upgrades to apply one by one.
+//
+// Four of the six spend a credit, and each says so on its own card rather than
+// once in a footnote. A button that quietly charges for a click is the thing
+// worth avoiding here: the two that are free are free because they are rules
+// rather than judgment, and that distinction is only useful to the user if it
+// is visible at the moment of pressing.
 
 import type { FC } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Check, Hash, PenLine, Scissors, SpellCheck2, Tag, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Pill from "@/app/components/dashboard/ui/Pill";
+import { SUGGESTION_CREDITS, costsCredit, type SuggestionTool } from "@/app/lib/resume/ai";
 import type { QuantifySuggestion, RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
 
 interface AiToolAction {
-  id: string;
+  id: SuggestionTool;
   icon: LucideIcon;
   label: string;
   description: string;
@@ -68,7 +75,14 @@ const AiToolsList: FC<AiToolsListProps> = ({
               <action.icon className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-primary leading-tight">{action.label}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[13px] font-bold text-primary leading-tight">{action.label}</p>
+                {costsCredit(action.id) && (
+                  <Pill variant="outline-dashed" className="flex-none">
+                    {SUGGESTION_CREDITS} credit
+                  </Pill>
+                )}
+              </div>
               <p className="text-[11px] text-black/45 leading-snug mt-0.5">{action.description}</p>
             </div>
           </div>
