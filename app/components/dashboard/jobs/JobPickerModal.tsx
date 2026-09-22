@@ -27,12 +27,13 @@
 import { useEffect, useId, useReducer, useRef, useState, type FC, type FormEvent, type ReactNode, type RefObject } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronDown, Chrome, CircleAlert, ClipboardPaste, Loader2, Search, Sparkles, Star, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Chrome, CircleAlert, ClipboardPaste, Loader2, Search, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
+import { EXTENSION_URL, useExtensionPresence } from "@/app/lib/extension/presence";
 import {
   JOB_FIELD_META,
   unfilledRequiredFields,
@@ -167,41 +168,75 @@ function requestFailureCode(error: unknown, link: boolean): ImportFailureCode {
  * Rides under the import form the way store promos do — but in this system's
  * clothes, and pitching the honest alternative to pasting: the extension saves
  * the posting from the careers page itself.
+ *
+ * It renders for exactly one person: someone who could install it and has not.
+ * Nothing at all until `NEXT_PUBLIC_EXTENSION_URL` names a real listing, and
+ * nothing for a browser that already answered the presence ping — selling
+ * somebody the thing they are running is how a promo loses its credibility.
+ * The old copy claimed a 4.9 rating and a Chrome Web Store feature; both were
+ * invented, and neither is coming back without a listing to read them off.
  */
-const ExtensionPromo: FC = () => (
-  <div className="mt-3 flex flex-none items-center gap-4 rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-4 shadow-[4px_4px_0_0_#e1f073]">
-    <span className="grid h-11 w-11 flex-none place-content-center rounded-xl bg-[#e1f073]">
-      <Chrome className="h-5 w-5 text-[#222325]" />
-    </span>
-    <div className="min-w-0 flex-1">
-      <p className="text-sm font-bold text-white">Skip the pasting next time</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-white/60">
-        The Chrome extension saves any posting straight to your jobs, in one click, from the careers page itself.
-      </p>
-      {/* Nice-to-have credentials give way before the form ever has to scroll. */}
-      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-white/70 [@media(max-height:760px)]:hidden">
-        <span className="inline-flex items-center gap-1">
-          <Star className="h-3 w-3 fill-[#e1f073] text-[#e1f073]" />
-          4.9 rating
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Check className="h-3 w-3 text-[#e1f073]" />
-          Featured on the Chrome Web Store
-        </span>
-      </p>
+const ExtensionPromo: FC = () => {
+  const { status } = useExtensionPresence();
+  if (!EXTENSION_URL || status !== "absent") return null;
+
+  return (
+    <div className="mt-3 flex flex-none items-center gap-4 rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-4 shadow-[4px_4px_0_0_#e1f073]">
+      <span className="grid h-11 w-11 flex-none place-content-center rounded-xl bg-[#e1f073]">
+        <Chrome className="h-5 w-5 text-[#222325]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-white">Skip the pasting next time</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-white/60">
+          The Chrome extension saves any posting straight to your jobs, in one click, from the careers page itself.
+        </p>
+      </div>
+      <a
+        href={EXTENSION_URL}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="flex-none rounded-lg border-[1.5px] border-white/30 px-3 py-2 text-xs font-bold text-white transition-colors hover:border-white">
+        Get it
+      </a>
     </div>
-    <a
-      href="https://chromewebstore.google.com"
-      target="_blank"
-      rel="noreferrer noopener"
-      className="flex-none rounded-lg border-[1.5px] border-white/30 px-3 py-2 text-xs font-bold text-white transition-colors hover:border-white">
-      Get it
-    </a>
-  </div>
-);
+  );
+};
+
+/** Only a real web address goes into an <img>: logos are whatever the posting named. */
+const logoSrc = (url: string | null): string | null => (url && /^https?:\/\//i.test(url) ? url : null);
+
+/**
+ * The company's logo when the posting has one, and its initials on ink when it
+ * has none — or when the logo fails to load, since a broken image reads worse
+ * than no image.
+ */
+const CompanyMark: FC<{ company: string | null; logo: string | null }> = ({ company, logo }) => {
+  const [broken, setBroken] = useState(false);
+  const src = logoSrc(logo);
+
+  if (src && !broken) {
+    return (
+      // A plain <img>, as in Avatar.tsx: logos come from whatever host a posting
+      // names, and next/image would need every one of them in remotePatterns.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        onError={() => setBroken(true)}
+        className="h-9 w-9 flex-none rounded-lg border border-black/10 bg-white object-contain p-1"
+      />
+    );
+  }
+  return (
+    <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#222325] text-[11px] font-extrabold text-white">
+      {initials(company)}
+    </span>
+  );
+};
 
 interface JobRowProps {
   company: string | null;
+  logo: string | null;
   role: string | null;
   subtitle: string;
   platform: boolean;
@@ -210,7 +245,7 @@ interface JobRowProps {
   onPick: () => void;
 }
 
-const JobRow: FC<JobRowProps> = ({ company, role, subtitle, platform, pending, disabled, onPick }) => (
+const JobRow: FC<JobRowProps> = ({ company, logo, role, subtitle, platform, pending, disabled, onPick }) => (
   <button
     type="button"
     onClick={onPick}
@@ -220,9 +255,7 @@ const JobRow: FC<JobRowProps> = ({ company, role, subtitle, platform, pending, d
       "group flex w-full items-center gap-3 border-b border-black/10 px-6 py-3.5 text-left last:border-b-0 cursor-pointer transition-colors hover:bg-[#fbfbf7] disabled:cursor-default",
       disabled && !pending && "opacity-50",
     )}>
-    <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#f0f0ea] text-[11px] font-extrabold text-black/60">
-      {initials(company)}
-    </span>
+    <CompanyMark key={logo ?? ""} company={company} logo={logo} />
     <span className="min-w-0 flex-1">
       <span className="flex items-center gap-1.5">
         <span className="truncate text-sm font-bold text-primary group-hover:underline underline-offset-2">
@@ -844,6 +877,7 @@ const PickerBody: FC<PickerBodyProps> = ({
                       <JobRow
                         key={job.id}
                         company={job.company}
+                        logo={job.companyLogo}
                         role={job.role}
                         subtitle={SOURCE_LABELS[job.source]}
                         platform={job.source === "platform"}
@@ -867,6 +901,7 @@ const PickerBody: FC<PickerBodyProps> = ({
                       <JobRow
                         key={listing.id}
                         company={listing.company || null}
+                        logo={listing.companyLogo}
                         role={listing.role || null}
                         subtitle={[listing.seniority, listing.regions.slice(0, 2).join(", ")].filter(Boolean).join(" · ") || "On Remote Worldwide"}
                         platform
