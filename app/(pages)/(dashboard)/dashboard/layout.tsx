@@ -7,6 +7,10 @@ import { getBillingOverview } from "@/libs/billing";
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  // Asked to be deleted: the account is locked until the date it goes, and the only screen it may
+  // open is the one that says when — and cancels. The API answers 423 everywhere else, so this
+  // redirect is the courtesy, not the enforcement.
+  if (session.user.deletionDueAt) redirect("/account-deletion");
   // Signed in but unproven. They keep the session — it is what makes resending a link trivial —
   // and see one screen until the address is confirmed. `/verify-email` sits outside this layout
   // deliberately, or the redirect would land back here and loop.

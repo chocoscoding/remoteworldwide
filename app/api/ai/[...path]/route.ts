@@ -29,10 +29,34 @@ const TIMEOUT_MS = 60_000;
 /** Streamed responses pass through untouched; JSON is buffered. */
 const STREAMED = new Set(["text/event-stream"]);
 
+/** The path under /api/ai to ask for, or null when a segment could step outside it. */
+function upstreamPath(path: string[]): string | null {
+  try {
+    const segments = path.map((segment) => decodeURIComponent(segment));
+    if (segments.some((s) => !s || s === "." || s === ".." || s.includes("/") || s.includes("\\"))) return null;
+    return segments.map((s) => encodeURIComponent(s)).join("/");
+  } catch {
+    return null;
+  }
+}
+
 async function proxy(req: Request, path: string[]): Promise<Response> {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Unauthorised", message: "Sign in to continue." }, { status: 401 });
+  }
+
+  // An account waiting out its deletion grace period opens nothing: the backend answers 423 on its
+  // own routes, and this is the same door for the AI service's.
+  if (session.user.deletionDueAt) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Account locked",
+        message: "Your account is scheduled for deletion. Cancel the deletion to use it again.",
+      },
+      { status: 423 },
+    );
   }
 
   if (!AI_TOKEN) {
@@ -46,7 +70,11 @@ async function proxy(req: Request, path: string[]): Promise<Response> {
   // A `?userId=` from the client is dropped, not forwarded: the only identity
   // the AI service reads is the header below.
   url.searchParams.delete("userId");
-  const target = `${AI_URL}/api/ai/${path.join("/")}${url.search}`;
+  const rest = upstreamPath(path);
+  const target = rest === null ? null : new URL(`${AI_URL}/api/ai/${rest}${url.search}`);
+  if (!target || !target.pathname.startsWith(new URL(`${AI_URL}/api/ai/`).pathname)) {
+    return NextResponse.json({ success: false, error: "Bad request", message: "That address isn't valid." }, { status: 400 });
+  }
 
   const headers: Record<string, string> = {
     accept: req.headers.get("accept") ?? "application/json",

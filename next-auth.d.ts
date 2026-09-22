@@ -14,6 +14,11 @@ declare module "next-auth" {
        * already defines as a Date — the only question asked here is whether to open the dashboard.
        */
       verified?: boolean;
+      /**
+       * ISO date a scheduled account deletion falls due, or null. Set, the account is locked: the
+       * dashboard layout sends it to /account-deletion and the API answers 423 everywhere else.
+       */
+      deletionDueAt?: string | null;
     };
   }
 }

@@ -7,5 +7,7 @@ export default async function SettingsAccountPage() {
   // is a `useSession()` round trip to render a line of text.
   const session = await auth();
 
-  return <AccountClient verified={session?.user?.verified !== false} />;
+  // The address the account signs in with, which is what the delete confirmation asks to be typed;
+  // the profile tab's email is a separate, editable field.
+  return <AccountClient verified={session?.user?.verified !== false} accountEmail={session?.user?.email ?? null} />;
 }

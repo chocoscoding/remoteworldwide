@@ -2,8 +2,8 @@
 
 import { FC } from "react";
 import { Download, Info } from "lucide-react";
-import { toast } from "sonner";
 import { useSettings, type PrivacyState } from "../SettingsProvider";
+import { useExportData } from "@/hooks/mutations/useAccountMutations";
 import { BUTTON_OUTLINE, SettingsRow, SettingsSection, Toggle } from "@/app/components/dashboard/settings/settings-ui";
 import SectionSave from "@/app/components/dashboard/settings/SectionSave";
 
@@ -37,6 +37,7 @@ const ROWS: { key: keyof PrivacyState; label: string; hint: string }[] = [
 
 const PrivacyClient: FC = () => {
   const { privacy, setPrivacy } = useSettings();
+  const exportData = useExportData();
 
   return (
     <>
@@ -53,10 +54,12 @@ const PrivacyClient: FC = () => {
       </SettingsSection>
 
       <SettingsSection title="Your data" description="Everything we hold about you, on request.">
-        <SettingsRow label="Export your data" hint="Applications, saved answers, resumes and session history as JSON.">
-          <button type="button" className={BUTTON_OUTLINE} onClick={() => toast("Export isn't wired up in this build.")}>
+        <SettingsRow
+          label="Export your data"
+          hint="Everything we hold: profile, applications, saved jobs and answers, documents, coach and interview history, credits — as one JSON file. Files themselves aren't included, only their details.">
+          <button type="button" className={BUTTON_OUTLINE} disabled={exportData.isPending} onClick={() => exportData.mutate()}>
             <Download className="h-3.5 w-3.5" />
-            Request export
+            {exportData.isPending ? "Gathering…" : "Download my data"}
           </button>
         </SettingsRow>
 
