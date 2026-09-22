@@ -7,7 +7,7 @@
 // file and fails if the field names drift — a mirror that drifts silently
 // shows up as a blank panel in production rather than a red build.
 
-import type { AtsKeyword, AtsMetric } from "@/app/lib/dashboard/types";
+import type { AtsKeyword, AtsMetric, ResumeContent } from "@/app/lib/dashboard/types";
 
 export type { AtsKeyword, AtsMetric };
 
@@ -114,4 +114,36 @@ export interface IngestedResume {
   content: null;
   /** Why parsing failed. Non-null only when `status` is "failed". */
   error: string | null;
+}
+
+/**
+ * `POST /api/ai/scan/lookup` — the latest scan this user already ran against
+ * one posting, with any of their resumes; `null` when there is none. Free and
+ * read-only: it reads back a score already paid for and never runs a scan.
+ *
+ * Mirrors `StoredScan` in the service's `scanService.ts`. What the log-an-
+ * application payoff shows instead of an estimate.
+ */
+export interface StoredScan {
+  scanId: string;
+  resumeId: string;
+  /** The file that was scored, as the ATS picker names it. Null when that resume has since been removed. */
+  fileName: string | null;
+  /** 0-100 overall match. */
+  score: number;
+  metrics: AtsMetric[];
+  /** Missing keywords, highest impact first — exactly as the scan stored them. */
+  gaps: AtsKeyword[];
+  degraded: boolean;
+  degradedReason: string | null;
+  /** When the scan ran, ISO-8601. */
+  scannedAt: string;
+}
+
+/**
+ * `GET /api/ai/resume/:id` — one ingested resume with the parsed content the
+ * list leaves out. `content` is null only for a row whose parsing failed.
+ */
+export interface IngestedResumeDetail extends Omit<IngestedResume, "content"> {
+  content: ResumeContent | null;
 }

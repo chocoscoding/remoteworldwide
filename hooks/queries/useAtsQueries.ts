@@ -7,7 +7,7 @@
 // the same reason `documents` stays out.
 
 import { useQuery } from "@tanstack/react-query";
-import { listIngestedResumes } from "@/app/lib/ats/api";
+import { getIngestedResume, listIngestedResumes, lookupStoredScan, storedScanKey } from "@/app/lib/ats/api";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
 
 /**
@@ -23,5 +23,38 @@ export function useIngestedResumesQuery() {
     queryKey: qk.ats.ingested(),
     queryFn: ({ signal }) => listIngestedResumes(signal),
     staleTime: STALE_TIME.ats,
+  });
+}
+
+/**
+ * One ingested resume with its parsed content, for the tools that rewrite it.
+ * A row never changes once parsed — an edit is a new row — so the cached copy
+ * stays true for as long as it is kept. Pass null to read nothing.
+ */
+export function useIngestedResumeQuery(resumeId: string | null) {
+  return useQuery({
+    queryKey: qk.ats.resume(resumeId ?? ""),
+    queryFn: ({ signal }) => getIngestedResume(resumeId ?? "", signal),
+    staleTime: STALE_TIME.ats,
+    enabled: resumeId !== null,
+  });
+}
+
+/**
+ * The latest scan this user already ran against one posting, or null when it
+ * was never scanned — the log-an-application payoff's score. Free: it reads a
+ * stored score back and never runs a scan. Pass an empty description to read
+ * nothing (a posting logged without its text has nothing to match against).
+ *
+ * Keyed by a hash of the text rather than the text, and short-lived: a scan
+ * run in another tab should show up the next time the payoff asks.
+ */
+export function useStoredScanQuery(jdText: string | null | undefined) {
+  const jd = (jdText ?? "").trim();
+  return useQuery({
+    queryKey: qk.ats.storedScan(storedScanKey(jd)),
+    queryFn: () => lookupStoredScan(jd),
+    staleTime: 30_000,
+    enabled: jd.length > 0,
   });
 }
