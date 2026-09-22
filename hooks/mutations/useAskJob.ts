@@ -62,7 +62,7 @@ function storeAnswer(queryClient: QueryClient, { savedJobId, threadId }: AskJobV
  * reported a balance, it goes in immediately so the meter moves with the
  * answer. The overview is refetched either way, because its ledger changed too.
  */
-function storeBalance(queryClient: QueryClient, credits: number | null) {
+export function storeBalance(queryClient: QueryClient, credits: number | null) {
   if (credits !== null) {
     queryClient.setQueryData<BillingOverview>(qk.billing.overview(), (overview) =>
       overview ? { ...overview, subscription: { ...overview.subscription, creditBalance: credits } } : overview,
