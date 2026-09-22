@@ -10,7 +10,6 @@
 import {
   CARD_DIMENSIONS,
   firstNameOf,
-  WIN_REFERRAL_LINK,
   type WinCardFormat,
   type WinCardToggles,
   type WinRecord,
@@ -28,8 +27,10 @@ export interface RenderWinCardOptions {
   format: WinCardFormat;
   /** The page's real font stack — read from computed style, since next/font hashes the family name. */
   fontFamily: string;
-  /** "Chocos coding" from the profile. */
+  /** The name from the settings profile. */
   ownerName: string;
+  /** The user's own invite link, display form ("remoteworldwide.net/j/ada") — printed in the footer. */
+  referralLink: string;
 }
 
 /** Per-format layout constants. One design, three densities. */
@@ -196,7 +197,7 @@ function drawQuote(
 }
 
 export function renderWinCard(canvas: HTMLCanvasElement, opts: RenderWinCardOptions): void {
-  const { win, toggles, format, fontFamily, ownerName } = opts;
+  const { win, toggles, format, fontFamily, ownerName, referralLink } = opts;
   const { width, height } = CARD_DIMENSIONS[format];
   const L = LAYOUT[format];
 
@@ -285,7 +286,7 @@ export function renderWinCard(canvas: HTMLCanvasElement, opts: RenderWinCardOpti
   ctx.textBaseline = "middle";
   ctx.fillStyle = LIME;
   ctx.font = `700 ${L.footer * 0.32}px ${fontFamily}`;
-  ctx.fillText(WIN_REFERRAL_LINK, L.pad, footerTop + L.footer / 2);
+  ctx.fillText(referralLink, L.pad, footerTop + L.footer / 2);
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.font = `800 ${L.footer * 0.26}px ${fontFamily}`;
   const brand = "REMOTE WORLDWIDE";

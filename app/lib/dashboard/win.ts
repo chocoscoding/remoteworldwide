@@ -3,8 +3,10 @@
 // Everything on the shareable card comes from here, FROZEN at the moment the
 // win is logged. The stats are a snapshot, not live reads, so the card a user
 // shared in August still says what it said in August even after their tracker
-// moves on. A real `wins` table replaces this module's constants and nothing
-// else — the shapes are the schema.
+// moves on. The numbers are pulled from the user's own data at log time
+// (`pullWinStats`) and the link is their real invite link. There is no `wins`
+// table yet, so a record lives as long as the session; the shapes are the
+// schema one would take.
 
 export interface WinFacts {
   company: string;
@@ -27,8 +29,8 @@ export interface WinStats {
 /**
  * One step of the path they took — the tracker's journey, dated. This is what
  * the voice of the card is: not just "I got the job" but the road there.
- * Derived from the application's tracker history; the mock freezes the
- * Vercel card's story the same way `buildTimeline` derives from `daysAgo`.
+ * Seeded from the application's tracker history in the win log, the same way
+ * `buildTimeline` derives from `daysAgo`, and completed by the user.
  */
 export interface WinJourneyStep {
   id: string;
@@ -68,42 +70,85 @@ export const CARD_DIMENSIONS: Record<WinCardFormat, { width: number; height: num
 };
 
 // ---------------------------------------------------------------------------
-// Mock source data — pre-filled from the tracker's Vercel application, which
-// is the one the rest of the dashboard already treats as the win.
+// Pulled stats — read off the user's own data at log time, never typed
 // ---------------------------------------------------------------------------
 
-/** Pulled stats, shown back in step two — the user types none of these. */
-export const WIN_STATS_PULL: Omit<WinStats, "streak" | "salaryDelta"> = {
-  applications: 34,
-  interviewLoops: 3,
-  referralsUsed: 1,
-};
+/** The slice of the applications summary the stats read: the server's funnel. */
+export interface WinFunnelStages {
+  stages: ReadonlyArray<{ id: string; reached: number }>;
+}
 
-export const WIN_SALARY_PREFILL = "+$12k";
+/** The slice of a recorded referral ask the stats read. */
+export interface WinReferralAsk {
+  job: { company: string } | null;
+}
+
+/**
+ * The numbers step three shows back. Applications and interview loops come
+ * from the server's funnel over the whole applications table (`reached` counts
+ * every application whose furthest stage got at least that far, so a rejection
+ * after two rounds still counts as a loop); referrals are the asks the user
+ * recorded for the winning company. Either source still loading reads as 0
+ * rather than a guess — the dialog says so while it waits.
+ */
+export function pullWinStats(
+  funnel: WinFunnelStages | undefined,
+  referralAsks: readonly WinReferralAsk[] | undefined,
+  company: string,
+): Omit<WinStats, "streak" | "salaryDelta"> {
+  const reached = (id: string) => funnel?.stages.find((s) => s.id === id)?.reached ?? 0;
+  const key = company.trim().toLowerCase();
+  return {
+    applications: reached("applied"),
+    interviewLoops: reached("interviewing"),
+    referralsUsed: key ? (referralAsks ?? []).filter((ask) => ask.job?.company.trim().toLowerCase() === key).length : 0,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Share copy
 // ---------------------------------------------------------------------------
 
-export const WIN_REFERRAL_LINK = "remoteworldwide.net/j/amara";
+/**
+ * What a logged win posts to the pod (POST /api/pod/wins). The role and
+ * company ARE the identity of the win, so the server's idempotency key is
+ * built from them: a double submit or a retry lands on the same key and the
+ * pod goal moves once. Same key formula as LivePodProvider's, so the two
+ * paths dedupe against each other; cut to the validator's 120 characters.
+ * What's moving prints no author for the others, so the text names the
+ * winner by first name when the profile has one.
+ */
+export function podWinBody(win: WinRecord, ownerName: string): { text: string; ref: string } {
+  const who = ownerName.trim() ? `${firstNameOf(ownerName.trim())} landed` : "Landed";
+  return {
+    text: `${who} ${win.facts.role} at ${win.facts.company} \u{1F389}`,
+    ref: `${win.facts.company}:${win.facts.role}`.toLowerCase().replace(/\s+/g, "-").slice(0, 120),
+  };
+}
 
-/** First name only, for the card toggle — "Chocos coding" -> "Amara". */
+/** First name only, for the card toggle — "Ada Obi" -> "Ada". */
 export const firstNameOf = (name: string) => name.split(" ")[0] ?? name;
+
+/**
+ * Attribution rides the shared link, per platform, so referral signups can be
+ * traced back to the share that brought them in. The on-screen preview stays
+ * clean. `link` is the user's own invite link (useInviteLink), absolute.
+ */
+export function trackedLink(link: string, utmSource: string | undefined, medium: string): string {
+  if (!utmSource) return link;
+  const sep = link.includes("?") ? "&" : "?";
+  return `${link}${sep}utm_source=${encodeURIComponent(utmSource)}&utm_medium=${medium}&utm_campaign=placement`;
+}
 
 /**
  * The pre-written caption. One body, small per-platform framing — the
  * platforms differ in what a composer will accept, not in what the story is.
  */
-export function winCaption(win: WinRecord, toggles: WinCardToggles, utmSource?: string): string {
+export function winCaption(win: WinRecord, toggles: WinCardToggles, link: string, utmSource?: string): string {
   const where = toggles.hideCompany ? win.facts.role : `${win.facts.role} at ${win.facts.company}`;
-  // Attribution rides the caption link, per platform, so referral signups
-  // can be traced back to the card that brought them in.
-  const link = utmSource
-    ? `https://${WIN_REFERRAL_LINK}?utm_source=${utmSource}&utm_medium=wincard&utm_campaign=placement`
-    : `https://${WIN_REFERRAL_LINK}`;
   return (
     `I got the job \u{1F389} ${where} — ${win.stats.applications} applications, ` +
     `${win.stats.interviewLoops} interview loops and a ${win.stats.streak}-day streak, tracked end to end. ` +
-    `If you're searching, this is where I did it: ${link}`
+    `If you're searching, this is where I did it: ${trackedLink(link, utmSource, "wincard")}`
   );
 }

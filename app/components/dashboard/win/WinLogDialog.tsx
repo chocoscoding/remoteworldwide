@@ -16,9 +16,10 @@ import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "@/app/components/dashb
 import { compareByPosition, toTrackerCard } from "@/app/lib/applications/api";
 import type { ApplicationItem } from "@/app/lib/applications/types";
 import type { PickedJob } from "@/app/lib/jobs/fields";
-import { WIN_SALARY_PREFILL, WIN_STATS_PULL, type WinJourneyStep, type WinRecord } from "@/app/lib/dashboard/win";
+import { pullWinStats, type WinJourneyStep, type WinRecord } from "@/app/lib/dashboard/win";
 import type { TrackerColumnId } from "@/app/lib/dashboard/types";
-import { useApplications } from "@/hooks/queries/useApplicationsQuery";
+import { useApplicationSummary, useApplications } from "@/hooks/queries/useApplicationsQuery";
+import { useReferralRequests } from "@/hooks/queries/useContactsQuery";
 
 /**
  * The win log. Four screens, each one question deep: which application won,
@@ -115,7 +116,9 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
   const [road, setRoad] = useState<RoadDates>({ offer: today });
 
   // --- Steps 3+4 -------------------------------------------------------------
-  const [salary, setSalary] = useState(WIN_SALARY_PREFILL);
+  // Empty, not a sample figure: whatever sits here is frozen into the record
+  // and can end up on a public card, so only the user may put a number in it.
+  const [salary, setSalary] = useState("");
   const [story, setStory] = useState("");
   const [shareAnonymously, setShareAnonymously] = useState(true);
   const [featureWithName, setFeatureWithName] = useState(false);
@@ -176,11 +179,21 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
   // One popover open at a time — selecting a day closes it.
   const [openRoadId, setOpenRoadId] = useState<string | null>(null);
 
+  // The numbers are the user's own: the server's funnel over every
+  // application, and the referral asks they recorded for this company.
+  const summary = useApplicationSummary();
+  const referralAsks = useReferralRequests();
+  const pulled = pullWinStats(summary.data?.funnel, referralAsks.data, company);
+  const statsLoading = summary.isPending || referralAsks.isPending;
   const pulledStats = [
-    { id: "apps", value: WIN_STATS_PULL.applications, label: "applications sent" },
-    { id: "loops", value: WIN_STATS_PULL.interviewLoops, label: "interview loops" },
+    { id: "apps", value: pulled.applications, label: pulled.applications === 1 ? "application sent" : "applications sent" },
+    { id: "loops", value: pulled.interviewLoops, label: pulled.interviewLoops === 1 ? "interview loop" : "interview loops" },
     { id: "streak", value: streak, label: "day streak" },
-    { id: "referral", value: WIN_STATS_PULL.referralsUsed, label: "referral used" },
+    {
+      id: "referral",
+      value: pulled.referralsUsed,
+      label: `referral ${pulled.referralsUsed === 1 ? "ask" : "asks"} at ${company.trim() || "this company"}`,
+    },
   ];
 
   function submit() {
@@ -192,7 +205,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
 
     onComplete({
       facts: { company: company.trim(), role: role.trim(), offerDateLabel: format(road.offer ?? today, "d MMMM") },
-      stats: { ...WIN_STATS_PULL, streak, salaryDelta: salary.trim() === "" ? null : salary.trim() },
+      stats: { ...pulled, streak, salaryDelta: salary.trim() === "" ? null : salary.trim() },
       journey,
       story: story.trim(),
       shareAnonymously,
@@ -388,7 +401,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                 <div className="grid grid-cols-2 gap-2.5">
                   {pulledStats.map((s) => (
                     <div key={s.id} className="rounded-xl border border-black/10 bg-[#fbfbf7] px-4 py-3">
-                      <p className="text-2xl font-bold leading-none tabular-nums text-primary">{s.value}</p>
+                      <p className="text-2xl font-bold leading-none tabular-nums text-primary">{statsLoading && s.id !== "streak" ? "…" : s.value}</p>
                       <p className="mt-1.5 text-xs text-black/60">{s.label}</p>
                     </div>
                   ))}
@@ -469,7 +482,9 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
               <StickerButton
                 variant="primary"
                 size="md"
-                disabled={(step === 0 && !jobValid) || (step === 1 && !roadValid)}
+                // The numbers are frozen into the record on submit, so they
+                // must have arrived before anyone moves past them.
+                disabled={(step === 0 && !jobValid) || (step === 1 && !roadValid) || (step === 2 && statsLoading)}
                 onClick={() => setStep((s) => s + 1)}>
                 Continue
                 <ArrowRight className="h-4 w-4" />

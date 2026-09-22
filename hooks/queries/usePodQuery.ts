@@ -29,6 +29,21 @@ export function usePodQuery(initial: PodOverview) {
   });
 }
 
+/**
+ * The same overview, for a surface outside the pod screen that has no server
+ * fetch to seed it — the share-win modal, which needs to know whether there is
+ * a pod to post to and who is in it. Same key, so on /dashboard/pod it reads
+ * the page's warm cache, and a post it makes lands on the page at once.
+ */
+export function usePodOverview({ enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: qk.pod.overview(),
+    queryFn: ({ signal }) => fetchPod(signal),
+    staleTime: STALE_TIME.pod,
+    enabled,
+  });
+}
+
 /** Server-side warm-up. Same key, same fetch. */
 export function prefetchPod(queryClient: QueryClient, load: () => Promise<PodOverview>) {
   return queryClient.prefetchQuery({ queryKey: qk.pod.overview(), queryFn: load, staleTime: STALE_TIME.pod });

@@ -17,9 +17,11 @@ import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import SuggestGoalDialog, { type SuggestedGoalInput } from "@/app/components/dashboard/modals/SuggestGoalDialog";
+import ShareWinModal from "@/app/components/dashboard/modals/ShareWinModal";
 import ManageGoalsDialog from "@/app/components/dashboard/pod/ManageGoalsDialog";
 import InvitePodDialog from "@/app/components/dashboard/pod/InvitePodDialog";
 import JoinPodDialog from "@/app/components/dashboard/pod/JoinPodDialog";
@@ -27,6 +29,7 @@ import CreatePodDialog from "@/app/components/dashboard/pod/CreatePodDialog";
 import LeavePodDialog from "@/app/components/dashboard/pod/LeavePodDialog";
 import PodEmptyState from "@/app/components/dashboard/pod/PodEmptyState";
 import { useLivePod } from "@/app/components/dashboard/pod/LivePodProvider";
+import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { GOAL_KIND_META } from "@/app/components/dashboard/pod/pod-goal-meta";
 import { JOIN_PARAM, JOIN_REFUSAL } from "@/app/lib/dashboard/pod-invite";
 import type { PodMember } from "@/app/lib/pod/types";
@@ -70,6 +73,7 @@ const PodClient: FC = () => {
     suggestGoal,
     logDay,
   } = useLivePod();
+  const { loggedToday, openLog } = useActivity();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -82,6 +86,7 @@ const PodClient: FC = () => {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  const [shareWinOpen, setShareWinOpen] = useState(false);
   const [draft, setDraft] = useState("");
   /** Null unless the owner is editing the name; holds the in-progress text. */
   const [nameDraft, setNameDraft] = useState<string | null>(null);
@@ -166,34 +171,50 @@ const PodClient: FC = () => {
               <span className="truncate text-sm font-semibold text-black/45">{pod.name}</span>
             ))}
         </div>
-        {/* Every action here acts on a pod, so out of one the bar is empty
-            rather than offering things that would have nowhere to land. */}
-        {inPod && (
-          <div className="flex flex-none items-center gap-3">
-            <StickerButton
-              variant="outline"
-              size="md"
-              onClick={() => setInviteOpen(true)}
-              disabled={seatsLeft === 0}
-              title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}>
-              <UserPlus className="h-4 w-4" />
-              Invite
-            </StickerButton>
-            <StickerButton
-              variant="outline"
-              size="md"
-              onClick={toggleMute}
-              disabled={busy}
-              title={muted ? "You'll still hear about your own membership" : "Silence this pod's activity"}>
-              {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-              {muted ? "Muted" : "Mute"}
-            </StickerButton>
-            <StickerButton variant="primary" size="md" onClick={() => logDay(1)} disabled={busy}>
-              <Flame className="h-4 w-4" />
-              Log today
-            </StickerButton>
-          </div>
-        )}
+        {/* Every action here acts on a pod, so out of one the bar holds only
+            the bell rather than offering things that would have nowhere to land. */}
+        <div className="flex flex-none items-center gap-3">
+          {inPod && (
+            <>
+              <StickerButton
+                variant="outline"
+                size="md"
+                onClick={() => setInviteOpen(true)}
+                disabled={seatsLeft === 0}
+                title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}>
+                <UserPlus className="h-4 w-4" />
+                Invite
+              </StickerButton>
+              <StickerButton
+                variant="outline"
+                size="md"
+                onClick={toggleMute}
+                disabled={busy}
+                title={muted ? "You'll still hear about your own membership" : "Silence this pod's activity"}>
+                {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                {muted ? "Muted" : "Mute"}
+              </StickerButton>
+              {/* An interview or offer off the tracker, to this pod and beyond. */}
+              <StickerButton variant="outline" size="md" onClick={() => setShareWinOpen(true)}>
+                <Trophy className="h-4 w-4" />
+                Share a win
+              </StickerButton>
+              {/* The board moves from what was really done ("no artifact, no
+                  day"): with something logged today this syncs it to the pod;
+                  with nothing yet it opens the log, which is the real action. */}
+              <StickerButton
+                variant="primary"
+                size="md"
+                onClick={() => (loggedToday ? logDay(1) : openLog())}
+                disabled={busy}
+                title={loggedToday ? "Show the pod what you did today" : "Log an application — the pod sees it on its own"}>
+                <Flame className="h-4 w-4" />
+                Log today
+              </StickerButton>
+            </>
+          )}
+          <NotificationBell />
+        </div>
       </header>
 
       <main className="mx-auto max-w-[1180px] px-8 py-7 pb-14">
@@ -419,6 +440,7 @@ const PodClient: FC = () => {
       <LeavePodDialog open={leaveOpen} onOpenChange={setLeaveOpen} />
       {manageOpen && <ManageGoalsDialog onClose={() => setManageOpen(false)} onSuggest={() => setSuggestOpen(true)} />}
       <SuggestGoalDialog open={suggestOpen} onOpenChange={setSuggestOpen} onSuggest={handleSuggest} />
+      <ShareWinModal open={shareWinOpen} onOpenChange={setShareWinOpen} />
     </div>
   );
 };

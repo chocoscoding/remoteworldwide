@@ -28,3 +28,19 @@ export interface InviteOverview {
   total: number;
   totalPages: number;
 }
+
+/**
+ * What /api/invites/summary answers with: the overview's counts and code
+ * without the page of people. The sidebar meter and the win share read it on
+ * every screen, so it carries no names. These are REFERRAL credits, a separate
+ * currency from the plan credits on the billing screen.
+ */
+export interface InviteSummary {
+  code: string;
+  creditsPerSubscriber: number;
+  creditsEarned: number;
+  /** What the people who joined but have not subscribed would be worth if they did. */
+  creditsPending: number;
+  joined: number;
+  subscribed: number;
+}

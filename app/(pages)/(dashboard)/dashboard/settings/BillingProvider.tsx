@@ -3,8 +3,8 @@
 // Plan, credit balance and checkout state — now backed by React Query.
 //
 // App-wide because the sidebar credit meter and the billing screen must never
-// disagree. Distinct from ActivityProvider.credits, which counts referral
-// credits earned through invites — a different currency.
+// disagree. Distinct from the invite summary (useInviteSummary), which counts
+// referral credits earned through invites — a different currency.
 //
 // Like SettingsProvider, this is an adapter: the context value is unchanged,
 // so every screen reading `useBilling()` was untouched. What changed

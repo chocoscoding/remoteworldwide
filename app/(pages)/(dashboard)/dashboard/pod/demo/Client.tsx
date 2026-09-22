@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import ShareWinModal from "@/app/components/dashboard/modals/ShareWinModal";
@@ -78,7 +79,7 @@ function initials(name: string): string {
 }
 
 const PodClient: FC = () => {
-  const { moving, toggleFire, shareToPod, goals, suggestGoal, inPod, capacity, memberCount, seatsLeft, joinByMatching, joinWithCode, leavePod } =
+  const { moving, toggleFire, goals, suggestGoal, inPod, capacity, memberCount, seatsLeft, joinByMatching, joinWithCode, leavePod } =
     usePod();
   const { openWinLog } = useWin();
   const router = useRouter();
@@ -117,12 +118,6 @@ const PodClient: FC = () => {
   };
 
   const toggleBoardRow = (rank: number) => setOpenBoardRow((prev) => (prev === rank ? null : rank));
-
-  const handleShareConfirm = () => {
-    setShareOpen(false);
-    shareToPod("You shared an interview win 🎉", { hot: true });
-    toast.success("Shared with your pod", { description: "It's on What's moving — they'll see it." });
-  };
 
   const handleSuggestGoal = (input: SuggestedGoalInput) => {
     suggestGoal(input);
@@ -172,29 +167,32 @@ const PodClient: FC = () => {
           <h1 className="whitespace-nowrap text-[17px] font-bold text-primary">Your pod</h1>
           <span className="truncate text-sm font-semibold text-black/45">Night Shift</span>
         </div>
-        {/* Every action here acts on a pod, so out of one the bar is empty
-            rather than offering things that would have nowhere to land. */}
-        {inPod && (
-          <div className="flex flex-none items-center gap-3">
-            <StickerButton
-              variant="outline"
-              size="md"
-              onClick={() => setInviteOpen(true)}
-              disabled={seatsLeft === 0}
-              title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}>
-              <UserPlus className="h-4 w-4" />
-              Invite
-            </StickerButton>
-            <StickerButton variant="outline" size="md" onClick={() => setMuted((v) => !v)}>
-              {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-              {muted ? "Muted" : "Mute"}
-            </StickerButton>
-            <StickerButton variant="primary" size="md" onClick={() => setShareOpen(true)}>
-              <Trophy className="h-4 w-4" />
-              Share a win
-            </StickerButton>
-          </div>
-        )}
+        {/* Every action here acts on a pod, so out of one the bar holds only
+            the bell rather than offering things that would have nowhere to land. */}
+        <div className="flex flex-none items-center gap-3">
+          {inPod && (
+            <>
+              <StickerButton
+                variant="outline"
+                size="md"
+                onClick={() => setInviteOpen(true)}
+                disabled={seatsLeft === 0}
+                title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}>
+                <UserPlus className="h-4 w-4" />
+                Invite
+              </StickerButton>
+              <StickerButton variant="outline" size="md" onClick={() => setMuted((v) => !v)}>
+                {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                {muted ? "Muted" : "Mute"}
+              </StickerButton>
+              <StickerButton variant="primary" size="md" onClick={() => setShareOpen(true)}>
+                <Trophy className="h-4 w-4" />
+                Share a win
+              </StickerButton>
+            </>
+          )}
+          <NotificationBell />
+        </div>
       </header>
 
       <main className="mx-auto max-w-[1180px] px-8 py-7 pb-14">
@@ -559,7 +557,9 @@ const PodClient: FC = () => {
         )}
       </main>
 
-      <ShareWinModal open={shareOpen} onOpenChange={setShareOpen} tier="Interview" onConfirm={handleShareConfirm} />
+      {/* The real share: the user's own tracker wins, their real pod and their
+          invite link — not this walkthrough's mock feed, which it never touches. */}
+      <ShareWinModal open={shareOpen} onOpenChange={setShareOpen} />
       {manageOpen && <ManageGoalsDialog onClose={() => setManageOpen(false)} onSuggest={() => setSuggestOpen(true)} />}
       <SuggestGoalDialog open={suggestOpen} onOpenChange={setSuggestOpen} onSuggest={handleSuggestGoal} />
       <PauseSearchDialog open={pauseOpen} onOpenChange={setPauseOpen} />

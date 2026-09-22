@@ -4,13 +4,14 @@ import { FC, useState } from "react";
 import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Check, MessageSquare, Mic, PartyPopper, Users, X } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { usePod } from "@/app/components/dashboard/pod/PodProvider";
+import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
+import { useSharePost } from "@/hooks/mutations/usePodMutations";
+import { firstNameOf } from "@/app/lib/dashboard/win";
 import { useWin } from "@/app/components/dashboard/win/WinProvider";
 import type { TrackerCard, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
 import { GHOST_AFTER_DAYS } from "@/app/components/dashboard/tracker/tracker-meta";
@@ -153,25 +154,31 @@ const NEXT_STEP_HINT: Record<TrackerColumnId, string> = {
  * onto the pod's What's moving feed where the others can fire it. Keyed by
  * card+column from the call site so reopening on another job (or after a
  * status change) offers a fresh share.
+ *
+ * Posts to the pod API directly: `usePod()` here reads the shell's mock pod
+ * (the live one is mounted only on /dashboard/pod), which would post nowhere.
+ * "On your pod" shows only once the server stored it; the toast, and the
+ * refusal when there is no pod, come from useSharePost. The feed prints no
+ * author for the others, so the post carries the profile's first name.
  */
 const SharePodRow: FC<{ card: TrackerCard; columnId: TrackerColumnId }> = ({ card, columnId }) => {
-  const { shareToPod } = usePod();
+  const sharePost = useSharePost();
+  const { profile } = useSettings();
   const [shared, setShared] = useState(false);
 
+  const who = profile.fullName.trim() ? firstNameOf(profile.fullName.trim()) : null;
   const milestone =
-    columnId === "saved" ? `You saved a role at ${card.company}` : `You: ${card.company} — now ${COLUMN_LABELS[columnId]}`;
+    columnId === "saved"
+      ? `${who ? `${who} saved` : "Saved"} a role at ${card.company}`
+      : `${who ? `${who}: ` : ""}${card.company} — now ${COLUMN_LABELS[columnId]}`;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 px-6 py-3">
       <p className="text-xs text-black/55">Feels like progress? Your pod sees what&apos;s moving.</p>
       <button
         type="button"
-        disabled={shared}
-        onClick={() => {
-          shareToPod(milestone);
-          setShared(true);
-          toast.success("On your pod's board", { description: milestone });
-        }}
+        disabled={shared || sharePost.isPending}
+        onClick={() => sharePost.mutate({ text: milestone }, { onSuccess: () => setShared(true) })}
         className={cn(
           "inline-flex flex-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
           shared

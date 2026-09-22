@@ -14,7 +14,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiPatch, apiPost } from "@/app/lib/api/client";
-import { apiMessage } from "@/app/lib/api/core";
+import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { qk } from "@/app/lib/query/keys";
 import type { PodGoalKind, PodOverview } from "@/app/lib/pod/types";
 
@@ -111,6 +111,38 @@ export const useRecordWin = () =>
     (body) => apiPost<PodOverview>("/api/pod/wins", body),
     () => toast.success("Logged with your pod", { description: "It's on the feed and it moved the pod's goal." }),
   );
+
+/**
+ * The win log's pod post. Same endpoint as `useRecordWin`, but fired from the
+ * dashboard shell: WinProvider sits above the pod screen's LivePodProvider, so
+ * the `recordJobWin` it would read from `usePod()` is the walkthrough's mock,
+ * which posts nowhere and toasts that it did.
+ *
+ * Being in no pod is not an error here — the win still happened, there is just
+ * no pod to tell — so the server's 409 resolves to null and says nothing,
+ * rather than landing a refusal on top of the celebration. The toast fires only
+ * on the server's answer, so "on your pod's board" is never a guess.
+ */
+export function useRecordJobWin() {
+  const queryClient = useQueryClient();
+
+  return useMutation<PodOverview | null, unknown, WinBody>({
+    mutationFn: async (body) => {
+      try {
+        return await apiPost<PodOverview>("/api/pod/wins", body);
+      } catch (error) {
+        if (error instanceof BackendError && error.status === 409) return null;
+        throw error;
+      }
+    },
+    onSuccess: (data) => {
+      if (!data) return;
+      queryClient.setQueryData(qk.pod.overview(), data);
+      toast.success("On your pod's board", { description: "Your win is on What's moving — they'll see it." });
+    },
+    onError: (error) => toast.error("Your pod didn't get the news", { description: apiMessage(error) }),
+  });
+}
 
 /**
  * The fire reaction, applied before the round trip. The server owns the real

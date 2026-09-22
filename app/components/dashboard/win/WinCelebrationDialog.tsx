@@ -11,12 +11,14 @@ import { toast } from "sonner";
 import {
   CARD_DIMENSIONS,
   DEFAULT_TOGGLES,
+  trackedLink,
   winCaption,
   type WinCardFormat,
   type WinCardToggles,
   type WinRecord,
 } from "@/app/lib/dashboard/win";
 import { paintWinCard } from "./win-card-render";
+import { useInviteLink } from "@/hooks/queries/useInviteSummary";
 
 /**
  * The celebration popup: confetti, the card, the share row. The preview IS
@@ -28,11 +30,17 @@ import { paintWinCard } from "./win-card-render";
  * - Mobile with the Web Share API: the native sheet gets the PNG itself.
  * - Desktop: the PNG downloads, the caption goes to the clipboard, and the
  *   platform opens — prefilled where a URL can carry text (WhatsApp,
- *   Telegram, X), paste-it-yourself on LinkedIn, which accepts neither.
+ *   Telegram, X); LinkedIn's share-offsite takes only the link, so the
+ *   caption is there to paste.
+ *
+ * The link on the card and in every caption is the user's real invite link,
+ * so a signup from a shared win is credited to them. Nothing here claims a
+ * post went out: a composer we opened is "opened", and only a native share
+ * sheet that resolved (the user picked a target) is "shared".
  */
 export interface WinCelebrationDialogProps {
   win: WinRecord;
-  /** "Chocos coding" — the card carries the profile name, not an input. */
+  /** The settings profile's name — the card carries it, it is not an input. */
   ownerName: string;
   onClose: () => void;
 }
@@ -47,8 +55,8 @@ interface ShareTarget {
   label: string;
   icon: LucideIcon;
   tile: string;
-  /** Builds the URL a desktop share opens; null means download + caption only. */
-  url: (caption: string) => string | null;
+  /** Builds the URL a desktop share opens from the platform's caption and tracked link. */
+  url: (caption: string, link: string) => string;
 }
 
 const SHARE_TARGETS: ShareTarget[] = [
@@ -59,15 +67,21 @@ const SHARE_TARGETS: ShareTarget[] = [
     tile: "bg-[#25d366]",
     url: (c) => `https://wa.me/?text=${encodeURIComponent(c)}`,
   },
-  { id: "linkedin", label: "LinkedIn", icon: Linkedin, tile: "bg-[#0a66c2]", url: () => "https://www.linkedin.com/feed/?shareActive=true" },
+  {
+    id: "linkedin",
+    label: "LinkedIn",
+    icon: Linkedin,
+    tile: "bg-[#0a66c2]",
+    url: (_c, link) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`,
+  },
   {
     id: "telegram",
     label: "Telegram",
     icon: Send,
     tile: "bg-[#229ed9]",
-    url: (c) => `https://t.me/share/url?url=${encodeURIComponent("https://remoteworldwide.net/j/amara")}&text=${encodeURIComponent(c)}`,
+    url: (c, link) => `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(c)}`,
   },
-  { id: "x", label: "X", icon: Twitter, tile: "bg-[#222325]", url: (c) => `https://x.com/intent/tweet?text=${encodeURIComponent(c)}` },
+  { id: "x", label: "X", icon: Twitter, tile: "bg-[#222325]", url: (c) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(c)}` },
 ];
 
 const TOGGLE_DEFS: { key: keyof WinCardToggles; onLabel: string; offLabel: string }[] = [
@@ -84,16 +98,19 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
   const [format, setFormat] = useState<WinCardFormat>("landscape");
   const [toggles, setToggles] = useState<WinCardToggles>(DEFAULT_TOGGLES);
   const [copied, setCopied] = useState(false);
+  // The real invite link; the bare site until the code arrives, never a made-up one.
+  const inviteLink = useInviteLink();
+  const referralLink = inviteLink.display;
 
   // First paint happens in the ref callback below — the canvas sits inside
   // Radix's portal, which mounts after this component's effects, so a mount
   // effect sees a null ref. This effect only handles prop-driven redraws.
   useEffect(() => {
     const el = canvasRef.current;
-    if (el) paintWinCard(el, () => canvasRef.current, { win, toggles, format, ownerName });
-  }, [win, toggles, format, ownerName]);
+    if (el) paintWinCard(el, () => canvasRef.current, { win, toggles, format, ownerName, referralLink });
+  }, [win, toggles, format, ownerName, referralLink]);
 
-  const caption = winCaption(win, toggles);
+  const caption = winCaption(win, toggles, inviteLink.url);
 
   function cardBlob(): Promise<Blob | null> {
     return new Promise((resolve) => {
@@ -126,7 +143,8 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
     const blob = await cardBlob();
     // The shared caption carries per-platform UTM on the referral link; the
     // on-screen preview stays clean.
-    const platformCaption = winCaption(win, toggles, target.id);
+    const platformCaption = winCaption(win, toggles, inviteLink.url, target.id);
+    const platformLink = trackedLink(inviteLink.url, target.id, "wincard");
 
     // Mobile-first: the native sheet takes the actual image.
     if (blob && typeof navigator !== "undefined" && navigator.canShare) {
@@ -134,9 +152,14 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
       if (navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({ files: [file], text: platformCaption });
+          // Resolving means a target was picked — the one moment we can say it.
+          toast.success("Shared");
           return;
-        } catch {
-          // Cancelled or unsupported combination — fall through to desktop.
+        } catch (error) {
+          // The user closed the sheet: that is a decision, not a failure to
+          // route around by opening a composer they just declined.
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          // Unsupported combination — fall through to desktop.
         }
       }
     }
@@ -148,13 +171,14 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
     }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
-    const url = target.url(platformCaption);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
-    toast.success(`Image saved + caption copied`, {
+    window.open(target.url(platformCaption, platformLink), "_blank", "noopener,noreferrer");
+    // "Opened", not "shared": the post exists only once they press the
+    // platform's own button, and we never see that.
+    toast.success(`Opened ${target.label}`, {
       description:
         target.id === "linkedin"
-          ? "LinkedIn takes neither from a link — paste the caption and attach the image."
-          : "Attach the saved image in the composer; your caption is already there.",
+          ? "Image saved and caption copied — LinkedIn takes only the link, so paste the caption and attach the image."
+          : "Image saved and caption copied — attach the image in the composer; your caption is already there.",
     });
   }
 
@@ -197,7 +221,7 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
               <canvas
                 ref={(el) => {
                   canvasRef.current = el;
-                  if (el) paintWinCard(el, () => canvasRef.current, { win, toggles, format, ownerName });
+                  if (el) paintWinCard(el, () => canvasRef.current, { win, toggles, format, ownerName, referralLink });
                 }}
                 className="h-auto w-full rounded-lg border border-black/15"
               />
