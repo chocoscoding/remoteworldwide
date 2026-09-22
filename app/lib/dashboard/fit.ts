@@ -5,6 +5,10 @@
 // makes that claim true: fit is a function of what you told us you want, so
 // changing a preference moves every score on the screen.
 //
+// The targets are live Remote Worldwide listings now (app/lib/recommendations/
+// view.ts), which carry a title and regions but no salary band or skills list —
+// so those two factors read "not published" rather than guessing.
+//
 // Pure and deterministic — safe to call during render. A real matching service
 // replaces the body of `computeFit` and nothing else.
 
@@ -123,7 +127,14 @@ function salaryFactor(target: RecommendationTarget, prefs: FitPrefs): FitFactor 
 
 function skillsFactor(target: RecommendationTarget, profile: FitProfile): FitFactor {
   if (target.skills.length === 0) {
-    return { id: "skills", label: "Skills", score: 70, met: false, detail: "They haven't listed what they're looking for." };
+    // Listings don't break skills out yet, but a title often names the one
+    // that matters ("Senior React Engineer") — a skill of yours there is real
+    // signal. Otherwise neutral: no list is not a mismatch.
+    const title = ` ${norm(target.role).replace(/[^a-z0-9+#.\s]/g, " ")} `;
+    const named = profile.skills.find((s) => norm(s).length > 1 && title.includes(` ${norm(s)} `));
+    return named
+      ? { id: "skills", label: "Skills", score: 90, met: true, detail: `${named} is right in the title.` }
+      : { id: "skills", label: "Skills", score: 70, met: false, detail: "The listing doesn't break out skills to compare." };
   }
   const mine = new Set(profile.skills.map(norm));
   const matched = target.skills.filter((s) => mine.has(norm(s)));
@@ -145,7 +156,16 @@ function timezoneFactor(target: RecommendationTarget, prefs: FitPrefs, profile: 
   if (prefs.remotePolicy === "anywhere") {
     return { id: "timezone", label: "Timezone", score: 100, met: true, detail: "You're open to any timezone." };
   }
-  const gap = Math.abs(target.timezoneOffset - parseGmtOffset(profile.timezone));
+  if (target.anywhere) {
+    return { id: "timezone", label: "Timezone", score: 100, met: true, detail: "They hire anywhere in the world." };
+  }
+  if (target.timezoneOffsets.length === 0) {
+    return { id: "timezone", label: "Timezone", score: 70, met: false, detail: "They don't say where they hire." };
+  }
+  // The region closest to you decides — a listing open to Europe and the
+  // Americas is a comfortable fit for someone in either.
+  const mine = parseGmtOffset(profile.timezone);
+  const gap = Math.min(...target.timezoneOffsets.map((offset) => Math.abs(offset - mine)));
   const score = gap <= 3 ? 100 : Math.max(10, Math.round(100 - (gap - 3) * 18));
   const hrs = `${gap}h`;
   return {

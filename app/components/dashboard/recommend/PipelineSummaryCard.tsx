@@ -8,7 +8,7 @@ import Avatar from "@/app/components/dashboard/ui/Avatar";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
-import { INTRO_STAGES } from "@/app/lib/dashboard/mock-data";
+import { RECOMMENDATION_STAGE_LABELS } from "@/app/lib/recommendations/types";
 import type { IntroPipelineEntry } from "@/app/lib/dashboard/types";
 
 /**
@@ -26,7 +26,7 @@ const PipelineSummaryCard: FC<PipelineSummaryCardProps> = ({ entry }) => {
   const unanswered = questions.filter((q) => !q.answer).length;
   const awaitingYou = unanswered > 0;
   const answered = questions.length > 0 && unanswered === 0;
-  const progress = Math.round((entry.stageIndex / (INTRO_STAGES.length - 1)) * 100);
+  const progress = Math.round((entry.stageIndex / (RECOMMENDATION_STAGE_LABELS.length - 1)) * 100);
 
   return (
     <Link href={`/dashboard/recommend/${entry.id}`} className="group block">
@@ -45,10 +45,10 @@ const PipelineSummaryCard: FC<PipelineSummaryCardProps> = ({ entry }) => {
               <p className="truncate text-[15px] font-bold text-primary">{entry.company}</p>
               {awaitingYou ? (
                 <Pill variant="urgent">Waiting on you</Pill>
-              ) : entry.stageIndex >= INTRO_STAGES.length - 1 ? (
+              ) : entry.stageIndex >= RECOMMENDATION_STAGE_LABELS.length - 1 ? (
                 <Pill variant="positive">Interviewing</Pill>
               ) : (
-                <Pill variant="neutral">{INTRO_STAGES[entry.stageIndex]}</Pill>
+                <Pill variant="neutral">{RECOMMENDATION_STAGE_LABELS[entry.stageIndex]}</Pill>
               )}
             </div>
             <p className="mt-0.5 truncate text-xs text-black/55">

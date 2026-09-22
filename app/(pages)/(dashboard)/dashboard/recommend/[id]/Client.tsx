@@ -1,21 +1,24 @@
 "use client";
 
-import { FC, useEffect, useState } from "react";
+import { FC, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, CircleAlert, RotateCw } from "lucide-react";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PipelineCard from "@/app/components/dashboard/recommend/PipelineCard";
-import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
+import { BackendError } from "@/app/lib/api/core";
+import { toPipelineEntry } from "@/app/lib/recommendations/view";
+import { useRecommendation, useWarmPaths } from "@/hooks/queries/useRecommendationsQuery";
 
 /**
  * One recommendation, on its own page. The list keeps the headline; this is
- * where the stage tracker and Q&A actually live.
+ * where the stage tracker, the reviewer's note and the Q&A actually live.
  *
- * The load is simulated — provider data is synchronous in this build — but
- * the states are real UI a fetch would need: a skeleton while loading, an
- * error card with retry when the entry can't be found. A real API call
- * replaces the timer and nothing else changes shape.
+ * Read from GET /api/recommendations/:id — opening on the list's cached copy
+ * when there is one, so a click from the list paints at once. Someone else's
+ * id reads exactly like a deleted one (404), and says so without a retry;
+ * anything else that fails offers one.
  */
 export interface RecDetailClientProps {
   entryId: string;
@@ -40,26 +43,12 @@ const DetailSkeleton: FC = () => (
 );
 
 const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
-  const { pipeline } = useNetwork();
-  // Bumped by "Try again" — re-runs the (simulated) load from scratch.
-  const [attempt, setAttempt] = useState(0);
-  // Loading is DERIVED: we're loading whenever the finished marker doesn't
-  // match the current entry+attempt. No setState in the effect body — the
-  // timer callback is the only writer, which keeps the compiler's
-  // set-state-in-effect rule satisfied and makes retry reset for free.
-  const loadKey = `${entryId}:${attempt}`;
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
-  const loading = loadedKey !== loadKey;
+  const query = useRecommendation(entryId);
+  // Mapped once per fetch: the day counts are read off the clock here, not on every render.
+  const entry = useMemo(() => (query.data ? toPipelineEntry(query.data) : undefined), [query.data]);
+  const warmPathAt = useWarmPaths(entry ? [entry.company] : []);
 
-  // The timer stands in for the fetch; a real API call replaces it 1:1.
-  useEffect(() => {
-    const timer = window.setTimeout(() => setLoadedKey(loadKey), 550);
-    return () => window.clearTimeout(timer);
-  }, [loadKey]);
-
-  // Found-ness is decided at render time against live provider state, so
-  // answering questions on this page never re-triggers the loading gate.
-  const entry = pipeline.find((e) => e.id === entryId);
+  const gone = query.error instanceof BackendError && query.error.status === 404;
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
@@ -70,31 +59,38 @@ const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
           <ArrowLeft className="h-4 w-4" />
           Recommendations
         </Link>
-        {!loading && entry && (
+        {entry && (
           <>
             <span aria-hidden className="text-black/25">/</span>
             <h1 className="truncate text-[15px] font-bold text-primary">{entry.company}</h1>
           </>
         )}
+        <NotificationBell className="ml-auto" />
       </header>
 
       <main className="mx-auto max-w-[760px] px-8 py-7 pb-14">
-        {loading ? (
+        {entry ? (
+          <PipelineCard entry={entry} warmPath={warmPathAt(entry.company)} />
+        ) : query.isPending ? (
           <DetailSkeleton />
-        ) : !entry ? (
+        ) : (
           <DashCard className="p-10 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#fdeae6]">
               <CircleAlert className="h-5 w-5 text-[#b23c26]" />
             </div>
-            <p className="text-[15px] font-bold text-primary">We couldn&apos;t load this recommendation</p>
+            <p className="text-[15px] font-bold text-primary">{gone ? "This recommendation isn't here" : "We couldn't load this recommendation"}</p>
             <p className="mx-auto mt-1.5 max-w-[380px] text-sm leading-relaxed text-black/55">
-              It may have been closed, or the link is stale. Your live recommendations are all on the main list.
+              {gone
+                ? "It may have been removed, or the link is stale. Your recommendations are all on the main list."
+                : "Something went wrong on our side. Try again, or head back to the list."}
             </p>
             <div className="mt-5 flex items-center justify-center gap-2.5">
-              <StickerButton variant="primary" size="md" onClick={() => setAttempt((n) => n + 1)}>
-                <RotateCw className="h-4 w-4" />
-                Try again
-              </StickerButton>
+              {!gone && (
+                <StickerButton variant="primary" size="md" onClick={() => void query.refetch()}>
+                  <RotateCw className="h-4 w-4" />
+                  Try again
+                </StickerButton>
+              )}
               <Link
                 href="/dashboard/recommend"
                 className="rounded-lg px-3 py-2 text-xs font-semibold text-black/60 transition-colors hover:bg-black/[0.05] hover:text-primary">
@@ -102,8 +98,6 @@ const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
               </Link>
             </div>
           </DashCard>
-        ) : (
-          <PipelineCard entry={entry} />
         )}
       </main>
     </div>

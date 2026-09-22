@@ -7,7 +7,10 @@ export type NotificationKind =
   | "pod.inactivity-warning"
   | "pod.removed"
   | "pod.deleted"
-  | "pod.rotated";
+  | "pod.rotated"
+  // A reviewer put you in front of a company, or the company sent its questions.
+  | "recommendation.created"
+  | "recommendation.questions";
 
 export interface NotificationItem {
   id: string;

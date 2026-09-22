@@ -3,10 +3,10 @@
 import { FC } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { INTRO_STAGES } from "@/app/lib/dashboard/mock-data";
+import { RECOMMENDATION_STAGE_LABELS } from "@/app/lib/recommendations/types";
 
 /**
- * Where you are with one company. Four stages, because a recommendation skips
+ * Where you are with one company. Three stages, because a recommendation skips
  * the funnel: reviewers put you forward, the company asks a question or two,
  * you answer, you talk.
  */
@@ -17,10 +17,10 @@ export interface IntroStageTrackerProps {
 
 const IntroStageTracker: FC<IntroStageTrackerProps> = ({ currentIndex, className }) => (
   <div className={cn("flex items-start", className)}>
-    {INTRO_STAGES.map((stage, i) => {
+    {RECOMMENDATION_STAGE_LABELS.map((stage, i) => {
       const done = i < currentIndex;
       const current = i === currentIndex;
-      const last = i === INTRO_STAGES.length - 1;
+      const last = i === RECOMMENDATION_STAGE_LABELS.length - 1;
 
       return (
         <div key={stage} className={cn("flex min-w-0 flex-col items-center", !last && "flex-1")}>

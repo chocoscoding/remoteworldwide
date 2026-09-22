@@ -7,6 +7,7 @@ import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import type { IntroPipelineEntry } from "@/app/lib/dashboard/types";
+import { RECOMMENDATION_ANSWER_MAX_CHARS } from "@/app/lib/recommendations/types";
 
 /**
  * The whole interaction with a company you've been put in front of: they ask
@@ -24,9 +25,14 @@ export interface IntroQuestionsProps {
 /** Draft storage key — survives reloads; cleared only on a successful send. */
 const draftKey = (questionId: string) => `rww-intro-draft-${questionId}`;
 
+/** Just this recommendation's answers, by question id — never a stale draft for a question that was removed. */
+const pick = (drafts: Record<string, string>, questions: { id: string }[]) =>
+  Object.fromEntries(questions.map((q) => [q.id, drafts[q.id] ?? ""]));
+
 const IntroQuestions: FC<IntroQuestionsProps> = ({ entry }) => {
-  const { answerIntroQuestions } = useNetwork();
+  const { answerIntroQuestions, answeringId } = useNetwork();
   const questions = entry.questions ?? [];
+  const sending = answeringId === entry.id;
 
   // Drafts autosave to localStorage on every keystroke and restore on mount —
   // losing a half-written answer is the worst bug this screen can have. Reads
@@ -53,8 +59,11 @@ const IntroQuestions: FC<IntroQuestionsProps> = ({ entry }) => {
     }
   }
 
-  function send() {
-    answerIntroQuestions(entry.id, drafts);
+  async function send() {
+    // Drafts are cleared only once the server has the answers: a refused send
+    // (the deadline passed, a network blip) must leave every word where it was.
+    const stored = await answerIntroQuestions({ id: entry.id, company: entry.company }, pick(drafts, questions));
+    if (!stored) return;
     try {
       for (const q of questions) window.localStorage.removeItem(draftKey(q.id));
     } catch {
@@ -63,6 +72,7 @@ const IntroQuestions: FC<IntroQuestionsProps> = ({ entry }) => {
   }
 
   const complete = questions.every((q) => (drafts[q.id] ?? "").trim().length > 0);
+  const tooLong = questions.some((q) => (drafts[q.id] ?? "").trim().length > RECOMMENDATION_ANSWER_MAX_CHARS);
 
   return (
     <div className="mt-4 border-t border-black/10 pt-4">
@@ -97,16 +107,18 @@ const IntroQuestions: FC<IntroQuestionsProps> = ({ entry }) => {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <StickerButton variant="primary" size="md" disabled={!complete} onClick={send}>
+        <StickerButton variant="primary" size="md" disabled={!complete || tooLong || sending} onClick={() => void send()}>
           <Send className="h-4 w-4" />
-          Send answers
+          {sending ? "Sending…" : "Send answers"}
         </StickerButton>
         <p className="text-xs text-black/55">
-          {complete
-            ? "Goes straight to their hiring team."
-            : questions.length === 1
-              ? "Answer to send."
-              : `Answer all ${questions.length} to send.`}
+          {tooLong
+            ? `Keep each answer under ${RECOMMENDATION_ANSWER_MAX_CHARS.toLocaleString()} characters.`
+            : complete
+              ? "Goes straight to their hiring team. You can't edit them after."
+              : questions.length === 1
+                ? "Answer to send."
+                : `Answer all ${questions.length} to send.`}
         </p>
       </div>
     </div>
