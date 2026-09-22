@@ -1,14 +1,15 @@
-// Streak engine for the Job Seeker Dashboard.
+// Streak presentation for the Job Seeker Dashboard.
 //
-// Pure, dependency-free helpers: tier lookup, milestone ladder, calendar
-// layout and the mock-history generator. Nothing here touches React or the
-// DOM — `StreakProvider` owns all the state, this file just does the maths.
+// Pure, dependency-free helpers: tier lookup, milestone ladder, day visuals and
+// calendar layout. The streak itself is the server's — derived from the
+// activity log in remoteworldwidebackend (streakService, helpers/streakMath) —
+// so nothing here counts a run any more; it only decides how one looks.
 //
 // Every Tailwind class below is written out as a literal string inside a
 // lookup map rather than assembled at runtime, so Tailwind's build-time
 // scanner sees each one and no streak visual ever needs an inline `style`.
 
-import type { StreakDay, StreakDayStatus, StreakMilestone, StreakState } from "./types";
+import type { StreakDay, StreakDayStatus, StreakMilestone } from "./types";
 
 // ---------------------------------------------------------------------------
 // Date helpers — all local-time, no UTC conversion, so "today" means the
@@ -406,43 +407,6 @@ export function dayVisual(status: StreakDayStatus, tier: StreakTier): DayVisual 
 }
 
 // ---------------------------------------------------------------------------
-// Streak arithmetic
-// ---------------------------------------------------------------------------
-
-/**
- * Counts back from the most recent day to find the live streak. `rest` and
- * `freeze` days are transparent — they neither add to the count nor end it.
- * An open `today` is skipped so the number doesn't drop to 0 every midnight.
- */
-export function computeStreak(days: StreakDay[]): number {
-  let streak = 0;
-  for (let i = days.length - 1; i >= 0; i--) {
-    const { status } = days[i];
-    if (status === "logged" || status === "backfilled") streak += 1;
-    else if (status === "rest" || status === "freeze" || status === "today") continue;
-    else break;
-  }
-  return streak;
-}
-
-/** Longest `done` run anywhere in the history, with the same pass-through rules. */
-export function computeLongest(days: StreakDay[]): number {
-  let best = 0;
-  let run = 0;
-  for (const { status } of days) {
-    if (status === "logged" || status === "backfilled") {
-      run += 1;
-      best = Math.max(best, run);
-    } else if (status === "rest" || status === "freeze" || status === "today") {
-      continue;
-    } else {
-      run = 0;
-    }
-  }
-  return best;
-}
-
-// ---------------------------------------------------------------------------
 // Calendar layout
 // ---------------------------------------------------------------------------
 
@@ -479,127 +443,4 @@ export function buildMonthGrid(month: Date, byKey: Map<string, StreakDay>, today
       isToday: key === todayKey,
     };
   });
-}
-
-// ---------------------------------------------------------------------------
-// Mock history
-// ---------------------------------------------------------------------------
-
-/**
- * Deterministic 0–1 generator. Seeded off the day index so the generated
- * history is byte-identical on the server and on the client, which keeps
- * hydration quiet — `Math.random()` here would mismatch on every reload.
- */
-function seeded(n: number): number {
-  const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-export interface BuildHistoryOptions {
-  /** Days of history to generate, ending today. */
-  span?: number;
-  /** Length of the unbroken run ending today. */
-  currentStreak?: number;
-  /** Monday-first indices treated as scheduled rest days. */
-  restDays?: number[];
-}
-
-/**
- * Builds a believable history: an unbroken `currentStreak` run ending
- * yesterday (today is left open so the user has something to log), a clean
- * break before it, then sparser earlier activity with one absorbed freeze.
- */
-export function buildStreakHistory(today: Date, options: BuildHistoryOptions = {}): StreakDay[] {
-  const { span = 126, currentStreak = 12, restDays = [6] } = options;
-  const days: StreakDay[] = [];
-
-  for (let offset = span - 1; offset >= 0; offset--) {
-    const date = addDays(today, -offset);
-    const key = dayKey(date);
-    const isRest = restDays.includes(weekdayIndex(date));
-    const roll = seeded(offset + 1);
-
-    // Today is always left open — logging is what closes it.
-    if (offset === 0) {
-      days.push({ date: key, status: "today", count: 0 });
-      continue;
-    }
-
-    // The live run: everything inside it is done, bar scheduled rest days.
-    if (offset <= currentStreak) {
-      days.push({ date: key, status: isRest ? "rest" : "logged", count: isRest ? 0 : 1 + Math.floor(roll * 3) });
-      continue;
-    }
-
-    // The miss that ended the previous run.
-    if (offset === currentStreak + 1) {
-      days.push({ date: key, status: "missed", count: 0 });
-      continue;
-    }
-
-    // One freeze absorbed a miss a few weeks back — shows the mechanic off.
-    if (offset === currentStreak + 9) {
-      days.push({ date: key, status: "freeze", count: 0 });
-      continue;
-    }
-
-    if (isRest) {
-      days.push({ date: key, status: "rest", count: 0 });
-      continue;
-    }
-
-    // Earlier history: mostly active, thinning out the further back it goes.
-    const activeChance = offset < span * 0.55 ? 0.82 : 0.55;
-    days.push(
-      roll < activeChance
-        ? (() => {
-            const count = 1 + Math.floor(seeded(offset + 99) * 3);
-            // Seeded intensity: most logged days were real applications, a
-            // few were kept alive by lighter work — mirrors live behaviour.
-            return { date: key, status: "logged" as const, count, intensity: seeded(offset + 7) < 0.3 ? count - 1 : count };
-          })()
-        : { date: key, status: "missed", count: 0 }
-    );
-  }
-
-  return days;
-}
-
-/**
- * Where the seeded demo streak starts. Deliberately one day short of the
- * 14-day rung: the very first "log today" both crosses a milestone and tips
- * the flame from Blaze to Inferno, so the reward system is reachable in a
- * mock build instead of being theoretical.
- */
-export const SEEDED_STREAK = 13;
-
-/**
- * The initial `StreakState` the provider seeds itself from.
- *
- * `buildStreakHistory`'s `currentStreak` counts *calendar* days, but rest
- * days inside the run are transparent to `computeStreak`, so a 13-day window
- * yields fewer than 13 burning days. Widen the window until the computed
- * streak actually lands on `SEEDED_STREAK` rather than hardcoding an offset
- * that silently drifts if the rest-day schedule ever changes.
- */
-export function buildInitialStreak(today: Date, restDays: number[] = [5, 6]): StreakState {
-  let days = buildStreakHistory(today, { restDays });
-  for (let window = SEEDED_STREAK; window <= SEEDED_STREAK * 2; window++) {
-    days = buildStreakHistory(today, { currentStreak: window, restDays });
-    if (computeStreak(days) >= SEEDED_STREAK) break;
-  }
-
-  const current = computeStreak(days);
-  return {
-    current,
-    longest: Math.max(computeLongest(days), current),
-    // Purchased/perk stock only — the free weekly allowance (2/week,
-    // use-it-or-lose-it) lives in the provider, not in this snapshot.
-    freezes: 1,
-    days,
-    // Everything already earned by the seeded history counts as celebrated,
-    // so opening the screen doesn't replay six old milestone modals.
-    claimed: STREAK_MILESTONES.filter((m) => m.days <= current).map((m) => m.days),
-    credits: 18,
-  };
 }

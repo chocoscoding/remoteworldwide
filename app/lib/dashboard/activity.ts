@@ -6,14 +6,13 @@
 // session, a status transition. Opening the app is not an action. Ticking a
 // checkbox with nothing behind it is not an action.
 //
-// Pure and React-free, like `streak.ts`. `ActivityProvider` owns the state;
-// this module only does the maths and the rules.
-//
-// Mock-only: nothing here persists. The structures are append-only within a
-// session so the model is honest and could be swapped onto a real store later,
-// but a reload starts over.
+// Pure and React-free, like `streak.ts`. The rule is enforced on the server
+// now: the backend's append-only `activity_events` log records each action in
+// the same request that writes its artifact, and derives the streak from it
+// (remoteworldwidebackend/src/types/streak.ts). This module keeps the action
+// registry the dashboard renders from, the habits, dedupe and pod quorum.
 
-import { addDays, dayKey, fromDayKey } from "./streak";
+import { addDays, fromDayKey } from "./streak";
 import type { StreakDay, TrackerColumnId } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -83,7 +82,7 @@ export interface ActionKindSpec {
   kind: ActionKind;
   /** Shown in the day's tooltip and the audit trail. */
   label: string;
-  /** What must exist for this action to be valid. Enforced by `recordAction`. */
+  /** What must exist for this action to be valid. Enforced by the server, which records it with the artifact. */
   artifact: string;
   /** The daily-habit row this action satisfies, so habits tick themselves. */
   habitLabel: string;
@@ -154,11 +153,6 @@ export const ACTION_KINDS: Record<ActionKind, ActionKindSpec> = {
   },
 };
 
-/** Weighted intensity of one day, summed across that day's actions. */
-export function dayIntensity(actions: QualifyingAction[], day: string): number {
-  return actions.reduce((sum, a) => (a.day === day ? sum + ACTION_KINDS[a.kind].intensityWeight : sum), 0);
-}
-
 /**
  * The per-day bar, derived from the weekly goal rather than configured twice —
  * 8 a week over 5 weekdays is the "2 a day, Mon-Fri" the Home card already
@@ -166,11 +160,6 @@ export function dayIntensity(actions: QualifyingAction[], day: string): number {
  */
 export function dailyTargetFrom(weeklyTarget: number, weekdays = 5): number {
   return Math.max(1, Math.ceil(weeklyTarget / weekdays));
-}
-
-/** A day is `full` once its weighted intensity reaches the daily target. */
-export function isFullDay(intensity: number, dailyTarget: number): boolean {
-  return intensity >= dailyTarget;
 }
 
 /**
@@ -192,40 +181,14 @@ export const DEFAULT_HABITS: HabitDef[] = [
   { id: "habit-prep", label: "15 minutes of interview prep", kind: "prep" },
 ];
 
-export interface QualifyingAction {
-  id: string;
-  kind: ActionKind;
-  /** Non-optional by design — no artifact, no action. */
-  artifactId: string;
-  /** ISO timestamp of the action itself. */
-  at: string;
-  /** The day this counts toward, after the grace-period rule below. */
-  day: string;
-}
-
-// ---------------------------------------------------------------------------
-// Grace period
-// ---------------------------------------------------------------------------
-
-/** Actions before this local hour count toward the previous day. */
-export const GRACE_HOUR = 4;
-
-/**
- * Which day an action counts toward. Someone still applying at 1am is
- * finishing yesterday, not starting today — crediting it to the calendar date
- * would break a streak that the user plainly did not break.
- */
-export function resolveActionDay(at: Date): string {
-  return dayKey(at.getHours() < GRACE_HOUR ? addDays(at, -1) : at);
-}
-
 // ---------------------------------------------------------------------------
 // Audit
 // ---------------------------------------------------------------------------
 
 /**
- * Every streak state change writes one of these. Nothing may silently reset a
- * streak — if the number moves, there is a row here saying why.
+ * Every streak state change has one of these. Nothing may silently reset a
+ * streak — if the number moves, there is a row saying why. The server writes
+ * them (`streak_days`) and the streak answer carries the newest.
  */
 export interface AuditEntry {
   id: string;
@@ -276,90 +239,6 @@ export function findDuplicate(
       return normalizeKey(a.company, a.role) === key;
     }) ?? null
   );
-}
-
-// ---------------------------------------------------------------------------
-// Day derivation
-// ---------------------------------------------------------------------------
-
-/**
- * Marks a day as logged (or backfilled) and returns a new array plus the audit
- * entry describing the change. Returns `null` for `audit` when nothing moved,
- * so callers can tell a real transition from a no-op.
- *
- * `rest` days are deliberately overwritable — logging on a rest day is allowed
- * and upgrades it, but a rest day left alone never breaks anything.
- */
-export function markDay(
-  days: StreakDay[],
-  day: string,
-  status: Extract<StreakDay["status"], "logged" | "backfilled">,
-  reason: string,
-  at: Date,
-  /** Weighted contribution of the action doing the marking — see `ACTION_KINDS`. */
-  intensityWeight = 0
-): { days: StreakDay[]; audit: AuditEntry | null } {
-  const existing = days.find((d) => d.date === day);
-  if (existing?.status === status) {
-    // Already in this state — bump the count, but there is no transition.
-    return {
-      days: days.map((d) =>
-        d.date === day ? { ...d, count: d.count + 1, intensity: (d.intensity ?? 0) + intensityWeight } : d
-      ),
-      audit: null,
-    };
-  }
-
-  return {
-    days: days.map((d) =>
-      d.date === day ? { ...d, status, count: d.count + 1, intensity: (d.intensity ?? 0) + intensityWeight } : d
-    ),
-    audit: {
-      id: `audit-${day}-${at.getTime()}`,
-      at: at.toISOString(),
-      day,
-      from: existing?.status ?? "none",
-      to: status,
-      reason,
-    },
-  };
-}
-
-/**
- * Applies a freeze to the first unplanned miss, if the user has one to spend.
- * Returns the changed days, the audit entry, and the day that was covered so
- * the caller can tell the user after the fact — §5 requires notifying, not
- * asking.
- */
-export function absorbMissWithFreeze(
-  days: StreakDay[],
-  freezes: number,
-  at: Date
-): { days: StreakDay[]; audit: AuditEntry | null; coveredDay: string | null } {
-  if (freezes <= 0) return { days, audit: null, coveredDay: null };
-
-  // Walk back from the most recent finished day looking for the first miss.
-  for (let i = days.length - 1; i >= 0; i--) {
-    const d = days[i];
-    if (d.status === "today" || d.status === "future") continue;
-    if (d.status === "missed") {
-      return {
-        days: days.map((x) => (x.date === d.date ? { ...x, status: "freeze" as const } : x)),
-        audit: {
-          id: `audit-${d.date}-${at.getTime()}`,
-          at: at.toISOString(),
-          day: d.date,
-          from: "missed",
-          to: "freeze",
-          reason: "Streak freeze auto-applied",
-        },
-        coveredDay: d.date,
-      };
-    }
-    // Anything else that isn't a miss means there's nothing to cover.
-    break;
-  }
-  return { days, audit: null, coveredDay: null };
 }
 
 /** Human label for a covered day, e.g. "Tuesday". */

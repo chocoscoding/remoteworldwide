@@ -4,13 +4,18 @@
 //
 // This is the highest-leverage moment in the whole system: the point right
 // after a streak snaps is when people quit. So it never shows a bare zero.
-// Inside the 48-hour window it offers the streak back; outside it, it shows
-// what was actually built — best run, total applications — and one button to
-// start again.
+// The server offers a break back only inside its repair window (a day after
+// the missed day closed), and this panel shows only while it does.
 //
-// The free half-restore exists so the offer isn't only for people who can pay.
-// Losing a month of work because you're 12 credits short is exactly the kind
-// of thing that ends a job search.
+// Three ways back, each decided server-side: a restore gift (free, earned), a
+// credit repair at the server's price (a ledger spend, charged once per
+// repaired day however often it is retried), and the free half-restore once a
+// month — which exists so the offer isn't only for people who can pay. Losing
+// a month of work because you're a few credits short is exactly the kind of
+// thing that ends a job search.
+//
+// Closing the panel only hides it for now. "Start from zero instead" is the
+// deliberate choice, and the server remembers it.
 
 import { type FC } from "react";
 import { motion, useReducedMotion } from "motion/react";
@@ -19,20 +24,28 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { REPAIR_WINDOW_HOURS } from "@/app/lib/dashboard/credits";
-import { heldOf } from "@/app/lib/dashboard/gifts";
 
 const RepairStreakPanel: FC = () => {
-  const { repair, gifts, longest, applications, restoreStreak, halfRestoreStreak, freeRestoreUsed, dismissRepair, openGifts } =
-    useActivity();
+  const {
+    repair,
+    longest,
+    applications,
+    restoreStreak,
+    repairWithCredits,
+    halfRestoreStreak,
+    freeRestoreUsed,
+    repairing,
+    dismissRepair,
+    startOverFromZero,
+    openGifts,
+  } = useActivity();
   const reduceMotion = useReducedMotion();
 
   if (!repair) return null;
 
-  const { brokenStreak, hoursSinceBreak } = repair;
+  const { brokenStreak, hoursSinceBreak, priceCredits, restoreHeld: hasRestore, freeHalfAvailable, halfDays: half } = repair;
   const inWindow = hoursSinceBreak <= REPAIR_WINDOW_HOURS;
-  const hoursLeft = Math.max(0, Math.ceil(REPAIR_WINDOW_HOURS - hoursSinceBreak));
-  const hasRestore = heldOf(gifts, "restore") > 0;
-  const half = Math.floor(brokenStreak / 2);
+  const hoursLeft = Math.max(0, repair.hoursLeft);
 
   return (
     <Dialog open onOpenChange={(o) => !o && dismissRepair()}>
@@ -51,7 +64,7 @@ const RepairStreakPanel: FC = () => {
             </div>
             <DialogDescription className="mt-2 text-sm text-white/55">
               {inWindow
-                ? `Life happened — it does. You can have them back for ${hoursLeft} more hours.`
+                ? `Life happened — it does. You can have them back for ${hoursLeft} more ${hoursLeft === 1 ? "hour" : "hours"}.`
                 : "That run is done — but none of the work behind it is. Every application still counts."}
             </DialogDescription>
           </div>
@@ -75,17 +88,24 @@ const RepairStreakPanel: FC = () => {
 
             {inWindow ? (
               <div className="flex flex-col gap-2.5">
-                <StickerButton variant="primary" size="lg" className="w-full" disabled={!hasRestore} onClick={restoreStreak}>
-                  <RotateCcw className="h-4 w-4" />
-                  {hasRestore ? `Use your Streak restore \u2014 all ${brokenStreak} days back` : "No restore gift held"}
-                </StickerButton>
+                {hasRestore ? (
+                  <StickerButton variant="primary" size="lg" className="w-full" disabled={repairing} onClick={restoreStreak}>
+                    <RotateCcw className="h-4 w-4" />
+                    {`Use your Streak restore — all ${brokenStreak} days back`}
+                  </StickerButton>
+                ) : (
+                  <StickerButton variant="primary" size="lg" className="w-full" disabled={repairing} onClick={repairWithCredits}>
+                    <RotateCcw className="h-4 w-4" />
+                    {`Repair all ${brokenStreak} days — ${priceCredits} credits`}
+                  </StickerButton>
+                )}
 
                 <p className="mt-2 text-center text-xs text-black/50">
                   {hasRestore ? (
-                    "A gift you earned \u2014 no charge, ever."
+                    "A gift you earned — no charge, ever."
                   ) : (
                     <>
-                      Restore gifts come from the big milestones and real wins.{" "}
+                      Or use a restore gift — they come from the big milestones and real wins.{" "}
                       <button type="button" onClick={openGifts} className="cursor-pointer font-semibold text-primary underline decoration-dotted underline-offset-2">
                         See your gifts
                       </button>
@@ -93,10 +113,10 @@ const RepairStreakPanel: FC = () => {
                   )}
                 </p>
 
-                {/* The fallback, only offered when they genuinely can't pay. */}
-                {!hasRestore && !freeRestoreUsed && half > 0 && (
-                  <StickerButton variant="outline" size="md" className="w-full" onClick={halfRestoreStreak}>
-                    Take {half} days back, free
+                {/* The fallback, so the offer is never only for people who can pay. */}
+                {!hasRestore && freeHalfAvailable && (
+                  <StickerButton variant="outline" size="md" className="w-full" disabled={repairing} onClick={halfRestoreStreak}>
+                    Take {half} {half === 1 ? "day" : "days"} back, free
                   </StickerButton>
                 )}
                 {!hasRestore && freeRestoreUsed && (
@@ -105,7 +125,7 @@ const RepairStreakPanel: FC = () => {
 
                 <button
                   type="button"
-                  onClick={dismissRepair}
+                  onClick={startOverFromZero}
                   className="mx-auto mt-1 text-xs font-semibold text-black/40 hover:text-primary cursor-pointer">
                   Start from zero instead
                 </button>
@@ -115,7 +135,7 @@ const RepairStreakPanel: FC = () => {
                 <p className="text-sm leading-relaxed text-black/60">
                   {longest} days is still your best run, and {applications.length} applications are still out there. Day one again.
                 </p>
-                <StickerButton variant="primary" size="lg" className="w-full" onClick={dismissRepair}>
+                <StickerButton variant="primary" size="lg" className="w-full" onClick={startOverFromZero}>
                   Start again
                 </StickerButton>
               </div>

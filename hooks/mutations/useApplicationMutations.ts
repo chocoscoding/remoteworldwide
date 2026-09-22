@@ -34,11 +34,13 @@ import {
   createApplication,
   deleteApplication,
   draftApplication,
+  isObjectId,
   updateApplication,
   updateGoals,
 } from "@/app/lib/applications/api";
 import type { ApplicationItem, CreateApplicationInput, GoalsItem, UpdateApplicationInput, UpdateGoalsInput } from "@/app/lib/applications/types";
 import { qk } from "@/app/lib/query/keys";
+import { refreshStreak } from "./useStreakMutations";
 
 const listKey = () => qk.activity.applications();
 const goalsKey = () => qk.activity.goals();
@@ -102,6 +104,18 @@ async function serverIdFor(id: string): Promise<string> {
 /** The id a row is cached under right now: its server id once the create has landed. */
 const cachedIdFor = (id: string) => serverIds.get(id) ?? id;
 
+/**
+ * The id the server issued for a create made in this tab, once it lands; null
+ * when that create failed or was never made here. For a flow with something to
+ * record against the real row once it exists — the apply wizard's answer log,
+ * whose route takes only a backend id. Call it after `useCreateApplication`'s
+ * create, never before: until then there is no pending create to wait for.
+ */
+export async function createdApplicationId(clientId: string): Promise<string | null> {
+  const id = await serverIdFor(clientId).catch(() => null);
+  return id !== null && isObjectId(id) ? id : null;
+}
+
 // ---------------------------------------------------------------------------
 // The cached list
 // ---------------------------------------------------------------------------
@@ -137,6 +151,9 @@ function refreshAfterWrites(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: listKey() });
   void queryClient.invalidateQueries({ queryKey: qk.activity.summary() });
   void queryClient.invalidateQueries({ queryKey: qk.tasks.all });
+  // The server records the streak's action with the write (an application
+  // logged, a card moved, a follow-up touched), and pays any gift it earned.
+  refreshStreak(queryClient);
 }
 
 /** Worth a Retry: the request never arrived, or the server failed. A 4xx fails the same way again. */
@@ -351,9 +368,12 @@ export function useUpdateGoals() {
       goalsDraft.confirmed = null;
       toast.error("Your goals didn't save", { id: "goals-save-failed", description: apiMessage(error) });
     },
-    // The week's goal is part of the summary.
+    // The week's goal is part of the summary, and rest days and pauses decide
+    // how the streak treats the days ahead.
     onSettled: () => {
-      if (queryClient.isMutating({ mutationKey: goalsKey() }) <= 1) void queryClient.invalidateQueries({ queryKey: qk.activity.summary() });
+      if (queryClient.isMutating({ mutationKey: goalsKey() }) > 1) return;
+      void queryClient.invalidateQueries({ queryKey: qk.activity.summary() });
+      void queryClient.invalidateQueries({ queryKey: qk.activity.streak() });
     },
   });
 

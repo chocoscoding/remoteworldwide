@@ -7,17 +7,25 @@
 // to show someone in week six of silence — it tells them they're doing
 // everything right and getting nothing, without ever showing the "getting".
 //
-// So this panel reports what actually came back: replies, interviews,
-// referrals, response time. It sits next to the coach line rather than under
-// it, because the number and the interpretation only mean something together.
+// So this panel reports what actually came back: replies, interviews, offers,
+// and how well the applications scored. It sits next to the coach line rather
+// than under it, because the number and the interpretation only mean something
+// together.
+//
+// Every figure is counted from the user's real applications. The reply rate,
+// interviews and offers are the server's funnel (`GET /api/applications/summary`
+// — the same numbers the coach reads, so the two can never disagree); the ATS
+// average is the mean of the scores real scans stamped on applications. A
+// number with nothing behind it yet reads "—", never a stand-in.
 
 import { type FC } from "react";
 import Link from "next/link";
-import { ArrowRight, MessageSquare, Send, Sparkles, Timer, Users } from "lucide-react";
+import { ArrowRight, Gauge, MessageSquare, Send, Sparkles, Trophy } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { HOME_STATS } from "@/app/lib/dashboard/mock-data";
+import type { ApplicationStage } from "@/app/lib/applications/types";
+import { useApplicationSummary, useApplications } from "@/hooks/queries/useApplicationsQuery";
 
 interface Outcome {
   id: string;
@@ -29,22 +37,49 @@ interface Outcome {
 
 const ProofOfProgress: FC = () => {
   const { current, longest, applications } = useActivity();
+  const summary = useApplicationSummary();
+  // The rows themselves, for what sits in a stage right now — the funnel counts
+  // how far applications ever got, closed ones included.
+  const rows = useApplications();
 
-  // The window is "since this streak began" — that's the span the user is
-  // being asked to believe in, so it's the span the outcomes should cover.
-  const windowDays = Math.max(current, 1);
-  // Real applications only. The seed's headline total used to be added on top,
-  // so a brand-new account opened on dozens of applications it never sent.
+  const stage = (id: ApplicationStage) => summary.data?.funnel.stages.find((s) => s.id === id);
+  // Sent applications only: a saved job was never sent.
   const sent = applications.length;
-  const replyRate = HOME_STATS.find((s) => s.id === "stat-reply-rate")?.value ?? "—";
-  const interviews = HOME_STATS.find((s) => s.id === "stat-interviews")?.value ?? "0";
+  // The share of sent applications that reached a conversation — the funnel's
+  // own conversion into that stage, null until anything was sent.
+  const replyConversion = stage("conversation")?.conversion ?? null;
+  const interviews = stage("interviewing")?.reached;
+  const offers = stage("offer")?.reached;
+  const interviewingNow = rows.data?.filter((row) => row.status === "interviewing").length ?? 0;
+  // Only real scans' scores: an application logged without one carries none.
+  const scores = applications.map((a) => a.atsScore).filter((score): score is number => typeof score === "number");
+  const averageAts = scores.length > 0 ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
+  const known = summary.data !== undefined;
 
   const outcomes: Outcome[] = [
-    { id: "sent", label: "Applications", value: String(sent), caption: `over ${windowDays} days`, icon: Send },
-    { id: "replies", label: "Reply rate", value: replyRate, caption: "of everything sent", icon: MessageSquare },
-    { id: "interviews", label: "Interviews", value: interviews, caption: "1 still upcoming", icon: Sparkles },
-    { id: "referrals", label: "Referrals", value: "6", caption: "warm paths opened", icon: Users },
-    { id: "response", label: "Median reply", value: "9d", caption: "when they do reply", icon: Timer },
+    { id: "sent", label: "Applications", value: String(sent), caption: "sent so far", icon: Send },
+    {
+      id: "replies",
+      label: "Reply rate",
+      value: replyConversion === null ? "—" : `${Math.round(replyConversion * 100)}%`,
+      caption: "of everything sent",
+      icon: MessageSquare,
+    },
+    {
+      id: "interviews",
+      label: "Interviews",
+      value: known ? String(interviews ?? 0) : "—",
+      caption: interviewingNow > 0 ? `${interviewingNow} in progress now` : "reached so far",
+      icon: Sparkles,
+    },
+    { id: "offers", label: "Offers", value: known ? String(offers ?? 0) : "—", caption: "reached so far", icon: Trophy },
+    {
+      id: "ats",
+      label: "Avg ATS score",
+      value: averageAts === null ? "—" : String(averageAts),
+      caption: scores.length > 0 ? `across ${scores.length} scanned` : "no scans yet",
+      icon: Gauge,
+    },
   ];
 
   return (
@@ -52,7 +87,7 @@ const ProofOfProgress: FC = () => {
       <div className="flex items-baseline justify-between gap-3 mb-1">
         <p className="text-[15px] font-bold text-primary">What&apos;s come back</p>
         <span className="text-xs text-black/45">
-          {current > 0 ? `last ${windowDays} days` : `best run: ${longest} days`}
+          {current > 0 ? `${current}-day streak · best ${longest}` : `best run: ${longest} ${longest === 1 ? "day" : "days"}`}
         </span>
       </div>
       <p className="text-xs text-black/45 mb-4">Effort is only half the picture. This is the other half.</p>

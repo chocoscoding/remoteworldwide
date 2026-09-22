@@ -2,64 +2,65 @@
 
 // App-wide activity state. Mounted once in `DashboardShell`.
 //
-// This replaces the old `StreakProvider`, which owned only a per-day counter.
-// The streak is now a *derivation*: applications and other qualifying actions
-// are the source of truth, and a day is logged because an artifact exists for
-// it — never because a button was pressed.
+// A thin React Query layer over the server. The streak, freezes, gifts,
+// repairs, habits and the audit trail used to be browser state seeded from a
+// fabricated 13-day history; they are now the backend's, derived from the
+// append-only activity log (remoteworldwidebackend/src/types/streak.ts):
 //
-// `useStreak()` is preserved as a thin selector so `StreakPill`, `StreakPanel`,
-// `StreakCalendar`, `StreakRewards` and the pod screen keep working unchanged.
+//  - `GET /api/streak` answers with the run as the server decided it — in the
+//    user's timezone, with the 4am grace hour, rest days, pauses and automatic
+//    freezes applied. Nothing here computes a streak.
+//  - A day counts because the server wrote an artifact for it. Logging an
+//    application, moving a card, posting to the pod, asking for a referral and
+//    finishing a prep session each record their own action where the artifact
+//    is written, so `recordAction` sends nothing for those kinds — it would
+//    count them twice. The one kind the server cannot see is a follow-up logged
+//    from the tracker, which `recordAction` reports against its application.
+//  - Gifts, freezes and repairs are server writes; this answers with what the
+//    server stored.
 //
-// Applications and goals are the server's: the applications table (Part 2
-// Phase B), read and written through React Query. Everything else here — the
-// streak, gifts, freezes, habits and the audit trail — is still browser state
-// that resets on reload, until it moves server-side too.
+// The context API is kept as it was, so every screen that calls
+// `recordAction`, `awardStrongEvent` or reads the streak keeps working.
+// `useStreak()` is a thin selector over the same value.
 
-import { createContext, useContext, useMemo, useState, type FC, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type FC, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ACTION_KINDS,
   DEFAULT_HABITS,
-  absorbMissWithFreeze,
   findDuplicate,
-  markDay,
   medianOf,
-  resolveActionDay,
   weekdayName,
   type ActionKind,
   type Application,
   type AuditEntry,
   type HabitDef,
-  type QualifyingAction,
-  dayIntensity,
   dailyTargetFrom,
-  isFullDay,
 } from "@/app/lib/dashboard/activity";
-import { scoreApplication, type ApplicationScore } from "@/app/lib/dashboard/ats-stub";
 import { MAX_STREAK_PROMPTS_PER_DAY } from "@/app/lib/dashboard/credits";
-import { GIFT_CATALOGUE, drawGift, heldGifts, type GiftEvent, type GiftKind } from "@/app/lib/dashboard/gifts";
-import { STRONG_EVENTS, strongRefId, weekKey, type StrongEventKind } from "@/app/lib/dashboard/rewards";
-import { INVITE_CREDITS_EARNED } from "@/app/lib/dashboard/invites";
+import { GIFT_CATALOGUE, type GiftEvent, type GiftKind } from "@/app/lib/dashboard/gifts";
+import type { StrongEventKind } from "@/app/lib/dashboard/rewards";
 import { DEFAULT_LOG_SECONDS, clampTarget } from "@/app/lib/dashboard/goals";
-import {
-  addDays,
-  buildInitialStreak,
-  computeLongest,
-  computeStreak,
-  dayKey,
-  fromDayKey,
-  milestonesCrossed,
-  nextMilestone,
-  tierFor,
-  weekdayIndex,
-} from "@/app/lib/dashboard/streak";
+import { addDays, dayKey, fromDayKey, milestonesUpTo, nextMilestone, tierFor, weekdayIndex } from "@/app/lib/dashboard/streak";
 import { FOLLOW_UP_AFTER_APPLY_DAYS } from "@/app/lib/dashboard/follow-up";
 import type { StreakDay, StreakMilestone, StreakState, TrackerColumnId } from "@/app/lib/dashboard/types";
-import { applicationInput, newClientId, toActivityApplication, wasApplied } from "@/app/lib/applications/api";
+import { applicationInput, isObjectId, newClientId, toActivityApplication, wasApplied } from "@/app/lib/applications/api";
 import type { GoalsItem, UpdateGoalsInput } from "@/app/lib/applications/types";
-import { usePersistedState } from "@/app/lib/persist/usePersistedState";
+import type { GiftItem, StreakDayItem, StreakItem } from "@/app/lib/streak/types";
 import { useCreateApplication, useUpdateGoals } from "@/hooks/mutations/useApplicationMutations";
+import {
+  refreshStreak,
+  useDismissRepair,
+  useMarkStreakSeen,
+  useRedeemGift,
+  useRepairStreak,
+  useReportFollowUp,
+  useRetireStreak,
+} from "@/hooks/mutations/useStreakMutations";
 import { useApplications, useGoals } from "@/hooks/queries/useApplicationsQuery";
+import { useGiftsQuery, useStreakQuery } from "@/hooks/queries/useStreakQuery";
+import { qk } from "@/app/lib/query/keys";
 
 // ---------------------------------------------------------------------------
 // Goals
@@ -93,6 +94,41 @@ function changedGoals(before: GoalsState, update: (g: GoalsState) => GoalsState)
 }
 
 // ---------------------------------------------------------------------------
+// Reading the server's streak
+// ---------------------------------------------------------------------------
+
+/** Qualifying actions on one day, whatever their kind. */
+const countOf = (kinds: StreakDayItem["kinds"]): number => Object.values(kinds).reduce<number>((sum, n) => sum + (n ?? 0), 0);
+
+/**
+ * A day's weighted intensity (`ACTION_KINDS[kind].intensityWeight`) — what the
+ * full-day bar reads. The server counts actions; the weights stay the
+ * browser's, beside the copy that explains them.
+ */
+const intensityOf = (kinds: StreakDayItem["kinds"]): number =>
+  (Object.entries(kinds) as [ActionKind, number][]).reduce((sum, [kind, n]) => sum + (ACTION_KINDS[kind]?.intensityWeight ?? 0) * n, 0);
+
+const dayOf = (item: StreakDayItem): StreakDay => ({ date: item.date, status: item.status, count: countOf(item.kinds), intensity: intensityOf(item.kinds) });
+
+const giftEventOf = (gift: GiftItem): GiftEvent => ({
+  id: gift.id,
+  kind: gift.kind,
+  reason: gift.reason,
+  refId: gift.refId ?? undefined,
+  at: gift.at,
+  usedAt: gift.usedAt ?? undefined,
+});
+
+/** A reached rung as the celebration renders it: the ladder's copy, with the gift the server drew. */
+function milestoneOf(days: number, gift: GiftKind): StreakMilestone | null {
+  const rung = milestonesUpTo(days).find((m) => m.days === days);
+  return rung ? { ...rung, gift } : null;
+}
+
+const EMPTY_DAYS: StreakDayItem[] = [];
+const EMPTY_GIFTS: GiftItem[] = [];
+
+// ---------------------------------------------------------------------------
 // Context shape
 // ---------------------------------------------------------------------------
 
@@ -107,15 +143,36 @@ export interface LogApplicationInput {
   duplicateOf?: string;
   /** When the log flow opened, so the provider can time it off its own clock. */
   startedAtMs?: number;
-  /** Which saved resume to score against. */
-  resumeId?: string;
+  /**
+   * The score of a REAL scan of this posting, when the log flow found one on
+   * file (`useStoredScanQuery`) — stamped on the application as its ATS score.
+   * Absent when the posting was never scanned: the application then carries no
+   * score at all, rather than an estimate presented as one.
+   */
+  atsScore?: number | null;
 }
 
+/**
+ * What the payoff panel opens on. There is no score here any more: logging
+ * used to compute a keyword-overlap estimate and hand it over as the match. The
+ * panel now reads the posting's stored scan itself — or says it has none.
+ */
 export interface LogApplicationResult {
   application: Application;
-  score: ApplicationScore;
   /** Day the follow-up reminder is set for. */
   followUpOn: string;
+}
+
+/** The break that can still be bought back, as the repair panel renders it. */
+export interface RepairOffer {
+  brokenStreak: number;
+  hoursSinceBreak: number;
+  hoursLeft: number;
+  /** Credits a repair costs — the server's price, never hard-coded here. */
+  priceCredits: number;
+  restoreHeld: boolean;
+  freeHalfAvailable: boolean;
+  halfDays: number;
 }
 
 interface ActivityContextValue extends StreakState {
@@ -129,20 +186,27 @@ interface ActivityContextValue extends StreakState {
   dismissCelebration: () => void;
   /** The milestone earned by the in-flight log, shown inline in the payoff. */
   pendingMilestone: StreakMilestone | null;
+  /** True until the first streak read has answered. */
+  streakLoading: boolean;
 
   // --- activity ---
   applications: Application[];
-  actions: QualifyingAction[];
   audit: AuditEntry[];
   /** Applications logged in the current Mon-start week, duplicates excluded. */
   weeklyLogged: number;
   /** Rolling median seconds per log; falls back to the documented default. */
   medianLogSeconds: number;
   logApplication: (input: LogApplicationInput) => LogApplicationResult;
+  /**
+   * Tells the streak an action happened. The server records every kind itself
+   * where the artifact is written — except a follow-up logged from the
+   * tracker, which is reported here against its application. Either way the
+   * streak refreshes and the flame bursts.
+   */
   recordAction: (kind: ActionKind, artifactId: string, label?: string) => void;
   checkDuplicate: (candidate: { company: string; role: string; url?: string }) => Application | null;
 
-  // --- intensity (what the credit rewards read) ---
+  // --- intensity (what the full-day bar reads) ---
   /** Per-day bar, derived from the weekly goal — 8/week => 2 a day. */
   dailyTarget: number;
   /** Today's weighted intensity so far. */
@@ -159,15 +223,12 @@ interface ActivityContextValue extends StreakState {
   gifts: GiftEvent[];
   /** Unused gifts waiting to be redeemed. */
   giftsWaiting: number;
-  /**
-   * Redeems the oldest unused gift of `kind`. Returns false when none is
-   * held or the redemption is refused (e.g. freezes at cap).
-   */
+  /** Redeems the oldest unused gift of `kind`. Returns false when none is held. */
   redeemGift: (kind: GiftKind) => boolean;
   /**
-   * Grants a rare-event gift exactly once per `suffix` (application id,
-   * recommendation id, ISO week) — the gift list's refId is the dedupe
-   * record. Returns false when it already fired.
+   * Rare-event gifts are the server's now: reaching interview or offer pays
+   * when the status change is saved, the weekly goal when the week's
+   * applications meet it. Kept so existing call sites compile; always false.
    */
   awardStrongEvent: (kind: StrongEventKind, suffix: string, detail?: string) => boolean;
   giftsOpen: boolean;
@@ -179,29 +240,24 @@ interface ActivityContextValue extends StreakState {
   closeCredits: () => void;
 
   // --- repair ---
-  /**
-   * Set when a streak has just been broken and is still inside the buy-back
-   * window. Null the rest of the time.
-   */
-  repair: { brokenStreak: number; hoursSinceBreak: number } | null;
-  /** Buys the broken streak back at full price. False if unaffordable. */
+  /** Set while a broken streak can still be bought back. Null the rest of the time. */
+  repair: RepairOffer | null;
+  /** Buys the broken streak back with a restore gift. False when none is held. */
   restoreStreak: () => boolean;
+  /** Buys it back with credits — a ledger spend at the server's price. */
+  repairWithCredits: () => void;
   /** The once-a-month free fallback: restores half, rounded down. */
   halfRestoreStreak: () => void;
   freeRestoreUsed: boolean;
+  /** A repair is on its way to the server. */
+  repairing: boolean;
+  /** Hides the repair panel for now; the offer stands until its window closes. */
   dismissRepair: () => void;
-  /**
-   * Breaks the streak on demand.
-   *
-   * Only exists because this build has no clock: a streak breaks at local
-   * midnight after a day with no qualifying action, which can never happen
-   * inside one mock session. Without it the repair and comeback screens are
-   * unreachable dead code. Delete this the moment there's a real scheduler.
-   */
-  simulateBreak: () => void;
+  /** "Start from zero instead": the deliberate choice, remembered by the server. */
+  startOverFromZero: () => void;
 
   // --- at-risk prompting ---
-  /** Local hour, read once on mount. Gates the after-8pm banner. */
+  /** The hour on the user's own clock. Gates the after-8pm banner. */
   nowHour: number;
   atRiskDismissed: boolean;
   dismissAtRisk: () => void;
@@ -219,9 +275,9 @@ interface ActivityContextValue extends StreakState {
   closeLog: () => void;
 
   // --- daily habits ---
-  /** The user's habit definitions, each bound to an artifact type. */
+  /** The user's habit definitions, each bound to an artifact type. Saved on the goals row. */
   habits: HabitDef[];
-  /** Habits with today's completion resolved from the action log. */
+  /** Habits with today's completion read from the server's day. */
   habitsToday: (HabitDef & { done: boolean })[];
   addHabit: () => void;
   updateHabit: (id: string, patch: Partial<Omit<HabitDef, "id">>) => void;
@@ -238,11 +294,7 @@ interface ActivityContextValue extends StreakState {
   /** Pauses the search for N days: streak held, prompts silenced. */
   pauseSearch: (days: number) => void;
   resumeSearch: () => void;
-  /**
-   * Days remaining on a pause, or null when not paused. Also null when the
-   * pause was set in another browser, which knows its length: read
-   * `goals.paused` for whether the search is paused.
-   */
+  /** Days remaining on a pause, or null when not paused or paused with no end date. */
   pausedDaysLeft: number | null;
 
   // --- hired ---
@@ -253,18 +305,13 @@ interface ActivityContextValue extends StreakState {
   retiredStreak: number | null;
 }
 
-/** Free tier + held stock never exceed this — abundant repair is the failure mode. */
-const FREEZE_CAP = 4;
-
 const ActivityCtx = createContext<ActivityContextValue | null>(null);
 
-let seq = 0;
-const nextId = (prefix: string) => `${prefix}-${(seq += 1)}`;
-
 export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   // Read once, lazily — calling Date during render violates the react-hooks
-  // purity rule, and this also keeps "today" stable if a tab is left open.
-  const [today] = useState(() => new Date());
+  // purity rule. Only a stand-in until the server's own "today" arrives.
+  const [now] = useState(() => new Date());
 
   // Goals are a row on the server. Until it loads the defaults stand in, the
   // same numbers a user who never set any gets back.
@@ -282,11 +329,18 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     writeGoals((current) => changedGoals(current ? goalsStateOf(current) : DEFAULT_GOALS, update));
   }
 
-  // Seeded from the default rest days so the calendar agrees with the "Sat &
-  // Sun are rest days" copy. Changing rest days afterwards affects the daily
-  // maths and future days but deliberately does not rewrite history —
-  // retroactively re-colouring past days would be a lie.
-  const [state, setState] = useState<StreakState>(() => buildInitialStreak(today, DEFAULT_GOALS.restDays));
+  // The streak and the gifts, as the server decided them.
+  const streakQuery = useStreakQuery();
+  const streak: StreakItem | undefined = streakQuery.data;
+  const giftsQuery = useGiftsQuery();
+  const giftItems = giftsQuery.data?.gifts ?? EMPTY_GIFTS;
+  const redeem = useRedeemGift();
+  const repairMutation = useRepairStreak();
+  const dismiss = useDismissRepair();
+  const markSeen = useMarkStreakSeen();
+  const retire = useRetireStreak();
+  const reportFollowUp = useReportFollowUp();
+
   // The applications table, as `activity.ts` records. Saved jobs are left out:
   // a job someone means to apply to is not an application yet, and counting one
   // would lift the weekly number, the applications-sent total and the duplicate
@@ -297,211 +351,140 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     [applicationsQuery.data],
   );
   const createApplication = useCreateApplication();
-  const [actions, setActions] = useState<QualifyingAction[]>([]);
-  const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [logDurations, setLogDurations] = useState<number[]>([]);
-  // Free freeze allowance: 2 per week, use-it-or-lose-it. `state.freezes` is
-  // the purchased/perk stock; this tier is always spent first and resets on
-  // the ISO-week boundary rather than accumulating.
-  const [freeFreezes, setFreeFreezes] = useState(2);
-  const [freeWeek, setFreeWeek] = useState(() => weekKey(today));
-  const [queue, setQueue] = useState<StreakMilestone[]>([]);
   const [logPulse, setLogPulse] = useState(0);
   const [logOpen, setLogOpen] = useState(false);
-  const [habits, setHabits] = useState<HabitDef[]>(DEFAULT_HABITS);
   const [giftsOpen, setGiftsOpen] = useState(false);
-  const [freeRestoreUsed, setFreeRestoreUsed] = useState(false);
-  const [repairDismissed, setRepairDismissed] = useState(false);
-  /** Streak length at the moment it broke, so it can be bought back. */
-  const [brokenStreak, setBrokenStreak] = useState<number | null>(null);
   const [atRiskDismissed, setAtRiskDismissed] = useState(false);
-  // The day a pause ends. The server keeps only whether the search is paused
-  // (the goals row), so the length the user chose is kept in this browser.
-  // Without it a reload mid-pause brought back a paused search with no days
-  // left, which settings read as not paused, offering no way to resume.
-  const [pauseEndsOn, setPauseEndsOn] = usePersistedState<string | null>("activity.pauseEndsOn", 1, null);
-  const [retiredStreak, setRetiredStreak] = useState<number | null>(null);
-  // The gift inventory. Seeded with one waiting freeze so the modal has a
-  // real row on first open — everything else is earned live.
-  const [gifts, setGifts] = useState<GiftEvent[]>(() => [
-    {
-      id: "gift-seed-freeze",
-      kind: "freeze",
-      reason: "Welcome gift",
-      at: today.toISOString(),
-    },
-  ]);
+  // The break whose repair panel was closed this session. Closing is not a
+  // decision — an overlay click must not throw a streak away — so only the
+  // explicit "start from zero" is sent to the server.
+  const [repairHiddenFor, setRepairHiddenFor] = useState<string | null>(null);
 
-  const todayKey = dayKey(today);
+  const todayKey = streak?.today ?? dayKey(now);
+  const streakDays = streak?.days ?? EMPTY_DAYS;
+  const days = useMemo(() => streakDays.map(dayOf), [streakDays]);
+  const byKey = new Map(days.map((d) => [d.date, d]));
+  const todayItem = streakDays.find((d) => d.date === todayKey);
+  const current = streak?.current ?? 0;
+  const longest = streak?.longest ?? 0;
+  const loggedToday = streak?.loggedToday ?? false;
+  const freeFreezes = streak?.freezes.free ?? 0;
+  const heldFreezes = streak?.freezes.held ?? 0;
+  const gifts = useMemo(() => giftItems.map(giftEventOf), [giftItems]);
+  const retiredStreak = streak?.retiredStreak ?? null;
+  const medianLogSeconds = logDurations.length >= 3 ? medianOf(logDurations) : DEFAULT_LOG_SECONDS;
+
+  // Rungs reached and not yet celebrated, in the order they were earned. Seen
+  // is the server's, so a rung reached by a prep session finished elsewhere
+  // still gets its moment, once, wherever the user looks next.
+  const queue = (streak?.milestones ?? [])
+    .filter((m) => !m.seen)
+    .sort((a, b) => a.days - b.days)
+    .map((m) => milestoneOf(m.days, m.gift))
+    .filter((m): m is StreakMilestone => m !== null);
+
+  // Habits live on the goals row; the defaults stand in until it loads.
+  const habits: HabitDef[] = goalsQuery.data?.habits ?? DEFAULT_HABITS;
+  // A habit is done when its bound artifact exists for today — read from the
+  // server's day, so the only way to complete one is to do the thing.
+  const habitsToday = habits.map((h) => ({ ...h, done: (todayItem?.kinds[h.kind] ?? 0) > 0 }));
+
+  const dailyTarget = dailyTargetFrom(goals.weeklyTarget);
+  const todayIntensity = todayItem ? intensityOf(todayItem.kinds) : 0;
+
+  // Applications this week, Monday-start, duplicates excluded so re-logging the
+  // same role can't inflate the weekly number.
+  const today = fromDayKey(todayKey);
+  const weekStart = addDays(today, -weekdayIndex(today)).getTime();
+  const weeklyLogged = applications.filter((a) => !a.duplicateOf && new Date(a.loggedAt).getTime() >= weekStart).length;
+
   // Whole days to the pause's end, never below zero. Null when the search isn't
-  // paused, and when it was paused somewhere this browser never saw.
+  // paused, and for a pause with no end date (hired, or paused from settings).
+  const pauseEndsOn = goalsQuery.data?.pauseEndsOn ?? null;
   const pausedDaysLeft =
     goals.paused && pauseEndsOn !== null
       ? Math.max(0, Math.round((fromDayKey(pauseEndsOn).getTime() - fromDayKey(todayKey).getTime()) / 86_400_000))
       : null;
-  const byKey = new Map(state.days.map((d) => [d.date, d]));
-  const loggedToday = byKey.get(todayKey)?.status === "logged" || byKey.get(todayKey)?.status === "backfilled";
-  const medianLogSeconds = logDurations.length >= 3 ? medianOf(logDurations) : DEFAULT_LOG_SECONDS;
 
-  // A habit is done when its bound artifact exists for today. There is no
-  // habit "done" state to set — it is read from the action log, so the only
-  // way to complete one is to do the thing.
-  const habitsToday = habits.map((h) => ({
-    ...h,
-    done: actions.some((a) => a.kind === h.kind && a.day === todayKey),
-  }));
+  // ------------------------------------------------------------------
+  // Telling the user what the server did. Toasts are side effects, so they
+  // live in effects keyed on the server's answer — never in render. Refs hold
+  // what has already been said, so a re-render (or React's development double
+  // run) cannot say it twice.
+  // ------------------------------------------------------------------
 
-  const dailyTarget = dailyTargetFrom(goals.weeklyTarget);
-  const todayIntensity = dayIntensity(actions, todayKey);
+  // The run grew: say so, pointing at the next rung. A rung reached is the
+  // celebration's to announce, so the toast stays out of its way.
+  const lastCount = useRef<number | null>(null);
+  const hasUnseenRung = queue.length > 0;
+  useEffect(() => {
+    if (!streak) return;
+    const before = lastCount.current;
+    lastCount.current = streak.current;
+    if (before === null || streak.current <= before || hasUnseenRung) return;
+    const upcoming = nextMilestone(streak.current);
+    toast.success(`${streak.current}-day streak`, {
+      id: "streak-grew",
+      description: `${upcoming.days - streak.current} more ${upcoming.days - streak.current === 1 ? "day" : "days"} to ${upcoming.label}.`,
+    });
+  }, [streak, hasUnseenRung]);
 
-  // Applications this week, Monday-start, duplicates excluded so re-logging the
-  // same role can't inflate the weekly number.
-  const weekStart = addDays(today, -weekdayIndex(today)).getTime();
-  const weeklyLogged = applications.filter((a) => !a.duplicateOf && new Date(a.loggedAt).getTime() >= weekStart).length;
+  // Freezes spent on their own: told after the fact, never asked (doc §4), once.
+  const told = useRef(new Set<string>());
+  const markSeenNow = markSeen.mutate;
+  useEffect(() => {
+    const fresh = (streak?.notices ?? []).filter((notice) => !told.current.has(notice.day));
+    if (!streak || fresh.length === 0) return;
+    for (const notice of fresh) told.current.add(notice.day);
+    const left = streak.freezes.free + streak.freezes.held;
+    toast(`Life happened — a freeze covered ${fresh.map((notice) => weekdayName(notice.day)).join(" and ")}.`, {
+      description: `Your streak never broke. ${left} ${left === 1 ? "freeze" : "freezes"} left.`,
+    });
+    markSeenNow({ freezes: fresh.map((notice) => notice.day) });
+  }, [streak, markSeenNow]);
 
-  /**
-   * The single path by which a day becomes logged. Everything else — the
-   * header button, the weekly strip, the pod's "Log one" — routes through here
-   * or through `recordAction`, so there is exactly one place where the streak
-   * can move and exactly one place that writes the audit trail.
-   */
-  function applyQualifyingAction(kind: ActionKind, artifactId: string, at: Date, reasonLabel?: string) {
-    const day = resolveActionDay(at);
-    const reason = reasonLabel ?? ACTION_KINDS[kind].label;
+  // The gift list follows the streak's count of waiting gifts: when the server
+  // granted one (a status change reaching interview, the weekly goal), the list
+  // is fetched again. New gifts get one quiet toast; a rung's gift is the
+  // celebration's to announce.
+  const waitingOnServer = streak?.giftsWaiting;
+  const waitingInList = giftsQuery.data ? giftItems.filter((g) => !g.usedAt).length : undefined;
+  const giftsFetching = giftsQuery.isFetching;
+  // Once per count the server reports, so a list that can never match (one
+  // capped at its page size) cannot turn this into a refetch loop.
+  const refetchedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (waitingOnServer === undefined || waitingInList === undefined || waitingOnServer === waitingInList || giftsFetching) return;
+    if (refetchedFor.current === waitingOnServer) return;
+    refetchedFor.current = waitingOnServer;
+    void queryClient.invalidateQueries({ queryKey: qkGifts });
+  }, [waitingOnServer, waitingInList, giftsFetching, queryClient]);
 
-    setActions((prev) => [...prev, { id: nextId("act"), kind, artifactId, at: at.toISOString(), day }]);
-
-    // Fresh ISO week => the free freeze allowance resets to 2. Use-it-or-
-    // lose-it: last week's unspent free tier does NOT roll into this one.
-    const wk = weekKey(at);
-    if (wk !== freeWeek) {
-      setFreeWeek(wk);
-      setFreeFreezes(2);
-    }
-    const freeAvailable = wk !== freeWeek ? 2 : freeFreezes;
-
-    const weight = ACTION_KINDS[kind].intensityWeight;
-    const before = state.current;
-    const marked = markDay(state.days, day, "logged", reason, at, weight);
-    let days = marked.days;
-    const auditRows: AuditEntry[] = marked.audit ? [marked.audit] : [];
-
-    // If there's an unplanned miss sitting behind us and a freeze to spend,
-    // absorb it and tell the user after the fact — never ask permission.
-    // The free weekly tier is spent before the purchased/perk stock, so paid
-    // freezes never burn while a free one quietly expires.
-    const absorbed = absorbMissWithFreeze(days, freeAvailable + state.freezes, at);
-    let freezesSpent = 0;
-    let freeSpent = 0;
-    if (absorbed.coveredDay) {
-      days = absorbed.days;
-      if (freeAvailable > 0) freeSpent = 1;
-      else freezesSpent = 1;
-      if (absorbed.audit) auditRows.push(absorbed.audit);
-    }
-    if (freeSpent) setFreeFreezes((n) => Math.max(0, n - 1));
-
-    const current = computeStreak(days);
-    const earned = milestonesCrossed(before, current, state.claimed);
-
-    // ------------------------------------------------------------------
-    // Gift grants. All randomness is drawn HERE, in the handler — never in
-    // render, never inside a setState updater (React can run those twice,
-    // which would reroll a gift). The drawn results are plain locals shared
-    // by the inventory and the celebration queue.
-    // ------------------------------------------------------------------
-    const earnedWithPayout = earned.map((m) => ({ ...m, gift: drawGift(m.giftTier) }));
-
-    const alreadyGranted = (ref: string) => gifts.some((g) => g.refId === ref);
-    const grants: GiftEvent[] = [];
-
-    // Weekly goal met (applications only) — one small gift per ISO week, ever.
-    if (kind === "application") {
-      const weeklyAfter = weeklyLogged + 1;
-      const weeklyRef = strongRefId("weekly-goal", wk);
-      if (weeklyAfter >= goals.weeklyTarget && !alreadyGranted(weeklyRef)) {
-        grants.push({
-          id: nextId("gift"),
-          kind: drawGift("small"),
-          reason: STRONG_EVENTS["weekly-goal"].reason,
-          refId: weeklyRef,
-          at: at.toISOString(),
-        });
-      }
-    }
-
-    // A full day earns recognition, deliberately not a gift — material
-    // rewards every day would flood the inventory into meaninglessness.
-    const intensityNow = dayIntensity(actions, day) + weight;
-    const becameFull = isFullDay(intensityNow, dailyTarget) && !isFullDay(intensityNow - weight, dailyTarget);
-
-    const freezesEarned = earned.reduce((n, m) => {
-      // "+2 streak freezes" grants two, not one — counting rungs instead of
-      // freezes once silently paid the 60-day reward out at half.
-      const match = m.perk?.match(/\+(\d+) streak freeze/);
-      return n + (match ? Number(match[1]) : 0);
-    }, 0);
-
-    setState((prev) => ({
-      ...prev,
-      days,
-      current,
-      longest: Math.max(computeLongest(days), current),
-      claimed: [...prev.claimed, ...earned.map((m) => m.days)],
-      // Held stock caps at FREEZE_CAP minus the free tier, so perk grants
-      // can't stockpile repair into meaninglessness.
-      freezes: Math.min(prev.freezes - freezesSpent + freezesEarned, FREEZE_CAP - freeAvailable + freeSpent),
-    }));
-    const milestoneGifts: GiftEvent[] = earnedWithPayout.map((m) => ({
-      id: nextId("gift"),
-      kind: m.gift as GiftKind,
-      reason: `${m.label} reached`,
-      refId: String(m.days),
-      at: at.toISOString(),
-    }));
-    if (grants.length > 0 || milestoneGifts.length > 0) {
-      setGifts((prev) => [...prev, ...grants, ...milestoneGifts]);
-    }
-    if (auditRows.length) setAudit((prev) => [...prev, ...auditRows]);
-    setLogPulse((n) => n + 1);
-
-    // The milestone modal announces its own gift; smaller grants get one
-    // quiet toast; a full day gets recognition without a package.
-    if (grants.length > 0) {
-      toast.success(`\u{1F381} ${grants.map((g) => GIFT_CATALOGUE[g.kind].label).join(" · ")}`, {
-        description: `${grants.map((g) => g.reason).join(" · ")} — waiting in your gifts.`,
-      });
-    } else if (becameFull) {
-      toast.success("Full day \u2713", { description: `You hit today's bar of ${dailyTarget}.` });
-    }
-
-    // Side effects stay out of the setState updaters — React may run those more
-    // than once in development.
-    if (absorbed.coveredDay) {
-      const left = freeAvailable - freeSpent + state.freezes - freezesSpent + freezesEarned;
-      toast(`Life happened — a freeze covered ${weekdayName(absorbed.coveredDay)}.`, {
-        description: `Your streak never broke. ${left} ${left === 1 ? "freeze" : "freezes"} left.`,
-      });
-    }
-
-    if (earnedWithPayout.length > 0) {
-      setQueue((prev) => [...prev, ...earnedWithPayout]);
+  const knownGifts = useRef<Set<string> | null>(null);
+  const giftsLoaded = giftsQuery.data !== undefined;
+  useEffect(() => {
+    if (!giftsLoaded) return;
+    if (knownGifts.current === null) {
+      knownGifts.current = new Set(giftItems.map((g) => g.id));
       return;
     }
-
-    if (marked.audit === null && kind === "application") return; // already logged today; the payoff panel is the feedback
-
-    const upcoming = nextMilestone(current);
-    toast.success(`${current}-day streak`, {
-      description: upcoming
-        ? `${upcoming.days - current} more ${upcoming.days - current === 1 ? "day" : "days"} to ${upcoming.label}.`
-        : "You are past every milestone.",
+    const known = knownGifts.current;
+    const fresh = giftItems.filter((g) => !known.has(g.id));
+    for (const g of fresh) known.add(g.id);
+    const announce = fresh.filter((g) => !g.usedAt && !g.refId?.startsWith("milestone:"));
+    if (announce.length === 0) return;
+    toast.success(`\u{1F381} ${announce.map((g) => GIFT_CATALOGUE[g.kind].label).join(" · ")}`, {
+      description: `${announce.map((g) => g.reason).join(" · ")} — waiting in your gifts.`,
     });
-  }
+  }, [giftsLoaded, giftItems]);
+
+  // ------------------------------------------------------------------
+  // Actions
+  // ------------------------------------------------------------------
 
   function logApplication(input: LogApplicationInput): LogApplicationResult {
     const at = new Date();
-    const score = scoreApplication(input.resumeId ?? "res-master", input.jdText);
 
     const application: Application = {
       id: newClientId("app"),
@@ -514,12 +497,17 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       loggedAt: at.toISOString(),
       status: "applied" as TrackerColumnId,
       duplicateOf: input.duplicateOf,
-      atsScore: score.score,
+      // Only ever a real scan's number, and only when the log flow found one.
+      // This used to be a keyword-overlap estimate against mock keywords,
+      // saved to the tracker as if it were a measurement.
+      atsScore: typeof input.atsScore === "number" ? input.atsScore : undefined,
     };
 
     // Returned now, saved behind: the payoff panel never waits on a round trip.
     // The id doubles as the idempotency key, so the failure toast's Retry saves
-    // this application once even if the first request did land.
+    // this application once even if the first request did land. The server
+    // records the day's action with the row, and the write refreshes the streak
+    // once it settles.
     createApplication({
       clientId: application.id,
       input: applicationInput({
@@ -537,82 +525,58 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       const seconds = Math.round((at.getTime() - input.startedAtMs) / 1000);
       if (seconds > 0) setLogDurations((prev) => [...prev, seconds].slice(-20));
     }
-    applyQualifyingAction("application", application.id, at);
+    setLogPulse((n) => n + 1);
 
     // The same constant the follow-up engine nudges on, so the promise made
     // here and the nudge that delivers it can never drift apart.
-    return { application, score, followUpOn: dayKey(addDays(at, FOLLOW_UP_AFTER_APPLY_DAYS)) };
+    return { application, followUpOn: dayKey(addDays(at, FOLLOW_UP_AFTER_APPLY_DAYS)) };
   }
 
   function recordAction(kind: ActionKind, artifactId: string, label?: string) {
-    applyQualifyingAction(kind, artifactId, new Date(), label);
+    void label; // the server writes its own reason; nothing a user typed reaches the log
+    setLogPulse((n) => n + 1);
+    if (kind === "follow-up") {
+      // The one action the server cannot see: reported against its application.
+      // A row whose create is still in flight has no server id yet; the touch
+      // the tracker sends with it records the same follow-up once it lands.
+      if (isObjectId(artifactId)) reportFollowUp.mutate(artifactId);
+      return;
+    }
+    // A referral ask or pod post has already been written — and its action with
+    // it — by the time a screen calls this, so the streak can refresh now.
+    // Applications and status changes refresh when their own write settles.
+    if (kind === "message" || kind === "prep") refreshStreak(queryClient);
   }
 
-  /**
-   * Rare-event gift (interview reached, offer reached, questions answered,
-   * weekly goal). Deduped forever by the gift list's refId, so re-dragging a
-   * card through the same stage can never pay twice. Drawn here, in the
-   * handler — see the purity note above.
-   */
   function awardStrongEvent(kind: StrongEventKind, suffix: string, detail?: string): boolean {
-    const ref = strongRefId(kind, suffix);
-    if (gifts.some((g) => g.refId === ref)) return false;
-    const spec = STRONG_EVENTS[kind];
-    const drawn: GiftKind = typeof spec.gift === "string" ? spec.gift : drawGift(spec.gift.tier);
-    setGifts((prev) => [
-      ...prev,
-      { id: nextId("gift"), kind: drawn, reason: detail ?? spec.reason, refId: ref, at: new Date().toISOString() },
-    ]);
-    toast.success(`\u{1F381} ${GIFT_CATALOGUE[drawn].label}`, {
-      description: `${detail ?? spec.reason} — waiting in your gifts.`,
-    });
-    return true;
+    void kind;
+    void suffix;
+    void detail;
+    return false;
   }
 
-  /**
-   * Redeems the oldest unused gift of `kind`. Consumable effects apply here;
-   * service gifts (rewrite, Pro day, intro) are marked used and acknowledged —
-   * in a real build they enqueue the actual service.
-   */
   function redeemGift(kind: GiftKind): boolean {
-    const target = gifts.find((g) => g.kind === kind && !g.usedAt);
-    if (!target) return false;
-    if (kind === "freeze") {
-      if (freeFreezes + state.freezes >= FREEZE_CAP) {
-        toast("You're holding the maximum freezes", { description: `${FREEZE_CAP} is the cap — use one first.` });
-        return false;
-      }
-      setState((prev) => ({ ...prev, freezes: prev.freezes + 1 }));
-    }
-    if (kind === "backfill") {
-      const yesterday = dayKey(addDays(today, -1));
-      const marked = markDay(state.days, yesterday, "backfilled", "Backfill gift used", new Date());
-      const current = computeStreak(marked.days);
-      setState((prev) => ({ ...prev, days: marked.days, current, longest: Math.max(prev.longest, current) }));
-      if (marked.audit) setAudit((prev) => [...prev, marked.audit!]);
-    }
-    if (kind === "restore" && brokenStreak !== null) {
-      setState((prev) => ({ ...prev, current: brokenStreak }));
-      setBrokenStreak(null);
-    }
-    setGifts((prev) => prev.map((g) => (g.id === target.id ? { ...g, usedAt: new Date().toISOString() } : g)));
-    toast.success(`${GIFT_CATALOGUE[kind].label} used`, {
-      description:
-        kind === "rewrite" || kind === "pro-day" || kind === "referral-intro"
-          ? "It's queued — you'll see it land shortly."
-          : undefined,
+    if (!gifts.some((g) => g.kind === kind && !g.usedAt)) return false;
+    redeem.mutate(kind, {
+      onSuccess: () =>
+        toast.success(`${GIFT_CATALOGUE[kind].label} used`, {
+          description:
+            kind === "rewrite" || kind === "pro-day" || kind === "referral-intro"
+              ? "It's noted on your account — we'll be in touch to deliver it."
+              : undefined,
+        }),
     });
     return true;
   }
 
   function checkDuplicate(candidate: { company: string; role: string; url?: string }) {
-    return findDuplicate(candidate, applications, today);
+    return findDuplicate(candidate, applications, now);
   }
 
   /**
    * Legacy entry point kept so existing call sites compile. It is deliberately
-   * NOT a naked day-marker any more — with no artifact it cannot qualify a day,
-   * so it routes to the log dialog instead via the returned no-op plus a nudge.
+   * NOT a naked day-marker — with no artifact it cannot qualify a day, so it
+   * nudges toward logging something real.
    */
   function logToday() {
     toast("Log an application to keep your streak", {
@@ -620,23 +584,41 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }
 
+  const offer = streak?.repair && streak.repair.day !== repairHiddenFor ? streak.repair : null;
+  const repair: RepairOffer | null = offer
+    ? {
+        brokenStreak: offer.brokenStreak,
+        hoursSinceBreak: offer.hoursSinceBreak,
+        hoursLeft: offer.hoursLeft,
+        priceCredits: offer.priceCredits,
+        restoreHeld: offer.restoreHeld,
+        freeHalfAvailable: offer.freeHalfAvailable,
+        halfDays: offer.halfDays,
+      }
+    : null;
+
+  const audit: AuditEntry[] = (streak?.audit ?? []).map((row) => ({ id: row.id, at: row.at, day: row.day, from: row.from, to: row.to, reason: row.reason }));
 
   const value: ActivityContextValue = {
-    ...state,
+    current,
+    longest,
+    days,
+    claimed: (streak?.milestones ?? []).map((m) => m.days),
     // Total across both tiers — existing consumers keep reading one number.
-    freezes: freeFreezes + state.freezes,
+    freezes: freeFreezes + heldFreezes,
+    // Referral credits are not this provider's: the invites page and the
+    // sidebar's invite meter read them from the backend (useInviteSummary),
+    // and the streak pays gifts, never currency. Kept at zero only because the
+    // `StreakState` shape still carries the field.
+    credits: 0,
     freeFreezes,
-    heldFreezes: state.freezes,
+    heldFreezes,
     dailyTarget,
     todayIntensity,
     awardStrongEvent,
     gifts,
-    giftsWaiting: heldGifts(gifts).length,
+    giftsWaiting: streak?.giftsWaiting ?? gifts.filter((g) => !g.usedAt).length,
     redeemGift,
-    // The credit economy is gone from this surface: referral credits live on
-    // the invites page, and the streak pays gifts. `credits` remains only for
-    // legacy readers (sidebar/billing) and counts referral credits alone.
-    credits: INVITE_CREDITS_EARNED,
     giftsOpen,
     openGifts: () => setGiftsOpen(true),
     closeGifts: () => setGiftsOpen(false),
@@ -648,15 +630,17 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     loggedToday,
     logPulse,
     logToday,
+    streakLoading: streakQuery.isPending,
     // Held back while the log dialog is open; the payoff panel surfaces the
     // milestone inline instead, and the full celebration plays on close.
     celebrating: logOpen ? null : (queue[0] ?? null),
-    dismissCelebration: () => setQueue((prev) => prev.slice(1)),
+    dismissCelebration: () => {
+      if (queue[0]) markSeen.mutate({ milestones: [queue[0].days] });
+    },
     /** What was earned by the log currently being shown, for the payoff panel. */
     pendingMilestone: queue[0] ?? null,
 
     applications,
-    actions,
     audit,
     weeklyLogged,
     medianLogSeconds,
@@ -664,56 +648,52 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     recordAction,
     checkDuplicate,
 
-
-    repair: brokenStreak !== null && !repairDismissed ? { brokenStreak, hoursSinceBreak: 6 } : null,
-    freeRestoreUsed,
-    dismissRepair: () => setRepairDismissed(true),
-    nowHour: today.getHours(),
+    repair,
+    freeRestoreUsed: streak?.freeRestoreUsed ?? false,
+    repairing: repairMutation.isPending,
+    dismissRepair: () => setRepairHiddenFor(streak?.repair?.day ?? null),
+    startOverFromZero: () => {
+      setRepairHiddenFor(streak?.repair?.day ?? null);
+      dismiss.mutate();
+    },
+    nowHour: streak?.localHour ?? now.getHours(),
     atRiskDismissed,
     dismissAtRisk: () => setAtRiskDismissed(true),
     // One banner + one hunt-hour prompt is the daily ceiling.
     promptsToday: atRiskDismissed ? MAX_STREAK_PROMPTS_PER_DAY : 1,
-    simulateBreak: () => {
-      if (state.current === 0) return;
-      setBrokenStreak(state.current);
-      setRepairDismissed(false);
-      setState((prev) => ({ ...prev, current: 0 }));
-      setAudit((prev) => [
-        ...prev,
-        {
-          id: nextId("audit"),
-          at: new Date().toISOString(),
-          day: todayKey,
-          from: "logged",
-          to: "missed",
-          reason: "Streak broken — no qualifying action",
-        },
-      ]);
-    },
     restoreStreak: () => {
-      // A restore is a GIFT now, never a purchase — earned at the big rungs
-      // and rare events, redeemed here when it matters most.
-      if (brokenStreak === null) return false;
-      const days = brokenStreak;
-      if (!redeemGift("restore")) return false;
-      toast.success(`${days}-day streak restored.`, { description: "Your restore gift brought it back whole." });
+      // A restore gift, never a purchase — earned at the big rungs and rare
+      // events, redeemed here when it matters most.
+      if (!repair || !repair.restoreHeld) return false;
+      const days = repair.brokenStreak;
+      repairMutation.mutate("gift", {
+        onSuccess: () => toast.success(`${days}-day streak restored.`, { description: "Your restore gift brought it back whole." }),
+      });
       return true;
     },
+    repairWithCredits: () => {
+      if (!repair) return;
+      const { brokenStreak: days, priceCredits } = repair;
+      repairMutation.mutate("credits", {
+        onSuccess: () => toast.success(`${days}-day streak restored.`, { description: `${priceCredits} credits spent.` }),
+      });
+    },
     halfRestoreStreak: () => {
-      if (brokenStreak === null) return;
-      const half = Math.floor(brokenStreak / 2);
-      setState((prev) => ({ ...prev, current: half }));
-      setFreeRestoreUsed(true);
-      setBrokenStreak(null);
-      toast(`${half} days restored, free.`, { description: "One free restore every 30 days." });
+      if (!repair) return;
+      const half = repair.halfDays;
+      repairMutation.mutate("half", {
+        onSuccess: () => toast(`${half} ${half === 1 ? "day" : "days"} restored, free.`, { description: "One free restore every 30 days." }),
+      });
     },
 
     habits,
     habitsToday,
+    // Saved whole on the goals row, gathered with the other goal edits into one
+    // PATCH — a label typed a letter at a time is one save, not twenty.
     addHabit: () =>
-      setHabits((prev) => [...prev, { id: nextId("habit"), label: "New habit", kind: "application" }]),
-    updateHabit: (id, patch) => setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch } : h))),
-    removeHabit: (id) => setHabits((prev) => prev.filter((h) => h.id !== id)),
+      writeGoals((row) => ({ habits: [...(row?.habits ?? DEFAULT_HABITS), { id: newClientId("habit"), label: "New habit", kind: "application" }] })),
+    updateHabit: (id, patch) => writeGoals((row) => ({ habits: (row?.habits ?? DEFAULT_HABITS).map((h) => (h.id === id ? { ...h, ...patch } : h)) })),
+    removeHabit: (id) => writeGoals((row) => ({ habits: (row?.habits ?? DEFAULT_HABITS).filter((h) => h.id !== id) })),
 
     logOpen,
     openLog: () => setLogOpen(true),
@@ -732,28 +712,27 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     pauseSearch: (days) => {
       // A pause is not a break: the count is held exactly where it is, and
       // every prompt goes quiet. People take time off; punishing that is how
-      // you lose them for good.
-      setPauseEndsOn(dayKey(addDays(today, days)));
-      setGoals((g) => ({ ...g, paused: true }));
-      toast.success(`Search paused for ${days} days.`, { description: `Your ${state.current}-day streak is held.` });
+      // you lose them for good. The end day is saved with the pause, so every
+      // device knows how long it runs, and the server holds the streak for it.
+      writeGoals(() => ({ paused: true, pauseEndsOn: dayKey(addDays(fromDayKey(todayKey), days)) }));
+      toast.success(`Search paused for ${days} days.`, { description: `Your ${current}-day streak is held.` });
     },
     resumeSearch: () => {
-      setPauseEndsOn(null);
-      setGoals((g) => ({ ...g, paused: false }));
-      toast.success("Welcome back.", { description: `Your ${state.current}-day streak is still yours.` });
+      writeGoals(() => ({ paused: false, pauseEndsOn: null }));
+      toast.success("Welcome back.", { description: `Your ${current}-day streak is still yours.` });
     },
     pausedDaysLeft,
 
     hired: retiredStreak !== null,
     retiredStreak,
-    markHired: () => {
-      setRetiredStreak(state.current);
-      setGoals((g) => ({ ...g, paused: true }));
-    },
+    markHired: () => retire.mutate(),
   };
 
   return <ActivityCtx.Provider value={value}>{children}</ActivityCtx.Provider>;
 };
+
+/** The gift list's key, built once: the effect that refetches it needs a stable reference. */
+const qkGifts = qk.activity.gifts();
 
 /** Full activity state. Throws outside the provider so misuse is loud. */
 export function useActivity(): ActivityContextValue {

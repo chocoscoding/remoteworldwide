@@ -26,7 +26,7 @@ export interface StreakPanelProps {
 }
 
 const StreakPanel: FC<StreakPanelProps> = ({ open, onOpenChange }) => {
-  const { current, longest, freezes, freeFreezes, giftsWaiting, loggedToday, openLog, logPulse, openGifts, simulateBreak } = useStreak();
+  const { current, longest, freezes, freeFreezes, giftsWaiting, loggedToday, openLog, logPulse, openGifts } = useStreak();
   const reduceMotion = useReducedMotion();
 
   const tier = tierFor(current);
@@ -124,19 +124,6 @@ const StreakPanel: FC<StreakPanelProps> = ({ open, onOpenChange }) => {
             <p className="text-[15px] font-bold text-primary mb-1">Rewards</p>
             <p className="text-xs text-black/45 mb-3">Each reward pays out once, the day you reach it.</p>
             <StreakRewards />
-
-            {/* Only here because a mock has no clock: a streak breaks at local
-                midnight, which can't happen inside one session, so without this
-                the repair and comeback screens are unreachable. */}
-            {current > 0 && (
-              <button
-                type="button"
-                onClick={simulateBreak}
-                className="mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-[1.5px] border-dashed border-black/25 px-3.5 py-2.5 text-xs font-bold text-black/60 transition-colors hover:border-[#222325] hover:text-primary">
-                <Snowflake className="h-3.5 w-3.5" />
-                Preview what happens if you miss a day
-              </button>
-            )}
           </div>
         </div>
       </DialogContent>

@@ -3,10 +3,12 @@
 Covers the job-seeker dashboard's streak system, daily goals, credits, pods and
 the "log an application" flow.
 
-> **This feature area is UI-only.** Every model below lives in React state and
-> resets on reload. There is no Prisma model, no API route and no server action
-> behind any of it, by explicit design decision. See
-> [Not built yet](#not-built-yet) before wiring it to anything real.
+> **The streak is server-side.** Streaks, freezes, gifts, repairs, habits and
+> the audit trail are stored and derived by the Express backend
+> (`remoteworldwidebackend`), from an append-only activity log. The browser
+> reads them through React Query and never computes a streak. See
+> [Server side](#server-side) for where each rule lives, and
+> [Not built yet](#not-built-yet) for what still is not.
 
 ---
 
@@ -31,20 +33,26 @@ not a goal, because it's gameable and it dips for reasons the user didn't cause.
 
 ## 2. The core rule: no artifact, no day
 
-A day counts only if something real was created. `QualifyingAction.artifactId`
-is non-optional, and every path that can move the streak goes through
-`applyQualifyingAction` in `ActivityProvider` — one place where the number can
-change, one place that writes the audit trail.
+A day counts only if something real was created. The backend's
+`activity_events` log gets a row in the same request that writes the artifact
+behind it — never from a button press — and the streak is derived from that log
+and nothing else. The only action a browser may report itself is a follow-up on
+an application it owns (`POST /api/streak/actions`), because a follow-up sent
+outside the product leaves no other trace; the server checks the application
+and dedupes it with the tracker's own "touch".
 
 The five qualifying actions (`ACTION_KINDS` in `app/lib/dashboard/activity.ts`):
 
-| Action | Artifact required |
-|---|---|
-| `application` | An `Application` row |
-| `follow-up` | A `MessageRecord` with recipient + timestamp |
-| `message` | A `MessageRecord` (referral or pod) |
-| `prep` | A `PrepSession` of ≥10 minutes, completed |
-| `status-change` | An application status transition |
+| Action | Artifact required | Written by |
+|---|---|---|
+| `application` | An `Application` row (sent, not saved; not back-dated) | `applicationService.create`, or a saved job moved into a stage |
+| `follow-up` | A touch on an application, a ticked follow-up task, or a reported follow-up on an owned application | `applicationService.update`, `taskService.updateTask`, `POST /api/streak/actions` |
+| `message` | A new referral ask, or a post to the pod | `referralRequestService.create`, `podService.share` / `recordWin` |
+| `prep` | A prep session of ≥10 minutes, finished | the AI service's finish, via `POST /api/internal/activity/prep` |
+| `status-change` | An application status transition (once per transition per day) | `applicationService.update` |
+
+Back-dated applications and the one-time board import never write an action:
+history cannot fill in a streak.
 
 Opening the app is not an action. A ticked checkbox with nothing behind it is
 not an action — which is why the daily-habits list is **not clickable**: each
@@ -54,22 +62,46 @@ habit is bound to an action kind and ticks itself when that artifact exists.
 
 ## 3. Files
 
-### Logic (pure, React-free, unit-testable)
+### Server side
+
+| File (remoteworldwidebackend) | Owns |
+|---|---|
+| `src/types/streak.ts` | The contract, and every constant below: grace hour, prep minimum, freeze tiers, repair price, reward ladder, gift pools |
+| `src/helpers/streakTime.ts` | Day keys in the user's zone, the 4am grace hour, ISO weeks, DST-safe instants |
+| `src/helpers/streakMath.ts` | The pure replay: runs, rest days, pauses, freezes, breaks, overrides |
+| `src/services/activityService.ts` | The activity writers (`recordActivity`, the prep hook, the one client-reported kind) |
+| `src/services/streakService.ts` | Lazy evaluation, rewards, gifts, repairs, the streak answer, the coach's view |
+| `src/services/podActivity.ts` | The pod board, derived from the same log |
+| `activity_events`, `streak_days`, `streak_states`, `streak_gifts` | The log; decided days, overrides and the audit trail; per-user state; the gift inventory |
+
+Routes: `GET /api/streak` (`?tz=` is the browser's zone, used only while the
+settings name none), `GET /api/streak/gifts`, `POST /api/streak/gifts/redeem`,
+`POST /api/streak/repair`, `POST /api/streak/repair/dismiss`,
+`POST /api/streak/seen`, `POST /api/streak/retire`, `POST /api/streak/actions`,
+and the service-token `POST /api/internal/activity/prep`. Habits and the pause
+end day live on the goals row (`PATCH /api/goals`). There is no scheduler: a
+closed day is decided the first time anything reads the streak after it closes.
+
+### Logic (pure, React-free)
 
 | File | Owns |
 |---|---|
-| `app/lib/dashboard/activity.ts` | Artifacts, action registry, grace period, dedupe, audit, pod quorum |
-| `app/lib/dashboard/streak.ts` | Date helpers, tier ladder, milestones, day visuals, streak arithmetic, calendar grid, mock history |
+| `app/lib/dashboard/activity.ts` | Action registry (labels, intensity weights), habits, dedupe, audit shape, pod quorum |
+| `app/lib/dashboard/streak.ts` | Date helpers, tier ladder, milestones, day visuals, calendar grid |
 | `app/lib/dashboard/goals.ts` | Target range, daily math, time estimate |
-| `app/lib/dashboard/credits.ts` | Ledger types, spend catalogue, repair pricing, prompt caps |
+| `app/lib/dashboard/credits.ts` | Prompt caps and repair windows |
+| `app/lib/streak/` | The contract's mirror and the browser calls |
 | `app/lib/dashboard/ats-stub.ts` | `scoreApplication()` — the ATS seam |
 | `app/lib/dashboard/parse-jd.ts` | Mock job-posting parser, with a failure path |
 
 ### State
 
 `app/components/dashboard/activity/ActivityProvider.tsx` — mounted once in
-`DashboardShell`. Owns applications, actions, days, goals, habits, the credit
-ledger, the audit trail, and the open/closed state of the global dialogs.
+`DashboardShell`. A thin React Query layer over `/api/streak`, the goals row
+and the applications table, keeping the context API every screen already calls
+(`recordAction`, `awardStrongEvent`, the streak fields). It also owns the
+open/closed state of the global dialogs and tells the user, once, what the
+server did (a freeze spent, a rung reached, a gift granted).
 
 `app/components/dashboard/streak/StreakContext.tsx` is a **compatibility shim**
 re-exporting `useStreak`, kept so the ownership change didn't have to touch
@@ -98,21 +130,35 @@ every consumer at once. `useStreak()` is now just an alias for `useActivity()`
 ## 4. Rules worth knowing before you change anything
 
 **Grace period.** Actions before **4:00 AM local** count toward the previous
-day (`GRACE_HOUR`). Someone applying at 1am is finishing yesterday.
+day (`GRACE_HOUR`, server-side). Someone applying at 1am is finishing yesterday.
+"Local" is the timezone from the user's settings; when they never picked one,
+the zone their browser last reported; else UTC. Each action stores the day it
+counted toward, so a later timezone change never moves a day that happened.
 
 **Rest days are transparent.** They neither extend nor break a streak, and
 render as skipped rather than as gaps. They come from `goals.restDays`
-(Monday-first indices), not from seeded history.
+(Monday-first indices). A closed day is decided once, when it is first read
+after closing, so changing rest days later does not rewrite history. Paused
+days are transparent the same way; a pause with an end day ends on that day.
 
-**Freezes auto-apply.** The first unplanned miss is absorbed if a freeze is
-available, and the user is told *after the fact* — never asked.
+**Freezes auto-apply.** An unplanned miss inside a live run is absorbed if a
+freeze is available — the free weekly tier (2 per ISO week, use-it-or-lose-it)
+first, then held stock (milestone perks, freeze gifts; free + held never pass
+4) — and the user is told *after the fact*, never asked. No freeze is spent
+when there is no run to protect.
 
-**Nothing silently resets.** Every streak state change appends an `AuditEntry`
-with a reason.
+**Repairs.** A break can be bought back for 24 hours after the missed day
+closes: with a restore gift, with credits (`STREAK_REPAIR_CREDITS` = 5, a spend
+through the credit ledger with feature `streak-repair` and the deterministic
+reference `streak-repair:{userId}:{day}`, so a retry never charges twice), or
+free at half the run once every 30 days. "Start from zero" is remembered;
+closing the panel is not.
 
-**Credits are derived.** `balanceOf(ledger)` sums an append-only list. Never
-store a mutable balance — four independent "balances" previously drifted apart
-the moment anything was earned.
+**Nothing silently resets.** Every freeze, break and repair is a stored
+`streak_days` row with a reason; those rows are the audit trail.
+
+**Credits are the ledger's.** Repairs spend through the backend's credit
+ledger; the streak itself pays gifts, never currency.
 
 **Dedupe warns, never blocks.** Normalised company+role over 90 days plus exact
 URL match. Duplicates still save; they just don't count twice toward the week.
@@ -132,41 +178,33 @@ read the clock once in a lazy `useState` initialiser.
 
 ## 5. Not built yet
 
-Things the UI models but cannot actually do without a backend:
-
-- **Persistence.** Everything resets on reload. There is no schema for any
-  dashboard domain object; `Bookmark` in `prisma/schema.prisma` is the existing
-  pattern for user-keyed data if this is ever made real.
 - **Push and email notifications.** §8 of the brief asks for a prompt at the
-  user's `hunt_hour`. The `huntHour` + timezone model is built and the in-app
-  at-risk banner works, but there is no scheduler, no service worker and no
-  mail provider.
+  user's `hunt_hour`. The `huntHour` model is stored and the in-app at-risk
+  banner works (on the user's own clock), but there is no reminder scheduler,
+  no service worker and no mail provider for it.
+- **Service gifts.** Redeeming a resume rewrite, a Pro day or a priority intro
+  marks the gift used; nothing delivers the service yet.
+- **"Answered a company's questions".** Its gift is paid by the server only;
+  `grantStrongEvent` in `streakService` is ready for the recommendations
+  programme to call when that lands.
 - **Real ATS scoring.** `ats-stub.ts` computes keyword overlap so the payoff
-  panel reacts to the pasted JD, but it is not the real model. Replacing the
-  body of `scoreApplication()` is the whole migration — the return type already
-  matches what the ATS screen renders.
-- **Real JD parsing.** `parse-jd.ts` is a mock. The real thing already exists:
-  `POST /api/jobs/parse` on the Express backend (ScrapingAnt → Groq). Swapping
-  is a single `fetch` in `parseJobUrl`; the return shape already matches.
-- **Timezone.** All date maths is browser-local. "Lagos · GMT+1" in the sidebar
-  is persona copy, not a real setting.
+  panel reacts to the pasted JD, but it is not the real model.
+- **Real JD parsing.** `parse-jd.ts` is a mock; the real thing is
+  `POST /api/jobs/parse` on the Express backend.
 - **Mobile.** The dashboard is desktop-only by decision — the sidebar never
   collapses to a drawer and headers use fixed `px-8`.
 
-### `simulateBreak()`
-
-`ActivityProvider` exposes `simulateBreak()`, surfaced as "Preview what happens
-if you miss a day" at the bottom of the streak panel. It exists **only** because
-a mock has no clock: a streak breaks at local midnight, which cannot happen
-inside one session, so without it the repair and comeback screens are
-unreachable dead code. **Delete both the method and the button** as soon as a
-real scheduler exists.
+There is no "preview a missed day" button any more: the server has a clock, so
+breaks, repairs and comebacks happen for real.
 
 ---
 
 ## 6. Verifying changes
 
-There are no automated tests for this area. The working loop is:
+The rules are tested on the backend (`tests/helpers/streakTime.test.ts`,
+`tests/helpers/streakMath.test.ts`, `tests/routes/streak.test.ts`: timezones,
+the grace hour, rest days, pauses, freezes, breaks, repairs, back-dated imports
+excluded). For the dashboard the working loop is:
 
 ```bash
 npx tsc --noEmit && npx eslint app/ && npx next build

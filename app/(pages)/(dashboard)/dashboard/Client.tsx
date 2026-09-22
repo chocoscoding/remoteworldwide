@@ -11,6 +11,7 @@ import type { ProgressBarFillColor } from "@/app/components/dashboard/ui/Progres
 import Pill from "@/app/components/dashboard/ui/Pill";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import StreakPill from "@/app/components/dashboard/streak/StreakPill";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import AtRiskBanner from "@/app/components/dashboard/streak/AtRiskBanner";
 import ProofOfProgress from "@/app/components/dashboard/ProofOfProgress";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
@@ -19,7 +20,6 @@ import { COLUMN_LABELS, STATUS_ORDER } from "@/app/components/dashboard/tracker/
 import { ACTION_KINDS, type ActionKind } from "@/app/lib/dashboard/activity";
 import { dayKey, fromDayKey, addDays, weekdayIndex, dayVisual, tierFor } from "@/app/lib/dashboard/streak";
 import { clampTarget, dailyMath, TARGET_STEP, HIGH_VOLUME_THRESHOLD, TARGET_MAX, TARGET_MIN } from "@/app/lib/dashboard/goals";
-import { WEEKLY_GOAL } from "@/app/lib/dashboard/mock-data";
 import type { TrackerColumnId } from "@/app/lib/dashboard/types";
 import { comparePlanRows, taskHref } from "@/app/lib/tasks/api";
 import { periodOf, type TaskItem, type TaskSourceKind } from "@/app/lib/tasks/types";
@@ -55,6 +55,24 @@ const SOURCE_LINE: Record<TaskSourceKind, string> = {
 const isUnseen = (task: TaskItem) => task.createdBy === "service" && task.seenAt === null;
 
 const NEXT_ACTION_SKELETON_WIDTHS = ["w-2/3", "w-1/2", "w-3/5"] as const;
+
+/** The week's seven labels, Monday first — the order `goals.restDays` numbers them in. */
+const WEEK_DAY_LABELS = ["M", "T", "W", "Th", "F", "S", "S"] as const;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * "Mon 21 — Sun 27 Sep": the Monday-to-Sunday week containing `todayKey`, the
+ * user's own today as the server counts it. The month is named once when the
+ * week stays inside it, on both ends when it straddles two.
+ */
+function weekRangeLabel(todayKey: string): string {
+  const today = fromDayKey(todayKey);
+  const monday = addDays(today, -weekdayIndex(today));
+  const sunday = addDays(monday, 6);
+  const sameMonth = monday.getMonth() === sunday.getMonth();
+  return `Mon ${monday.getDate()}${sameMonth ? "" : ` ${MONTHS[monday.getMonth()]}`} — Sun ${sunday.getDate()} ${MONTHS[sunday.getMonth()]}`;
+}
 
 // A link dressed as the outline sticker button. The old markup put a <button>
 // inside the <Link>, which nests one control in another.
@@ -92,8 +110,6 @@ const HomeClient: FC = () => {
     addHabit,
     updateHabit,
     removeHabit,
-    dailyTarget,
-    todayIntensity,
   } = useActivity();
   const habitsDone = habitsToday.filter((h) => h.done).length;
 
@@ -117,13 +133,13 @@ const HomeClient: FC = () => {
   const restDays = new Set(goals.restDays);
   const streakTier = tierFor(streak);
 
-  // The Monday-first week that contains today, resolved against real streak
-  // history rather than WEEKLY_GOAL.doneDays — the strip and the calendar now
-  // read from one source, so logging a day lights up both at once.
+  // The Monday-first week that contains today, resolved against the server's
+  // streak history — the strip and the calendar read from one source, so a
+  // logged day lights up both at once.
   const weekDays = useMemo(() => {
     const today = fromDayKey(todayKey);
     const monday = addDays(today, -weekdayIndex(today));
-    return WEEKLY_GOAL.allDays.map((label, i) => {
+    return WEEK_DAY_LABELS.map((label, i) => {
       const date = addDays(monday, i);
       const key = dayKey(date);
       return { label, key, index: i, day: byKey.get(key) ?? null, isToday: key === todayKey };
@@ -194,17 +210,18 @@ const HomeClient: FC = () => {
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Your week</h1>
-          <span className="text-sm text-black/45 truncate">Mon 3 — Sun 9 Aug</span>
+          <span className="text-sm text-black/45 truncate">{weekRangeLabel(todayKey)}</span>
         </div>
         <div className="flex items-center gap-3 flex-none">
           <StreakPill />
           <StickerButton variant="primary" size="md" onClick={() => openLog()}>
             Log an application
           </StickerButton>
+          <NotificationBell />
         </div>
       </header>
 
-      <main className="px-8 py-7 pb-14 max-w-[1240px] mx-auto">
+      <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto">
         <AtRiskBanner />
 
         {/* Hero row: weekly goal + today */}
@@ -219,7 +236,9 @@ const HomeClient: FC = () => {
               <div className="flex items-start justify-between gap-4 mb-4">
                 <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-secondary">Weekly goal</p>
                 {goalsKnown ? (
-                  <p className="text-xs text-white/45 text-right">{goals.paused ? "Paused. Nothing is expected until you're back." : math.sentence}</p>
+                  <p className="text-xs text-white/45 text-right">
+                    {goals.paused ? "Paused. Nothing is expected until you're back." : math.sentence}
+                  </p>
                 ) : (
                   <span aria-hidden className="h-3 w-40 animate-pulse rounded bg-white/10" />
                 )}
@@ -435,7 +454,7 @@ const HomeClient: FC = () => {
                   <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-1">Working days</p>
                   <p className="text-xs text-black/45 mb-2.5">Filled days are the ones you work. Tap one to make it a rest day.</p>
                   <div className="flex gap-1.5">
-                    {WEEKLY_GOAL.allDays.map((day, i) => {
+                    {WEEK_DAY_LABELS.map((day, i) => {
                       // Filled means active. The picker used to fill the *rest*
                       // days, which read backwards — a solid chip says "on".
                       const working = !restDays.has(i);
@@ -592,7 +611,9 @@ const HomeClient: FC = () => {
                 <div className="flex flex-col items-start gap-3 rounded-xl bg-[#f0f0ea]/70 px-4 py-4">
                   <div>
                     <p className="text-sm font-semibold text-primary">Nothing open on your plan</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-black/50">Ask your coach what to focus on next. It can suggest steps to add.</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-black/50">
+                      Ask your coach what to focus on next. It can suggest steps to add.
+                    </p>
                   </div>
                   <Link href={FULL_PLAN_HREF} className={outlineLink}>
                     Plan with your coach
@@ -610,7 +631,11 @@ const HomeClient: FC = () => {
                       <span className="text-sm font-semibold text-primary truncate">{task.title}</span>
                       {isUnseen(task) && (
                         <>
-                          <span aria-hidden title="New" className="h-2 w-2 flex-none rounded-full bg-[#e1f073] ring-[1.5px] ring-[#222325]" />
+                          <span
+                            aria-hidden
+                            title="New"
+                            className="h-2 w-2 flex-none rounded-full bg-[#e1f073] ring-[1.5px] ring-[#222325]"
+                          />
                           <span className="sr-only">(new)</span>
                         </>
                       )}
