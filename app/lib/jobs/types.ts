@@ -204,6 +204,13 @@ export interface JobAnswerEvidence {
   role: string | null;
 }
 
+/**
+ * Where an answer can send the user next, chosen by the AI service from this
+ * fixed set (`JOB_NEXT_STEPS` in remoteworldwideai/src/types/jobs.ts).
+ */
+export const JOB_NEXT_STEPS = ["interview-prep", "tailor-resume", "find-referral", "cover-letter", "ats-score", "track", "coach"] as const;
+export type JobNextStep = (typeof JOB_NEXT_STEPS)[number];
+
 /** The frontend's existing `JdQaAnswer` shape, plus evidence the UI may show. */
 export interface JobAnswer {
   id: string;
@@ -212,6 +219,8 @@ export interface JobAnswer {
   missing: string;
   tips: string[];
   evidence: JobAnswerEvidence[];
+  /** Most useful first, at most three. Absent or empty on answers stored before the service chose them. */
+  nextSteps?: JobNextStep[];
 }
 
 export interface JobThreadEntry {

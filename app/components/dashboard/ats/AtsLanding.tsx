@@ -22,13 +22,19 @@ export interface AtsLandingProps {
    * nobody has scored says so.
    */
   scores: ReadonlyMap<string, number>;
+  /**
+   * A job already chosen for this visit, by a link from its own screen. The
+   * second card then names it, and `onScoreVsJob` scores against it instead
+   * of opening the picker. Null or absent: the card asks for one.
+   */
+  job?: { company: string; role: string } | null;
   /** Registers the upload and returns the new entry so it can be selected. */
   onUpload: (file: File) => Promise<VaultDoc | null>;
   onScoreGeneral: (resumeId: string) => void;
   onScoreVsJob: (resumeId: string) => void;
 }
 
-const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, onUpload, onScoreGeneral, onScoreVsJob }) => {
+const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload, onScoreGeneral, onScoreVsJob }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -59,7 +65,10 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, onUpload, onScoreGen
       </p>
 
       {/* Step 1 — which resume */}
-      <div className="mt-2 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
+      {/* Two columns once there are resumes to choose between. With none, the
+          upload tile is the only child, and a two-column grid would leave it
+          stranded at half width beside an empty cell. */}
+      <div className={cn("mt-2 grid w-full grid-cols-1 gap-2.5", resumes.length > 0 && "sm:grid-cols-2")}>
         {resumes.map((r) => {
           const selected = r.id === selectedId;
           const badge = sourceBadgeLabel(r.source);
@@ -145,9 +154,9 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, onUpload, onScoreGen
               <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
                 <Link2 className="h-4 w-4 text-primary" />
               </span>
-              <span className="mt-3 block text-sm font-bold text-primary">Against a job</span>
+              <span className="mt-3 block text-sm font-bold text-primary">{job ? "Against this job" : "Against a job"}</span>
               <span className="mt-1 block text-xs leading-relaxed text-black/50">
-                Pick a listing or paste any posting — we score the match.
+                {job ? `${job.role} at ${job.company} — we score the match.` : "Pick a listing or paste any posting — we score the match."}
               </span>
             </button>
           </div>

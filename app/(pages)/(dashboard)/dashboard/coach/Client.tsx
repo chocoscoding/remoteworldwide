@@ -14,11 +14,13 @@
 // A new chat costs nothing until its first message: "+" only clears the screen,
 // and the first send creates the session and then streams into it.
 
-import { FC, FormEvent, UIEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FC, FormEvent, Suspense, UIEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, Clock, CreditCard, Loader2, Mic, Plus, RotateCcw, RotateCw, Send } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { AlertTriangle, ArrowLeft, ArrowRight, AudioLines, Clock, CreditCard, Loader2, Mic, Plus, RotateCcw, RotateCw, Send, Square } from "lucide-react";
 import { Lottie } from "lottie-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
@@ -26,14 +28,29 @@ import { initialsOf } from "@/app/components/dashboard/ui/Avatar";
 import PlanPanel from "@/app/components/dashboard/plan/PlanPanel";
 import ProposalCard from "@/app/components/dashboard/coach/ProposalCard";
 import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
+import InlineTalkBar from "@/app/components/dashboard/voice/InlineTalkBar";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
+import { useVoiceConversation } from "@/app/components/dashboard/voice/useVoiceConversation";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import { apiMessage } from "@/app/lib/api/core";
-import { COACH_BILLING_HREF, coachCardHref, describeReplyDone, describeUsage, fresherUsage, type CoachFailure } from "@/app/lib/coach/api";
-import { COACH_LIMITS, type CoachMessageCard, type CoachProposalItem } from "@/app/lib/coach/types";
+import { COACH_BILLING_HREF, coachCardHref, createCoachSession, describeReplyDone, type CoachFailure } from "@/app/lib/coach/api";
+import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
+import type { SavedJobItem } from "@/app/lib/jobs/types";
+import {
+  COACH_LIMITS,
+  type CoachMessageCard,
+  type CoachProposalItem,
+  type CoachSessionDetail,
+  type CoachSessionList,
+  type CreateCoachSessionResult,
+} from "@/app/lib/coach/types";
 import { qk } from "@/app/lib/query/keys";
 import type { Settings } from "@/app/lib/settings/types";
 import { periodOf } from "@/app/lib/tasks/types";
+import { isTalkActive, problemCopy } from "@/app/lib/voice/talkState";
 import { useCoachSession, useCoachSessions } from "@/hooks/queries/useCoachQueries";
+import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
+import { useVoiceConfig } from "@/hooks/queries/useVoiceConfig";
 import { isDraftKey, isTurnInFlight, useSendCoachMessage, type CoachTurn } from "@/hooks/mutations/useSendCoachMessage";
 
 // Links styled as sticker buttons rather than a <button> nested inside an <a>,
@@ -61,6 +78,34 @@ function turnAnnouncement(turn: CoachTurn | undefined): string {
   if (!turn) return "";
   if (isTurnInFlight(turn)) return "Coach is replying…";
   return turn.status === "done" ? describeReplyDone(turn) : "";
+}
+
+/** Voice minutes are counted per UTC day, so they come back at the next UTC midnight after `from`. */
+function minutesBackAt(from: number): string {
+  const at = new Date(from);
+  at.setUTCHours(24, 0, 0, 0);
+  return at.toISOString();
+}
+
+/**
+ * The start of a question about a saved job, left in the composer for the user
+ * to finish. Null when the job names neither a role nor a company.
+ */
+function jobDraftFor({ company, role }: Pick<SavedJobItem, "company" | "role">): string | null {
+  const r = role?.trim();
+  const c = company?.trim();
+  const subject = r && c ? `the ${r} role at ${c}` : r ? `the ${r} role` : c ? `a role at ${c}` : null;
+  return subject ? `I'm looking at ${subject}. `.slice(0, COACH_LIMITS.messageMax) : null;
+}
+
+/** A session made for a call goes into the rail and the cache at once, as a typed first message's does. */
+function storeTalkSession(queryClient: QueryClient, { session, usage }: CreateCoachSessionResult) {
+  const list = queryClient.getQueryData<CoachSessionList>(qk.coach.sessions());
+  if (list) queryClient.setQueryData<CoachSessionList>(qk.coach.sessions(), { sessions: [session, ...list.sessions.filter((other) => other.id !== session.id)], usage });
+  else void queryClient.invalidateQueries({ queryKey: qk.coach.sessions() });
+  if (!queryClient.getQueryData(qk.coach.session(session.id))) {
+    queryClient.setQueryData<CoachSessionDetail>(qk.coach.session(session.id), { session, messages: [], usage });
+  }
 }
 
 const CoachBadge: FC = () => (
@@ -130,9 +175,9 @@ const TypingBubble: FC = () => (
 );
 
 /** Where the reply would have been: why it isn't, and a Retry that sends the same message under the same id. */
-const FailureRow: FC<{ failure: CoachFailure; onRetry: () => void }> = ({ failure, onRetry }) => {
+const FailureRow: FC<{ failure: CoachFailure; onRetry: () => void; retryDisabled: boolean }> = ({ failure, onRetry, retryDisabled }) => {
   const retry = failure.retryable ? (
-    <StickerButton variant="outline" size="sm" onClick={onRetry}>
+    <StickerButton variant="outline" size="sm" onClick={onRetry} disabled={retryDisabled}>
       <RotateCcw className="h-3.5 w-3.5" aria-hidden />
       Retry
     </StickerButton>
@@ -195,10 +240,11 @@ interface TurnRowsProps {
   userStored: boolean;
   initials: string;
   onRetry: (turnKey: string) => void;
+  retryDisabled: boolean;
 }
 
 /** A turn on its way into the session: the message, the reply as it arrives, and a failure if there is one. */
-const TurnRows: FC<TurnRowsProps> = ({ turn, userStored, initials, onRetry }) => {
+const TurnRows: FC<TurnRowsProps> = ({ turn, userStored, initials, onRetry, retryDisabled }) => {
   const { final } = turn;
   const text = final ? final.text : turn.reply;
   const card = final ? final.card : turn.card;
@@ -207,12 +253,12 @@ const TurnRows: FC<TurnRowsProps> = ({ turn, userStored, initials, onRetry }) =>
     <>
       {!userStored && <MessageRow from="user" text={turn.userMessage?.text ?? turn.text} initials={initials} />}
       {(text || card || proposal) && <MessageRow from="coach" text={text} card={card} proposal={proposal} initials={initials} />}
-      {turn.failure && <FailureRow failure={turn.failure} onRetry={() => onRetry(turn.key)} />}
+      {turn.failure && <FailureRow failure={turn.failure} onRetry={() => onRetry(turn.key)} retryDisabled={retryDisabled} />}
     </>
   );
 };
 
-const CoachClient: FC = () => {
+const CoachScreen: FC = () => {
   const sessionsQuery = useCoachSessions();
   const { turns, send, retry } = useSendCoachMessage();
   // null = a new chat: the default when you land, and what "+" returns to.
@@ -222,6 +268,30 @@ const CoachClient: FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const followRef = useRef(true);
   const shapeRef = useRef("");
+
+  // A link from a job's own screen (?job=<saved job id>) starts a question
+  // about that job in a new chat's composer, for the user to finish. Words are
+  // the only way to name a job here: a session holds nothing but its messages,
+  // and the context bundle is the account, not one posting. Never sent for
+  // them, since a reply can cost a credit. Read back from saved jobs rather
+  // than the link's labels, once, and only into an empty composer; a job that
+  // has gone leaves it empty.
+  const params = useSearchParams();
+  const context = readJobContext(params, "job");
+  const [contextFor, setContextFor] = useState<string | null>(null);
+  const [draftedFor, setDraftedFor] = useState<string | null>(null);
+  const contextPending = context.savedJobId !== null && contextFor !== context.savedJobId;
+  const saved = useSavedJobQuery(contextPending ? context.savedJobId : null);
+  const savedJob = saved.data && saved.data.id === context.savedJobId ? saved.data : null;
+  if (contextPending && (savedJob || saved.isError)) {
+    setContextFor(context.savedJobId);
+    const jobDraft = savedJob ? jobDraftFor(savedJob) : null;
+    if (jobDraft && activeKey === null && !draft.trim()) {
+      setDraft(jobDraft);
+      setDraftedFor(context.savedJobId);
+    }
+  }
+  const backHref = backToJobHref(context);
 
   const draftTurn = activeKey !== null && isDraftKey(activeKey) ? turns.find((turn) => turn.draftKey === activeKey) : undefined;
   // A draft nothing holds any more (its session never came, and it was dropped) is a new chat again.
@@ -269,6 +339,141 @@ const CoachClient: FC = () => {
   // A start still waiting on the mic prompt: the mic button calls it off, and so does sending.
   const requesting = micStatus === "requesting";
 
+  // Talk mode. A call's turns are stored in this session, so it is read again as each one settles.
+  const voiceConfig = useVoiceConfig();
+  const talkOn = !!voiceConfig.data?.spokenEnabled && !!voiceConfig.data?.features.coach.enabled;
+  const talkSessionRef = useRef<string | null>(null);
+  const refreshGate = useRef({ running: false, again: false });
+  // One refetch in flight; whatever is asked meanwhile becomes one more after it.
+  const refreshTalkSession = useCallback(() => {
+    const gate = refreshGate.current;
+    if (gate.running) {
+      gate.again = true;
+      return;
+    }
+    gate.running = true;
+    void (async () => {
+      try {
+        do {
+          gate.again = false;
+          const id = talkSessionRef.current;
+          if (id) {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: qk.coach.session(id) }),
+              queryClient.invalidateQueries({ queryKey: qk.coach.sessions() }),
+            ]);
+          }
+        } while (gate.again);
+      } finally {
+        gate.running = false;
+      }
+    })().catch(() => undefined);
+  }, [queryClient]);
+  // The call's end also settles its last turn (onTurnSettled); what is left is today's minutes.
+  const refreshVoiceConfig = useCallback(() => void queryClient.invalidateQueries({ queryKey: qk.voice.config() }), [queryClient]);
+  const talk = useVoiceConversation({
+    feature: "coach",
+    targetId: activeSessionId,
+    enabled: talkOn,
+    onTurnSettled: refreshTalkSession,
+    onEnded: refreshVoiceConfig,
+  });
+  const { start: startTalk, end: endTalk, reset: resetTalk } = talk;
+  const talkActive = isTalkActive(talk.state);
+  // True while a new chat's session is being created for a call.
+  const [talkOpening, setTalkOpening] = useState(false);
+  const talking = talkActive || talkOpening;
+  const showTalk = talkActive || talk.problem !== null;
+  const outOfMinutes = voiceConfig.data?.remainingSeconds === 0;
+  const minutesBack = outOfMinutes ? minutesBackAt(voiceConfig.dataUpdatedAt) : null;
+  const talkReason = talkActive
+    ? null
+    : minutesBack !== null
+      ? problemCopy({ kind: "minutes", retryAt: minutesBack })
+      : busy
+        ? "Wait for the coach to finish replying"
+        : null;
+  const talkLabel = talkActive ? "End voice call" : talkReason ? `Talk to your coach. ${talkReason}` : "Talk to your coach";
+  const talkCaption = talk.state !== "live" ? "" : talk.agentCaption ? `Coach: ${talk.agentCaption}` : talk.userCaption ? `You: ${talk.userCaption}` : "";
+  const pendingTalkRef = useRef<string | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const talkButtonRef = useRef<HTMLButtonElement>(null);
+  const typeFocusRef = useRef(false);
+
+  // A tab left open past the reset asks again instead of staying locked until a reload.
+  useEffect(() => {
+    if (minutesBack === null) return;
+    const timer = setTimeout(refreshVoiceConfig, Math.max(0, Date.parse(minutesBack) - Date.now()) + 30_000);
+    return () => clearTimeout(timer);
+  }, [minutesBack, refreshVoiceConfig]);
+
+  const handleTalk = async () => {
+    if (talkActive) {
+      typeFocusRef.current = true;
+      endTalk();
+      return;
+    }
+    if (activeSessionId !== null) {
+      talkSessionRef.current = activeSessionId;
+      startTalk();
+      return;
+    }
+    // A new chat, or one whose first message never got its session.
+    if (talkOpening || busy) return;
+    const from = activeKey;
+    setTalkOpening(true);
+    try {
+      const created = await createCoachSession();
+      storeTalkSession(queryClient, created);
+      pendingTalkRef.current = created.session.id;
+      // Only if still where Talk was pressed; a user who has moved on stays where they went.
+      setActiveKey((key) => (key === from ? created.session.id : key));
+    } catch (error) {
+      toast.error(apiMessage(error));
+    } finally {
+      setTalkOpening(false);
+    }
+  };
+
+  // Started after the render that names the new session: the hook reads its target from the last commit.
+  useEffect(() => {
+    const pending = pendingTalkRef.current;
+    if (pending === null || talkOpening) return;
+    pendingTalkRef.current = null;
+    if (pending !== activeSessionId) return;
+    talkSessionRef.current = pending;
+    startTalk();
+  }, [activeSessionId, talkOpening, startTalk]);
+
+  // Dictation and a call would share the mic.
+  useEffect(() => {
+    if (talking && (listening || requesting)) stopDictation();
+  }, [talking, listening, requesting, stopDictation]);
+
+  const handleTypeInstead = useCallback(() => {
+    resetTalk();
+    typeFocusRef.current = true;
+  }, [resetTalk]);
+
+  // The composer stays disabled until the call has ended, so focus waits for that.
+  useEffect(() => {
+    if (talking || !typeFocusRef.current) return;
+    typeFocusRef.current = false;
+    inputRef.current?.focus();
+  }, [talking, showTalk]);
+
+  // A question started from a job link is picked up where it stops: focus, with the caret after its words.
+  useEffect(() => {
+    if (draftedFor !== null) inputRef.current?.focus();
+  }, [draftedFor]);
+
+  // A retried message is a typed send: locked during a call, and it closes a refusal's panel like one.
+  const handleRetry = (turnKey: string) => {
+    if (talking) return;
+    resetTalk();
+    retry(turnKey);
+  };
+
   const itemCount = stored.length + liveTurns.length;
   const tail = lastTurn ? lastTurn.reply.length : 0;
   useEffect(() => {
@@ -289,8 +494,6 @@ const CoachClient: FC = () => {
     followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_SLACK_PX;
   };
 
-  const usageLine = describeUsage(fresherUsage(sessionsQuery.data?.usage, sessionQuery.data?.usage));
-
   const sessions = sessionsQuery.data?.sessions ?? [];
   // A new chat whose session is still being created is in the rail at once, untitled, like the session it is about to be.
   const creating = turns.flatMap((turn) =>
@@ -307,9 +510,10 @@ const CoachClient: FC = () => {
   const handleSend = (e: FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text || busy || talking) return;
     const turn = send(activeSessionId, text);
     if (!turn) return;
+    resetTalk();
     setDraft("");
     if (listening || requesting) stopDictation();
     // First message of a new chat: the view follows the draft, and the draft becomes its session.
@@ -334,6 +538,15 @@ const CoachClient: FC = () => {
               "Knows your profile, applications and results"
             )}
           </p>
+        </div>
+        <div className="flex flex-none items-center gap-2.5">
+          {backHref && (
+            <Link href={backHref} className={OUTLINE_LINK}>
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+              Back to the job
+            </Link>
+          )}
+          <NotificationBell />
         </div>
       </header>
 
@@ -497,7 +710,8 @@ const CoachClient: FC = () => {
                   turn={turn}
                   userStored={turn.userMessage !== null && storedIds.has(turn.userMessage.id)}
                   initials={initials}
-                  onRetry={retry}
+                  onRetry={handleRetry}
+                  retryDisabled={talking}
                 />
               ))}
 
@@ -521,21 +735,50 @@ const CoachClient: FC = () => {
                 <div
                   className={cn(
                     "flex-1 flex items-center gap-2 h-11 rounded-lg border bg-[#f6f6f6] pl-4 pr-2 transition-colors",
-                    listening ? "border-[#222325]" : "border-black/12 focus-within:border-black/30",
+                    showTalk && talk.problem
+                      ? "border-[#b23c26]/25 bg-[#fdf4f2]"
+                      : listening || showTalk
+                        ? "border-[#222325]"
+                        : "border-black/12 focus-within:border-black/30",
                   )}>
-                  <input
-                    type="text"
+                  {showTalk && (
+                    <InlineTalkBar
+                      talk={talk}
+                      speakingLabel="Coach is speaking"
+                      onTypeInstead={handleTypeInstead}
+                      controlRef={talkButtonRef}
+                      className="flex-1 self-stretch"
+                    />
+                  )}
+                  {/* A one-line textarea rather than an input: password managers
+                      (NordPass has no opt-out attribute) offer saved cards and
+                      logins on inputs, and leave textareas alone. Enter sends and
+                      newlines are dropped, so it behaves like the input it replaced. */}
+                  <textarea
+                    ref={inputRef}
+                    rows={1}
+                    wrap="off"
+                    autoComplete="off"
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => setDraft(e.target.value.replace(/\r?\n/g, " "))}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }}
                     maxLength={COACH_LIMITS.messageMax}
+                    disabled={talking}
                     aria-label="Message your coach"
-                    placeholder={listening ? "Listening…" : "Ask your coach anything…"}
-                    className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/40 focus:outline-none"
+                    placeholder={talking ? "End the call to type" : listening ? "Listening…" : "Ask your coach anything…"}
+                    className={cn(
+                      "flex-1 min-w-0 h-5 resize-none overflow-hidden bg-transparent text-sm leading-5 text-primary placeholder:text-black/40 focus:outline-none disabled:cursor-not-allowed",
+                      showTalk && "hidden",
+                    )}
                   />
                   <button
                     type="button"
                     onClick={listening || requesting ? stopDictation : startDictation}
-                    disabled={!dictationSupported || micStatus === "denied"}
+                    disabled={!dictationSupported || micStatus === "denied" || talking}
                     aria-pressed={listening}
                     aria-label={listening ? "Stop dictating" : requesting ? "Cancel dictation" : "Dictate your message"}
                     title={
@@ -554,33 +797,57 @@ const CoachClient: FC = () => {
                     className={cn(
                       "inline-flex h-8 w-8 flex-none items-center justify-center rounded-md cursor-pointer transition-colors disabled:opacity-30 disabled:pointer-events-none",
                       listening ? "bg-[#222325] text-[#e1f073]" : "text-black/45 hover:bg-black/5 hover:text-primary",
+                      showTalk && "hidden",
                     )}>
                     {micStatus === "requesting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
                   </button>
+                  {talkOn && (
+                    // A disabled button gets no hover, so its reason rides on the wrapper's tooltip.
+                    <span className="inline-flex flex-none" title={talkReason ?? talkLabel}>
+                      <StickerButton
+                        ref={talkButtonRef}
+                        variant={talkActive ? "primary" : "secondary"}
+                        size="sm"
+                        onClick={() => void handleTalk()}
+                        disabled={talkOpening || talk.state === "ending" || (!talkActive && (busy || outOfMinutes))}
+                        aria-label={talkLabel}
+                        className={talkActive ? undefined : "border-[1.5px] border-[#222325] hover:shadow-[2px_2px_0_0_#222325]"}>
+                        {talkOpening ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        ) : talkActive ? (
+                          <Square className="h-3 w-3 fill-current" aria-hidden />
+                        ) : (
+                          <AudioLines className="h-3.5 w-3.5" aria-hidden />
+                        )}
+                        {talkActive ? "End" : "Talk"}
+                      </StickerButton>
+                    </span>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={!draft.trim() || busy}
+                  disabled={!draft.trim() || busy || talking || showTalk}
                   aria-label="Send"
                   title="Send"
                   className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-[#222325] text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:pointer-events-none">
                   <Send className="h-4 w-4" />
                 </button>
               </form>
-              {/* Today's allowance, so a reply that costs a credit is never a
-                  surprise. The line keeps its height while it loads, so the
-                  composer doesn't jump. While dictating it shows the words not
-                  final yet instead: the input's placeholder can show them only
-                  while the box is empty, and after the first pause it never is. */}
+              {/* While dictating, the words not final yet: the input's placeholder
+                  can show them only while the box is empty, and after the first
+                  pause it never is. In a call, the live caption. The line keeps
+                  its height when empty, so the composer doesn't jump. */}
               <p className="mt-2 min-h-[1rem] px-1 text-[11px] font-medium text-black/45">
                 {listening && interim ? (
                   <span data-interim className="block truncate italic text-black/60">
                     {interimTail(interim)}
                   </span>
-                ) : (
-                  usageLine
-                )}
+                ) : talkCaption ? (
+                  <span data-caption className="block truncate italic text-black/60">
+                    {talkCaption}
+                  </span>
+                ) : null}
               </p>
             </div>
           </DashCard>
@@ -589,5 +856,24 @@ const CoachClient: FC = () => {
     </div>
   );
 };
+
+/** The screen's frame, shown only if the page is ever prerendered without search params. */
+const CoachFallback: FC = () => (
+  <div className="h-screen flex flex-col bg-[#f6f6f6] overflow-hidden">
+    <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
+      <h1 className="text-[17px] font-bold text-primary leading-tight truncate">Career coach</h1>
+      <NotificationBell />
+    </header>
+  </div>
+);
+
+// useSearchParams needs a Suspense boundary for a prerendered page. This one
+// renders per request (the dashboard layout reads the session), so the fallback
+// should never show; the boundary keeps the screen correct if that changes.
+const CoachClient: FC = () => (
+  <Suspense fallback={<CoachFallback />}>
+    <CoachScreen />
+  </Suspense>
+);
 
 export default CoachClient;
