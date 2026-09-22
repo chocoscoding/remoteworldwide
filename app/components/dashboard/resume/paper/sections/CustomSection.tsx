@@ -15,7 +15,7 @@ export interface CustomSectionProps {
  * "custom", so this component is only ever the body: a muted placeholder.
  */
 const CustomSection: FC<CustomSectionProps> = () => (
-  <p className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No content yet.</p>
+  <p data-resume-placeholder className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No content yet.</p>
 );
 
 export default CustomSection;

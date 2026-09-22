@@ -100,7 +100,7 @@ const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
           {/* Same role as the sections' "No experience added yet." lines: a
               hint at what goes here, not content. Faded off the name's own
               colour so it reads on every chrome, band and sidebar included. */}
-          {content.name || <span className="opacity-35">Your name</span>}
+          {content.name || <span data-resume-placeholder className="opacity-35">Your name</span>}
         </p>
         {content.title && (
           <p className="mt-[2pt] text-[length:var(--r-fs-title)] leading-tight text-[color:var(--r-c-title)]">{content.title}</p>

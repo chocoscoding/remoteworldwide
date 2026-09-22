@@ -1,15 +1,18 @@
 "use client";
 
 import { FC, useState } from "react";
-import { Check, ChevronDown, Download, FileCode, FileText, FileType2, FolderOpen } from "lucide-react";
+import { Check, ChevronDown, Download, FileCode, FileText, FileType2, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 
 /**
  * Shared "download this document" overlay, used by both the Resume and
- * Cover-letter screens. Format selection + Download are purely local —
- * nothing is actually exported, "Download" just closes the modal.
+ * Cover-letter screens. The screen does the export (`onDownload`) — DOCX and
+ * Markdown are built in the browser and saved; PDF opens the browser's print
+ * dialog on the document alone (see app/lib/export/save.ts on why) — and this
+ * stays open, busy, until it finishes, so a failure is shown here rather than
+ * lost behind a closed dialog.
  */
 
 export type DownloadFormat = "pdf" | "docx" | "md";
@@ -28,14 +31,14 @@ const FORMAT_OPTIONS: FormatOption[] = [
     label: "PDF",
     ext: ".pdf",
     icon: FileText,
-    helper: "The safest bet for recruiters and ATS systems — formatting stays locked wherever it's opened.",
+    helper: "Exactly as it looks here, with real text ATS systems can read. Opens your browser's print dialog — choose \"Save as PDF\".",
   },
   {
     id: "docx",
     label: "Word",
     ext: ".docx",
     icon: FileType2,
-    helper: "Fully editable in Word or Google Docs, in case you want to tweak it further yourself.",
+    helper: "Fully editable in Word or Google Docs. Laid out in one clean column, which ATS systems read most reliably.",
   },
   {
     id: "md",
@@ -55,27 +58,50 @@ export interface DownloadModalProps {
   docLabel?: string;
   /** Base filename shown next to the chosen extension, e.g. "Amara-Okafor-Resume". */
   fileName?: string;
-  /** Optional callback fired with the chosen format right before the modal closes. No real export happens either way. */
-  onDownload?: (format: DownloadFormat) => void;
+  /** The format selected on open. Key the modal on it to change it between openings. */
+  defaultFormat?: DownloadFormat;
+  /** Does the export. The modal stays open and busy until it settles; a rejection is shown here. */
+  onDownload?: (format: DownloadFormat) => void | Promise<void>;
+  /**
+   * Per-format help text, for a document that is not a copy of what is on
+   * screen — the ATS report prints a clean layout of the scan, not the page, so
+   * "exactly as it looks here" would be untrue of it. Unset formats keep the default.
+   */
+  helpers?: Partial<Record<DownloadFormat, string>>;
 }
 
-const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = "document", fileName = "Amara-Okafor", onDownload }) => {
-  const [format, setFormat] = useState<DownloadFormat>("pdf");
+const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = "document", fileName = "Document", defaultFormat = "pdf", onDownload, helpers }) => {
+  const [format, setFormat] = useState<DownloadFormat>(defaultFormat);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const selected = FORMAT_OPTIONS.find((f) => f.id === format) ?? FORMAT_OPTIONS[0];
 
-  const handleDownload = () => {
-    onDownload?.(format);
-    onOpenChange(false);
+  const handleDownload = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onDownload?.(format);
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "That download didn't work — please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (busy) return;
         onOpenChange(next);
-        if (!next) setMenuOpen(false);
+        if (!next) {
+          setMenuOpen(false);
+          setError(null);
+        }
       }}>
       <DialogContent className="bg-white rounded-[20px] border-0 p-0 max-w-md gap-0">
         <div className="p-6">
@@ -132,24 +158,34 @@ const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = 
             )}
           </div>
 
-          <p className="text-xs text-black/50 leading-relaxed mb-5">{selected.helper}</p>
+          <p className="text-xs text-black/50 leading-relaxed mb-5">{helpers?.[selected.id] ?? selected.helper}</p>
 
           <div className="flex items-center gap-2 rounded-xl bg-[#f0f0ea] px-4 py-3 mb-1">
-            <FolderOpen className="h-4 w-4 flex-none text-black/45" />
+            <Info className="h-4 w-4 flex-none text-black/45" />
             <p className="text-xs font-medium text-black/55">
-              Saves to <span className="font-semibold text-primary">My documents</span> too, as {fileName}
-              {selected.ext}.
+              {format === "pdf" ? "The dialog suggests the name " : "Saves to your downloads as "}
+              <span className="font-semibold text-primary">
+                {fileName}
+                {selected.ext}
+              </span>
+              .
             </p>
           </div>
+
+          {error && (
+            <p className="mt-3 rounded-xl border border-[#b23c26]/20 bg-[#fdf4f2] px-4 py-3 text-xs text-[#b23c26]" role="alert">
+              {error}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2.5 border-t border-black/8 px-6 py-4">
-          <StickerButton type="button" variant="outline" size="md" onClick={() => onOpenChange(false)}>
+          <StickerButton type="button" variant="outline" size="md" disabled={busy} onClick={() => onOpenChange(false)}>
             Cancel
           </StickerButton>
-          <StickerButton type="button" variant="primary" size="md" onClick={handleDownload}>
-            <Download className="h-4 w-4" />
-            Download
+          <StickerButton type="button" variant="primary" size="md" disabled={busy || !onDownload} onClick={() => void handleDownload()}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {busy ? "Preparing…" : format === "pdf" ? "Save as PDF" : "Download"}
           </StickerButton>
         </div>
       </DialogContent>

@@ -11,7 +11,7 @@ const SummarySection: FC<SummarySectionProps> = ({ content }) =>
   content.summary ? (
     <p className="text-[length:var(--r-fs-base)] leading-[var(--r-lh)] text-[color:var(--r-text)]">{content.summary}</p>
   ) : (
-    <p className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No summary yet.</p>
+    <p data-resume-placeholder className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No summary yet.</p>
   );
 
 export default SummarySection;

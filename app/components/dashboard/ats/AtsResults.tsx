@@ -14,9 +14,13 @@
 // honestly labelled: ticking a fix is a PROJECTION of what closing that gap is
 // worth, not a rescore. Only a real scan moves the real number, and the
 // projected figure is marked as such wherever it is shown.
+//
+// "Download report" writes the scan out as PDF (a clean print layout), Word or
+// Markdown — see `app/lib/export/ats-report.ts`. It carries the scored number
+// only, never the projection: a report outlives the screen it came from.
 
 import { FC, useMemo, useState } from "react";
-import { AlertTriangle, Check, ChevronDown, Download, FileText, Link2, Loader2, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, Download, FileText, Link2, Loader2, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
@@ -26,7 +30,10 @@ import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import AddToPlanButton from "@/app/components/dashboard/plan/AddToPlanButton";
+import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { ATS_BILLING_HREF, coveredKeywords, scanTier, unmetRequirements, type ScanFailure } from "@/app/lib/ats/api";
+import { ATS_REPORT_CSS, atsReportHtml, atsReportToDocx, atsReportToMarkdown } from "@/app/lib/export/ats-report";
+import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
 import type { ScanReport } from "@/app/lib/ats/types";
 import type { ScanStatus } from "@/hooks/mutations/useScanResume";
 import { TASK_LIMITS } from "@/app/lib/tasks/types";
@@ -97,7 +104,7 @@ const AtsResults: FC<AtsResultsProps> = ({
   onExit,
 }) => {
   const [keywordsOpen, setKeywordsOpen] = useState(true);
-  const [reportDownloaded, setReportDownloaded] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
 
   // Missing and partial requirements, worst first — the fix list, and the
   // source of the projected lifts.
@@ -124,9 +131,26 @@ const AtsResults: FC<AtsResultsProps> = ({
   // reads as "you matched nothing".
   const metrics = (report?.metrics ?? []).filter((m) => !(m.id === KEYWORD_METRIC && (report?.degraded || !job)));
 
-  function handleDownload() {
-    setReportDownloaded(true);
-    window.setTimeout(() => setReportDownloaded(false), 2000);
+  const reportFileName = safeFileName(`ATS report - ${resume.name}${job ? ` - ${job.company}` : ""}`);
+
+  /**
+   * Writes the report on screen out, in the format picked. Read from `report`
+   * at the moment of the click, so a write-up that landed after the score is
+   * in it. The modal stays open and busy until this settles and shows a
+   * failure itself.
+   */
+  async function handleDownload(format: DownloadFormat) {
+    if (!report) throw new Error("The scan hasn't finished yet — try again in a moment.");
+    const input = { report, resumeName: resume.name, job: job ? { company: job.company, role: job.role } : null, scannedAt };
+    if (format === "docx") {
+      saveBlob(await atsReportToDocx(input), `${reportFileName}.docx`);
+      return;
+    }
+    if (format === "md") {
+      saveText(atsReportToMarkdown(input), `${reportFileName}.md`);
+      return;
+    }
+    await printDocument({ title: reportFileName, html: atsReportHtml(input), pageSize: "A4", pageMargin: "16mm 16mm", css: ATS_REPORT_CSS });
   }
 
   return (
@@ -249,9 +273,9 @@ const AtsResults: FC<AtsResultsProps> = ({
                     </p>
                   )}
                 </div>
-                <StickerButton variant="outline" size="md" onClick={handleDownload}>
-                  {reportDownloaded ? <Check className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-                  {reportDownloaded ? "Report saved" : "Download report"}
+                <StickerButton variant="outline" size="md" onClick={() => setDownloadOpen(true)}>
+                  <Download className="h-4 w-4" />
+                  Download report
                 </StickerButton>
               </div>
             </div>
@@ -380,6 +404,19 @@ const AtsResults: FC<AtsResultsProps> = ({
           )}
         </>
       )}
+
+      <DownloadModal
+        open={downloadOpen}
+        onOpenChange={setDownloadOpen}
+        docLabel="scan report"
+        fileName={reportFileName}
+        onDownload={handleDownload}
+        helpers={{
+          pdf: "A clean, printable layout of this scan — score, metrics, gaps and rewrites. Opens your browser's print dialog — choose \"Save as PDF\".",
+          docx: "The same report as an editable Word document.",
+          md: "The same report as plain-text markup — handy for notes or pasting elsewhere.",
+        }}
+      />
     </div>
   );
 };
