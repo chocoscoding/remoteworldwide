@@ -4,131 +4,195 @@
 //
 // The screen answers one question: who can refer me for THIS job, how do I
 // reach them, and what do I say? So you pick a job (one of ours, or paste any
-// posting), and everything below is about that job: who's inside, their email
-// and LinkedIn, and an intro written for that person and that role.
+// posting), and everything below is about that job: the people you already
+// know at its company, a web search for the people there (WebReferrals —
+// LinkedIn profiles, likely work emails, open roles near it) and an intro
+// written for that person and that role.
 //
-// Browsing the whole network is the second tab, not the front door.
+// Your own network is the other tab: the contacts you brought in — LinkedIn
+// connections from a Connections.csv import, people you saved from a search,
+// people you added by hand — paged and searched on the server. Filters are only
+// what the data can back: where a contact came from, and whether their company
+// is hiring on Remote Worldwide right now.
 
-import { FC, useMemo, useRef, useState } from "react";
+import { FC, Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Briefcase, Network, Search, SearchX, Users, X } from "lucide-react";
+import { Briefcase, Loader2, Network, RotateCw, Search, SearchX, Upload, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
+import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
 import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
+import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
 import type { PickedJob } from "@/app/lib/jobs/fields";
-import { APPS, JD_CONTENT, TIE_META } from "@/app/lib/dashboard/mock-data";
-import type { TieKind } from "@/app/lib/dashboard/types";
+import type { ReferralContact } from "@/app/lib/dashboard/types";
+import type { ReferralPerson } from "@/app/lib/referrals/types";
+import type { ContactCounts, ContactSource } from "@/app/lib/contacts/types";
+import { contactToReferral, foundContact } from "@/app/lib/contacts/people";
+import { useReferralSearch } from "@/hooks/queries/useReferralSearch";
+import { useContact, useContacts } from "@/hooks/queries/useContactsQuery";
+import { useDebouncedValue } from "@/hooks/queries/useJobQueries";
+import { useDeleteContact } from "@/hooks/mutations/useContactMutations";
 import ContactRow from "@/app/components/dashboard/referrals/ContactRow";
 import DraftPanel from "@/app/components/dashboard/referrals/DraftPanel";
 import NetworkSourcesDialog from "@/app/components/dashboard/referrals/NetworkSourcesDialog";
+import WebReferrals from "@/app/components/dashboard/referrals/WebReferrals";
 
 type Tab = "all" | "job";
-type TieFilter = "all" | TieKind;
+type SourceFilter = "all" | ContactSource;
 
-const TIE_FILTERS: { id: TieFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "strong", label: "Strong ties" },
-  { id: "second", label: "2nd degree" },
-  { id: "alumni", label: "Alumni" },
+/** Where a contact came from — the only tie the data can honestly back. */
+const SOURCE_FILTERS: { id: SourceFilter; label: string; count: (c: ContactCounts) => number }[] = [
+  { id: "all", label: "All", count: (c) => c.all },
+  { id: "linkedin-csv", label: "LinkedIn", count: (c) => c["linkedin-csv"] },
+  { id: "web", label: "Found online", count: (c) => c.web },
+  { id: "manual", label: "Added by you", count: (c) => c.manual },
 ];
 
-const clampPage = (page: number, total: number) => Math.min(Math.max(page, 1), Math.max(total, 1));
+const SEARCH_DEBOUNCE_MS = 250;
+/** How many of your contacts at a job's company the For a job tab lists; the rest are a search away on All contacts. */
+const KNOWN_PAGE = 50;
+/** Rows shown before "Show all" — as in the search results below it. */
+const KNOWN_PREVIEW = 6;
 
 // Who's hiring, and for what: all a referral ask needs. One constant feeds
 // both the pick and the type, so they cannot drift.
 const REFERRAL_JOB_SPEC = "company, role";
-type ReferralJob = PickedJob<typeof REFERRAL_JOB_SPEC>;
+
+/** A Mongo id — anything else in ?contact= is a stale link from the old sample list. */
+const CONTACT_ID = /^[0-9a-f]{24}$/i;
 
 /**
- * Companies that actually have a live role — what "Open role" filters on.
- *
- * Deliberately still the mock listings, not real ones: the contacts it filters
- * are mock too, written against exactly these companies (see REFERRAL_CONTACTS),
- * and real listings would match none of them. It used to be read off the
- * picker's own job list, which is gone. A real version needs the backend to say
- * which of a network's companies are hiring, once the network is real.
+ * The job being referred for: always a saved job, either picked here or handed
+ * over by a link from its own screen (?savedJobId=…&company=…&role=…). The id is
+ * all the search sends; company and role are for showing.
  */
-const OPEN_ROLE_COMPANIES: ReadonlySet<string> = new Set(
-  [JD_CONTENT.company, ...APPS.map((a) => a.meta.split("·")[0].trim())].map((company) => company.toLowerCase()),
-);
+interface ReferralTarget {
+  id: string;
+  company: string;
+  role: string;
+  pasted: boolean;
+}
 
-const ReferralsClient: FC = () => {
-  const { contacts, askedContactIds, contactsForJob } = useNetwork();
+const targetOf = (job: PickedJob<typeof REFERRAL_JOB_SPEC>): ReferralTarget => ({
+  id: job.id,
+  company: job.company,
+  role: job.role,
+  pasted: job.source !== "platform",
+});
+
+const askJobOf = (job: ReferralTarget | null) => (job ? { company: job.company, role: job.role, savedJobId: job.id } : undefined);
+
+const ReferralsScreen: FC = () => {
+  const { isAsked, askedContactIds } = useNetwork();
   const params = useSearchParams();
   const { pickJob } = useJobPicker();
+  const context = readJobContext(params, "savedJobId");
+  const [contextDismissed, setContextDismissed] = useState(false);
 
-  // Read the deep link once, at mount — ?contact=ref-maria opens her draft.
-  //
-  // It used to preselect "the open job at her company" from a mock list too.
-  // A job here is now always a saved job the picker returned, and a link cannot
-  // make that pick for you, so she opens untailored on All contacts, where her
-  // draft shows; Pick a job tailors it from there. (On the For a job tab with
-  // no job, the empty state would hide the very draft the link asked for.)
-  const [deepLinked] = useState(() => {
+  // Read the deep link once, at mount — ?contact=<id> opens that contact's
+  // draft on All contacts, whichever page they are on. A job cannot be picked
+  // by a link, so the draft opens untailored; Pick a job tailors it from there.
+  const [deepLinkId, setDeepLinkId] = useState<string | null>(() => {
     const id = params.get("contact");
-    return id ? contacts.find((c) => c.id === id) : undefined;
+    return id && CONTACT_ID.test(id) ? id : null;
   });
+  const deepLinked = useContact(deepLinkId);
 
-  const [job, setJob] = useState<ReferralJob | null>(null);
-  // Your contacts are the default view; narrowing to a job is the step you
-  // take from there.
-  const [tab, setTab] = useState<Tab>("all");
+  // A link from a job's own screen lands on that job's search; otherwise your
+  // contacts are the default view, and narrowing to a job is the step from there.
+  const [job, setJob] = useState<ReferralTarget | null>(() =>
+    context.savedJobId && context.company ? { id: context.savedJobId, company: context.company, role: context.role ?? "", pasted: false } : null,
+  );
+  const [tab, setTab] = useState<Tab>(() => (context.savedJobId && context.company ? "job" : "all"));
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(deepLinked?.id ?? null);
+  // The contact whose intro is open on All contacts. Held whole, not by id, so
+  // paging or searching away from them never closes the draft.
+  const [picked, setPicked] = useState<ReferralContact | null>(null);
+  // Whoever's intro is open on the For a job tab: someone you know there, or someone the search found.
+  const [jobDraft, setJobDraft] = useState<ReferralContact | null>(null);
   const [query, setQuery] = useState("");
-  const [tieFilter, setTieFilter] = useState<TieFilter>("all");
-  const [openRoleOnly, setOpenRoleOnly] = useState(false);
-  const [sameTzOnly, setSameTzOnly] = useState(false);
+  const [source, setSource] = useState<SourceFilter>("all");
+  const [hiringOnly, setHiringOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
 
   const draftRef = useRef<HTMLDivElement | null>(null);
 
-  const paths = useMemo(() => (job ? contactsForJob(job.company) : null), [job, contactsForJob]);
-  const selected = selectedId ? contacts.find((c) => c.id === selectedId) : undefined;
+  const q = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
+  const contacts = useContacts({ q, source: source === "all" ? undefined : source, hiring: hiringOnly || undefined, page, pageSize });
+  const counts = contacts.data?.counts;
+  const items = contacts.data?.items ?? [];
+  const total = contacts.data?.total ?? 0;
+  const removeContact = useDeleteContact();
 
-  const myTimezone = "GMT+1";
+  // Your own contacts at the job's company — the warmest paths there are. People
+  // saved from a web search are strangers, not people you know, so they stay in
+  // the search results below rather than under this heading. Never the previous
+  // job's people under this job's heading while the new list loads.
+  const known = useContacts({ company: job ? [job.company] : [], pageSize: KNOWN_PAGE }, { enabled: tab === "job" && !!job?.company });
+  const knownPeople = known.isPlaceholderData ? [] : (known.data?.items ?? []).map(contactToReferral).filter((c) => c.tie !== "cold");
+  const moreKnown = (known.data?.total ?? 0) > KNOWN_PAGE;
+  const [showAllKnown, setShowAllKnown] = useState(false);
+  // The person being written to always stays on screen, even past the preview.
+  const shownKnown = showAllKnown ? knownPeople : knownPeople.filter((c, i) => i < KNOWN_PREVIEW || c.id === jobDraft?.id);
 
-  const filteredAll = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return contacts
-      .filter((c) => {
-        if (tieFilter !== "all" && c.tie !== tieFilter) return false;
-        if (openRoleOnly && !OPEN_ROLE_COMPANIES.has(c.company.toLowerCase())) return false;
-        if (sameTzOnly && c.timezone !== myTimezone) return false;
-        if (!q) return true;
-        return `${c.name} ${c.company} ${c.role} ${c.targetRole}`.toLowerCase().includes(q);
-      })
-      .sort((a, b) => TIE_META[a.tie].rank - TIE_META[b.tie].rank);
-  }, [contacts, query, tieFilter, openRoleOnly, sameTzOnly]);
+  // Shares WebReferrals' cache entry, so this is the same free read, not a second one.
+  const found = useReferralSearch(job?.id ?? null);
+  const foundCount = found.data ? found.data.people.length : undefined;
 
-  const totalPages = Math.max(1, Math.ceil(filteredAll.length / pageSize));
-  const currentPage = clampPage(page, totalPages);
-  const pagedAll = filteredAll.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const selected = picked ?? (deepLinked.data ? contactToReferral(deepLinked.data) : null);
 
-  const tieCounts: Record<TieFilter, number> = {
-    all: contacts.length,
-    strong: contacts.filter((c) => c.tie === "strong").length,
-    second: contacts.filter((c) => c.tie === "second").length,
-    alumni: contacts.filter((c) => c.tie === "alumni").length,
-  };
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  function openDraft(id: string) {
-    setSelectedId(id);
+  function scrollToDraft() {
     requestAnimationFrame(() => draftRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function openDraft(contact: ReferralContact) {
+    setPicked(contact);
+    setDeepLinkId(null);
+    scrollToDraft();
+  }
+
+  function openJobDraft(contact: ReferralContact) {
+    setJobDraft(contact);
+    scrollToDraft();
+  }
+
+  function openFoundDraft(person: ReferralPerson) {
+    if (job) openJobDraft(foundContact(person, job));
+  }
+
+  function remove(contact: ReferralContact) {
+    removeContact.mutate(
+      { id: contact.id, name: contact.name },
+      {
+        onSuccess: () => {
+          if (selected?.id === contact.id) {
+            setPicked(null);
+            setDeepLinkId(null);
+          }
+          // The last person on a later page: step back rather than show an empty page.
+          if (items.length === 1 && page > 1) setPage(page - 1);
+        },
+      },
+    );
   }
 
   async function chooseJob() {
     const result = await pickJob(REFERRAL_JOB_SPEC);
     if (result.status !== "picked") return;
-    setJob(result.job);
+    setJob(targetOf(result.job));
     setTab("job");
-    setSelectedId(null);
+    setPicked(null);
+    setDeepLinkId(null);
+    setJobDraft(null);
   }
 
   function resetFilters<T>(setter: (v: T) => void, value: T) {
@@ -136,15 +200,24 @@ const ReferralsClient: FC = () => {
     setPage(1);
   }
 
-  const selectedInDirect = !!(job && selected && paths?.direct.some((c) => c.id === selected.id));
-
   // One draft panel, slotted directly under whichever list holds the person
   // you're writing to — never below unrelated sections.
   const draftBlock = selected ? (
     <div ref={draftRef} className="scroll-mt-24">
-      <DraftPanel key={`${selected.id}:${job?.id ?? "none"}`} contact={selected} job={job ?? undefined} />
+      <DraftPanel key={`${selected.id}:${job?.id ?? "none"}`} contact={selected} job={askJobOf(job)} />
     </div>
   ) : null;
+
+  const jobDraftBlock =
+    jobDraft && job ? (
+      <div ref={draftRef} className="scroll-mt-24">
+        <DraftPanel key={`${jobDraft.id}:${job.id}`} contact={jobDraft} job={askJobOf(job)} />
+      </div>
+    ) : null;
+  // Someone you know is drafted under your list; someone found, under their search group.
+  const knownDrafting = !!jobDraft?.contactId;
+
+  const noContactsYet = counts !== undefined && counts.all === 0;
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
@@ -158,10 +231,22 @@ const ReferralsClient: FC = () => {
             <Network className="h-4 w-4" />
             Network sources
           </StickerButton>
+          <NotificationBell />
         </div>
       </header>
 
       <main className="mx-auto max-w-[1100px] px-8 py-7 pb-14">
+        {!contextDismissed && (
+          <JobContextBanner
+            className="mb-5"
+            action="Finding a referral"
+            role={context.role}
+            company={context.company}
+            backHref={backToJobHref(context)}
+            onDismiss={() => setContextDismissed(true)}
+          />
+        )}
+
         {/* Job context — the page's anchor. Ink, because everything below is
             subordinate to this one decision. */}
         {job ? (
@@ -171,11 +256,11 @@ const ReferralsClient: FC = () => {
                 <Briefcase className="h-4 w-4 text-[#222325]" />
               </span>
               <div className="min-w-0">
-                <p className="truncate text-[15px] font-bold text-white">{job.role}</p>
+                <p className="truncate text-[15px] font-bold text-white">{job.role || "Role not named"}</p>
                 <p className="truncate text-xs text-white/60">
                   {job.company}
-                  {job.source !== "platform" && " · pasted in"}
-                  {paths && ` · ${paths.direct.length} ${paths.direct.length === 1 ? "person" : "people"} inside`}
+                  {job.pasted && " · pasted in"}
+                  {foundCount !== undefined && foundCount > 0 && ` · ${foundCount} ${foundCount === 1 ? "person" : "people"} found`}
                 </p>
               </div>
             </div>
@@ -191,7 +276,7 @@ const ReferralsClient: FC = () => {
                 aria-label="Clear selected job"
                 onClick={() => {
                   setJob(null);
-                  setSelectedId(null);
+                  setJobDraft(null);
                 }}
                 className="grid h-8 w-8 flex-none cursor-pointer place-content-center rounded-lg border-[1.5px] border-white/30 text-white/70 transition-colors hover:border-white hover:text-white">
                 <X className="h-3.5 w-3.5" />
@@ -208,8 +293,8 @@ const ReferralsClient: FC = () => {
             setPage(1);
           }}
           options={[
-            { id: "all", label: "All contacts", count: contacts.length },
-            { id: "job", label: "For a job", count: paths?.direct.length },
+            { id: "all", label: "All contacts", count: counts?.all },
+            { id: "job", label: "For a job", count: foundCount },
           ]}
         />
 
@@ -218,81 +303,87 @@ const ReferralsClient: FC = () => {
             <DashEmptyState
               icon={Briefcase}
               title="No job selected yet"
-              body="Pick a role and this fills with the people who can get you in front of it."
+              body="Pick a role and we'll show who you already know there, and search the web for the people who can get you in front of it."
               ctaLabel="Pick a job"
               onCta={chooseJob}
             />
           ) : (
-            <div className="flex flex-col gap-8">
-              <section>
-                <div className="mb-3.5 flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="text-[15px] font-bold text-primary">
-                    {paths!.direct.length > 0
-                      ? `${paths!.direct.length} ${paths!.direct.length === 1 ? "person" : "people"} inside ${job.company}`
-                      : `Nobody inside ${job.company} yet`}
-                  </h2>
-                  {paths!.direct.length > 0 && <span className="text-xs text-black/55">Warmest first</span>}
-                </div>
-
-                {paths!.direct.length > 0 ? (
-                  // The payoff surface — the page's one accent moment.
+            <div className="flex flex-col gap-6">
+              {knownPeople.length > 0 && (
+                <section>
+                  <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="text-sm font-bold text-primary">
+                      People you know at {job.company}{" "}
+                      <span className="font-normal text-black/45 tabular-nums">
+                        {knownPeople.length}
+                        {moreKnown && "+"}
+                      </span>
+                    </h3>
+                    <span className="text-xs text-black/55">From your contacts — the warmest way in</span>
+                  </div>
                   <DashCard className="overflow-hidden border-[1.5px] border-[#222325] p-0 shadow-[4px_4px_0_0_#e1f073]">
                     <div className="flex flex-col divide-y divide-black/8">
-                      {paths!.direct.map((c) => (
+                      {shownKnown.map((c) => (
                         <ContactRow
                           key={c.id}
                           contact={c}
-                          jobRole={job.role}
-                          asked={askedContactIds.has(c.id)}
-                          selected={selectedId === c.id}
-                          onDraft={() => openDraft(c.id)}
+                          jobRole={job.role || undefined}
+                          asked={isAsked(c)}
+                          selected={jobDraft?.id === c.id}
+                          onDraft={() => openJobDraft(c)}
                         />
                       ))}
                     </div>
+                    {knownPeople.length > KNOWN_PREVIEW && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllKnown((v) => !v)}
+                        className="w-full cursor-pointer border-t border-black/8 px-5 py-2.5 text-left text-xs font-semibold text-black/55 transition-colors hover:bg-[#fbfbf7] hover:text-primary">
+                        {showAllKnown ? "Show fewer" : `Show all ${knownPeople.length}`}
+                      </button>
+                    )}
                   </DashCard>
-                ) : (
-                  <DashEmptyState
-                    icon={Users}
-                    title={`No contacts at ${job.company}`}
-                    body="Nobody in your network works there. The people below might still know someone — or connect a real network source to widen the search."
-                    ctaLabel="Network sources"
-                    onCta={() => setSourcesOpen(true)}
-                  />
-                )}
-              </section>
-
-              {selectedInDirect && draftBlock}
-
-              {paths!.adjacent.length > 0 && (
-                <section>
-                  <div className="mb-3.5">
-                    {/* Deliberately the quiet tier — an aside, not a peer of
-                        the direct list. */}
-                    <h2 className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55">Might know someone</h2>
-                    <p className="mt-1 text-xs text-black/55">
-                      Recruiters and alumni elsewhere — they can&apos;t refer you to {job.company}, but they can point you at whoever can.
-                    </p>
-                  </div>
-                  <DashCard className="overflow-hidden p-0">
-                    <div className="flex flex-col divide-y divide-black/8">
-                      {paths!.adjacent.map((c) => (
-                        <ContactRow
-                          key={c.id}
-                          contact={c}
-                          quiet
-                          asked={askedContactIds.has(c.id)}
-                          selected={selectedId === c.id}
-                          onDraft={() => openDraft(c.id)}
-                        />
-                      ))}
-                    </div>
-                  </DashCard>
+                  {knownDrafting && <div className="mt-6">{jobDraftBlock}</div>}
                 </section>
               )}
-
-              {selected && !selectedInDirect && draftBlock}
+              <WebReferrals
+                key={job.id}
+                savedJobId={job.id}
+                company={job.company}
+                role={job.role}
+                askedIds={askedContactIds}
+                draftingId={jobDraft && !knownDrafting ? jobDraft.id : null}
+                onDraft={openFoundDraft}
+                draft={knownDrafting ? null : jobDraftBlock}
+              />
             </div>
           )
+        ) : contacts.isPending ? (
+          <p className="inline-flex items-center gap-2 text-sm text-black/50" role="status">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            Loading your contacts…
+          </p>
+        ) : contacts.isError && !contacts.data ? (
+          <DashEmptyState
+            icon={RotateCw}
+            title="Your contacts didn't load"
+            body="Something went wrong reaching the server. Try again in a moment."
+            ctaLabel="Try again"
+            onCta={() => void contacts.refetch()}
+          />
+        ) : noContactsYet ? (
+          <DashEmptyState
+            icon={Users}
+            title="Bring in your network"
+            body={
+              <>
+                Import your LinkedIn connections: on LinkedIn, go to Settings → Data privacy → Get a copy of your data, tick Connections,
+                and upload the Connections.csv it sends you. You can also save people a job search finds, or add someone by hand.
+              </>
+            }
+            ctaLabel="Import from LinkedIn"
+            onCta={() => setSourcesOpen(true)}
+          />
         ) : (
           <div>
             <div className="relative mb-4">
@@ -301,54 +392,63 @@ const ReferralsClient: FC = () => {
                 type="text"
                 value={query}
                 onChange={(e) => resetFilters(setQuery, e.target.value)}
-                placeholder="Search by name, company or role…"
+                placeholder="Search by name, company or title…"
+                aria-label="Search your contacts"
                 className="h-11 w-full rounded-xl border border-black/10 bg-white pl-10 pr-4 text-sm text-primary outline-none transition-colors placeholder:text-black/35 focus:border-[#222325]"
               />
             </div>
 
             <div className="mb-4 flex flex-wrap items-center gap-1.5">
-              {TIE_FILTERS.map((f) => (
+              {SOURCE_FILTERS.map((f) => (
                 <button
                   key={f.id}
                   type="button"
-                  aria-pressed={tieFilter === f.id}
-                  onClick={() => resetFilters(setTieFilter, f.id)}
+                  aria-pressed={source === f.id}
+                  onClick={() => resetFilters(setSource, f.id)}
                   className={cn(
                     "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    tieFilter === f.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
+                    source === f.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
                   )}>
                   {f.label}
-                  <span className={cn("font-normal tabular-nums", tieFilter === f.id ? "text-black/60" : "text-black/55")}>
-                    {tieCounts[f.id]}
+                  <span className={cn("font-normal tabular-nums", source === f.id ? "text-black/60" : "text-black/55")}>
+                    {counts ? f.count(counts).toLocaleString() : ""}
                   </span>
                 </button>
               ))}
 
-              <span aria-hidden className="mx-1 h-4 w-px bg-black/10" />
+              {/* Only offered when it can match someone: their company has a live job on Remote Worldwide. */}
+              {counts && (counts.hiring > 0 || hiringOnly) && (
+                <>
+                  <span aria-hidden className="mx-1 h-4 w-px bg-black/10" />
+                  <button
+                    type="button"
+                    aria-pressed={hiringOnly}
+                    onClick={() => resetFilters(setHiringOnly, !hiringOnly)}
+                    title="Their company has a live job on Remote Worldwide"
+                    className={cn(
+                      "inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                      hiringOnly ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
+                    )}>
+                    Hiring now
+                    <span className="font-normal tabular-nums text-black/55">{counts.hiring.toLocaleString()}</span>
+                  </button>
+                </>
+              )}
 
-              {[
-                { on: openRoleOnly, toggle: () => resetFilters(setOpenRoleOnly, !openRoleOnly), label: "Open role" },
-                { on: sameTzOnly, toggle: () => resetFilters(setSameTzOnly, !sameTzOnly), label: "Same timezone" },
-              ].map((t) => (
-                <button
-                  key={t.label}
-                  type="button"
-                  aria-pressed={t.on}
-                  onClick={t.toggle}
-                  className={cn(
-                    "cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    t.on ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
-                  )}>
-                  {t.label}
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={() => setSourcesOpen(true)}
+                className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-black/55 transition-colors hover:bg-black/[0.05] hover:text-primary">
+                <Upload className="h-3.5 w-3.5" />
+                Import or add
+              </button>
             </div>
 
-            {filteredAll.length === 0 ? (
-              query.trim() ? (
+            {items.length === 0 ? (
+              q ? (
                 <DashEmptyState
                   icon={SearchX}
-                  title={`Nobody matches “${query.trim()}”`}
+                  title={`Nobody matches “${q}”`}
                   body="Try a shorter search, or clear it to see your whole network."
                   ctaLabel="Clear search"
                   onCta={() => resetFilters(setQuery, "")}
@@ -360,38 +460,42 @@ const ReferralsClient: FC = () => {
                   body="Nobody in your network matches all of those at once."
                   ctaLabel="Show everyone"
                   onCta={() => {
-                    setTieFilter("all");
-                    setOpenRoleOnly(false);
-                    setSameTzOnly(false);
+                    setSource("all");
+                    setHiringOnly(false);
                     setPage(1);
                   }}
                 />
               )
             ) : (
-              <DashCard className="overflow-hidden p-0">
+              <DashCard className={cn("overflow-hidden p-0 transition-opacity", contacts.isPlaceholderData && "opacity-60")}>
                 <div className="flex flex-col divide-y divide-black/8">
-                  {pagedAll.map((c) => (
-                    <ContactRow
-                      key={c.id}
-                      contact={c}
-                      asked={askedContactIds.has(c.id)}
-                      selected={selectedId === c.id}
-                      onDraft={() => openDraft(c.id)}
-                    />
-                  ))}
+                  {items.map((item) => {
+                    const c = contactToReferral(item);
+                    return (
+                      <ContactRow
+                        key={c.id}
+                        contact={c}
+                        asked={isAsked(c)}
+                        selected={selected?.id === c.id}
+                        onDraft={() => openDraft(c)}
+                        onRemove={() => remove(c)}
+                        removing={removeContact.isPending && removeContact.variables?.id === c.id}
+                      />
+                    );
+                  })}
                 </div>
               </DashCard>
             )}
 
             <DashPagination
-              page={currentPage}
+              page={Math.min(page, totalPages)}
               totalPages={totalPages}
               pageSize={pageSize}
-              totalItems={filteredAll.length}
+              totalItems={total}
               itemNoun="contacts"
               onPageChange={setPage}
               onPageSizeChange={(next) => {
-                const firstVisible = (currentPage - 1) * pageSize;
+                const firstVisible = (page - 1) * pageSize;
                 setPageSize(next);
                 setPage(Math.floor(firstVisible / next) + 1);
               }}
@@ -402,9 +506,24 @@ const ReferralsClient: FC = () => {
         {tab === "all" && draftBlock && <div className="mt-8">{draftBlock}</div>}
       </main>
 
-      <NetworkSourcesDialog open={sourcesOpen} onOpenChange={setSourcesOpen} />
+      <NetworkSourcesDialog open={sourcesOpen} onOpenChange={setSourcesOpen} counts={counts} />
     </div>
   );
 };
+
+const ReferralsFallback: FC = () => (
+  <div className="min-h-screen bg-[#f6f6f6]">
+    <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
+      <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Referral search</h1>
+      <NotificationBell />
+    </header>
+  </div>
+);
+
+const ReferralsClient: FC = () => (
+  <Suspense fallback={<ReferralsFallback />}>
+    <ReferralsScreen />
+  </Suspense>
+);
 
 export default ReferralsClient;
