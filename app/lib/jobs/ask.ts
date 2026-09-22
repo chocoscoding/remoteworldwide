@@ -1,6 +1,6 @@
 // Browser-side calls for Ask about a job.
 //
-// Both routes live in the AI service and go through the session proxy at
+// Every route lives in the AI service and goes through the session proxy at
 // `app/api/ai/[...path]/route.ts`, never a rewrite: the proxy is what sets
 // `x-user-id` from the verified session and adds the service token, so the
 // browser never says who it is and never holds a secret. Paths are relative for
@@ -11,7 +11,7 @@
 // saved-job id and the AI service reads the posting from the backend itself, so
 // nobody can spend model calls on text of their own choosing through this file.
 
-import { apiPost } from "@/app/lib/api/client";
+import { apiGet, apiPost } from "@/app/lib/api/client";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import {
   JD_QUICK_QUESTION_IDS,
@@ -36,7 +36,20 @@ export const MAX_JOB_QUESTION_CHARS = 1_000;
 
 const QUICK_IDS: ReadonlySet<string> = new Set(JD_QUICK_QUESTION_IDS);
 
-/** The chips come from `mock-data.ts` with `id: string`; only the ids the AI service knows may go out as `questionId`. */
+/**
+ * The quick-question chips, in the order they show. The labels match the AI
+ * service's `QUICK_QUESTIONS` (jobAskService), so a stored answer reads the same
+ * as the chip that asked it. Moved here from mock-data.ts: they are the screen's
+ * own copy, not sample data.
+ */
+export const JD_QUICK_QUESTIONS: ReadonlyArray<{ id: JdQuickQuestionId; label: string }> = [
+  { id: "fit", label: "Am I a fit?" },
+  { id: "really-asking", label: "What are they really asking for?" },
+  { id: "salary", label: "Salary sanity check" },
+  { id: "questions-to-ask", label: "Questions to ask them" },
+];
+
+/** Only the ids the AI service knows may go out as `questionId`. */
 export function isQuickQuestionId(id: string): id is JdQuickQuestionId {
   return QUICK_IDS.has(id);
 }
@@ -54,6 +67,15 @@ const threadPath = (id: string) => `${JOB_THREADS_PATH}/${encodeURIComponent(id)
  */
 export function openJobThread(savedJobId: string) {
   return apiPost<JobThreadItem>(JOB_THREADS_PATH, { savedJobId });
+}
+
+/**
+ * A thread as it stands now, by its id. Not rate limited, unlike opening, so
+ * it is how the screen picks up answers stored outside its own asks (a spoken
+ * call). It never follows an edit to the posting; only opening does that.
+ */
+export function getJobThread(threadId: string, signal?: AbortSignal) {
+  return apiGet<JobThreadItem>(threadPath(threadId), signal);
 }
 
 /**
