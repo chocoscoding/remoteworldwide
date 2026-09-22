@@ -14,13 +14,12 @@
 // red build.
 //
 // What ai-tools.ts no longer is, is the engine. Its transforms ran in the
-// browser over the document on screen; these run in the service, where the
-// generative four can reach a model and where a credit can be charged. The
-// deterministic two (`shorten`, `tone`) go over the wire as well even though
-// they are pure string work — see the note on `FREE_TOOLS`.
+// browser over the document on screen; these run in the service, where all six
+// reach a model and a credit can be charged — see the note on `FREE_TOOLS`.
 
 import { apiPost } from "@/app/lib/api/client";
 import type {
+  AskResult,
   KeywordInjection,
   QuantifySuggestion,
   RewriteVariant,
@@ -30,31 +29,32 @@ import type {
 } from "@/app/lib/dashboard/resume/ai-tools";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 
-export type { KeywordInjection, QuantifySuggestion, RewriteVariant, ShortenResult, TailorResult, ToneResult };
+export type { AskResult, KeywordInjection, QuantifySuggestion, RewriteVariant, ShortenResult, TailorResult, ToneResult };
 
 const SUGGESTIONS_PATH = "/api/ai/suggestions";
 
-export const SUGGESTION_TOOLS = ["tailor", "rewrite", "keywords", "quantify", "shorten", "tone"] as const;
+/**
+ * The six named tools, then `ask` — the rail's free-form "Ask for a rewrite…"
+ * box, which rides the same route, meter and narrow-diff contract. The AI
+ * service's list matches this one, and its contract test checks `ask` is in
+ * both.
+ */
+export const SUGGESTION_TOOLS = ["tailor", "rewrite", "keywords", "quantify", "shorten", "tone", "ask"] as const;
 export type SuggestionTool = (typeof SUGGESTION_TOOLS)[number];
+
+/** Mirrors the service's MAX_ASK_INSTRUCTION_CHARS and its route validator — the input's `maxLength`. */
+export const MAX_ASK_INSTRUCTION_CHARS = 500;
 
 /** What one generative run costs, for the copy that warns before spending it. */
 export const SUGGESTION_CREDITS = 1;
 
 /**
- * The two that cost nothing.
- *
- * `shorten` keeps the first two bullets of every role and the first two
- * sentences of the summary; `tone` applies a fixed typo table and reports what
- * it changed. Both are rules rather than judgment, and a model asked to execute
- * a rule adds latency, cost and the chance of a different answer on the second
- * click — which is the worst property a document editor can have, because the
- * user's next action is to undo and try again.
- *
- * They still go to the server rather than staying here, so that what a tool
- * does has one definition instead of two that drift. The round trip is the
- * price of that, and it is cheaper than the bug.
+ * Tools that never cost a credit. Empty now: `shorten` and `tone` used to be
+ * fixed rules (keep two bullets per role; a typo table) and were free, and are
+ * real rewrites now, priced like the other four. The service still answers some
+ * runs for free — nothing to add, nothing to cut — and says so in the result.
  */
-export const FREE_TOOLS: ReadonlySet<SuggestionTool> = new Set<SuggestionTool>(["shorten", "tone"]);
+export const FREE_TOOLS: ReadonlySet<SuggestionTool> = new Set<SuggestionTool>();
 
 /** True when running this tool will spend `SUGGESTION_CREDITS`. */
 export const costsCredit = (tool: SuggestionTool): boolean => !FREE_TOOLS.has(tool);
@@ -76,6 +76,8 @@ export interface SuggestionInput {
   role?: string | null;
   /** An explicit want-list for `keywords`. Falls back to the JD's own top terms. */
   keywords?: string[] | null;
+  /** Required by `ask`: what the user typed into the rewrite box. */
+  instruction?: string | null;
 }
 
 const run = <T,>(tool: SuggestionTool, input: SuggestionInput) =>
@@ -85,6 +87,7 @@ const run = <T,>(tool: SuggestionTool, input: SuggestionInput) =>
     company: input.company ?? null,
     role: input.role ?? null,
     keywords: input.keywords ?? null,
+    instruction: input.instruction ?? null,
   });
 
 /** Rewrites the summary and skills towards one posting. Needs `jdText`. */
@@ -109,3 +112,13 @@ export const quantifySuggestions = (input: SuggestionInput) => run<QuantifySugge
 export const shortenToOnePage = (input: SuggestionInput) => run<ShortenResult>("shorten", input);
 
 export const fixToneAndGrammar = (input: SuggestionInput) => run<ToneResult>("tone", input);
+
+/**
+ * The rail's "Ask for a rewrite…" box: the user's instruction applied to the
+ * summary and the existing bullets, and nothing else. The service refuses any
+ * proposed line that adds a figure the resume never had or balloons past the
+ * line it replaces — keeping the user's own — and reports how many it kept
+ * back in `rejectedLines`. Nothing surviving is a failed run, not a no-op, and
+ * is not charged.
+ */
+export const askForRewrite = (input: SuggestionInput & { instruction: string }) => run<AskResult>("ask", input);

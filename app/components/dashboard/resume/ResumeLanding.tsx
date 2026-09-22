@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState, type FC } from "react";
-import { FilePlus2, FileText, Loader2, Trash2, Upload } from "lucide-react";
+import { useRef, useState, type FC, type ReactNode } from "react";
+import { FilePlus2, FileText, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import TimeAgo from "timeago-react";
 import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { RESUME_ACCEPT } from "@/app/lib/resume/api";
+import { BUILD_CREDITS, RESUME_ACCEPT } from "@/app/lib/resume/api";
 import { isStaleCheck, type ResumeDocument } from "./resume-document";
 
 export interface ResumeLandingProps {
@@ -35,9 +35,12 @@ export interface ResumeLandingProps {
   onImport?: (file: File) => Promise<void>;
   /** Delete a document from the library, for good. Same contract as the two above. */
   onDelete?: (id: string) => Promise<void>;
+  /** Open "Build with AI". The caller owns the dialog and opens what it builds. */
+  onBuild?: () => void;
+  banner?: ReactNode;
 }
 
-const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, onOpen, onCreateBlank, onImport, onDelete }) => {
+const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, onOpen, onCreateBlank, onImport, onDelete, onBuild, banner }) => {
   const [naming, setNaming] = useState(false);
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
@@ -88,6 +91,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
       <div className="mx-auto flex min-h-screen max-w-[680px] flex-col items-center justify-center px-6 py-12 text-center">
+        {banner && <div className="mb-2 w-full">{banner}</div>}
         <span aria-hidden className="flex items-center justify-center">
           <Lottie src={`/Lottie/neobrutalism/Edit_Contract_lottie.json`} autoplay loop speed={0.63} style={{ width: 300, height: 300 }} />
         </span>
@@ -97,7 +101,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
           Start one from scratch, bring in a resume you already have, or keep polishing one you made here.
         </p> */}
 
-        {/* The two ways to start fresh */}
+        {/* The ways to start fresh */}
         <div className="mt-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
@@ -140,6 +144,25 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
               onChange={(e) => void handleFile(e.target.files?.[0])}
             />
           </label>
+
+          {onBuild && (
+            <button
+              type="button"
+              onClick={onBuild}
+              disabled={!ready}
+              className="group flex items-center gap-4 rounded-2xl border-[1.5px] border-[#222325] bg-[#e1f073] p-5 text-left text-primary cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-50 sm:col-span-2">
+              <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
+                <Sparkles className="h-4 w-4 text-[#e1f073]" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold">Build with AI</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-black/60">
+                  Tell it the role — it writes a tailored resume from your profile or the resume you imported.
+                </span>
+              </span>
+              <span className="flex-none rounded-full bg-[#222325] px-2.5 py-1 text-[11px] font-bold text-white">{BUILD_CREDITS} credits</span>
+            </button>
+          )}
         </div>
 
         {/* Step 2 of "start from scratch" — reveal, don't modal */}

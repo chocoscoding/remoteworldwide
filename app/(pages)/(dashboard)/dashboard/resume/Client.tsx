@@ -33,12 +33,17 @@
 // HANDLERS are implemented one level down. The landing's own create/import
 // handlers live HERE instead, because with no document open there's nothing
 // to stash first.
-import { useCallback, useState, type FC } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Suspense, useCallback, useState, type FC, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
 import { ResumeDesignProvider } from "@/app/components/dashboard/resume/ResumeDesignContext";
 import { createBlankContent, fromStored, importLabel, type ResumeDocument } from "@/app/components/dashboard/resume/resume-document";
 import { apiMessage } from "@/app/lib/api/core";
+import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
+import { parseFieldSpec, toPickedJob } from "@/app/lib/jobs/fields";
+import type { SavedJobItem } from "@/app/lib/jobs/types";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
 import {
   createResumeDocument,
@@ -48,11 +53,36 @@ import {
   type StoredResumeDocument,
 } from "@/app/lib/resume/api";
 import ResumeLanding from "@/app/components/dashboard/resume/ResumeLanding";
-import ResumeScreenBody from "@/app/components/dashboard/resume/ResumeScreenBody";
+import BuildResumeDialog from "@/app/components/dashboard/resume/BuildResumeDialog";
+import ResumeScreenBody, { RESUME_JOB_SPEC, type ResumeJob, type TailorPreset } from "@/app/components/dashboard/resume/ResumeScreenBody";
+import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
 
-const ResumeWorkspace: FC<{ initialDocuments: StoredResumeDocument[] }> = ({ initialDocuments }) => {
+const RESUME_JOB_SPEC_PARSED = parseFieldSpec(RESUME_JOB_SPEC);
+
+/** A saved job as Tailor's pick, or null when it lacks what Tailor needs (a description). */
+function resumeJobFrom(saved: SavedJobItem): ResumeJob | null {
+  try {
+    return toPickedJob<typeof RESUME_JOB_SPEC>(saved, RESUME_JOB_SPEC_PARSED, saved.extraction.sources);
+  } catch {
+    return null;
+  }
+}
+
+const latestDocumentId = (documents: StoredResumeDocument[]): string | null =>
+  documents.reduce<StoredResumeDocument | null>((latest, d) => (!latest || d.updatedAt.getTime() > latest.updatedAt.getTime() ? d : latest), null)
+    ?.id ?? null;
+
+interface ResumeWorkspaceProps {
+  initialDocuments: StoredResumeDocument[];
+  /** Open the most recently saved resume instead of the landing. */
+  openLatest: boolean;
+  banner: ReactNode;
+  tailorPreset: TailorPreset | null;
+}
+
+const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, openLatest, banner, tailorPreset }) => {
   const [documents, setDocuments] = useState<ResumeDocument[]>(() => initialDocuments.map(fromStored));
-  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [activeDocId, setActiveDocId] = useState<string | null>(() => (openLatest ? latestDocumentId(initialDocuments) : null));
 
   const activeDoc = activeDocId !== null ? documents.find((d) => d.id === activeDocId) : undefined;
 
@@ -90,6 +120,15 @@ const ResumeWorkspace: FC<{ initialDocuments: StoredResumeDocument[] }> = ({ ini
     }
   };
 
+  // "Build with AI". The builder saved the document already, so it is opened,
+  // not created again; the build spent credits, so the balance is refreshed.
+  const queryClient = useQueryClient();
+  const [buildOpen, setBuildOpen] = useState(false);
+  const openBuilt = (stored: StoredResumeDocument) => {
+    open(fromStored(stored));
+    void queryClient.invalidateQueries({ queryKey: qk.billing.overview() });
+  };
+
   const deleteFromLanding = async (id: string) => {
     try {
       await deleteResumeDocument(id);
@@ -108,14 +147,19 @@ const ResumeWorkspace: FC<{ initialDocuments: StoredResumeDocument[] }> = ({ ini
 
   if (!activeDoc) {
     return (
-      <ResumeLanding
-        library="ready"
-        documents={documents}
-        onOpen={setActiveDocId}
-        onCreateBlank={createBlankFromLanding}
-        onImport={importFromLanding}
-        onDelete={deleteFromLanding}
-      />
+      <>
+        <ResumeLanding
+          library="ready"
+          documents={documents}
+          onOpen={setActiveDocId}
+          onCreateBlank={createBlankFromLanding}
+          onImport={importFromLanding}
+          onDelete={deleteFromLanding}
+          onBuild={() => setBuildOpen(true)}
+          banner={banner}
+        />
+        <BuildResumeDialog open={buildOpen} onOpenChange={setBuildOpen} onBuilt={openBuilt} />
+      </>
     );
   }
 
@@ -128,12 +172,46 @@ const ResumeWorkspace: FC<{ initialDocuments: StoredResumeDocument[] }> = ({ ini
         setDocuments={setDocuments}
         setActiveDocId={setActiveDocId}
         onSaved={markSaved}
+        banner={banner}
+        tailorPreset={tailorPreset}
       />
     </ResumeDesignProvider>
   );
 };
 
-const ResumeClient: FC = () => {
+const ResumeScreen: FC = () => {
+  const params = useSearchParams();
+  const context = readJobContext(params, "tailor");
+  const [contextDismissed, setContextDismissed] = useState(false);
+  const tailorId = contextDismissed ? null : context.savedJobId;
+
+  const saved = useSavedJobQuery(tailorId);
+  const savedJob = saved.data && saved.data.id === tailorId ? saved.data : null;
+  const tailorJob = savedJob ? resumeJobFrom(savedJob) : null;
+  const role = context.role ?? savedJob?.role ?? null;
+  const company = context.company ?? savedJob?.company ?? null;
+  const label = role && company ? `${role} at ${company}` : (role ?? company ?? "this job");
+
+  const tailorPreset: TailorPreset | null =
+    tailorId === null
+      ? null
+      : tailorJob
+        ? { status: "ready", label: `${tailorJob.role} at ${tailorJob.company}`, job: tailorJob }
+        : savedJob || saved.isError
+          ? { status: "failed", label }
+          : { status: "loading", label };
+
+  const banner =
+    tailorId !== null && (role || company) ? (
+      <JobContextBanner
+        action="Tailoring"
+        role={role}
+        company={company}
+        backHref={backToJobHref(context)}
+        onDismiss={() => setContextDismissed(true)}
+      />
+    ) : null;
+
   const library = useQuery({
     queryKey: qk.resumes.list(),
     queryFn: ({ signal }) => listResumeDocuments(signal),
@@ -143,11 +221,20 @@ const ResumeClient: FC = () => {
     refetchOnReconnect: false,
   });
 
-  if (library.data) return <ResumeWorkspace initialDocuments={library.data} />;
+  if (library.data)
+    return <ResumeWorkspace initialDocuments={library.data} openLatest={tailorId !== null} banner={banner} tailorPreset={tailorPreset} />;
 
   // Not loaded: the landing, saying so, with its two ways to start held back.
   // A resume created before the list arrives would be seeded over when it did.
-  return <ResumeLanding library={library.isError ? "error" : "loading"} onRetry={() => void library.refetch()} documents={[]} />;
+  return (
+    <ResumeLanding library={library.isError ? "error" : "loading"} onRetry={() => void library.refetch()} documents={[]} banner={banner} />
+  );
 };
+
+const ResumeClient: FC = () => (
+  <Suspense fallback={<ResumeLanding library="loading" documents={[]} />}>
+    <ResumeScreen />
+  </Suspense>
+);
 
 export default ResumeClient;

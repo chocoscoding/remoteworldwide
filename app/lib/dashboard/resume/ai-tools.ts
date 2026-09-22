@@ -4,9 +4,8 @@
 // This file used to be the engine as well: six pure transforms over
 // `ResumeContent`, written so the rail could work before there was anything to
 // call. The engine has moved. Every tool now runs in the AI service, reached
-// through `app/lib/resume/ai.ts` — four of them reach a model, and the two that
-// do not (`shorten`, `tone`) still run there so that what a tool DOES has one
-// definition rather than two that drift apart.
+// through `app/lib/resume/ai.ts`, and all six reach a model — `shorten` and
+// `tone` were fixed rules once, and are real rewrites now.
 //
 // What stays here is the part that was always the contract. The AI service
 // mirrors these interfaces field for field, and its
@@ -103,4 +102,24 @@ export interface ToneResult {
   content: ResumeContent;
   /** What was changed, in words the caption can print — "trailing periods on bullets". */
   fixes: string[];
+}
+
+// ---------------------------------------------------------------------------
+// 7 · Ask for a rewrite — the rail's free-form box
+// ---------------------------------------------------------------------------
+
+/**
+ * The user's own instruction, applied as a narrow diff: only the summary and
+ * existing bullet text can come back changed. Every count is the service's,
+ * computed from the before and after — the caption states them, and a model
+ * is never trusted to count its own edits.
+ */
+export interface AskResult {
+  content: ResumeContent;
+  /** Whether the summary was rewritten. */
+  summaryChanged: boolean;
+  /** How many existing bullets were rewritten. */
+  bulletsChanged: number;
+  /** Proposed lines the service discarded (a figure the resume never had, or a line that ballooned) — the user's own line was kept. */
+  rejectedLines: number;
 }

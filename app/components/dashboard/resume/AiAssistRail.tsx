@@ -15,6 +15,18 @@
 // A check describes the text it scored. Once the resume reads differently —
 // any edit, any AI tool — the card greys the number and says so, and offers
 // the same check again, rather than presenting an old score as this resume's.
+//
+// ── The suggestion cards are the check's findings ──────────────────────────
+// Derived from the standing scan by `check-suggestions.ts` — the keywords it
+// found missing, the bullet rewrites its write-up proposed, a metric in the
+// "needs work" band with the evidence for it — each wired to the tool that
+// acts on it. No check, no cards: they used to be fixed mock findings shown on
+// any checked resume, whatever the check had actually said.
+//
+// ── "Ask for a rewrite…" is real ────────────────────────────────────────────
+// The instruction goes to the AI service's `ask` tool (1 credit, charged only
+// for a usable result); the screen merges the narrow diff that comes back and
+// writes the caption from the service's counts.
 
 import type { FC } from "react";
 import Link from "next/link";
@@ -26,11 +38,26 @@ import Pill from "@/app/components/dashboard/ui/Pill";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { ATS_BILLING_HREF, SCAN_CREDITS, keywordLabel, missingGaps, scanTier, type ScanFailure } from "@/app/lib/ats/api";
-import { ATS_FIX_ITEMS } from "@/app/lib/dashboard/mock-data";
+import { MAX_ASK_INSTRUCTION_CHARS, SUGGESTION_CREDITS, type SuggestionTool } from "@/app/lib/resume/ai";
 import type { CheckStatus } from "@/hooks/mutations/useCheckResume";
 import type { ResumeCheck } from "./resume-document";
+import type { CheckSuggestion } from "./check-suggestions";
 
-const SUGGESTION_ITEMS = ATS_FIX_ITEMS.filter((f) => f.id === "fix-keyword" || f.id === "fix-skills");
+/** The tool a card runs, when it runs one — for its busy state. A rewrite is applied locally and has none. */
+const SUGGESTION_TOOL: Record<CheckSuggestion["kind"], SuggestionTool | null> = {
+  keywords: "keywords",
+  quantify: "quantify",
+  shorten: "shorten",
+  rewrite: null,
+};
+
+/** A card's button, its price on it when it spends one. The scan's own rewrites were paid for with the check. */
+const SUGGESTION_ACTION: Record<CheckSuggestion["kind"], (s: CheckSuggestion) => string> = {
+  keywords: (s) => `${(s.terms?.length ?? 0) === 1 ? "Add it" : "Add them"} · ${SUGGESTION_CREDITS} credit`,
+  rewrite: () => "Use this line",
+  quantify: () => `Suggest numbers · ${SUGGESTION_CREDITS} credit`,
+  shorten: () => `Shorten · ${SUGGESTION_CREDITS} credit`,
+};
 
 /** More chips than this is a list, not a glance. The ATS screen has the whole report. */
 const MAX_GAP_CHIPS = 6;
@@ -48,8 +75,8 @@ const PHASE_COPY: Partial<Record<CheckStatus, string>> = {
 
 export interface AiAssistRailProps {
   isBlank: boolean;
-  /** Whether the standing job check found anything to change — the fix cards are its findings, never a default. */
-  hasSuggestions: boolean;
+  /** What the standing check found worth acting on — its findings, never a default. Empty with no check. */
+  suggestions: CheckSuggestion[];
   /** The standing check; null shows the two ways to run one instead. */
   check: ResumeCheck | null;
   /** The resume has been edited since `check` ran. */
@@ -62,10 +89,11 @@ export interface AiAssistRailProps {
   /** Runs the standing check again — same posting, current text. */
   onRecheck: () => void;
   onDismissCheckFailure: () => void;
-  appliedSuggestions: Set<string>;
-  expandedSuggestions: Set<string>;
-  onApplySuggestion: (id: string) => void;
-  onToggleExpandedSuggestion: (id: string) => void;
+  /** What acting on a card came to, by card id — shown in place of its button. */
+  suggestionOutcomes: Record<string, string>;
+  onRunSuggestion: (suggestion: CheckSuggestion) => void;
+  /** The AI tool out right now, if any. One at a time: every paid action here waits for it. */
+  aiRunning: SuggestionTool | null;
   askInput: string;
   onAskInputChange: (value: string) => void;
   onAskSubmit: () => void;
@@ -86,7 +114,7 @@ const CheckButton: FC<{ onClick: () => void; disabled?: boolean; children: strin
 
 const AiAssistRail: FC<AiAssistRailProps> = ({
   isBlank,
-  hasSuggestions,
+  suggestions,
   check,
   stale,
   checkStatus,
@@ -96,10 +124,9 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   onCheckAgainstJob,
   onRecheck,
   onDismissCheckFailure,
-  appliedSuggestions,
-  expandedSuggestions,
-  onApplySuggestion,
-  onToggleExpandedSuggestion,
+  suggestionOutcomes,
+  onRunSuggestion,
+  aiRunning,
   askInput,
   onAskInputChange,
   onAskSubmit,
@@ -110,6 +137,10 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   const report = check?.report ?? null;
   const tier = report ? scanTier(report.score) : null;
   const gaps = report ? missingGaps(report).slice(0, MAX_GAP_CHIPS) : [];
+  const asking = aiRunning === "ask";
+  // A rewrite whose line has been edited away can no longer be applied; it
+  // stays only to show it was, if it was.
+  const cards = suggestions.filter((s) => s.kind !== "rewrite" || s.rewrite?.at || suggestionOutcomes[s.id]);
 
   if (isBlank) {
     return (
@@ -259,44 +290,54 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
         )}
       </DashCard>
 
-      {/* Suggestion cards — a job check's findings. Without one there is
-          nothing to claim about this resume, so the rail says how to get some. */}
-      {hasSuggestions ? (
+      {/* Suggestion cards — the standing check's findings. Without one there
+          is nothing to claim about this resume, so the rail says how to get some. */}
+      {cards.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {SUGGESTION_ITEMS.map((item) => {
-            const applied = appliedSuggestions.has(item.id);
-            const expanded = expandedSuggestions.has(item.id);
+          {stale && (
+            <p className="px-1 text-[11px] leading-snug text-black/45">From the check of an earlier draft — each one is re-read against your resume as it is now.</p>
+          )}
+          {cards.map((suggestion) => {
+            const outcome = suggestionOutcomes[suggestion.id];
+            const tool = SUGGESTION_TOOL[suggestion.kind];
+            const running = tool !== null && aiRunning === tool;
             return (
-              <DashCard key={item.id} className="border-2 border-[#222325] p-3.5">
-                <p className="text-sm font-bold text-primary">{item.label}</p>
-                <p className="text-xs text-black/60 leading-relaxed mt-1">{item.detail}</p>
-                {expanded && (
-                  <div className="mt-2.5 rounded-lg bg-[#f6f6f6] px-3 py-2.5 text-xs text-black/55 leading-relaxed">
-                    Jump to the {item.id === "fix-keyword" ? "Summary" : "Skills"} section to see exactly what changes.
+              <DashCard key={suggestion.id} className="border-2 border-[#222325] p-3.5">
+                <p className="text-sm font-bold text-primary">{suggestion.title}</p>
+                <p className="text-xs text-black/60 leading-relaxed mt-1">{suggestion.detail}</p>
+                {/* A rewrite is shown whole before it is used: the line it
+                    replaces, and the line it would become. */}
+                {suggestion.rewrite && (
+                  <div className="mt-2.5 rounded-lg bg-[#f6f6f6] px-3 py-2.5 text-xs leading-relaxed">
+                    <p className="text-black/45 line-through">{suggestion.rewrite.before}</p>
+                    <p className="mt-1 font-semibold text-primary">{suggestion.rewrite.after}</p>
                   </div>
                 )}
                 <div className="flex items-center gap-3 mt-3">
-                  <StickerButton
-                    type="button"
-                    variant={applied ? "outline" : "primary"}
-                    size="sm"
-                    disabled={applied}
-                    onClick={() => onApplySuggestion(item.id)}>
-                    {applied ? (
-                      <>
-                        <Check className="h-3.5 w-3.5" />
-                        Applied
-                      </>
-                    ) : (
-                      item.action
-                    )}
-                  </StickerButton>
-                  <button
-                    type="button"
-                    onClick={() => onToggleExpandedSuggestion(item.id)}
-                    className="text-xs font-semibold text-black/60 hover:text-primary cursor-pointer">
-                    Show me
-                  </button>
+                  {outcome ? (
+                    <p className="flex items-start gap-1.5 text-xs font-semibold text-[#6c7a1e]">
+                      <Check className="mt-px h-3.5 w-3.5 flex-none" />
+                      {outcome}
+                    </p>
+                  ) : (
+                    <StickerButton
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      // One AI run at a time, whoever started it: a second one
+                      // would supersede the first after its credit was spent.
+                      disabled={aiRunning !== null}
+                      onClick={() => onRunSuggestion(suggestion)}>
+                      {running ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Working…
+                        </>
+                      ) : (
+                        SUGGESTION_ACTION[suggestion.kind](suggestion)
+                      )}
+                    </StickerButton>
+                  )}
                 </div>
               </DashCard>
             );
@@ -304,18 +345,34 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
         </div>
       ) : (
         <DashCard className="border-2 border-[#222325] p-3.5">
-          <p className="text-sm font-bold text-primary">Nothing to suggest yet</p>
-          <p className="text-xs text-black/60 leading-relaxed mt-1">
-            Check this resume against a job and we&apos;ll surface what to strengthen for it here.
-          </p>
+          {/* The write-up — and the rewrites that come with it — lands after
+              the score, so "nothing found" waits until it has. */}
+          {check && checkStatus === "explaining" ? (
+            <p className="flex items-center gap-2 text-xs text-black/55">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Reading through this check for what to fix…
+            </p>
+          ) : (
+            <>
+              <p className="text-sm font-bold text-primary">{check ? "Nothing to fix from this check" : "Nothing to suggest yet"}</p>
+              <p className="text-xs text-black/60 leading-relaxed mt-1">
+                {check
+                  ? check.job
+                    ? "It found no missing keywords, bullet rewrites or weak spots to act on."
+                    : "A general check found no weak spots to act on. Check it against a job to see what a posting wants."
+                  : "Check this resume against a job and we'll surface what to strengthen for it here."}
+              </p>
+            </>
+          )}
         </DashCard>
       )}
 
-      {/* Ask for a rewrite */}
+      {/* Ask for a rewrite — the AI service's `ask` tool, on the text as it
+          stands. The price is on the box, before it is spent. */}
       <DashCard className="border-2 border-[#222325] p-3.5">
         <div className="flex items-center gap-2.5">
           <div className="flex-1 flex items-center gap-2 rounded-xl border border-black/20 bg-[#fbfbf7] px-3.5 py-2.5">
-            <Sparkles className="h-4 w-4 flex-none text-black/50" />
+            {asking ? <Loader2 className="h-4 w-4 flex-none animate-spin text-black/50" /> : <Sparkles className="h-4 w-4 flex-none text-black/50" />}
             <input
               type="text"
               value={askInput}
@@ -323,18 +380,24 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
               onKeyDown={(e) => {
                 if (e.key === "Enter") onAskSubmit();
               }}
-              placeholder="Ask for a rewrite…"
+              maxLength={MAX_ASK_INSTRUCTION_CHARS}
+              disabled={asking}
+              aria-label="Tell the AI how to rewrite your resume"
+              placeholder={asking ? "Rewriting your resume…" : "Ask for a rewrite…"}
               className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/45 outline-none"
             />
           </div>
         </div>
+        <p className="mt-2 text-[11px] leading-snug text-black/45">
+          Summary and bullets only, from facts already on your resume · {SUGGESTION_CREDITS} credit
+        </p>
         <button
           type="button"
           onClick={onAskSubmit}
-          disabled={!askInput.trim()}
+          disabled={!askInput.trim() || aiRunning !== null}
           className="mt-2.5 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-white text-xs font-semibold py-2 disabled:opacity-40 disabled:cursor-default cursor-pointer hover:bg-black transition-colors">
-          <Send className="h-3.5 w-3.5" />
-          Send
+          {asking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          {asking ? "Rewriting…" : "Send"}
         </button>
         {askStatus && (
           <div className="mt-3 flex items-start gap-2 rounded-xl bg-[#f0f0ea] px-3.5 py-2.5">

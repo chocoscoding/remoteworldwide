@@ -268,6 +268,52 @@ export async function listResumeDocuments(signal?: AbortSignal): Promise<StoredR
 export const createResumeDocument = (input: { label: string; content: ResumeContent }): Promise<StoredResumeDocument> =>
   tracked(apiPost<StoredResumeDocument>(DOCUMENTS, input));
 
+// ---------------------------------------------------------------------------
+// Build with AI
+// ---------------------------------------------------------------------------
+
+/** What one build costs. Mirrors BUILD_CREDITS in the AI service's resume builder. */
+export const BUILD_CREDITS = 3;
+
+export interface BuildResumeInput {
+  targetRole: string;
+  seniority?: string | null;
+  /** A posting to aim the resume at — a saved job's description. */
+  jdText?: string | null;
+  /** That saved job's id, kept on the document. */
+  jobId?: string | null;
+  /** An INGESTED resume to rewrite from (a row of `GET /api/ai/resume`), not a library document. */
+  fromResumeId?: string | null;
+  /** Omitted: the builder picks one. */
+  template?: string | null;
+}
+
+/** The builder's answer, as far as this app reads it: the library document it saved, and why it built it that way. */
+export interface BuiltResume {
+  label: string;
+  rationale: string;
+  /** Already in the library — open it rather than creating another. Null only if saving failed after a paid build. */
+  document: StoredResumeDocument | null;
+}
+
+/**
+ * Builds a resume from the user's profile or an imported resume, optionally
+ * aimed at a posting, for `BUILD_CREDITS`. The AI service saves it to the
+ * library itself, so this is tracked like the other writes: a list fetched
+ * straight after sees it.
+ */
+export const buildResume = (input: BuildResumeInput) =>
+  tracked(
+    apiPost<BuiltResume>("/api/ai/build", {
+      targetRole: input.targetRole,
+      seniority: input.seniority || undefined,
+      jdText: input.jdText || undefined,
+      jobId: input.jobId || undefined,
+      fromResumeId: input.fromResumeId || undefined,
+      template: input.template || undefined,
+    }),
+  );
+
 /** The browser's keepalive quota is 64KB across every such request in flight; this leaves room for a second one. */
 const KEEPALIVE_MAX_BYTES = 48_000;
 

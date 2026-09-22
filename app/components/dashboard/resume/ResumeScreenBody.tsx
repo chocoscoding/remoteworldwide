@@ -15,13 +15,16 @@
 // "reset a dozen states" cleanup is needed the way the old screen's
 // `createNewResume` required.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type FC, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type FC, type ReactNode, type SetStateAction } from "react";
 import { ArrowLeft, Download, Plus } from "lucide-react";
 import TimeAgo from "timeago-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import DownloadModal from "@/app/components/dashboard/modals/DownloadModal";
+import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
+import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
+import { resumeToDocx, resumeToMarkdown } from "@/app/lib/export/resume";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { ResumePaper, PageGuides } from "@/app/components/dashboard/resume/paper";
 import { useResumeDesign } from "@/app/components/dashboard/resume/useResumeDesign";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
@@ -56,6 +59,7 @@ import type { PickedJob } from "@/app/lib/jobs/fields";
 // or a credit — now runs in the AI service through `app/lib/resume/ai.ts`.
 import { applyQuantify, type QuantifySuggestion, type RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
 import {
+  askForRewrite,
   fixToneAndGrammar,
   injectKeywords,
   quantifySuggestions,
@@ -65,6 +69,7 @@ import {
 } from "@/app/lib/resume/ai";
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
 import { useCheckResume } from "@/hooks/mutations/useCheckResume";
+import { applyBulletRewrite, deriveCheckSuggestions, type CheckSuggestion } from "./check-suggestions";
 
 type DocTab = "overview" | "content" | "customize" | "ai";
 type SummarySuggestionState = "pending" | "accepted" | "dismissed";
@@ -111,8 +116,11 @@ const ZOOM_BUTTON_CLASS =
 // What Tailor and the ATS card's "Against a job" read from a picked job. Skills
 // and requirements are asked for but never required: a pasted posting may name
 // none. One constant feeds both the pick and the type, so they cannot drift.
-const RESUME_JOB_SPEC = "company, role, description, skills?, requirements?";
-type ResumeJob = PickedJob<typeof RESUME_JOB_SPEC>;
+export const RESUME_JOB_SPEC = "company, role, description, skills?, requirements?";
+export type ResumeJob = PickedJob<typeof RESUME_JOB_SPEC>;
+
+/** A job Tailor was handed by a link (?tailor=<savedJobId>): its card shows it, and Run uses it without the picker. */
+export type TailorPreset = { status: "loading" | "failed"; label: string } | { status: "ready"; label: string; job: ResumeJob };
 
 export interface ResumeScreenBodyProps {
   documents: ResumeDocument[];
@@ -122,13 +130,15 @@ export interface ResumeScreenBodyProps {
   setActiveDocId: Dispatch<SetStateAction<string | null>>;
   /** Every save that lands, including the one flushed as this component unmounts — see `useResumeAutosave`. */
   onSaved: (id: string, updatedAt: Date) => void;
+  banner?: ReactNode;
+  tailorPreset?: TailorPreset | null;
 }
 
-const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, activeDoc, setDocuments, setActiveDocId, onSaved }) => {
-  const { design, sections, dispatch } = useResumeDesign();
+const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, activeDoc, setDocuments, setActiveDocId, onSaved, banner, tailorPreset = null }) => {
+  const { design, sections } = useResumeDesign();
   const { collapsed: sidebarCollapsed } = useSidebarCollapse();
 
-  const [docTab, setDocTab] = useState<DocTab>("content");
+  const [docTab, setDocTab] = useState<DocTab>(tailorPreset ? "ai" : "content");
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [newResumeOpen, setNewResumeOpen] = useState(false);
   const [creatingResume, setCreatingResume] = useState(false);
@@ -163,8 +173,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
   // The ATS card's check — a real scan of the document on screen.
   const checker = useCheckResume();
-  const [appliedSuggestions, setAppliedSuggestions] = useState<Set<string>>(new Set());
-  const [expandedSuggestions, setExpandedSuggestions] = useState<Set<string>>(new Set());
+  // What acting on a suggestion card came to, by card id — the card shows it in
+  // place of its button. Per mount, so it resets with the document like the rest.
+  const [suggestionOutcomes, setSuggestionOutcomes] = useState<Record<string, string>>({});
   const [askInput, setAskInput] = useState("");
   const [askStatus, setAskStatus] = useState<string | null>(null);
 
@@ -224,10 +235,53 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   // A job check's findings stand only while the check does — Remove takes the
   // "to match this posting" rewrite away with the posting it was matched to.
   const suggestions = activeDoc.check?.job ? (activeDoc.suggestions ?? null) : null;
+  // The rail's suggestion cards: what the standing check found, against the
+  // content as it is now — free, and gone the moment the check is removed.
+  const checkSuggestions = useMemo(() => deriveCheckSuggestions(activeDoc.check, content, pageCount), [activeDoc.check, content, pageCount]);
   const downloadFileName = content.name.trim() ? `${content.name.trim().replace(/\s+/g, "-")}-Resume` : "Resume";
   const previewScale = Math.max(0.45, Math.min(1.8, fit.scale * (zoomPercent / 100)));
 
   const setZoom = (next: number) => setZoomPercent(Math.min(180, Math.max(45, next)));
+
+  /**
+   * Exports what is on screen. Word and Markdown are built from the content and
+   * section order; PDF prints the live paper itself — the one rendering of the
+   * chosen template and fonts that exists — at its page size, without the zoom
+   * or the page-guide overlay around it.
+   *
+   * One page prints edge to edge, exactly as previewed. More than one takes the
+   * design's vertical margin on every page instead, since the paper's own top
+   * and bottom padding would otherwise land only on the first and last.
+   */
+  const handleDownload = async (format: DownloadFormat) => {
+    const base = safeFileName(downloadFileName);
+    if (format === "docx") {
+      saveBlob(await resumeToDocx(content, design, sections), `${base}.docx`);
+      return;
+    }
+    if (format === "md") {
+      saveText(resumeToMarkdown(content, sections), `${base}.md`);
+      return;
+    }
+    const paper = paperWrapRef.current?.firstElementChild;
+    if (!(paper instanceof HTMLElement)) throw new Error("The resume preview isn't ready yet — try again in a moment.");
+    // The editor's "No … added yet." prompts are for the editor: a section
+    // that holds only one is left out of the PDF, as are the empty-name hint
+    // and the on-screen page-break label (the break itself stays).
+    const copy = paper.cloneNode(true) as HTMLElement;
+    copy.querySelectorAll("[data-resume-placeholder]").forEach((node) => (node.closest("[data-resume-section]") ?? node).remove());
+    const multi = pageCount > 1;
+    await printDocument({
+      title: base,
+      html: `<div class="rww-print${multi ? " rww-print-multi" : ""}">${copy.outerHTML}</div>`,
+      pageSize: design.doc.pageFormat === "a4" ? "A4" : "Letter",
+      pageMargin: multi ? `${design.spacing.marginYmm}mm 0` : "0",
+      bodyClass: ALL_FONT_VARS,
+      css:
+        ".rww-print li{break-inside:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}" +
+        (multi ? ".rww-print-multi>*{min-height:0!important;padding-top:0!important;padding-bottom:0!important;}" : ""),
+    });
+  };
 
   // -------------------------------------------------------------------------
   // Document switch / create — explicit save-then-swap, not a reactive
@@ -303,10 +357,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   // -------------------------------------------------------------------------
   // AI assist rail / AI tools tab.
   //
-  // Every tool now runs in the AI service. Four of them reach a model and cost
-  // a credit; `shorten` and `tone` are deterministic and cost nothing, but they
-  // go over the wire too so that what a tool does has one definition rather
-  // than two that drift.
+  // Every tool runs in the AI service, reaches a model and costs a credit —
+  // `shorten` and `tone` included, which used to be fixed rules. Those two
+  // rewrite text across the whole document, so their result is merged into the
+  // content as it is now (`mergeRewrite`) rather than replacing it.
   //
   // What did NOT move is where the caption comes from. The service returns the
   // facts — which terms were added, how many words were cut, what was fixed —
@@ -330,7 +384,32 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
   const quote = (terms: string[]) => terms.map((term) => `"${term}"`).join(" and ");
 
+  /**
+   * A shorten or tone result, applied to the content as it is NOW. The summary
+   * and each role's bullets take the rewrite only where they still match what
+   * was sent, so anything typed during the round trip is kept, not overwritten.
+   */
+  const mergeRewrite = (now: ResumeContent, sent: ResumeContent, result: ResumeContent): ResumeContent => {
+    const sentById = new Map(sent.experience.map((entry) => [entry.id, entry]));
+    const resultById = new Map(result.experience.map((entry) => [entry.id, entry]));
+    const same = (a: string[], b: string[]) => a.length === b.length && a.every((line, i) => line === b[i]);
+    return {
+      ...now,
+      summary: now.summary === sent.summary ? result.summary : now.summary,
+      experience: now.experience.map((entry) => {
+        const before = sentById.get(entry.id);
+        const after = resultById.get(entry.id);
+        return before && after && same(entry.bullets, before.bullets) ? { ...entry, bullets: after.bullets } : entry;
+      }),
+    };
+  };
+
   const runAiTool = (id: string) => {
+    if (id === "tailor" && tailorPreset && tailorPreset.status !== "failed") {
+      if (tailorPreset.status === "ready") void handleTailorJob(tailorPreset.job);
+      return;
+    }
+
     // The two tools that need a posting open the picker first; the run happens
     // on pick. Neither can be answered from the document alone, and the screen
     // does not keep a job description around — a standing check stores the
@@ -367,31 +446,30 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
     }
 
     if (id === "shorten") {
+      const sent = content;
       void (async () => {
-        const result = await runSuggestion("shorten", () => shortenToOnePage({ content }));
+        const result = await runSuggestion("shorten", () => shortenToOnePage({ content: sent }));
         if (!result) return;
         if (result.removedWords === 0) {
-          landAiTool(id, "Already tight — nothing worth cutting.");
+          landAiTool(id, "Already fits one page — nothing worth cutting.");
           return;
         }
-        landAiTool(
-          id,
-          `Trimmed ${result.removedWords} words (${result.trimmedBullets} lower-impact bullet${result.trimmedBullets === 1 ? "" : "s"}).`,
-          () => setContent(result.content),
-        );
+        const dropped = result.trimmedBullets > 0 ? `, ${result.trimmedBullets} lower-impact bullet${result.trimmedBullets === 1 ? "" : "s"} dropped` : "";
+        landAiTool(id, `Tightened by ${result.removedWords} words${dropped}.`, () => setContent((now) => mergeRewrite(now, sent, result.content)));
       })();
       return;
     }
 
     if (id === "tone") {
+      const sent = content;
       void (async () => {
-        const result = await runSuggestion("tone", () => fixToneAndGrammar({ content }));
+        const result = await runSuggestion("tone", () => fixToneAndGrammar({ content: sent }));
         if (!result) return;
         if (result.fixes.length === 0) {
           landAiTool(id, "No issues found — your resume reads clean.");
           return;
         }
-        landAiTool(id, `Fixed ${result.fixes.join(", ")}.`, () => setContent(result.content));
+        landAiTool(id, `Fixed: ${result.fixes.join(", ")}.`, () => setContent((now) => mergeRewrite(now, sent, result.content)));
       })();
       return;
     }
@@ -524,41 +602,100 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   };
   const dismissSummarySuggestion = () => setSummarySuggestion("dismissed");
 
-  const applySuggestion = (id: string) => {
-    setAppliedSuggestions((prev) => new Set(prev).add(id));
-    if (id === "fix-keyword") acceptSummarySuggestion();
-    if (id === "fix-skills") {
-      // Real effect now that section order is real: move Skills ahead of
-      // Experience, same intent as the old (cosmetic-only) "Move it" action.
-      const skillsIdx = sections.findIndex((s) => s.kind === "skills");
-      const experienceIdx = sections.findIndex((s) => s.kind === "experience");
-      if (skillsIdx !== -1 && experienceIdx !== -1 && skillsIdx > experienceIdx) {
-        dispatch({
-          type: "sections/reorder",
-          from: skillsIdx,
-          to: experienceIdx,
-        });
+  /**
+   * Acts on one of the rail's suggestion cards — each is a finding of the
+   * standing check, wired to the tool that addresses it (see
+   * `check-suggestions.ts`). Cards that spend a credit go through the same
+   * `runSuggestion` as the AI Tools tab, so "one tool at a time", the failure
+   * toast and the credit-meter refresh are the same everywhere.
+   */
+  const runCheckSuggestion = async (suggestion: CheckSuggestion) => {
+    const settle = (caption: string) => setSuggestionOutcomes((prev) => ({ ...prev, [suggestion.id]: caption }));
+
+    if (suggestion.kind === "keywords" && suggestion.terms?.length) {
+      // The check's own missing terms as the want-list, so the tool works in
+      // exactly what the scan found missing rather than re-deriving a list
+      // from the posting. WHICH are still missing is decided by the service.
+      const sent = content;
+      const result = await runSuggestion("keywords", () => injectKeywords({ content: sent, keywords: suggestion.terms }));
+      if (!result) return;
+      if (result.added.length === 0) {
+        settle("Already covered — nothing to add.");
+        return;
       }
+      // Merged onto the content as it is NOW: the rewritten summary only if the
+      // summary is still what was sent, and the terms appended to Skills
+      // either way — typing during the round trip is never overwritten.
+      setContent((now) => {
+        const have = new Set(now.skills.map((skill) => skill.toLowerCase()));
+        return {
+          ...now,
+          summary: now.summary === sent.summary ? result.content.summary : now.summary,
+          skills: [...now.skills, ...result.added.filter((term) => !have.has(term.toLowerCase()))],
+        };
+      });
+      settle(`Added ${quote(result.added)} to your Summary and Skills.`);
+      return;
+    }
+
+    if (suggestion.kind === "rewrite" && suggestion.rewrite?.at) {
+      // Free: the scan generated this line and was paid for. Re-located against
+      // the content as it is now, and applied only if the original still
+      // stands — a line edited since is the user's, not the scan's.
+      const { before, after } = suggestion.rewrite;
+      setContent((now) => applyBulletRewrite(now, before, after));
+      settle("Applied to your bullet.");
+      return;
+    }
+
+    // Quantify proposes lines to review and shorten rewrites across the whole
+    // document, so both run as the AI Tools tab's own tools — their results
+    // and captions land there, where the proposals can be picked.
+    if (suggestion.kind === "quantify" || suggestion.kind === "shorten") {
+      setDocTab("ai");
+      runAiTool(suggestion.kind);
     }
   };
 
-  const toggleExpandedSuggestion = (id: string) => {
-    setExpandedSuggestions((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  /**
+   * The rail's "Ask for a rewrite…" box — the cover letter's revise, for a
+   * resume. The instruction and the document on screen go to the AI service,
+   * which answers with a narrow diff (summary + bullets by marker) and has
+   * already thrown out any proposed line that adds a figure the resume never
+   * had or balloons past the line it replaces.
+   *
+   * Applied with `mergeRewrite`, like shorten and tone: the round trip is long
+   * enough to type in, and a line typed during it is kept, not overwritten.
+   * The caption is written here from the service's counts — which parts
+   * changed, and how many proposals were kept back — never from model prose.
+   *
+   * A failure keeps the instruction in the box, so it can be reworded or
+   * retried; `useResumeSuggestion` has already toasted why.
+   */
+  const handleAskSubmit = async () => {
+    const instruction = askInput.trim();
+    if (!instruction || aiRunning) return;
+    if (isBlank) {
+      setAskStatus("Add a summary or some bullet points first, then say how you'd like them changed.");
+      return;
+    }
+    const sent = content;
+    setAskStatus(null);
+    const result = await runSuggestion("ask", () => askForRewrite({ content: sent, instruction }));
+    if (!result) return;
 
-  const handleAskSubmit = () => {
-    if (!askInput.trim()) return;
-    // Nothing is behind this box yet — no route takes a free-form rewrite
-    // instruction. It used to say a credit had been spent and the rewrite
-    // would be applied, and neither was true.
-    setAskStatus(`Noted: "${askInput.trim()}". Free-form rewrites aren't available yet — the AI Tools tab has the ones that are.`);
+    setContent((now) => mergeRewrite(now, sent, result.content));
     setAskInput("");
-    window.setTimeout(() => setAskStatus(null), 4000);
+
+    const parts = [
+      result.summaryChanged ? "your Summary" : null,
+      result.bulletsChanged > 0 ? `${result.bulletsChanged} bullet${result.bulletsChanged === 1 ? "" : "s"}` : null,
+    ].filter(Boolean);
+    const held =
+      result.rejectedLines > 0
+        ? ` ${result.rejectedLines} proposed line${result.rejectedLines === 1 ? "" : "s"} would have added details your resume doesn't have, so ${result.rejectedLines === 1 ? "it was" : "they were"} left as you wrote ${result.rejectedLines === 1 ? "it" : "them"}.`
+        : "";
+    setAskStatus(`Rewrote ${parts.join(" and ")} to “${instruction}”.${held} Not quite right? Say what to change next, or edit it directly.`);
   };
 
   return (
@@ -599,10 +736,12 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
             <Download className="h-4 w-4" />
             Download
           </StickerButton>
+          <NotificationBell />
         </div>
       </header>
 
       <main className="px-6 py-7 pb-14 max-w-[1540px] mx-auto">
+        {banner && <div className="mb-4">{banner}</div>}
         <div className={cn("grid gap-4 items-start", GRID_COLS_CLASS(sidebarCollapsed)[docTab])}>
           {/* LEFT SIDEBAR — Overview has none; its old "N pages · N roles ·
               last edited" line moved to a small caption above the preview
@@ -630,6 +769,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
                     aiDone={aiDone}
                     captions={aiCaptions}
                     onRun={runAiTool}
+                    tailorFor={tailorPreset}
+                    onPickTailorJob={() => void pickJobFor("tailor")}
                     rewriteVariants={rewriteOptions}
                     onUseRewrite={useRewriteVariant}
                     quantify={quantifyList}
@@ -741,7 +882,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
             ) : (
               <AiAssistRail
                 isBlank={isBlank}
-                hasSuggestions={suggestions !== null}
+                suggestions={checkSuggestions}
                 check={activeDoc.check}
                 stale={checkIsStale}
                 checkStatus={checker.status}
@@ -751,13 +892,12 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
                 onCheckAgainstJob={() => void pickJobFor("scan")}
                 onRecheck={recheck}
                 onDismissCheckFailure={checker.clearFailure}
-                appliedSuggestions={appliedSuggestions}
-                expandedSuggestions={expandedSuggestions}
-                onApplySuggestion={applySuggestion}
-                onToggleExpandedSuggestion={toggleExpandedSuggestion}
+                suggestionOutcomes={suggestionOutcomes}
+                onRunSuggestion={(suggestion) => void runCheckSuggestion(suggestion)}
+                aiRunning={aiRunning}
                 askInput={askInput}
                 onAskInputChange={setAskInput}
-                onAskSubmit={handleAskSubmit}
+                onAskSubmit={() => void handleAskSubmit()}
                 askStatus={askStatus}
                 onDismissAskStatus={() => setAskStatus(null)}
               />
@@ -766,7 +906,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
         </div>
       </main>
 
-      <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="resume" fileName={downloadFileName} />
+      <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="resume" fileName={safeFileName(downloadFileName)} onDownload={handleDownload} />
       <NewResumeDialog
         open={newResumeOpen}
         onOpenChange={setNewResumeOpen}
