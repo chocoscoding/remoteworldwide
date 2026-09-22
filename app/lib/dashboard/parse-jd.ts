@@ -28,7 +28,13 @@ export interface ParsedJob {
   jdText?: string;
 }
 
-export type ParseResult = { ok: true; parsed: ParsedJob } | { ok: false; reason: string };
+/**
+ * `importId` is the finished import the fields came from. The log dialog reads
+ * only `parsed`; the apply wizard hands the id to `saveJob`, which seeds the
+ * saved job from everything the import read (salary, apply link, requirements)
+ * rather than from the four fields here.
+ */
+export type ParseResult = { ok: true; parsed: ParsedJob; importId: string } | { ok: false; reason: string };
 
 /** Anything that looks like a URL takes the parse path; everything else is free text. */
 export function looksLikeUrl(input: string): boolean {
@@ -128,7 +134,7 @@ function toParseResult(item: JobImportItem, link: string): ParseResult {
   const parsed: ParsedJob = { company: companyName, role: roleName };
   if (location) parsed.location = location;
   if (description) parsed.jdText = description;
-  return { ok: true, parsed };
+  return { ok: true, parsed, importId: item.id };
 }
 
 /**

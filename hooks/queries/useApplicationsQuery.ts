@@ -13,7 +13,8 @@
 // behind it.
 
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { getApplicationSummary, getGoals, listApplications } from "@/app/lib/applications/api";
+import { applicationUrl, findDuplicateApplication, getApplicationSummary, getGoals, listApplications } from "@/app/lib/applications/api";
+import { APPLICATION_LIMITS, type DuplicateCheckQuery } from "@/app/lib/applications/types";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
 
 // Options builders, shared by the hooks below and by imperative reads
@@ -64,4 +65,24 @@ export function useApplicationSummary({ enabled = true }: ReadOptions = {}) {
 /** Weekly target, rest days, hunt hour, pause, and whether the browser board was imported. */
 export function useGoals({ enabled = true }: ReadOptions = {}) {
   return useQuery({ ...goalsQuery(), enabled });
+}
+
+/**
+ * The earlier application this job looks like, or null — checked by the server
+ * against every row, not just the ones loaded. A warning to show, never a
+ * reason to refuse. Pass null while there is no job to check.
+ */
+export function useDuplicateApplication(query: DuplicateCheckQuery | null) {
+  // Fitted to the route's limits, as a create is: a scraped company name past
+  // them would be a 400 rather than a check.
+  const company = query?.company.trim().slice(0, APPLICATION_LIMITS.companyMax) ?? "";
+  const role = query?.role.trim().slice(0, APPLICATION_LIMITS.roleMax) ?? "";
+  const url = applicationUrl(query?.url) ?? "";
+  return useQuery({
+    queryKey: qk.activity.applicationDuplicate(company, role, url),
+    queryFn: ({ signal }) => findDuplicateApplication({ company, role, url: url || undefined }, signal),
+    staleTime: STALE_TIME.activity,
+    // The route refuses a blank company or role, so a job missing either is not asked about.
+    enabled: company.length > 0 && role.length > 0,
+  });
 }
