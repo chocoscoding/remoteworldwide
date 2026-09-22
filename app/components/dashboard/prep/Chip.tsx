@@ -31,46 +31,22 @@ const ON_DARK: Record<ChipTone, string> = {
   white: "bg-white/12 text-white/80",
 };
 
-/**
- * Two quieter takes on the dark-surface chip, side by side for comparison.
- * The solid fills above read as loud against ink — a saturated blue block
- * pulls harder than the job title next to it. Delete whichever loses.
- */
-export const ON_DARK_VARIANT_A: Record<ChipTone, string> = {
-  red: "bg-white text-[#c33f28]",
-  blue: "bg-white text-[#2f5bb7]",
-  green: "bg-white text-[#1f7a4c]",
-  white: "bg-white/90 text-[#222325]",
-};
-
-export const ON_DARK_VARIANT_B: Record<ChipTone, string> = {
-  red: "bg-[#f5a898] text-[#222325]",
-  blue: "bg-[#a8c4f5] text-[#222325]",
-  green: "bg-[#a8e0bd] text-[#222325]",
-  white: "bg-[#e6e6df] text-[#222325]",
-};
-
 export interface ChipProps {
   tone?: ChipTone;
   /** Renders the variant tuned for a dark surface. */
   onDark?: boolean;
-  /** Temporary: which dark-surface palette to use while both are on trial. */
-  darkVariant?: "solid" | "a" | "b";
   children: ReactNode;
   className?: string;
 }
 
-function darkPalette(variant: ChipProps["darkVariant"]): Record<ChipTone, string> {
-  if (variant === "a") return ON_DARK_VARIANT_A;
-  if (variant === "b") return ON_DARK_VARIANT_B;
-  return ON_DARK;
-}
-
-const Chip: FC<ChipProps> = ({ tone = "white", onDark = false, darkVariant = "solid", children, className }) => (
+const Chip: FC<ChipProps> = ({ tone = "white", onDark = false, children, className }) => (
   <span
     className={cn(
-      "inline-flex flex-none items-center rounded-full px-2.5 py-1 text-[11px] font-bold leading-none whitespace-nowrap",
-      onDark ? darkPalette(darkVariant)[tone] : ON_LIGHT[tone],
+      // `gap-1` costs the text-only chips nothing — flexbox wraps a contiguous
+      // run of text in one anonymous item and gap only applies between items —
+      // and keeps a leading glyph's spacing out of every call site.
+      "inline-flex flex-none items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none whitespace-nowrap",
+      onDark ? ON_DARK[tone] : ON_LIGHT[tone],
       className
     )}>
     {children}
