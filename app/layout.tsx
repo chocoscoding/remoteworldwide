@@ -46,6 +46,11 @@ export const metadata: Metadata = {
   keywords: ["job", "remote", "remote work", "remote worldwide", "work", "remote jobs", "tech jobs", "worldwide jobs"],
 };
 
+// Server-only, so the banner costs nothing until there is an incident. Setting
+// it needs an env change and a redeploy; if you ever need it without one, read
+// it here from Edge Config or the backend's /api/status instead.
+const downtimeMessage = process.env.DOWNTIME_MESSAGE?.trim();
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -90,7 +95,7 @@ export default function RootLayout({
           shadow="0 0 10px #000000,0 0 5px #000000"
           showSpinner={false}
         />
-        <Downtime />
+        {downtimeMessage && <Downtime message={downtimeMessage} />}
         <ToastContainer
           className={"z-50"}
           position="bottom-right"
