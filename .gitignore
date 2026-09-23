@@ -34,4 +34,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.env
+
+# env — the glob matters: plain `.env` left `.env.local`, `.env.production` and
+# any `.env.bak` committable. The template is the one file that belongs in git.
+.env*
+!.env.example
