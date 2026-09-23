@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "react-toastify";
 import { signOut } from "@/app/lib/authClient";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,22 @@ import AuthNotice from "@/app/components/auth/AuthNotice";
 import { brutalistLink } from "@/app/components/auth/authStyles";
 
 type Phase = "confirming" | "waiting" | "failed";
+
+/** When the resend cooldown ends, as epoch ms — kept so a reload carries on counting down. */
+const RESEND_UNTIL_KEY = "rww.verify-email.resend-until";
+
+// Read through useSyncExternalStore, as LeadMagnetCard does: the server renders 0, hydration agrees,
+// and the stored value takes over straight after — no mismatch and no setState in an effect.
+const noopSubscribe = () => () => {};
+const readStoredUntil = () => {
+  try {
+    return Number(window.localStorage.getItem(RESEND_UNTIL_KEY)) || 0;
+  } catch {
+    // Storage blocked (private window, cleared site data): the resend still refuses inside the window.
+    return 0;
+  }
+};
+const serverUntil = () => 0;
 
 /**
  * The one screen an unverified account can reach.
@@ -20,7 +36,11 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(token ? "confirming" : "waiting");
   const [sending, setSending] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const storedUntil = useSyncExternalStore(noopSubscribe, readStoredUntil, serverUntil);
+  // Kept alongside the stored copy so the countdown still works when storage refuses the write.
+  const [until, setUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const cooldown = Math.max(0, Math.ceil((Math.max(storedUntil, until) - now) / 1000));
   // React 18 mounts twice in development, and redeeming a single-use link twice would spend it and
   // then report it as already used.
   const redeemed = useRef(false);
@@ -50,9 +70,20 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
 
   useEffect(() => {
     if (cooldown <= 0) return;
-    const timer = setTimeout(() => setCooldown((seconds) => seconds - 1), 1000);
+    const timer = setTimeout(() => setNow(Date.now()), 1000);
     return () => clearTimeout(timer);
-  }, [cooldown]);
+  }, [cooldown, now]);
+
+  const startCooldown = (seconds: number) => {
+    const end = Date.now() + seconds * 1000;
+    setUntil(end);
+    setNow(Date.now());
+    try {
+      window.localStorage.setItem(RESEND_UNTIL_KEY, String(end));
+    } catch {
+      // As above: the countdown just won't survive a reload.
+    }
+  };
 
   const resend = async () => {
     setSending(true);
@@ -62,7 +93,7 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
 
       if (response.status === 429) {
         toast.info(payload?.message ?? "We just sent one. Give it a moment.");
-        setCooldown(60);
+        startCooldown(payload?.data?.retryInSeconds ?? 60);
         return;
       }
       if (!response.ok) {
@@ -76,7 +107,7 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
       }
 
       toast.success("Sent. Check your inbox.");
-      setCooldown(60);
+      startCooldown(payload?.data?.retryInSeconds ?? 60);
     } finally {
       setSending(false);
     }
