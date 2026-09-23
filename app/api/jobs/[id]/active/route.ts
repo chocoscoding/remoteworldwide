@@ -1,13 +1,13 @@
-import { auth } from "@/auth";
+import { requireAdmin } from "@/app/lib/auth/require-admin";
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 // MAKE JOB ACTIVE/ INACTIVE
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
+    const denied = await requireAdmin();
+    if (denied) return denied;
 
-    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const id = (await params).id;
     if (!id) {
       return NextResponse.json({ message: "Job ID is required" }, { status: 400 });

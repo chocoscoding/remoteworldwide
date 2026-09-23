@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { requireAdmin } from "@/app/lib/auth/require-admin";
 import { prisma } from "@/prisma";
 import { hexoid } from "hexoid";
 import { NextRequest, NextResponse } from "next/server";
@@ -125,9 +125,9 @@ export async function GET(req: NextRequest) {
 // CREATE JOB
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
+    const denied = await requireAdmin();
+    if (denied) return denied;
 
-    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const { title, description, companyId, applicationUrl, category, region, seniority } = await req.json();
     const normalizedRegion = Array.isArray(region) ? region : region ? [region] : [];
     const BODY_VALUES = { title, description, companyId, applicationUrl, category, region: normalizedRegion, seniority, slug: "0" };
