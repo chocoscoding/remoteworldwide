@@ -5,7 +5,7 @@
 // Not `DashEmptyState`: this state has three genuinely different ways out, and
 // that shared component carries one CTA. Matching is still the one we want
 // taken, so it keeps the sticker button. Starting a pod is a real choice rather
-// than a fallback, so it sits directly under it as an outline button; an invite
+// than a fallback, so it sits beside it as an outline button; an invite
 // is something you were handed rather than something you go looking for, so it
 // stays the quiet line at the bottom.
 //
@@ -37,8 +37,8 @@ const PodEmptyState: FC<PodEmptyStateProps> = ({ capacity, onMatch, onCreate, on
       Pods apply 2.4× more consistently. We&apos;ll match you with up to {Math.max(1, capacity - 1)} others at your level, in
       your timezone.
     </p>
-    <div className="mt-6 flex flex-col items-center gap-2.5">
-      <StickerButton variant="primary" size="lg" onClick={onMatch} disabled={matching}>
+    <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+      <StickerButton variant="primary" size="md" onClick={onMatch} disabled={matching}>
         {matching ? "Finding your pod…" : "Match me with a pod"}
       </StickerButton>
       <StickerButton variant="outline" size="md" onClick={onCreate} disabled={matching}>
