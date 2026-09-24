@@ -18,7 +18,7 @@ import { apiGet, apiPost } from "@/app/lib/api/client";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { createSseParser } from "@/app/lib/api/sse";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
-import type { BulletRewrite, ExtractedRequirements, IngestedResume, ScanInput, ScanReport } from "./types";
+import type { BulletRewrite, ExtractedRequirements, IngestedResume, IngestedResumeDetail, ScanInput, ScanReport, StoredScan } from "./types";
 
 export const ATS_PATH = "/api/ai/scan";
 const RESUMES_PATH = "/api/ai/resume";
@@ -43,9 +43,50 @@ export function listIngestedResumes(signal?: AbortSignal) {
   return apiGet<IngestedResume[]>(RESUMES_PATH, signal);
 }
 
+/**
+ * One ingested resume, parsed content included — what the apply wizard sends to
+ * the tailor and keyword tools, which work on content rather than on an id.
+ * Another user's id is a 404.
+ */
+export function getIngestedResume(resumeId: string, signal?: AbortSignal) {
+  return apiGet<IngestedResumeDetail>(`${RESUMES_PATH}/${encodeURIComponent(resumeId)}`, signal);
+}
+
 /** What a posting asks for, read on its own. Free: no resume, no credit. */
 export function extractRequirements(jdText: string, jobId?: string | null) {
   return apiPost<ExtractedRequirements>(`${ATS_PATH}/requirements`, { jdText, jobId: jobId ?? null });
+}
+
+/**
+ * The latest scan this user already ran against a posting — any of their
+ * resumes — or null when it was never scanned. Free: it reads a stored score
+ * back and never runs a scan, which is why the log-an-application payoff can
+ * ask it as a side effect of logging without charging anyone.
+ *
+ * A POST with the description in the body, not a GET: a posting is tens of
+ * kilobytes of text, and a query string is logged by every hop it crosses.
+ */
+export function lookupStoredScan(jdText: string) {
+  return apiPost<StoredScan | null>(`${ATS_PATH}/lookup`, { jdText });
+}
+
+/**
+ * A short, stable cache key for a posting's text (cyrb53), so the query key
+ * never holds the description itself. Trimmed first, as the service trims it
+ * before hashing, so the same paste is the same key.
+ */
+export function storedScanKey(jdText: string): string {
+  const text = jdText.trim();
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `${text.length}:${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,22 +97,27 @@ export function extractRequirements(jdText: string, jobId?: string | null) {
 export const fileNameOf = (doc: Pick<VaultDoc, "name" | "ext">): string => (doc.ext ? `${doc.name}.${doc.ext}` : doc.name);
 
 /**
- * An already-ingested resume for this document, matched on the filename the
- * import recorded.
+ * An already-ingested resume for this document: the one the document is linked
+ * to (`aiResumeId`, written the first time the bridge imported it), else one
+ * matched on the filename the import recorded.
  *
- * A hint, not a guarantee: two documents can share a name, and a renamed
- * document stops matching. Both cases are harmless because the fallback below
- * is idempotent — importing again returns the resume that already exists
- * rather than making a second one. What the match buys is skipping a download
- * and an upload when the answer is already known.
+ * The filename is only a fallback for documents imported before the link
+ * existed: two documents can share a name, a renamed document stops matching,
+ * and a deduped import keeps the FIRST upload's filename, so the same CV under
+ * another name never matches. All harmless because the fallback below is
+ * idempotent — importing again returns the resume that already exists, and now
+ * links it. What a match buys is skipping a download and an upload.
  *
  * A resume that failed to parse is not a match: it has no chunks, so a scan
  * naming it would 404. Re-importing it is the right answer, and it will fail
  * again with a message the user can act on.
  */
-export function findIngested(doc: Pick<VaultDoc, "name" | "ext">, ingested: readonly IngestedResume[]): IngestedResume | null {
+export function findIngested(doc: Pick<VaultDoc, "name" | "ext" | "aiResumeId">, ingested: readonly IngestedResume[]): IngestedResume | null {
+  const ready = ingested.filter((resume) => resume.status === "ready");
+  const linked = doc.aiResumeId ? ready.find((resume) => resume.resumeId === doc.aiResumeId) : undefined;
+  if (linked) return linked;
   const wanted = fileNameOf(doc).toLowerCase();
-  return ingested.find((resume) => resume.status === "ready" && resume.fileName.toLowerCase() === wanted) ?? null;
+  return ready.find((resume) => resume.fileName.toLowerCase() === wanted) ?? null;
 }
 
 /**
@@ -84,19 +130,19 @@ export function findIngested(doc: Pick<VaultDoc, "name" | "ext">, ingested: read
  * has already been imported returns the same id without re-embedding.
  */
 export function prepareResumeForDoc(documentId: string) {
-  return apiPost<IngestedResume & { chunkCount: number; duplicate: boolean }>(RESUME_FOR_DOC_PATH, { documentId });
+  // `chunkCount` is absent when the bridge answered from the document's link rather than an import.
+  return apiPost<IngestedResume & { chunkCount?: number; duplicate: boolean }>(RESUME_FOR_DOC_PATH, { documentId });
 }
 
 /**
  * The resume id to score for a document: the one already ingested, or a fresh
  * import when there is none.
  *
- * This is the whole bridge between the two stores, and it is deliberately a
- * read-then-write rather than a mapping table. A table would need writing on
- * every upload, invalidating on every rename and reconciling whenever an
- * import was deduped — for a lookup the importer can already answer correctly.
+ * The link lives on the document itself (`aiResumeId`): the bridge writes it on
+ * import and answers from it afterwards, so neither side keeps a mapping table
+ * that renames or deduped imports could put out of step.
  */
-export async function resolveResumeId(doc: Pick<VaultDoc, "id" | "name" | "ext">, ingested: readonly IngestedResume[]): Promise<string> {
+export async function resolveResumeId(doc: Pick<VaultDoc, "id" | "name" | "ext" | "aiResumeId">, ingested: readonly IngestedResume[]): Promise<string> {
   const known = findIngested(doc, ingested);
   if (known) return known.resumeId;
   const prepared = await prepareResumeForDoc(doc.id);
@@ -328,7 +374,7 @@ export function describeScanFailure(error: unknown): ScanFailure {
  * The banding the whole dashboard shares.
  *
  * Kept identical to `scoreTier` in `app/lib/dashboard/ats-stub.ts`, which the
- * resume card and the payoff panel still read — the AI service's contract test
+ * job-fit estimate (`fit.ts`) still bands with — the AI service's contract test
  * asserts the two agree, so a band changed in one place and not the other is a
  * red build rather than two screens disagreeing about the same number.
  */

@@ -18,8 +18,15 @@
 // Step 3 is idempotent: the AI service dedupes on a sha256 of the EXTRACTED
 // TEXT, not of the bytes, so importing the same CV twice returns the resume
 // that already exists (`duplicate: true`) without re-parsing or re-embedding
-// it. That is what makes calling this on every scan of a never-scanned
-// document cheap, and why no mapping table is kept on this side.
+// it.
+//
+// Idempotent is not free, though: steps 1-3 still download the file and
+// extract its text every time. So the answer is written back onto the document
+// (`aiResumeId`, backend `PUT /api/documents/:id/ai-resume`), and a document
+// that already carries one is answered from it — one small read, no download —
+// as long as the AI service still has that resume ready. A stored file never
+// changes, so the link can only go stale by the parsed resume being deleted,
+// and then this falls through to importing again, which relinks it.
 
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
@@ -40,8 +47,17 @@ interface ImportedResume {
   version: number;
   status: string;
   fileName: string;
-  chunkCount: number;
+  /** Absent when the answer came from the document's link rather than an import. */
+  chunkCount?: number;
   duplicate: boolean;
+}
+
+/** `GET /api/ai/resume/:id` — the parts the bridge reads. */
+interface StoredResume {
+  resumeId: string;
+  version: number;
+  status: string;
+  fileName: string;
 }
 
 const fail = (status: number, message: string) => NextResponse.json({ success: false, message, data: null }, { status });
@@ -71,6 +87,21 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (!doc) return fail(404, "That document was not found.");
   if (doc.kind !== "resume") return fail(422, "Only a resume can be scored. Change this document's type to resume first.");
+
+  // Already parsed: the link written the first time, if the AI service still
+  // has that resume ready. Anything else — gone, failed, the service briefly
+  // unreachable — falls through to importing, which is always correct.
+  if (doc.aiResumeId) {
+    try {
+      const known = await ai<StoredResume>(`/resume/${encodeURIComponent(doc.aiResumeId)}`, { userId: session.user.id });
+      if (known.status === "ready") {
+        const data: ImportedResume = { resumeId: known.resumeId, version: known.version, status: known.status, fileName: known.fileName, duplicate: true };
+        return NextResponse.json({ success: true, message: "Resume ready", data });
+      }
+    } catch {
+      // Import below.
+    }
+  }
 
   const fileName = doc.ext ? `${doc.name}.${doc.ext}` : doc.name;
   const mimeType = mimeForFileName(fileName);
@@ -120,6 +151,16 @@ export async function POST(req: Request): Promise<Response> {
       userId: session.user.id,
       timeoutMs: IMPORT_TIMEOUT_MS,
     });
+    // Remember it on the document, so the next ask skips all of the above.
+    // Best-effort: a link that failed to save costs one more download later,
+    // never this answer.
+    if (imported.status === "ready" && imported.resumeId !== doc.aiResumeId) {
+      await backend(`/documents/${encodeURIComponent(documentId)}/ai-resume`, {
+        method: "PUT",
+        body: { aiResumeId: imported.resumeId },
+        session: true,
+      }).catch(() => undefined);
+    }
     return NextResponse.json({ success: true, message: "Resume ready", data: imported });
   } catch (error) {
     // The AI service's own wording for a file a person can fix themselves — an

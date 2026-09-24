@@ -297,6 +297,14 @@ export interface VaultDoc {
   addedAt: number;
   updatedLabel: string;
   archived?: boolean;
+  /** The master resume — the one reviewers read, and the extension attaches by default. At most one. */
+  master?: boolean;
+  /**
+   * The parsed resume (an `ai_resumes` id in the AI service) this file became,
+   * recorded the first time it was imported. A hint: when the AI service no
+   * longer has it ready, import again (`/api/ats/resume-for-doc` does both).
+   */
+  aiResumeId?: string | null;
   /** A stored match score + which job it was against, where mock data has one. */
   jdScore?: number | null;
   jdLabel?: string;
@@ -364,26 +372,40 @@ export interface JdQaAnswer {
 // Referrals
 // ---------------------------------------------------------------------------
 
-/** Closed union so warmth can be sorted and filtered, not just printed. */
-export type TieKind = "strong" | "second" | "alumni";
+/**
+ * Closed union so warmth can be sorted and filtered, not just printed — and
+ * read off where a person came from, never guessed (app/lib/contacts/people.ts):
+ * `connection` is a LinkedIn connection from the import (1st degree, which says
+ * nothing about how well you know them), `added` is someone you typed in
+ * yourself, `cold` is someone referral search found online — a stranger whose
+ * intro has to say how you found them.
+ */
+export type TieKind = "connection" | "added" | "cold";
 
 export interface ReferralContact {
+  /** What "asked" and selection key on: a saved contact's id, or a found person's. */
   id: string;
+  /** Set when this person is one of your saved contacts. */
+  contactId?: string;
   name: string;
+  /** What to greet them by — LinkedIn's own first-name field when imported. Falls back to the first word of `name`. */
+  firstName?: string;
   tie: TieKind;
+  /** Their title. May be blank: plenty of LinkedIn connections list none. */
   role: string;
   company: string;
-  targetRole: string;
+  /** The line under the name: how you know them. */
   status: string;
-  /** Present for 2nd-degree contacts — the mutual connection's name. */
-  via?: string;
-  bio?: string;
-  /** "GMT+1" — feeds the same-timezone filter. */
-  timezone: string;
-  /** The two reach channels the referral flow is actually built around. */
+  location?: string;
+  /** The two reach channels the referral flow is built around. Either may be "" — most imported connections share no email. */
   email: string;
+  /** `likely` is a guess from the company's email format and must be labelled so. */
+  emailStatus?: "known" | "found" | "likely";
   linkedinUrl: string;
-  lastInteraction?: string;
+  /** The page a web-found person was found on, when it is not LinkedIn. */
+  profileUrl?: string;
+  /** Their company has a live job on Remote Worldwide. */
+  hiring?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -401,24 +423,29 @@ export interface ChecklistItem {
 // ---------------------------------------------------------------------------
 
 /**
- * A company our reviewers watch. Carries real facts (role, salary, timezone,
- * skills) so fit can be computed against your preferences rather than stored
- * as a literal percentage.
+ * A job worth watching: a live Remote Worldwide listing
+ * (app/lib/recommendations/view.ts `toWatchTarget`). Carries facts (role,
+ * regions, salary and skills when a listing has them) so fit is computed
+ * against your preferences rather than stored as a literal percentage.
  */
 export interface RecommendationTarget {
+  /** The listing's id. */
   id: string;
   company: string;
   role: string;
-  /** Display string, e.g. "$140k–$180k + equity". */
+  /** Display string, e.g. "$140k–$180k + equity". Listings don't carry one yet. */
   salaryText?: string;
   /** Midpoint in USD — what the fit engine compares against minSalary. */
   salaryUsd?: number;
-  /** Hours from GMT for the company's hub. */
-  timezoneOffset: number;
+  /** Approximate hours from GMT for each region the listing hires in. Empty = not stated. */
+  timezoneOffsets: number[];
+  /** Open to hires anywhere — the timezone factor is met outright. */
+  anywhere?: boolean;
   skills: string[];
-  /** The reviewer's one-liner on why this company is on your list. */
+  /** A one-line summary under the name: seniority, regions, how fresh. */
   note?: string;
-  onHold?: boolean;
+  /** The listing's own page, e.g. `/jobs/{slug}`. */
+  href?: string;
 }
 
 /** One of the one or two things a company asks before they'll book time. */
@@ -429,48 +456,33 @@ export interface IntroQuestion {
 }
 
 /**
- * A company our reviewers put you in front of. There is no messaging thread:
- * they ask a question or two, you answer, and you're connected — which is why
- * this carries `questions` rather than a message list.
+ * A company our reviewers put you in front of — the screen's view of a backend
+ * recommendation (app/lib/recommendations/view.ts `toPipelineEntry`). There is
+ * no messaging thread: they ask a question or two, you answer, and you're
+ * connected — which is why this carries `questions` rather than a message list.
  */
 export interface IntroPipelineEntry {
   id: string;
-  targetId: string;
+  /** The Remote Worldwide listing it is for, when there is one — keeps it out of "worth watching". */
+  platformJobId: string | null;
   company: string;
   role: string;
-  /** Index into INTRO_STAGES. */
+  /** Index into RECOMMENDATION_STAGE_LABELS. */
   stageIndex: number;
   startedAgoDays: number;
   questions?: IntroQuestion[];
-  /** A warm contact at this company, when you have one. */
-  contactId?: string;
   /** Days left to answer, shown while questions are open. Unset = no clock. */
   expiresInDays?: number;
-  /** Set once the rec closed without a hire. Absent = still live. */
-  outcome?: "passed" | "expired";
+  /** Set once the rec closed. Absent = still live. */
+  outcome?: "connected" | "passed" | "expired";
   /** Days since the outcome landed — >7 moves the row into History. */
   outcomeAgoDays?: number;
-}
-
-// ---------------------------------------------------------------------------
-// Home screen
-// ---------------------------------------------------------------------------
-
-export interface HomeStat {
-  id: string;
-  label: string;
-  value: string;
-  delta: string;
-  positive?: boolean;
-}
-
-export interface WeeklyGoal {
-  current: number;
-  target: number;
-  /** Days of the M-S week that are marked done, e.g. ["M", "T", "Th"]. */
-  doneDays: string[];
-  /** All seven day labels in order, M through S. */
-  allDays: string[];
+  /** The reviewer's line on why you were put forward. */
+  note?: string;
+  /** Who put you forward, as they sign it. */
+  reviewerName?: string;
+  /** The posting, when there is a link to one. */
+  jobUrl?: string;
 }
 
 // ---------------------------------------------------------------------------

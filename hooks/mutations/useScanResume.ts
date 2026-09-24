@@ -100,8 +100,12 @@ export function useScanResume() {
         const resumeId = await resolveResumeId(doc, ingested);
         if (!current()) return null;
 
-        // An import happened, so the list the picker matches against is stale.
-        if (!known) void queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
+        // An import happened, so the list the picker matches against is stale —
+        // and so is the document, which the bridge has just linked to it.
+        if (!known) {
+          void queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
+          void queryClient.invalidateQueries({ queryKey: qk.documents.list() });
+        }
 
         setState((prev) => ({ ...prev, status: "scoring" }));
 
