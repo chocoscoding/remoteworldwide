@@ -53,16 +53,36 @@ export interface PrivacySettings {
   allowAiCoaching: boolean;
 }
 
+/**
+ * How a form-filling browser extension may use the saved-answer library. Saved on the account
+ * (PUT /api/settings/extension) because no extension exists yet: the choice is made now and read
+ * by whatever fills forms later. There is deliberately no "connected" field — nothing reports in.
+ */
+export interface ExtensionSettings {
+  /**
+   * Type profile values and saved answers in as a form loads. Off by default: otherwise nothing is
+   * filled until the user presses the extension's button on the form and picks a source. A saved
+   * draft is never filled on load either way.
+   */
+  fillOnLoad: boolean;
+  /** Draft an answer for a question it has never seen, labelled for the user to check. */
+  draftNewQuestions: boolean;
+  /** Fill demographic questions from saved answers. Off by default; never guessed either way. */
+  fillDemographics: boolean;
+}
+
 export interface Settings {
   profile: ProfileSettings;
   preferences: JobPreferences;
   notifications: NotificationSettings;
   privacy: PrivacySettings;
+  extension: ExtensionSettings;
   updatedAt: Date | null;
 }
 
 export type SubscriptionStatus = "none" | "pending" | "active" | "past_due" | "canceled";
-export type LedgerReason = "plan_grant" | "purchase" | "spend" | "refund" | "adjustment";
+// "reward": credits paid for an action, e.g. answering a recommendation's questions (`rec-answers:{id}`).
+export type LedgerReason = "plan_grant" | "purchase" | "spend" | "refund" | "adjustment" | "reward";
 export type CheckoutStatus = "pending" | "completed" | "canceled" | "failed";
 
 export interface Plan {
