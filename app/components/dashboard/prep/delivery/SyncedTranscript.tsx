@@ -1,16 +1,23 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import { ariaTime, formatClock, numberAnswers, type DeliveryTurn } from "@/app/lib/voice/format";
 import type { DeliveryTranscriptSegment, DeliveryTranscriptWord } from "@/app/lib/voice/types";
 import { usePlaybackControls, usePlaybackState, usePlaybackTime } from "./PlaybackProvider";
 
 /**
  * The transcript that follows the recording: the word being spoken is lit,
- * a click on any word plays from it, and "Follow along" keeps the current
- * line in view.
+ * a click on any word plays from it, and while the line being played is off
+ * screen a button offers the way back to it.
+ *
+ * It never scrolls by itself. It used to follow along inside its own capped
+ * scroll box, and that box fought the reader: it took the wheel from the page
+ * and would not hand it back at its end, and a scrollbar drag didn't count as
+ * the reader taking over, so the next line pulled them back. Now it is part of
+ * the page, scrolled with the page, and the page moves only when the reader
+ * asks it to.
  *
  * Words are matched onto each segment's own text rather than rendered from
  * the word list, because the transcript may carry punctuation on the words,
@@ -30,8 +37,6 @@ export interface SyncedTranscriptProps {
   segments: readonly DeliveryTranscriptSegment[];
   words: readonly DeliveryTranscriptWord[];
   turns: readonly DeliveryTurn[];
-  /** "Follow along" starts on. Default true. */
-  defaultFollow?: boolean;
   className?: string;
 }
 
@@ -49,6 +54,16 @@ const MATCH_LOOKAHEAD = 3;
 const OUTSIDE = -2;
 /** Inside the segment, before its first word, or a segment without word times. */
 const WHOLE = -1;
+
+/**
+ * The part of the screen a line counts as seen in: below the recording player,
+ * which sticks to the top of the report (RecordingPlayer, about 80px with its
+ * offset), and above the "back to what's playing" button at the bottom.
+ */
+const SEEN_MARGIN = "-96px 0px -64px 0px";
+
+/** Where the line being played is when it is off screen. */
+type Offscreen = "above" | "below" | null;
 
 // ---------------------------------------------------------------------------
 // Preparing the text
@@ -169,50 +184,57 @@ function activeWord(segment: PreparedSegment, ms: number): number {
 // Component
 // ---------------------------------------------------------------------------
 
-const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, defaultFollow = true, className }) => {
+const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, className }) => {
   const controls = usePlaybackControls();
   const canPlay = controls !== null;
   const playing = usePlaybackState()?.playing ?? false;
-  const [follow, setFollow] = useState(defaultFollow);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const followRef = useRef(follow);
-  const playingRef = useRef(playing);
-  useEffect(() => {
-    followRef.current = follow;
-    playingRef.current = playing;
-  }, [follow, playing]);
+  const [offscreen, setOffscreen] = useState<Offscreen>(null);
+  const currentRow = useRef<HTMLElement | null>(null);
+  const watcher = useRef<IntersectionObserver | null>(null);
 
   const blocks = useMemo(() => buildBlocks(segments, words, turns), [segments, words, turns]);
   const synced = segments.length > 0;
 
-  const scrollToRow = useCallback((row: HTMLElement) => {
-    const box = scrollRef.current;
-    if (!box) return;
-    const top = row.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    box.scrollTo({ top: Math.max(0, top - box.clientHeight / 3), behavior: reduce ? "auto" : "smooth" });
+  // Watches the line being played, so the way back to it shows only while it
+  // is off screen. It only ever offers: the page is the reader's to move.
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // A report queued for the line before is stale once another is playing.
+        const entry = entries.filter((e) => e.target === currentRow.current).pop();
+        if (!entry) return;
+        if (!entry.target.isConnected || entry.isIntersecting) setOffscreen(null);
+        else setOffscreen(entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0) ? "above" : "below");
+      },
+      { rootMargin: SEEN_MARGIN }
+    );
+    watcher.current = observer;
+    if (currentRow.current) observer.observe(currentRow.current);
+    return () => {
+      observer.disconnect();
+      watcher.current = null;
+    };
   }, []);
 
-  // Called by a segment as it becomes the one being spoken. Reads refs, so a
-  // segment's memoised props never change with follow or play state.
-  const onActivate = useCallback(
-    (row: HTMLElement) => {
-      if (followRef.current && playingRef.current) scrollToRow(row);
-    },
-    [scrollToRow]
-  );
+  // Called by a segment as it becomes the one being spoken. Stable, so a
+  // segment's memoised props never change with play state.
+  const onActivate = useCallback((row: HTMLElement) => {
+    const observer = watcher.current;
+    if (currentRow.current && observer) observer.unobserve(currentRow.current);
+    currentRow.current = row;
+    observer?.observe(row);
+  }, []);
 
-  // Turning follow back on (or pressing play with it on) catches up at once.
-  useEffect(() => {
-    if (!follow || !playing) return;
-    const row = scrollRef.current?.querySelector<HTMLElement>('[data-current="true"]');
-    if (row) scrollToRow(row);
-  }, [follow, playing, scrollToRow]);
-
-  // Scrolling by hand means the user wants to read elsewhere; stop pulling
-  // them back. Programmatic scrolls fire none of these events.
-  const stopFollowing = () => {
-    if (followRef.current) setFollow(false);
+  const backToPlaying = () => {
+    const row = currentRow.current;
+    if (!row?.isConnected) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // The one scroll this component makes, and only on the reader's click.
+    row.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+    // The button goes once the line is in view; focus lands on the line's own
+    // play button rather than falling back to the top of the page.
+    row.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
   };
 
   const seek = useCallback((ms: number, preroll: number) => controls?.seekTo(ms, { preroll }), [controls]);
@@ -226,30 +248,11 @@ const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, d
             {synced && canPlay ? "Click any word to hear it." : "What you said, as transcribed from the recording."}
           </p>
         </div>
-        {synced && canPlay && (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={follow}
-            onClick={() => setFollow((v) => !v)}
-            className="group inline-flex flex-none cursor-pointer items-center gap-2 rounded-md text-xs font-bold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2">
-            <NeoCheckbox checked={follow} size="sm" />
-            Follow along
-          </button>
-        )}
       </header>
 
-      <div
-        ref={scrollRef}
-        tabIndex={0}
-        aria-label="Transcript text"
-        role="region"
-        onWheel={stopFollowing}
-        onTouchMove={stopFollowing}
-        onKeyDown={(e) => {
-          if (e.target === e.currentTarget && ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key)) stopFollowing();
-        }}
-        className="flex max-h-[520px] flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#e1f073] sm:px-6">
+      {/* No height cap and no scroll box of its own: the page is the only
+          thing that scrolls, so the wheel always moves the page. */}
+      <div className="flex flex-col gap-4 px-5 py-4 sm:px-6">
         {blocks.length === 0 && <p className="text-sm text-black/50">There&apos;s no transcript for this session.</p>}
         {blocks.map((block) => {
           if (block.kind === "ai") return <InterviewerTurn key={block.key} turn={block.turn} onSeek={canPlay ? seek : null} />;
@@ -277,6 +280,23 @@ const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, d
           );
         })}
       </div>
+
+      {synced && canPlay && (
+        // A row of its own at the end, so where the transcript ends the button
+        // sits under the last line instead of on it; above that, it sticks to
+        // the bottom of the screen. Clicks pass through everything but the button.
+        <div className="pointer-events-none sticky bottom-3 z-20 -mt-2 flex h-11 items-center justify-center">
+          {playing && offscreen && (
+            <button
+              type="button"
+              onClick={backToPlaying}
+              className="pointer-events-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] border-[#222325] bg-[#e1f073] px-3.5 py-1.5 text-xs font-bold text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_#222325] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2">
+              {offscreen === "above" ? <ArrowUp aria-hidden className="h-3.5 w-3.5" /> : <ArrowDown aria-hidden className="h-3.5 w-3.5" />}
+              Back to what&apos;s playing
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 };

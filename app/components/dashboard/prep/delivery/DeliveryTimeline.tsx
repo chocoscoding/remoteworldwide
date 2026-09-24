@@ -14,6 +14,8 @@ import {
   type PointerEvent,
   type ReactNode,
   type RefObject,
+  type TouchEvent,
+  type WheelEvent,
 } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,7 @@ import {
   type DeliveryTurn,
 } from "@/app/lib/voice/format";
 import { DELIVERY_FLAG_KINDS, type DeliveryAnswer, type DeliveryFlag, type DeliveryFlagKind, type DeliveryReport } from "@/app/lib/voice/types";
+import { LONG_GAP_MS, buildPace, buildWave, px, type PaceGeometry, type WaveGeometry } from "./deliveryCurves";
 import { usePlaybackControls, usePlaybackState, usePlaybackTime } from "./PlaybackProvider";
 import TimestampChip from "./TimestampChip";
 
@@ -42,19 +45,22 @@ import TimestampChip from "./TimestampChip";
  * Small multiples, not one chart: pace (wpm), pitch (semitones) and energy
  * (dB) have nothing in common but time, so each gets its own row and its own
  * scale over a shared x-axis. Every row is a single series, so the row label
- * names it and no legend box is needed. Findings sit in one lane per kind:
- * position, not colour, tells the kinds apart.
+ * names it and no legend box is needed; the key under the chart explains the
+ * line styles. Findings sit in one lane per kind: position, not colour, tells
+ * the kinds apart.
  *
  * Colour follows the dashboard's own tokens and was checked with the dataviz
  * palette validator: the blue measure line and the red finding markers stay
- * apart under protanopia and deuteranopia on both the white card (#ffffff)
- * and the ink surface (#222325). The 140-160 wpm band is the brand lime and
- * is context only: the scores never use it.
+ * apart under protanopia and deuteranopia on the white card (#ffffff), the
+ * rows' panel (#fbfbf7) and the ink surfaces (#222325, #292a2c). The 140-160
+ * wpm band is the brand lime and is context only: the scores never use it.
  *
- * Hand-drawn SVG on a measured width, with no chart library. Pitch and energy
- * arrive every 250 ms (3,360 points for 14 minutes), more than the pixels
- * available, so they are binned to 2 px: the line is each bin's mean and a
- * faint band its min-max range.
+ * Hand-drawn SVG on a measured width, with no chart library. The lines come
+ * from deliveryCurves.ts: pitch and energy (every 250 ms) are pooled into
+ * bins sized to the width, short pauses inside an answer are bridged with a
+ * dotted span rather than cutting the line, and the curve is a monotone cubic
+ * that never overshoots the data. Answers too short for a pace window show
+ * their own pace, so the chart agrees with the Pace figure and the table.
  *
  * Performance: the rows are memoised and never follow playback. The playhead,
  * the lit answer and the lit findings each subscribe to the time store with a
@@ -62,7 +68,8 @@ import TimestampChip from "./TimestampChip";
  *
  * Narrow screens: the label column stays put (sticky) and the plot keeps a
  * 480 px minimum inside its own horizontal scroller; the page never scrolls
- * sideways. While playing, the scroller follows the playhead.
+ * sideways. While playing, the scroller follows the playhead until the reader
+ * scrolls it themselves.
  */
 export interface DeliveryTimelineProps {
   delivery: DeliveryReport;
@@ -75,8 +82,8 @@ export interface DeliveryTimelineProps {
 // classes for the label column, so both columns line up without measuring.
 // ---------------------------------------------------------------------------
 
-const PACE_H = 72;
-const WAVE_H = 56;
+const PACE_H = 76;
+const WAVE_H = 64;
 const ANSWERS_H = 28;
 const LANE_H = 24;
 const AXIS_H = 22;
@@ -84,40 +91,36 @@ const ROW_PAD = 6;
 /** The rows' `gap-1.5`. */
 const ROW_GAP = 6;
 
-/** Pitch and energy are binned to this many pixels. */
-const BIN_PX = 2;
-/** The drawn line averages this many bins either side. */
-const SMOOTH_BINS = 2;
 /** Crosshair keyboard steps. */
 const KEY_STEP_MS = 5_000;
 const KEY_PAGE_MS = 30_000;
 /** The minimum distance between time-axis labels. */
 const MIN_TICK_PX = 60;
 const TICK_STEPS_S = [15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+/** A sideways swipe this long is the reader scrolling the chart, not tapping it. */
+const SWIPE_PX = 8;
 
 const PACE_BAND = { low: 140, high: 160 } as const;
 
 /** Tokens, light and dark, as literal classes; SVG marks paint with `currentColor`. */
 const TONE = {
   surface: "bg-white dark:bg-[#222325]",
+  /** The measure rows sit on a panel a step off the card, so the three small multiples read as three. */
+  panel: "fill-[#fbfbf7] dark:fill-[#292a2c]",
   line: "text-[#2f5bb7] dark:text-[#5b8def]",
   flag: "text-[#b23c26] dark:text-[#e5533d]",
   band: "text-[#e1f073]",
   grid: "text-[#ecece6] dark:text-white/10",
+  /** "You, typically": the pace average and the pitch and energy medians. */
+  reference: "text-black/40 dark:text-white/30",
   muted: "fill-black/45 dark:fill-white/50",
   ring: "stroke-white dark:stroke-[#222325]",
+  panelRing: "stroke-[#fbfbf7] dark:stroke-[#292a2c]",
 } as const;
 
 // ---------------------------------------------------------------------------
 // Geometry — pure, rebuilt only when the data or the width changes
 // ---------------------------------------------------------------------------
-
-interface WaveGeometry {
-  line: string;
-  area: string;
-  zeroY: number;
-  limit: number;
-}
 
 interface AnswerMark {
   turnId: string;
@@ -127,6 +130,8 @@ interface AnswerMark {
   x0: number;
   x1: number;
   question: string | null;
+  /** The question, cut to fit inside the bar; null when there's no room. */
+  caption: string | null;
 }
 
 interface FlagMark {
@@ -144,7 +149,7 @@ interface Lane {
 interface Geometry {
   width: number;
   durationMs: number;
-  pace: { line: string; dots: Array<{ x: number; y: number }>; bandY0: number; bandY1: number; hi: number; lo: number; hiY: number; loY: number };
+  pace: PaceGeometry;
   pitch: WaveGeometry;
   energy: WaveGeometry;
   answers: AnswerMark[];
@@ -153,7 +158,6 @@ interface Geometry {
 }
 
 const clampTo = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
-const px = (n: number) => Math.round(n * 10) / 10;
 
 /** The recording's length, trusting the report but never cutting off data it carries. */
 function timelineDuration(delivery: DeliveryReport): number {
@@ -163,113 +167,20 @@ function timelineDuration(delivery: DeliveryReport): number {
   return end;
 }
 
-function answerIndexAt(answers: readonly DeliveryAnswer[], ms: number): number {
-  for (let i = 0; i < answers.length; i++) if (ms >= answers[i].startMs && ms < answers[i].endMs) return i;
-  return -1;
-}
+// Rough glyph widths at the bar's type sizes, a little over the average for
+// a sans at that size, so a caption is cut short rather than running past
+// the end of its bar. Under a dozen characters a caption says too little to
+// be worth the noise; the number alone stays.
+const DIGIT_PX = 6.5;
+const CAPTION_CHAR_PX = 5.4;
+const MIN_CAPTION_CHARS = 12;
 
-function buildPace(delivery: DeliveryReport, x: (ms: number) => number, answers: readonly DeliveryAnswer[]): Geometry["pace"] {
-  const points = [...delivery.series.pace].filter((p) => Number.isFinite(p.wpm) && Number.isFinite(p.atMs)).sort((a, b) => a.atMs - b.atMs);
-  const values = points.map((p) => p.wpm);
-  const min = values.length ? Math.min(...values) : PACE_BAND.low;
-  const max = values.length ? Math.max(...values) : PACE_BAND.high;
-  // Room for the band at least, and for every value with a little air.
-  const lo = Math.min(100, Math.floor((min - 10) / 10) * 10);
-  const hi = Math.max(200, Math.ceil((max + 10) / 10) * 10);
-  const y = (wpm: number) => px(ROW_PAD + ((hi - wpm) / (hi - lo)) * (PACE_H - ROW_PAD * 2));
-
-  // Break the line between answers, and across any gap much wider than the
-  // series' own spacing, so it never draws speech across a question.
-  const gaps = points.slice(1).map((p, i) => p.atMs - points[i].atMs).sort((a, b) => a - b);
-  const typical = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
-  const breakAfter = Math.max(typical * 3, 20_000);
-
-  let line = "";
-  const dots: Array<{ x: number; y: number }> = [];
-  let runStart = -1;
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    const prev = points[i - 1];
-    const joined = prev !== undefined && p.atMs - prev.atMs <= breakAfter && answerIndexAt(answers, p.atMs) === answerIndexAt(answers, prev.atMs);
-    const X = px(x(p.atMs));
-    const Y = y(clampTo(p.wpm, lo, hi));
-    if (!joined) {
-      if (runStart === i - 1 && prev !== undefined) dots.push({ x: px(x(prev.atMs)), y: y(clampTo(prev.wpm, lo, hi)) });
-      runStart = i;
-      line += `M${X} ${Y}`;
-    } else {
-      line += `L${X} ${Y}`;
-    }
-  }
-  // A run of one point has no length to stroke; it gets a dot instead.
-  const last = points[points.length - 1];
-  if (last !== undefined && runStart === points.length - 1) dots.push({ x: px(x(last.atMs)), y: y(clampTo(last.wpm, lo, hi)) });
-
-  return { line, dots, bandY0: y(PACE_BAND.high), bandY1: y(PACE_BAND.low), hi, lo, hiY: y(hi), loY: y(lo) };
-}
-
-function buildWave(values: ReadonlyArray<number | null>, stepMs: number, durationMs: number, width: number, minLimit: number, maxLimit: number): WaveGeometry {
-  const bins = Math.max(1, Math.ceil(width / BIN_PX));
-  const stats: Array<{ x: number; mean: number; min: number; max: number } | null> = [];
-  let extreme = 0;
-  for (let b = 0; b < bins; b++) {
-    const t0 = (b * BIN_PX * durationMs) / width;
-    const t1 = (Math.min(width, (b + 1) * BIN_PX) * durationMs) / width;
-    const i0 = Math.max(0, Math.floor(t0 / stepMs));
-    const i1 = Math.min(values.length, Math.max(i0 + 1, Math.ceil(t1 / stepMs)));
-    let sum = 0;
-    let n = 0;
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (let i = i0; i < i1; i++) {
-      const v = values[i];
-      if (v === null || v === undefined || !Number.isFinite(v)) continue;
-      sum += v;
-      n++;
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-    if (n === 0) {
-      stats.push(null);
-      continue;
-    }
-    extreme = Math.max(extreme, Math.abs(lo), Math.abs(hi));
-    stats.push({ x: px(Math.min(width, (b + 0.5) * BIN_PX)), mean: sum / n, min: lo, max: hi });
-  }
-
-  // Symmetric about zero (the user's own median), wide enough for the data
-  // but capped so one spike can't flatten everything else.
-  const limit = clampTo(Math.ceil(extreme), minLimit, maxLimit);
-  const mid = WAVE_H / 2;
-  const half = mid - ROW_PAD;
-  const y = (v: number) => px(mid - (clampTo(v, -limit, limit) / limit) * half);
-
-  let line = "";
-  let area = "";
-  let run: Array<{ x: number; mean: number; min: number; max: number }> = [];
-  const flush = () => {
-    if (run.length === 0) return;
-    const first = run[0];
-    // The line is a contour to follow, so it is smoothed over neighbouring
-    // bins (never across a gap); the band keeps each bin's true range.
-    const smooth = run.map((_, i) => {
-      const near = run.slice(Math.max(0, i - SMOOTH_BINS), i + SMOOTH_BINS + 1);
-      return near.reduce((sum, s) => sum + s.mean, 0) / near.length;
-    });
-    line += `M${first.x} ${y(smooth[0])}` + run.slice(1).map((s, i) => `L${s.x} ${y(smooth[i + 1])}`).join("");
-    // A lone bin still gets a visible sliver.
-    const pts = run.length === 1 ? [{ ...first, x: first.x - 1 }, { ...first, x: first.x + 1 }] : run;
-    area += `M${pts[0].x} ${y(pts[0].max)}` + pts.slice(1).map((s) => `L${s.x} ${y(s.max)}`).join("");
-    area += [...pts].reverse().map((s) => `L${s.x} ${y(s.min)}`).join("") + "Z";
-    run = [];
-  };
-  for (const s of stats) {
-    if (s === null) flush();
-    else run.push(s);
-  }
-  flush();
-
-  return { line, area, zeroY: mid, limit };
+/** The question an answer replied to, as much as fits beside its number. */
+function answerCaption(number: number, question: string | null, width: number): string | null {
+  if (!question) return null;
+  const room = width - 16 - String(number).length * DIGIT_PX - 6;
+  const chars = Math.floor(room / CAPTION_CHAR_PX);
+  return chars >= MIN_CAPTION_CHARS ? clip(question, chars) : null;
 }
 
 function buildTicks(durationMs: number, width: number): Array<{ ms: number; x: number }> {
@@ -286,17 +197,15 @@ function buildGeometry(delivery: DeliveryReport, turns: readonly DeliveryTurn[],
   const numbers = numberAnswers(turns);
   const questions = questionsByAnswer(turns);
 
-  const answerMarks: AnswerMark[] = answers.map((a, i) => ({
-    turnId: a.turnId,
+  const answerMarks: AnswerMark[] = answers.map((a, i) => {
     // The user's own count when the turn is known, so "Answer 3" means the same everywhere.
-    number: numbers.get(a.turnId) ?? i + 1,
-    startMs: a.startMs,
-    endMs: a.endMs,
+    const number = numbers.get(a.turnId) ?? i + 1;
     // 1 px of surface either side keeps neighbouring answers apart.
-    x0: px(x(a.startMs) + 1),
-    x1: px(Math.max(x(a.startMs) + 3, x(a.endMs) - 1)),
-    question: questions.get(a.turnId) ?? null,
-  }));
+    const x0 = px(x(a.startMs) + 1);
+    const x1 = px(Math.max(x(a.startMs) + 3, x(a.endMs) - 1));
+    const question = questions.get(a.turnId) ?? null;
+    return { turnId: a.turnId, number, startMs: a.startMs, endMs: a.endMs, x0, x1, question, caption: answerCaption(number, question, x1 - x0) };
+  });
   const numberOf = new Map(answerMarks.map((a) => [a.turnId, a.number]));
 
   const lanes: Lane[] = DELIVERY_FLAG_KINDS.map((kind) => ({
@@ -312,14 +221,22 @@ function buildGeometry(delivery: DeliveryReport, turns: readonly DeliveryTurn[],
       })),
   })).filter((lane) => lane.flags.length > 0);
 
-  const { stepMs } = delivery.series;
-  const safeStep = stepMs > 0 ? stepMs : 250;
+  const wave = { stepMs: delivery.series.stepMs, durationMs, width, height: WAVE_H, pad: ROW_PAD, answers };
   return {
     width,
     durationMs,
-    pace: buildPace(delivery, x, answers),
-    pitch: buildWave(delivery.series.pitchSt, safeStep, durationMs, width, 4, 12),
-    energy: buildWave(delivery.series.energyDb, safeStep, durationMs, width, 6, 18),
+    pace: buildPace({
+      points: delivery.series.pace,
+      answers,
+      words: delivery.transcript?.words ?? [],
+      wpmMean: delivery.metrics.wpmMean,
+      band: PACE_BAND,
+      x,
+      height: PACE_H,
+      pad: ROW_PAD,
+    }),
+    pitch: buildWave(delivery.series.pitchSt, { ...wave, minLimit: 4, maxLimit: 12, limitStep: 2 }),
+    energy: buildWave(delivery.series.energyDb, { ...wave, minLimit: 6, maxLimit: 18, limitStep: 3 }),
     answers: answerMarks,
     lanes,
     ticks: buildTicks(durationMs, width),
@@ -333,14 +250,20 @@ function buildGeometry(delivery: DeliveryReport, turns: readonly DeliveryTurn[],
 interface Reading {
   ms: number;
   pace: number | null;
+  /** The pace is the answer's own, over its spoken span: the answer had no 15 s window. */
+  paceWhole: boolean;
   pitch: number | null;
   energy: number | null;
   answer: AnswerMark | null;
+  /** The answer's own figures, the same the table shows. */
+  answerStats: DeliveryAnswer | null;
+  /** Inside an answer, at a step with no speech. */
+  pause: boolean;
   interviewer: boolean;
   flags: FlagMark[];
 }
 
-/** The series' mean over ±1 s, so the tooltip reads what the line shows, not one noisy sample. */
+/** The series' mean over ±1 s, so the tooltip reads a moment, not one noisy sample. */
 function seriesAt(values: ReadonlyArray<number | null>, stepMs: number, ms: number): number | null {
   const step = stepMs > 0 ? stepMs : 250;
   const centre = Math.floor(ms / step);
@@ -359,6 +282,7 @@ function seriesAt(values: ReadonlyArray<number | null>, stepMs: number, ms: numb
 function readAt(ms: number, delivery: DeliveryReport, geometry: Geometry, turns: readonly DeliveryTurn[], pinned: string | null): Reading {
   const answer = geometry.answers.find((a) => ms >= a.startMs && ms < a.endMs) ?? null;
   let pace: number | null = null;
+  let paceWhole = false;
   if (answer) {
     let best = Infinity;
     for (const p of delivery.series.pace) {
@@ -368,15 +292,28 @@ function readAt(ms: number, delivery: DeliveryReport, geometry: Geometry, turns:
         pace = p.wpm;
       }
     }
+    // An answer the chart draws at its own pace reads the same number here.
+    const span = pace === null ? geometry.pace.spans.find((s) => s.turnId === answer.turnId) : undefined;
+    if (span) {
+      pace = span.wpm;
+      paceWhole = true;
+    }
   }
+  const step = delivery.series.stepMs > 0 ? delivery.series.stepMs : 250;
+  const energy = delivery.series.energyDb;
+  const index = Math.floor(ms / step);
   const interviewer = !answer && turns.some((t) => t.who === "ai" && t.startMs !== undefined && t.endMs !== undefined && ms >= t.startMs && ms < t.endMs);
   const flags = geometry.lanes.flatMap((lane) => lane.flags).filter((f) => f.flag.id === pinned || (ms >= f.flag.atMs && ms <= f.flag.endMs));
   return {
     ms,
     pace,
+    paceWhole,
     pitch: seriesAt(delivery.series.pitchSt, delivery.series.stepMs, ms),
-    energy: seriesAt(delivery.series.energyDb, delivery.series.stepMs, ms),
+    energy: seriesAt(energy, delivery.series.stepMs, ms),
     answer,
+    answerStats: answer ? (delivery.answers.find((a) => a.turnId === answer.turnId) ?? null) : null,
+    // Energy is null exactly where the recording had no speech; without the series there's no telling.
+    pause: answer !== null && index < energy.length && (energy[index] === null || energy[index] === undefined),
     interviewer,
     flags,
   };
@@ -384,9 +321,11 @@ function readAt(ms: number, delivery: DeliveryReport, geometry: Geometry, turns:
 
 function readingSentence(r: Reading): string {
   const parts = [formatClock(r.ms)];
-  if (r.answer) parts.push(`answer ${r.answer.number}`);
-  else if (r.interviewer) parts.push("interviewer speaking");
-  if (r.pace !== null) parts.push(`pace ${Math.round(r.pace)} words a minute`);
+  if (r.answer) {
+    parts.push(`answer ${r.answer.number}, ${ariaTime(r.ms - r.answer.startMs)} in`);
+    if (r.pause) parts.push("a pause");
+  } else if (r.interviewer) parts.push("interviewer speaking");
+  if (r.pace !== null) parts.push(`pace ${Math.round(r.pace)} words a minute${r.paceWhole ? " over the whole answer" : ""}`);
   if (r.pitch !== null) parts.push(`pitch ${formatSigned(r.pitch)} semitones`);
   if (r.energy !== null) parts.push(`energy ${formatSigned(r.energy)} decibels`);
   for (const f of r.flags) parts.push(`${FLAG_KIND_META[f.flag.kind].label}: ${formatMeasure(f.flag.measure)}`);
@@ -420,6 +359,12 @@ const DeliveryTimeline: FC<DeliveryTimelineProps> = ({ delivery, turns, classNam
   const [tableOpen, setTableOpen] = useState(false);
   const plotRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  // Whether the scroller follows the playhead while playing. Scrolling the
+  // chart by hand means the reader wants to look elsewhere, as it does for
+  // the transcript, so it stops pulling them back; pressing play again, or
+  // playing from a point on the chart, picks it up again.
+  const followRef = useRef(true);
+  const touchRef = useRef<{ x: number; y: number } | null>(null);
 
   const measure = useCallback((el: HTMLDivElement | null) => {
     plotRef.current = el;
@@ -454,6 +399,7 @@ const DeliveryTimeline: FC<DeliveryTimelineProps> = ({ delivery, turns, classNam
     () => (cursor && geometry ? readAt(cursor.ms, delivery, geometry, turns, cursor.flagId) : null),
     [cursor, geometry, delivery, turns]
   );
+  const hasAverage = delivery.metrics.wpmMean !== null;
 
   const msAtClientX = (clientX: number): number | null => {
     const el = plotRef.current;
@@ -522,11 +468,51 @@ const DeliveryTimeline: FC<DeliveryTimelineProps> = ({ delivery, turns, classNam
     if (cursorRef.current?.source === "marker") moveCursor(null);
   }, [moveCursor]);
 
+  // A reader's own sideways scroll: a trackpad swipe or shift-wheel, a
+  // sideways touch swipe, or a drag on the scrollbar. The scroller's own
+  // scrollTo fires none of these, so following never cancels itself.
+  const onScrollerWheel = (e: WheelEvent<HTMLDivElement>) => {
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) followRef.current = false;
+  };
+  const onScrollerTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0];
+    touchRef.current = t ? { x: t.clientX, y: t.clientY } : null;
+  };
+  const onScrollerTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    const from = touchRef.current;
+    const t = e.touches[0];
+    if (!from || !t) return;
+    const dx = Math.abs(t.clientX - from.x);
+    // A vertical swipe is scrolling the page, not the chart.
+    if (dx > SWIPE_PX && dx > Math.abs(t.clientY - from.y)) followRef.current = false;
+  };
+  // The scroller's own box is only its scrollbar and padding; the rows cover the rest.
+  const onScrollerPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) followRef.current = false;
+  };
+  // A click or Enter on the plot, an answer or a finding plays from a point
+  // the reader is looking at, so following it from there is what they expect.
+  const onScrollerClickCapture = (e: MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) followRef.current = true;
+  };
+  const onScrollerKeyDownCapture = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") followRef.current = true;
+  };
+
+  const answerCount = delivery.answers.length;
+
   return (
     <section aria-label="Delivery over time" className={cn("rounded-2xl border border-black/10 dark:border-white/15", TONE.surface, className)}>
       <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-5 pb-3 pt-4 sm:px-6">
         <div className="min-w-0">
-          <h3 className="text-[14.5px] font-bold text-primary dark:text-white">Delivery over time</h3>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <h3 className="text-[14.5px] font-bold text-primary dark:text-white">Delivery over time</h3>
+            {durationMs > 0 && (
+              <span className="text-xs text-black/40 dark:text-white/45">
+                {answerCount} {answerCount === 1 ? "answer" : "answers"} · {formatDuration(durationMs)}
+              </span>
+            )}
+          </div>
           <p id={hintId} className="mt-0.5 text-xs leading-relaxed text-black/50 dark:text-white/55">
             {seekTo ? "Click anywhere to play from that moment. With the chart focused, arrow keys move through it and Enter plays." : "Pace, pitch and energy across the session."}
           </p>
@@ -537,17 +523,30 @@ const DeliveryTimeline: FC<DeliveryTimelineProps> = ({ delivery, turns, classNam
           aria-expanded={tableOpen}
           className="inline-flex flex-none cursor-pointer items-center gap-1 rounded-md text-xs font-bold text-black/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] dark:text-white/60 dark:hover:text-white">
           {tableOpen ? "Hide numbers" : "Show as a table"}
-          <ChevronDown aria-hidden className={cn("h-3.5 w-3.5 transition-transform", tableOpen && "rotate-180")} />
+          <ChevronDown aria-hidden className={cn("h-3.5 w-3.5 transition-transform motion-reduce:transition-none", tableOpen && "rotate-180")} />
         </button>
       </header>
 
-      <div ref={scrollerRef} className="overflow-x-auto overscroll-x-contain pb-3">
+      <div
+        ref={scrollerRef}
+        onWheel={onScrollerWheel}
+        onTouchStart={onScrollerTouchStart}
+        onTouchMove={onScrollerTouchMove}
+        onPointerDown={onScrollerPointerDown}
+        onClickCapture={onScrollerClickCapture}
+        onKeyDownCapture={onScrollerKeyDownCapture}
+        className="overflow-x-auto overscroll-x-contain pb-3">
         <div className="flex">
           {/* Label column: stays in view while the plot scrolls under it. */}
           <div className={cn("sticky left-0 z-20 flex w-[104px] flex-none flex-col gap-1.5 pl-5 pr-2 sm:w-[132px] sm:pl-6", TONE.surface)}>
-            <RowLabel height="h-[72px]" name="Pace" unit="wpm" note={`${PACE_BAND.low}–${PACE_BAND.high} band`} />
-            <RowLabel height="h-[56px]" name="Pitch" unit="semitones" />
-            <RowLabel height="h-[56px]" name="Energy" unit="dB" />
+            <RowLabel
+              height="h-[76px]"
+              name="Pace"
+              unit="wpm"
+              notes={hasAverage ? [["band", `${PACE_BAND.low}–${PACE_BAND.high} band`], ["reference", "your average"]] : [["band", `${PACE_BAND.low}–${PACE_BAND.high} band`]]}
+            />
+            <RowLabel height="h-[64px]" name="Pitch" unit="semitones" notes={[["reference", "your median"]]} />
+            <RowLabel height="h-[64px]" name="Energy" unit="dB" notes={[["reference", "your median"]]} />
             <RowLabel height="h-[28px]" name="Answers" />
             {laneKinds.map((kind) => (
               <RowLabel key={kind} height="h-[24px]" name={FLAG_KIND_META[kind].short} tone="flag" />
@@ -590,7 +589,7 @@ const DeliveryTimeline: FC<DeliveryTimelineProps> = ({ delivery, turns, classNam
               )}
             </div>
 
-            {geometry && <Playhead width={geometry.width} durationMs={geometry.durationMs} scrollerRef={scrollerRef} plotRef={plotRef} />}
+            {geometry && <Playhead width={geometry.width} durationMs={geometry.durationMs} scrollerRef={scrollerRef} plotRef={plotRef} followRef={followRef} />}
             {geometry && reading && <CursorLayer reading={reading} width={geometry.width} durationMs={geometry.durationMs} />}
             {/* The keyboard cursor's reading, spoken; hover readings are not, they'd be noise. */}
             <p aria-live="polite" className="sr-only">
@@ -599,6 +598,8 @@ const DeliveryTimeline: FC<DeliveryTimelineProps> = ({ delivery, turns, classNam
           </div>
         </div>
       </div>
+
+      <ReadingGuide geometry={geometry} hasFlags={laneKinds.length > 0} />
 
       {tableOpen && <AnswersTable delivery={delivery} turns={turns} />}
     </section>
@@ -609,25 +610,43 @@ const DeliveryTimeline: FC<DeliveryTimelineProps> = ({ delivery, turns, classNam
 // Label column
 // ---------------------------------------------------------------------------
 
-const RowLabel: FC<{ height: string; name: string; unit?: string; note?: string; tone?: "flag" }> = ({ height, name, unit, note, tone }) => (
+type Swatch = "band" | "reference";
+
+/** A key for a row's context marks, drawn as the mark itself: a lime block for the band, a hairline for "you, typically". */
+const SwatchMark: FC<{ kind: Swatch }> = ({ kind }) =>
+  kind === "band" ? (
+    <span aria-hidden className="h-2 w-2 flex-none rounded-[2px] bg-[#e1f073]/60" />
+  ) : (
+    <span aria-hidden className="h-px w-2.5 flex-none bg-black/35 dark:bg-white/40" />
+  );
+
+const RowLabel: FC<{ height: string; name: string; unit?: string; notes?: ReadonlyArray<readonly [Swatch, string]>; tone?: "flag" }> = ({
+  height,
+  name,
+  unit,
+  notes,
+  tone,
+}) => (
   <div className={cn("flex flex-col justify-center overflow-hidden", height)}>
     <span className={cn("flex items-center gap-1.5 truncate text-[11px] font-bold leading-tight", tone === "flag" ? "text-[#b23c26] dark:text-[#f08a74]" : "text-primary dark:text-white")}>
       {tone === "flag" && <span aria-hidden className="h-1.5 w-1.5 flex-none rotate-45 bg-current" />}
       {name}
     </span>
     {unit && <span className="truncate text-[10px] leading-tight text-black/45 dark:text-white/50">{unit}</span>}
-    {note && (
-      <span className="mt-0.5 inline-flex items-center gap-1 truncate text-[10px] leading-tight text-black/45 dark:text-white/50">
-        <span aria-hidden className="h-2 w-2 flex-none rounded-[2px] bg-[#e1f073]/60" />
-        {note}
+    {notes?.map(([kind, text]) => (
+      <span key={text} className="mt-0.5 inline-flex items-center gap-1 truncate text-[10px] leading-tight text-black/45 dark:text-white/50">
+        <SwatchMark kind={kind} />
+        {text}
       </span>
-    )}
+    ))}
   </div>
 );
 
 // ---------------------------------------------------------------------------
 // Static rows
 // ---------------------------------------------------------------------------
+
+const Panel: FC<{ width: number; height: number }> = ({ width, height }) => <rect x={0} y={0} width={width} height={height} rx={6} className={TONE.panel} />;
 
 const GridLines: FC<{ ticks: Geometry["ticks"]; height: number }> = ({ ticks, height }) => (
   <g aria-hidden className={TONE.grid}>
@@ -637,8 +656,8 @@ const GridLines: FC<{ ticks: Geometry["ticks"]; height: number }> = ({ ticks, he
   </g>
 );
 
-/** A value label inside the plot, haloed in the surface colour so a line under it can't swallow it. */
-const PlotLabel: FC<{ x: number; y: number; children: ReactNode; anchor?: "start" | "end" }> = ({ x, y, children, anchor = "start" }) => (
+/** A value label inside the plot, haloed in the panel colour so a line under it can't swallow it. */
+const PlotLabel: FC<{ x: number; y: number; children: ReactNode; anchor?: "start" | "middle" | "end" }> = ({ x, y, children, anchor = "start" }) => (
   <text
     x={x}
     y={y}
@@ -647,52 +666,117 @@ const PlotLabel: FC<{ x: number; y: number; children: ReactNode; anchor?: "start
     paintOrder="stroke"
     strokeWidth={3}
     strokeLinejoin="round"
-    className={cn("text-[9.5px] font-semibold tabular-nums", TONE.muted, TONE.ring)}>
+    className={cn("text-[9.5px] font-semibold tabular-nums", TONE.muted, TONE.panelRing)}>
     {children}
   </text>
 );
+
+/** Dots, not dashes: a span joined across a pause, never mistaken for a measured one. */
+const BRIDGE_DASH = "0 4";
 
 const StaticRows = memo(function StaticRows({ geometry }: { geometry: Geometry }) {
   const { width, pace, pitch, energy, ticks } = geometry;
   return (
     <>
-      <svg width={width} height={PACE_H} className="block overflow-visible" aria-hidden>
-        <GridLines ticks={ticks} height={PACE_H} />
-        <rect x={0} y={pace.bandY0} width={width} height={Math.max(1, pace.bandY1 - pace.bandY0)} fill="currentColor" className={cn(TONE.band, "opacity-50 dark:opacity-20")} />
-        <g className={TONE.line}>
-          <path d={pace.line} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-          {pace.dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r={3} fill="currentColor" />
-          ))}
-        </g>
-        <PlotLabel x={3} y={pace.hiY + 4}>
-          {pace.hi}
-        </PlotLabel>
-        <PlotLabel x={3} y={pace.loY - 4}>
-          {pace.lo}
-        </PlotLabel>
-      </svg>
+      <PaceRow pace={pace} width={width} ticks={ticks} />
       <WaveRow wave={pitch} width={width} ticks={ticks} unit="st" />
       <WaveRow wave={energy} width={width} ticks={ticks} unit="dB" />
     </>
   );
 });
 
+const PaceRow: FC<{ pace: PaceGeometry; width: number; ticks: Geometry["ticks"] }> = ({ pace, width, ticks }) => {
+  const charted = pace.line !== "" || pace.dots.length > 0 || pace.spans.length > 0;
+  // The average's label sits above its line unless that would crowd the top label.
+  const avgLabelY = pace.avgY - 7 < pace.hiY + 12 ? pace.avgY + 7 : pace.avgY - 7;
+  if (pace.empty) {
+    // No word timings at all: a band and a scale with nothing on them would only suggest there should be.
+    return (
+      <svg width={width} height={PACE_H} className="block overflow-visible" aria-hidden>
+        <Panel width={width} height={PACE_H} />
+        <GridLines ticks={ticks} height={PACE_H} />
+        <PlotLabel x={width / 2} y={PACE_H / 2} anchor="middle">
+          Unavailable
+        </PlotLabel>
+      </svg>
+    );
+  }
+  return (
+    <svg width={width} height={PACE_H} className="block overflow-visible" aria-hidden>
+      <Panel width={width} height={PACE_H} />
+      <GridLines ticks={ticks} height={PACE_H} />
+      <rect x={0} y={pace.bandY0} width={width} height={Math.max(1, pace.bandY1 - pace.bandY0)} fill="currentColor" className={cn(TONE.band, "opacity-50 dark:opacity-20")} />
+      {pace.avg !== null && (
+        <line x1={0} x2={width} y1={pace.avgY} y2={pace.avgY} stroke="currentColor" strokeWidth={1} shapeRendering="crispEdges" className={TONE.reference} />
+      )}
+      <g className={TONE.line}>
+        {/* An answer's own pace across its spoken span, bracketed at both ends so it reads as one figure for the whole stretch. */}
+        {pace.spans.map((s) => (
+          <path
+            key={s.turnId}
+            d={`M${s.x0} ${s.y}H${s.x1}M${s.x0} ${s.y - 4}V${s.y + 4}M${s.x1} ${s.y - 4}V${s.y + 4}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        ))}
+        <path d={pace.bridge} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeDasharray={BRIDGE_DASH} opacity={0.75} />
+        <path d={pace.line} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        {/* One dot per 15 s window: the line between them is only the join. */}
+        {pace.dots.map((d, i) => (
+          <circle key={i} cx={d.x} cy={d.y} r={3} fill="currentColor" strokeWidth={1.5} className={TONE.panelRing} />
+        ))}
+      </g>
+      <PlotLabel x={4} y={pace.hiY + 4}>
+        {pace.hi}
+      </PlotLabel>
+      <PlotLabel x={4} y={pace.loY - 4}>
+        {pace.lo}
+      </PlotLabel>
+      {pace.avg !== null && (
+        <PlotLabel x={width - 4} y={avgLabelY} anchor="end">
+          {`your avg ${Math.round(pace.avg)}`}
+        </PlotLabel>
+      )}
+      {!charted && (
+        <PlotLabel x={width / 2} y={ROW_PAD + 8} anchor="middle">
+          No answer was long enough to chart; your average is shown
+        </PlotLabel>
+      )}
+    </svg>
+  );
+};
+
 const WaveRow: FC<{ wave: WaveGeometry; width: number; ticks: Geometry["ticks"]; unit: string }> = ({ wave, width, ticks, unit }) => (
   <svg width={width} height={WAVE_H} className="block overflow-visible" aria-hidden>
+    <Panel width={width} height={WAVE_H} />
     <GridLines ticks={ticks} height={WAVE_H} />
-    {/* Zero is the user's own median: the one reference line this row needs. */}
-    <line x1={0} x2={width} y1={wave.zeroY} y2={wave.zeroY} stroke="currentColor" strokeWidth={1} shapeRendering="crispEdges" className="text-black/15 dark:text-white/20" />
-    <g className={TONE.line}>
-      <path d={wave.area} fill="currentColor" fillOpacity={0.12} />
-      <path d={wave.line} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </g>
-    <PlotLabel x={3} y={ROW_PAD + 3}>
-      {`+${wave.limit} ${unit}`}
-    </PlotLabel>
-    <PlotLabel x={3} y={WAVE_H - ROW_PAD - 3}>
-      {`${formatSigned(-wave.limit, 0)} ${unit}`}
-    </PlotLabel>
+    {wave.empty ? (
+      // No prosody at all (or none in this series): say so rather than draw an empty row.
+      <PlotLabel x={width / 2} y={WAVE_H / 2} anchor="middle">
+        Unavailable
+      </PlotLabel>
+    ) : (
+      <>
+        {/* Zero is the user's own median: the one reference line this row needs. */}
+        <line x1={0} x2={width} y1={wave.zeroY} y2={wave.zeroY} stroke="currentColor" strokeWidth={1} shapeRendering="crispEdges" className={TONE.reference} />
+        <g className={TONE.line}>
+          <path d={wave.area} fill="currentColor" fillOpacity={0.12} />
+          <path d={wave.bridge} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeDasharray={BRIDGE_DASH} opacity={0.75} />
+          <path d={wave.line} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          {wave.dots.map((d, i) => (
+            <circle key={i} cx={d.x} cy={d.y} r={1.75} fill="currentColor" />
+          ))}
+        </g>
+        <PlotLabel x={4} y={ROW_PAD + 3}>
+          {`+${wave.limit} ${unit}`}
+        </PlotLabel>
+        <PlotLabel x={4} y={WAVE_H - ROW_PAD - 3}>
+          {`${formatSigned(-wave.limit, 0)} ${unit}`}
+        </PlotLabel>
+      </>
+    )}
   </svg>
 );
 
@@ -771,15 +855,25 @@ const AnswerSpan: FC<{ mark: AnswerMark } & MarkHandlers> = ({ mark, onEnter, on
         height={ANSWERS_H - 6}
         rx={4}
         className={cn(
-          "transition-colors",
+          "transition-colors motion-reduce:transition-none",
           current ? "fill-[#e1f073]" : "fill-[#f0f0ea] group-hover:fill-[#e6e6de] dark:fill-white/10 dark:group-hover:fill-white/20"
         )}
       />
       <rect aria-hidden x={mark.x0 - 1} y={2} width={w + 2} height={ANSWERS_H - 4} rx={5} fill="none" strokeWidth={2} className="stroke-[#222325] opacity-0 group-focus-visible:opacity-100 dark:stroke-[#e1f073]" />
-      {w >= 16 && (
-        <text x={mark.x0 + w / 2} y={ANSWERS_H / 2 + 0.5} textAnchor="middle" dominantBaseline="middle" className={cn("pointer-events-none text-[10.5px] font-bold tabular-nums", current ? "fill-[#222325]" : "fill-[#222325] dark:fill-white")}>
-          {mark.number}
+      {mark.caption ? (
+        // Number, then the question it answered, cut to the bar: the row reads as the interview's running order.
+        <text x={mark.x0 + 8} y={ANSWERS_H / 2 + 0.5} dominantBaseline="middle" className="pointer-events-none text-[10.5px] tabular-nums">
+          <tspan className={cn("font-bold", current ? "fill-[#222325]" : "fill-[#222325] dark:fill-white")}>{mark.number}</tspan>
+          <tspan dx={6} className={cn("text-[10px] font-semibold", current ? "fill-[#222325]/70" : "fill-black/50 dark:fill-white/55")}>
+            {mark.caption}
+          </tspan>
         </text>
+      ) : (
+        w >= 16 && (
+          <text x={mark.x0 + w / 2} y={ANSWERS_H / 2 + 0.5} textAnchor="middle" dominantBaseline="middle" className={cn("pointer-events-none text-[10.5px] font-bold tabular-nums", current ? "fill-[#222325]" : "fill-[#222325] dark:fill-white")}>
+            {mark.number}
+          </text>
+        )
       )}
     </g>
   );
@@ -849,19 +943,28 @@ interface PlayheadProps {
   durationMs: number;
   scrollerRef: RefObject<HTMLDivElement | null>;
   plotRef: RefObject<HTMLDivElement | null>;
+  /** Cleared when the reader scrolls the chart themselves. */
+  followRef: RefObject<boolean>;
 }
 
 /** Re-renders only when the playhead crosses a whole pixel. */
-const Playhead: FC<PlayheadProps> = ({ width, durationMs, scrollerRef, plotRef }) => {
+const Playhead: FC<PlayheadProps> = ({ width, durationMs, scrollerRef, plotRef, followRef }) => {
   const x = usePlaybackTime((ms) => (ms < 0 || durationMs <= 0 ? -1 : Math.round((Math.min(ms, durationMs) / durationMs) * width)));
   const playing = usePlaybackState()?.playing ?? false;
 
+  // Pressing play means "watch it": follow again, even after scrolling away.
+  // Declared before the effect below, so it has run by the time that one does.
+  useEffect(() => {
+    if (playing) followRef.current = true;
+  }, [playing, followRef]);
+
   // On a narrow screen the plot scrolls; keep the playhead in view while
-  // playing, but leave the user's own scrolling alone while paused.
+  // playing, but leave the user's own scrolling alone while paused, and once
+  // they have scrolled by hand.
   useEffect(() => {
     const scroller = scrollerRef.current;
     const plot = plotRef.current;
-    if (!playing || x < 0 || !scroller || !plot || scroller.scrollWidth <= scroller.clientWidth) return;
+    if (!playing || !followRef.current || x < 0 || !scroller || !plot || scroller.scrollWidth <= scroller.clientWidth) return;
     // Where the plot starts in the scroller's content: the width of the
     // sticky label column that covers the start of every scrolled view.
     const gutter = plot.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
@@ -873,7 +976,7 @@ const Playhead: FC<PlayheadProps> = ({ width, durationMs, scrollerRef, plotRef }
     if (Math.abs(target - left) < 1) return;
     const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     scroller.scrollTo({ left: target, behavior: reduce ? "auto" : "smooth" });
-  }, [x, playing, scrollerRef, plotRef]);
+  }, [x, playing, scrollerRef, plotRef, followRef]);
 
   if (x < 0) return null;
   return (
@@ -886,31 +989,51 @@ const Playhead: FC<PlayheadProps> = ({ width, durationMs, scrollerRef, plotRef }
   );
 };
 
-const TOOLTIP_W = 216;
+const TOOLTIP_W = 236;
 
 const CursorLayer: FC<{ reading: Reading; width: number; durationMs: number }> = ({ reading, width, durationMs }) => {
   const x = Math.round((reading.ms / Math.max(1, durationMs)) * width);
   const flip = x + 14 + TOOLTIP_W > width;
   const left = flip ? Math.max(0, x - 14 - TOOLTIP_W) : x + 14;
-  const context = reading.answer ? `Answer ${reading.answer.number}` : reading.interviewer ? "Interviewer speaking" : "Between answers";
+  const { answer, answerStats } = reading;
+  const context = answer ? `Answer ${answer.number}` : reading.interviewer ? "Interviewer speaking" : "Between answers";
+  const measured = reading.pace !== null || reading.pitch !== null || reading.energy !== null;
+  // The answer's own figures, as the table has them; its pace is left out when the line above already is it.
+  const whole: string[] = [];
+  if (answerStats) {
+    // Non-breaking spaces: a unit wrapped onto a line of its own reads as a stray word.
+    if (answerStats.wpm !== null && !reading.paceWhole) whole.push(`${Math.round(answerStats.wpm)}\u00a0wpm`);
+    if (answerStats.pitchRangeSt !== null) whole.push(`pitch range ${answerStats.pitchRangeSt.toFixed(1)}\u00a0st`);
+  }
   return (
     <>
       <div aria-hidden className="pointer-events-none absolute bottom-[22px] left-0 top-0 z-10 w-px bg-black/40 dark:bg-white/50" style={{ transform: `translateX(${x}px)` }} />
       <div
         aria-hidden
-        className="pointer-events-none absolute left-0 top-2 z-30 w-[216px] rounded-xl border-[1.5px] border-[#222325] bg-white p-3 shadow-[3px_3px_0_0_#222325] dark:border-white/30 dark:bg-[#2c2d30] dark:shadow-none"
+        className="pointer-events-none absolute left-0 top-2 z-30 w-[236px] rounded-xl border-[1.5px] border-[#222325] bg-white p-3 shadow-[3px_3px_0_0_#222325] dark:border-white/30 dark:bg-[#2c2d30] dark:shadow-none"
         style={{ transform: `translateX(${left}px)` }}>
         <p className="flex items-baseline justify-between gap-2">
           <span className="text-sm font-bold tabular-nums text-primary dark:text-white">{formatClock(reading.ms)}</span>
           <span className="truncate text-[11px] font-semibold text-black/45 dark:text-white/55">{context}</span>
         </p>
-        {reading.answer?.question && <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-black/50 dark:text-white/55">{reading.answer.question}</p>}
-        {(reading.pace !== null || reading.pitch !== null || reading.energy !== null) && (
+        {answer && (
+          <p className="text-[11px] tabular-nums text-black/45 dark:text-white/50">
+            {formatClock(reading.ms - answer.startMs)} into the answer
+            {reading.pause && <span className="font-semibold text-black/60 dark:text-white/70"> · pause</span>}
+          </p>
+        )}
+        {answer?.question && <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-black/55 dark:text-white/60">{answer.question}</p>}
+        {measured && (
           <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-0.5 text-xs">
-            <TooltipValue label="pace" value={reading.pace === null ? "—" : `${Math.round(reading.pace)} wpm`} />
-            <TooltipValue label="pitch" value={reading.pitch === null ? "—" : `${formatSigned(reading.pitch)} st`} />
-            <TooltipValue label="energy" value={reading.energy === null ? "—" : `${formatSigned(reading.energy)} dB`} />
+            <TooltipValue label={reading.paceWhole ? "pace, whole answer" : "pace"} value={reading.pace === null ? "—" : `${Math.round(reading.pace)} wpm`} />
+            <TooltipValue label="pitch vs your median" value={reading.pitch === null ? "—" : `${formatSigned(reading.pitch)} st`} />
+            <TooltipValue label="energy vs your median" value={reading.energy === null ? "—" : `${formatSigned(reading.energy)} dB`} />
           </dl>
+        )}
+        {whole.length > 0 && (
+          <p className="mt-2 text-[11px] leading-snug text-black/50 dark:text-white/55">
+            <span className="font-semibold text-black/60 dark:text-white/70">Whole answer:</span> {whole.join(" · ")}
+          </p>
         )}
         {reading.flags.length > 0 && (
           <ul className="mt-2 flex flex-col gap-1.5 border-t border-black/10 pt-2 dark:border-white/15">
@@ -937,6 +1060,81 @@ const TooltipValue: FC<{ label: string; value: string }> = ({ label, value }) =>
     <dd className="text-right font-bold tabular-nums text-primary dark:text-white">{value}</dd>
     <dt className="text-black/45 dark:text-white/50">{label}</dt>
   </>
+);
+
+// ---------------------------------------------------------------------------
+// How to read it
+// ---------------------------------------------------------------------------
+
+/**
+ * What each row means and what good looks like, then a key to the marks.
+ * The chart has to stand on its own wherever the report puts it, so it
+ * explains itself instead of leaning on the findings above it.
+ */
+const ReadingGuide: FC<{ geometry: Geometry | null; hasFlags: boolean }> = ({ geometry, hasFlags }) => {
+  const bridged = geometry !== null && (geometry.pitch.bridged || geometry.energy.bridged || geometry.pace.bridge !== "");
+  const spans = geometry !== null && geometry.pace.spans.length > 0;
+  return (
+    <div className="border-t border-black/10 px-5 pb-4 pt-3.5 dark:border-white/15 sm:px-6">
+      <dl className="grid gap-x-6 gap-y-2 text-[11.5px] leading-relaxed sm:grid-cols-3">
+        <GuideEntry name="Pace">
+          Words a minute in each 15 s of an answer. Many listeners find {PACE_BAND.low}–{PACE_BAND.high} easy to follow; the band is context, not a score.
+        </GuideEntry>
+        <GuideEntry name="Pitch">
+          How far your voice rose and fell around your usual. A line that moves, with a wide shaded band, sounds expressive; a thin, level one through a whole
+          answer can sound flat.
+        </GuideEntry>
+        <GuideEntry name="Energy">
+          Loudness around your usual. A line that slopes down through an answer is trailing off; steady or rising holds attention to the end.
+        </GuideEntry>
+      </dl>
+      <ul aria-label="Key" className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-black/50 dark:text-white/55">
+        <KeyItem label="Measured">
+          <path d="M1 5h16" strokeWidth={2} strokeLinecap="round" />
+        </KeyItem>
+        {bridged && (
+          <KeyItem label="Joined across a short pause">
+            <path d="M1 5h16" strokeWidth={2} strokeLinecap="round" strokeDasharray={BRIDGE_DASH} opacity={0.75} />
+          </KeyItem>
+        )}
+        {/* Two phrases at different heights, not a dashed line: a break is where one stretch ends and the next begins. */}
+        <KeyItem label={`Break: a silence over ${LONG_GAP_MS / 1000} s, or the next answer`}>
+          <path d="M1 7h5M12 3h5" strokeWidth={2} strokeLinecap="round" />
+        </KeyItem>
+        {spans && (
+          <KeyItem label="Pace of an answer too short for 15 s windows">
+            <path d="M2 5h14M2 1.5v7M16 1.5v7" strokeWidth={2} strokeLinecap="round" />
+          </KeyItem>
+        )}
+        {hasFlags && (
+          <li className="inline-flex items-center gap-1.5">
+            <svg aria-hidden width={18} height={10} viewBox="0 0 18 10" className={TONE.flag}>
+              <path d="M4 2L7 5L4 8L1 5Z" fill="currentColor" />
+              <path d="M13 0.5L17.5 5L13 9.5L8.5 5Z" fill="currentColor" />
+            </svg>
+            Findings; a bigger diamond is a stronger one
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+};
+
+const GuideEntry: FC<{ name: string; children: ReactNode }> = ({ name, children }) => (
+  <div>
+    <dt className="inline font-bold text-primary dark:text-white">{name} </dt>
+    <dd className="inline text-black/55 dark:text-white/60">{children}</dd>
+  </div>
+);
+
+/** A key entry drawn with the chart's own mark, so it matches what's on the plot. */
+const KeyItem: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
+  <li className="inline-flex items-center gap-1.5">
+    <svg aria-hidden width={18} height={10} viewBox="0 0 18 10" fill="none" stroke="currentColor" className={TONE.line}>
+      {children}
+    </svg>
+    {label}
+  </li>
 );
 
 // ---------------------------------------------------------------------------
@@ -983,7 +1181,7 @@ const AnswersTable: FC<{ delivery: DeliveryReport; turns: readonly DeliveryTurn[
                   {a.energyDeltaDb === null ? dash : `${formatSigned(a.energyDeltaDb - (first ?? 0))} dB`}
                 </td>
                 <td className="py-2 pr-3 text-right">{a.leadInMs === null ? dash : formatMeasureValue(a.leadInMs, "ms")}</td>
-                <td className="py-2 pr-3 text-right">{a.fillers}</td>
+                <td className="py-2 pr-3 text-right">{delivery.metrics.fillersPer100Words === null ? dash : a.fillers}</td>
                 <td className="py-2 pr-3 text-right">{flagsByTurn.get(a.turnId) ?? 0}</td>
                 <td className="py-2 text-right">
                   <TimestampChip atMs={a.startMs} endMs={a.endMs} />
