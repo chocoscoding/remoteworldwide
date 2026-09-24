@@ -76,6 +76,19 @@ export function useSavedJobsQuery(q: string, { enabled = true }: ListOptions = {
   });
 }
 
+/**
+ * The saved-jobs screen's list: the same server search as `useSavedJobsQuery`,
+ * up to the server's ceiling. Debounce `q` before passing it.
+ */
+export function useSavedJobsList(q: string, limit: number) {
+  return useQuery({
+    queryKey: qk.savedJobs.listUpTo(q.trim(), limit),
+    queryFn: ({ signal }) => listSavedJobs(q.trim(), signal, limit),
+    staleTime: STALE_TIME.savedJobs,
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useSavedJobQuery(id: string | null) {
   return useQuery({ ...savedJobQuery(id ?? ""), enabled: id !== null });
 }

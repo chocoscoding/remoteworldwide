@@ -60,9 +60,9 @@ export function searchPlatformJobs(q: string, limit = PLATFORM_SEARCH_LIMIT, sig
 // Saved jobs
 // ---------------------------------------------------------------------------
 
-/** "Your jobs", most recently used first. */
-export function listSavedJobs(q = "", signal?: AbortSignal) {
-  return apiGet<SavedJobItem[]>(withQuery(SAVED_JOBS_PATH, { q: q.trim() }), signal);
+/** "Your jobs", most recently used first. `limit` is the server's to cap (50); left out, it uses its own default (20). */
+export function listSavedJobs(q = "", signal?: AbortSignal, limit?: number) {
+  return apiGet<SavedJobItem[]>(withQuery(SAVED_JOBS_PATH, { q: q.trim(), limit }), signal);
 }
 
 /** Another user's id is a 404, never a 403, so ids cannot be probed. */
