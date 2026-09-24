@@ -28,17 +28,20 @@ export type { ActionItem, DimensionScore, EvidenceItem, LanguageStat, Rewrite, T
 // ---------------------------------------------------------------------------
 
 /**
- * Who writes the live captions during an interview. Set by the AI service's
- * environment only; a session also falls back from `aws-transcribe` to
- * `web-speech` when AWS can't be had. The recording and the report are
- * unaffected either way.
+ * Who writes the live captions during an interview. The AI service's
+ * environment chooses `elevenlabs` or `web-speech`, and a session falls back
+ * from `elevenlabs` to `web-speech` when no engine is configured.
+ * `aws-transcribe` remains for the STT lab and for sessions recorded before the
+ * AWS stream was retired. The recording and the report are unaffected either way.
  */
-export const LIVE_STT_PROVIDERS = ["aws-transcribe", "web-speech"] as const;
+export const LIVE_STT_PROVIDERS = ["elevenlabs", "aws-transcribe", "web-speech"] as const;
 export type LiveSttProvider = (typeof LIVE_STT_PROVIDERS)[number];
 
-/** The report transcript is always AWS batch, whatever produced the captions. */
-export const REPORT_STT_PROVIDER = "aws-transcribe-batch" as const;
-export type ReportSttProvider = typeof REPORT_STT_PROVIDER;
+/** Every engine a report transcript can come from; old rows keep the one that wrote them. */
+export const REPORT_STT_PROVIDERS = ["aws-transcribe-batch", "elevenlabs-scribe"] as const;
+export type ReportSttProvider = (typeof REPORT_STT_PROVIDERS)[number];
+/** The engine new report transcripts come from. */
+export const REPORT_STT_PROVIDER: ReportSttProvider = "elevenlabs-scribe";
 
 /** Why a speech-to-text call failed, provider-neutral. */
 export const STT_ERROR_KINDS = ["limited", "bad-audio", "unavailable", "auth", "timeout"] as const;
@@ -78,8 +81,14 @@ export type EndReason = (typeof END_REASONS)[number];
 export const CAP_REASONS = ["length", "credits", "max"] as const;
 export type CapReason = (typeof CAP_REASONS)[number];
 
-/** The analysis pipeline, in order. Text sessions mark `assemble`, `transcribe` and `prosody` as `skipped`. */
-export const ANALYSIS_STEPS = ["assemble", "transcribe", "prosody", "flags", "report", "charge"] as const;
+/**
+ * The analysis pipeline, in order. Text sessions mark `assemble`, `transcribe` and `prosody` as `skipped`.
+ *
+ * `insights` writes the report's Positioning and Diction sections AFTER the
+ * session is `ready`, so a report can be open while it runs. Read the
+ * sections' own `status` (on `PrepReportPayload`), not this step.
+ */
+export const ANALYSIS_STEPS = ["assemble", "transcribe", "prosody", "flags", "report", "charge", "insights"] as const;
 export type AnalysisStep = (typeof ANALYSIS_STEPS)[number];
 
 export const STEP_STATUSES = ["pending", "running", "done", "skipped", "failed"] as const;
@@ -122,6 +131,17 @@ export type PrepSessionLength = (typeof PREP_SESSION_LENGTHS)[number];
 export const PREP_LIMIT_REASONS = ["voice-minutes", "text-sessions"] as const;
 export type PrepLimitReason = (typeof PREP_LIMIT_REASONS)[number];
 
+/**
+ * Which recording a part belongs to:
+ *  - `voice`: the candidate's own echo-cancelled mic. The record: the report
+ *    transcript and the delivery analysis are built from it alone.
+ *  - `mix`: playback only. The candidate and the interviewer together, as the
+ *    browser played them, so the report's recording has both voices. Nothing
+ *    is measured from it, and a session without a usable one plays `voice`.
+ */
+export const RECORDING_TRACKS = ["voice", "mix"] as const;
+export type RecordingTrack = (typeof RECORDING_TRACKS)[number];
+
 export const PREP_LIMITS = {
   /** Turns stored per session, both speakers. */
   turnsMax: 60,
@@ -135,7 +155,45 @@ export const PREP_LIMITS = {
   retriesMax: 3,
   ratingMin: 1,
   ratingMax: 5,
+  /** Muted stretches one finish may carry. */
+  mutedSpansMax: 200,
+  /** How far a playback mix's first sample may sit from the session clock's zero, either way. */
+  mixOffsetMaxMs: 10_000,
 } as const;
+
+/**
+ * When a report has a score, and how far it can be trusted. The first three
+ * are the charge rule (under any of them a session is `tooShort` and not
+ * charged); the rest are the evidence gates a dimension must pass to be scored.
+ */
+export const SCORE_RULES = {
+  minAnswers: 2,
+  minSpeechMs: 30_000,
+  minTypedWords: 30,
+  minAnswerWords: 5,
+  minContentWords: 30,
+  minFirstPersonMentions: 3,
+  minJudgedSpeechMs: 15_000,
+  minScoredDimensions: 4,
+  minContentDimensions: 2,
+} as const;
+
+/**
+ * - `full`: long enough to charge, and enough dimensions had evidence.
+ * - `provisional`: too short to charge, but scored from the dimensions that had
+ *   evidence. Show it labelled; it never counts towards preparedness.
+ * - `none`: too few dimensions had evidence; there is no overall score.
+ */
+export const SCORE_CONFIDENCES = ["full", "provisional", "none"] as const;
+export type ScoreConfidence = (typeof SCORE_CONFIDENCES)[number];
+
+/** Why a score is provisional (the charge rule it fell under) or missing (`little-evidence`). */
+export const SCORE_REASONS = ["few-answers", "little-speech", "few-words", "little-evidence"] as const;
+export type ScoreReason = (typeof SCORE_REASONS)[number];
+
+/** The evidence gate an unscored dimension missed. */
+export const DIMENSION_GATES = ["few-words", "few-mentions", "no-questions", "little-speech", "no-timings", "short-session"] as const;
+export type DimensionGate = (typeof DIMENSION_GATES)[number];
 
 // ---------------------------------------------------------------------------
 // Configuration the client reads
@@ -206,10 +264,9 @@ export interface PartUrl {
 /**
  * `POST /api/ai/prep/sessions` — 201.
  *
- * A typed session records nothing: `capMs`, `capReason`, `liveProvider`,
- * `gatewayUrl` and `streamTicket` are null, `partUrls` is empty and
- * `maxParts` / `partMaxBytes` are 0. A voice session's `streamTicket` is null
- * when captions start on Web Speech; `liveProvider` says which.
+ * A typed session records nothing: `capMs`, `capReason` and `liveProvider`
+ * are null, `partUrls` is empty and `maxParts` / `partMaxBytes` are 0. A voice
+ * session's `liveProvider` says who captions it: `elevenlabs`, or `web-speech`.
  */
 export interface CreatePrepSessionResult {
   session: PrepSessionSummary;
@@ -217,10 +274,6 @@ export interface CreatePrepSessionResult {
   capMs: number | null;
   capReason: CapReason | null;
   liveProvider: LiveSttProvider | null;
-  /** The gateway's `wss:` URL. */
-  gatewayUrl: string | null;
-  /** Single-use, short-lived. Sent as the `ticket.<ticket>` WebSocket subprotocol, never in a URL, never logged. */
-  streamTicket: string | null;
   /** Parts `0..n`, at most `PREP_LIMITS.partUrlBatchMax`. */
   partUrls: PartUrl[];
   /** Parts past this `seq` are refused. */
@@ -255,17 +308,13 @@ export interface PrepLimited {
  */
 export interface PartUrlsInput {
   from: number;
+  /** Which recording's parts; absent is `voice`. Each track numbers its parts from 0 under the same cap. */
+  track?: RecordingTrack;
 }
 
 export interface PartUrlsResult {
   partUrls: PartUrl[];
   maxParts: number;
-}
-
-/** `POST /api/ai/prep/sessions/:id/stream-ticket` — a fresh ticket for one reconnect. Answers 429 once the session's tickets are spent and 409 when it can no longer stream; the client then falls back to browser captions. */
-export interface StreamTicketResult {
-  gatewayUrl: string | null;
-  streamTicket: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +324,7 @@ export interface StreamTicketResult {
 /**
  * One turn as the browser recorded it. For a voice answer `text` is what the
  * user sent (captions, possibly edited); the analysis replaces it with the
- * batch transcript unless the turn was `typed`. `startMs`/`endMs` are the
+ * report transcript unless the turn was `typed`. `startMs`/`endMs` are the
  * answer window (AI speech end to submit) or the AI's own speech.
  */
 export interface PrepTurnInput {
@@ -293,7 +342,7 @@ export interface PrepTurnInput {
   bargedIn?: boolean;
 }
 
-/** A stored turn is the turn as sent, with `text` filled from the batch transcript once analysed. */
+/** A stored turn is the turn as sent, with `text` filled from the report transcript once analysed. */
 export type PrepTurn = PrepTurnInput;
 
 /** What the browser believes it uploaded. The server checks each part against it. */
@@ -302,6 +351,28 @@ export interface PartManifestEntry {
   bytes: number;
   /** Lowercase hex. */
   sha256: string;
+}
+
+/**
+ * A stretch the candidate had muted themselves, whole ms on the session clock.
+ * The recording holds silence there; the delivery analysis leaves it out, so
+ * it never reads as a long pause or a slow start.
+ */
+export interface MutedSpan {
+  startMs: number;
+  endMs: number;
+}
+
+/**
+ * The playback-only mix recorded beside the candidate's own track (`mix`
+ * parts). Only ever played: the analysis reads the candidate's track alone,
+ * and a mix the service cannot line up falls back to that track.
+ */
+export interface PlaybackMixInput {
+  /** At least one; the mix's parts from 0 without a gap. */
+  parts: PartManifestEntry[];
+  /** Where the mix's first sample sits on the session clock (negative: before the zero). Within `PREP_LIMITS.mixOffsetMaxMs`. */
+  offsetMs: number;
 }
 
 /**
@@ -316,6 +387,12 @@ export interface FinishPrepSessionInput {
   endReason: EndReason;
   /** The browser's own wall clock, ISO. Informational; durations come from the audio. */
   clock: { startedAt: string; endedAt: string };
+  /** The recording track reported `autoGainControl: false`, so its loudness is the speaker's own. */
+  agcOff?: boolean;
+  /** Voice sessions only. Sorted, non-overlapping, ending by the cap plus a minute as turn times do; at most `PREP_LIMITS.mutedSpansMax`. */
+  mutedSpans?: MutedSpan[];
+  /** Voice sessions only; absent when no usable mix was recorded. */
+  mix?: PlaybackMixInput;
 }
 
 export interface FinishPrepSessionResult {
@@ -351,7 +428,7 @@ export interface PrepSessionSummary {
   lengthMinutes: PrepSessionLength;
   createdAt: string;
   completedAt: string | null;
-  /** 0-100, once the report exists. Null while locked. */
+  /** 0-100, once the report exists. Null while locked, and when there is no score (`scoreConfidence: "none"`). */
   overallScore: number | null;
   /** The billed recording length, `min(probed, cap)`; null for typed sessions and before assembly. */
   durationMs: number | null;
@@ -360,10 +437,12 @@ export interface PrepSessionSummary {
   billing: PrepBilling;
   /** A 402 at charge time: the report and delivery sections are withheld until an unlock succeeds. */
   locked: boolean;
-  /** Too little was answered to grade; the score is not a measure of the user and must not count towards preparedness. */
+  /** Too short to charge (`SCORE_RULES`); any score is provisional and must not count towards preparedness. */
   tooShort: boolean;
   /** 0-100. */
   progress: number;
+  /** How far `overallScore` can be trusted; set once `ready`. Absent from an older service: read `mapSession.scoreDisplayOf`. */
+  scoreConfidence?: ScoreConfidence;
 }
 
 /** `GET /api/ai/prep/sessions?trackId=` — newest first. */
@@ -389,6 +468,10 @@ export interface PrepAnalysisState {
   error: string | null;
   /** `PREP_LIMITS.retriesMax` minus the retries already used; the report page's Retry shows only while above 0. */
   retriesLeft: number;
+  /** How much of the recording the report transcript covers, 0-1; 0 means it has no word timings at all, so the delivery section says so instead of measuring. Null until transcribed. */
+  transcriptCoverage?: number | null;
+  /** The share of the answer windows' time that timed words cover, 0-1; null until transcribed. */
+  speechCoverage?: number | null;
 }
 
 /**
@@ -439,17 +522,224 @@ export interface DeletePrepSessionResult {
 // The report — the graded half; the shapes inside it live in prep-data.ts
 // ---------------------------------------------------------------------------
 
-/** The graded half of a prep-data.ts `PrepSession`; the client joins it with the summary and turns. */
+/**
+ * The graded half of a prep-data.ts `PrepSession`; the client joins it with the summary and turns.
+ *
+ * `tooShort` is the charge rule and only that; how the score reads is
+ * `scoreConfidence` (see `mapSession.scoreDisplayOf`).
+ */
 export interface PrepReportPayload {
-  /** 0-100. */
-  overallScore: number;
+  /** 0-100; null when too few dimensions could be judged (`scoreConfidence: "none"`). */
+  overallScore: number | null;
+  /** The dimensions this session gave enough evidence to judge, in rubric order. */
   dimensions: DimensionScore[];
   languageStats: LanguageStat[];
   rewrites: Rewrite[];
   actionItems: ActionItem[];
   /** The summary lines, joined. */
   coachNote: string;
+  /** Too short to charge (`SCORE_RULES`). */
   tooShort: boolean;
+  /** Absent only from a service older than the evidence gates. */
+  scoreConfidence?: ScoreConfidence;
+  /** Why the score is provisional or missing; null for a full score. */
+  scoreReason?: ScoreReason | null;
+  /** The dimensions not scored, each with the gate it missed: show "not enough to judge", never a number. */
+  unscoredDimensions?: UnscoredDimension[];
+  /** What the verdict rests on, for "Provisional — based on only 12 s of your voice". Null on a report from before the gates. */
+  scoreEvidence?: ScoreEvidence | null;
+  /** Absent: analysed before this section existed ("not analysed"), which is not `ready` with nothing found. */
+  positioning?: PositioningSection;
+  /** Absent: analysed before this section existed. */
+  diction?: DictionSection;
+}
+
+/** A rubric dimension listed instead of scored: its gate, and a line to show. */
+export interface UnscoredDimension {
+  id: string;
+  label: string;
+  gate: DimensionGate;
+  note: string;
+  howToImprove: string;
+}
+
+/** The amounts behind a report's verdict. */
+export interface ScoreEvidence {
+  /** Answers with text, as the charge rule counts them. */
+  answers: number;
+  /** Answers with at least `SCORE_RULES.minAnswerWords` content words. */
+  substantiveAnswers: number;
+  /** Content words across the real answers. */
+  contentWords: number;
+  /** The candidate's measured voice; null for a typed session. */
+  speechMs: number | null;
+  scoredDimensions: number;
+}
+
+// ---------------------------------------------------------------------------
+// Positioning and Diction — the report's two analysed sections
+// ---------------------------------------------------------------------------
+//
+// Every finding quotes the candidate's own words from one answer, checked
+// against the transcript; every claim about the company or role cites a
+// numbered posting requirement or a line of the posting. "Not enough evidence"
+// is the honest, expected answer for most criteria after a short interview.
+// Nothing here is a score: a level and its evidence is all a section claims.
+
+/**
+ * - `ready`: analysed (any criterion may still be `not-enough-evidence`).
+ * - `pending`: the report is out and this section is still being written; poll the detail.
+ * - `unavailable`: it could not be analysed (`failure` says why); the rest of the report stands.
+ */
+export const REPORT_SECTION_STATUSES = ["ready", "pending", "unavailable"] as const;
+export type ReportSectionStatus = (typeof REPORT_SECTION_STATUSES)[number];
+
+/**
+ * - `model-unavailable`: the text model was down, busy or gave nothing usable.
+ * - `interrupted`: the analysis stopped before it finished.
+ * - `switched-off`: the analysis was switched off when this session was analysed.
+ */
+export const REPORT_SECTION_FAILURES = ["model-unavailable", "interrupted", "switched-off"] as const;
+export type ReportSectionFailure = (typeof REPORT_SECTION_FAILURES)[number];
+
+export const POSITIONING_AREAS = ["alignment", "problem-solving", "collaboration", "growth"] as const;
+export type PositioningArea = (typeof POSITIONING_AREAS)[number];
+
+export const POSITIONING_AREA_LABELS = {
+  alignment: "Behavioral & Cultural Alignment",
+  "problem-solving": "Problem-Solving & Critical Thinking",
+  collaboration: "Collaboration & Interpersonal Dynamics",
+  growth: "Drive, Ambition & Growth Potential",
+} as const;
+
+/** In area order, two per area. */
+export const POSITIONING_CRITERIA = [
+  "values-match",
+  "adaptability",
+  "analytical-approach",
+  "decision-trade-offs",
+  "active-listening",
+  "cross-functional-communication",
+  "learning-agility",
+  "role-trajectory",
+] as const;
+export type PositioningCriterionId = (typeof POSITIONING_CRITERIA)[number];
+
+/** A qualitative level, never a number. `concern`: the answers show the opposite of what the criterion looks for. */
+export const POSITIONING_LEVELS = ["strong", "some-evidence", "concern", "not-enough-evidence"] as const;
+export type PositioningLevel = (typeof POSITIONING_LEVELS)[number];
+
+/**
+ * Why a criterion is `not-enough-evidence`:
+ * - `not-discussed`: nothing the candidate said shows it either way.
+ * - `values-not-stated`: the posting states no values to match against.
+ * - `no-posting`: it needs the posting, and none could be read.
+ */
+export const EVIDENCE_GAPS = ["not-discussed", "values-not-stated", "no-posting"] as const;
+export type EvidenceGap = (typeof EVIDENCE_GAPS)[number];
+
+/** Whether the posting states the company's values. Nothing else is a source for them. */
+export const COMPANY_VALUES_STATES = ["stated", "not-stated", "no-posting"] as const;
+export type CompanyValuesState = (typeof COMPANY_VALUES_STATES)[number];
+
+/** The posting text an analysis read: the track's saved job, else text pasted onto the track, else none; `unavailable` when it could not be read. */
+export const POSTING_SOURCES = ["saved-job", "track-text", "none", "unavailable"] as const;
+export type PostingSourceKind = (typeof POSTING_SOURCES)[number];
+
+export const DICTION_KINDS = ["grammar", "word-choice", "hedging", "repetition", "fillers", "concision"] as const;
+export type DictionKind = (typeof DICTION_KINDS)[number];
+
+/** The candidate's own words from one answer, verbatim. */
+export interface AnswerQuote {
+  quote: string;
+  /** The answer's turn id. */
+  turnId: string;
+  /** The question it answered. */
+  question?: string;
+  atMs?: number;
+  endMs?: number;
+}
+
+/** What a claim about the job rests on: a numbered requirement (its text as extracted), or a line of the posting, verbatim. */
+export interface PostingCitation {
+  /** 1-based, in `PostingUsed.requirements` order; null for a quoted line. */
+  requirement: number | null;
+  text: string;
+}
+
+/** The kind of question that would give a criterion evidence; fixed per criterion. */
+export interface EvidenceProbe {
+  format: PrepFormat;
+  /** "A setback story". */
+  kind: string;
+  /** One way an interviewer asks it. */
+  example: string;
+}
+
+export interface PositioningCriterion {
+  id: PositioningCriterionId;
+  area: PositioningArea;
+  label: string;
+  level: PositioningLevel;
+  /** What the evidence shows, or why there is none. */
+  note: string;
+  /** Empty exactly when `level` is `not-enough-evidence`. */
+  evidence: AnswerQuote[];
+  /** What a claim about the company or role rests on. */
+  posting: PostingCitation[];
+  /** Set exactly when `level` is `not-enough-evidence`. */
+  gap: EvidenceGap | null;
+  probe: EvidenceProbe;
+}
+
+/** Which posting text grounded an analysis; postings change after a session. */
+export interface PostingUsed {
+  source: PostingSourceKind;
+  /** sha256 of the canonical posting text; null without one. */
+  jdHash: string | null;
+  /** The numbered requirements, in the order `PostingCitation.requirement` counts. */
+  requirements: string[];
+  readAt: string;
+}
+
+export interface PositioningSection {
+  status: ReportSectionStatus;
+  /** Set when `unavailable`. */
+  failure: ReportSectionFailure | null;
+  /** Every criterion, in `POSITIONING_CRITERIA` order, when `ready`; empty otherwise. */
+  criteria: PositioningCriterion[];
+  /** Null unless `ready`, and when too little was said for the posting to be read. */
+  companyValues: CompanyValuesState | null;
+  /** The values or principles the posting states, verbatim. */
+  statedValues: string[];
+  /** Null unless `ready` and a posting was looked for. */
+  posting: PostingUsed | null;
+}
+
+export interface DictionFinding {
+  id: string;
+  kind: DictionKind;
+  quote: string;
+  turnId: string;
+  question?: string;
+  /** Why it reads poorly to an interviewer. */
+  note: string;
+  /** The same point, said better. */
+  suggestion: string;
+  atMs?: number;
+  endMs?: number;
+}
+
+export interface DictionSection {
+  status: ReportSectionStatus;
+  failure: ReportSectionFailure | null;
+  /** False: too little was said to judge how it was said, so no findings is not a clean bill. */
+  enoughEvidence: boolean;
+  findings: DictionFinding[];
+  /** The report's own Filler words stat, repeated rather than recounted. */
+  fillers: { value: string; good: boolean } | null;
+  /** Words of the candidate's answers the analysis read. */
+  wordsRead: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -579,7 +869,7 @@ export interface NormalizedTranscript {
 }
 
 // ---------------------------------------------------------------------------
-// The gateway stream protocol
+// The gateway stream protocol (the STT lab's AWS captions)
 // ---------------------------------------------------------------------------
 
 /**
@@ -589,7 +879,7 @@ export interface NormalizedTranscript {
  */
 export const STREAM_SUBPROTOCOL = "rww.voice.v1" as const;
 export const STREAM_TICKET_PREFIX = "ticket." as const;
-/** The gateway's one WebSocket route, relative to `CreatePrepSessionResult.gatewayUrl`. */
+/** The relay's WebSocket route, relative to `LabRunCreateResult.gatewayUrl`. */
 export const STREAM_PATH = "/v1/voice/stream" as const;
 
 /**
@@ -655,7 +945,7 @@ export type StreamCloseCode = (typeof STREAM_CLOSE)[keyof typeof STREAM_CLOSE];
 
 /**
  * Every engine the lab compares; Web Speech runs in the admin's browser and its
- * text is posted back. Identical to `LIVE_STT_PROVIDERS` since the
+ * text is posted back. `LIVE_STT_PROVIDERS` without `elevenlabs` since the
  * batch engine went: the lab scores what the browser and the gateway heard
  * while the clip was recorded, and nothing transcribes it a second time.
  */

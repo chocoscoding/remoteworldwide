@@ -9,7 +9,7 @@
 //
 // Audio never comes through here. Recording parts go straight to S3 on the
 // presigned PUTs these calls hand out (capture/s3Upload.ts), and live audio
-// goes to the voice gateway (capture/relayStream.ts).
+// goes to the speech engine (capture/engineSession.ts).
 //
 // Two things differ from the plain client:
 //  - Dates stay ISO strings. The shared client revives `createdAt` and
@@ -42,8 +42,8 @@ import {
   type PrepSessionList,
   type PrepSessionSummary,
   type PrepVoiceConfig,
+  type RecordingTrack,
   type RetryPrepSessionResult,
-  type StreamTicketResult,
   type UnlockPrepSessionResult,
 } from "./types";
 
@@ -163,12 +163,13 @@ export async function createPrepSession(input: CreatePrepSessionInput): Promise<
 // ---------------------------------------------------------------------------
 
 /**
- * Presigned POSTs from part `from`. Also the session's heartbeat, so the
+ * Presigned PUTs from part `from`. Also the session's heartbeat, so the
  * capture calls it every few minutes even with URLs in hand. A `from` past the
- * cap is refused with a 4xx.
+ * cap is refused with a 4xx. `track` is the playback mix's parts (`mix`);
+ * the candidate's own track sends none, as every browser before the mix did.
  */
-export function getPartUrls(id: string, from: number) {
-  const body: PartUrlsInput = { from };
+export function getPartUrls(id: string, from: number, track?: RecordingTrack) {
+  const body: PartUrlsInput = track && track !== "voice" ? { from, track } : { from };
   return apiPost<PartUrlsResult>(`${sessionPath(id)}/parts/urls`, body);
 }
 
@@ -179,16 +180,6 @@ export function getPartUrls(id: string, from: number) {
  */
 export function getQuestionSpeech(id: string, questionId: string) {
   return apiPost<PlaybackLink | null>(`${sessionPath(id)}/speech`, { questionId });
-}
-
-/**
- * A fresh single-use ticket for one gateway reconnect. Answers 429 once the
- * session's tickets are spent and 409 when it can no longer stream, and both
- * fields are null when no gateway is configured; relayStream then falls back to
- * browser captions.
- */
-export function getStreamTicket(id: string) {
-  return apiPost<StreamTicketResult>(`${sessionPath(id)}/stream-ticket`);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,12 +207,16 @@ const byteLength = (text: string): number => new TextEncoder().encode(text).leng
  * The finish body as the beacon sends it, shrunk to fit `maxBytes`, or null
  * when even the smallest form does not fit. In order, it drops:
  *  1. `liveText` (only the live-versus-batch agreement measure reads it);
- *  2. the text of spoken answers (the analysis replaces it with the batch
+ *  2. the playback mix: a manifest as long as the recording's own, and only
+ *     ever played (the playback is then the candidate's track, as it always
+ *     was), where the next step costs the answers their words;
+ *  3. the text of spoken answers (the analysis replaces it with the batch
  *     transcript anyway);
- *  3. the tail of every remaining text, evenly.
+ *  4. the tail of every remaining text, evenly.
  * The part manifest is never dropped: without it the service cannot check the
  * parts, and the abandoned-session sweep finishes the session from storage
- * instead.
+ * instead. Nor are the muted stretches: a few hundred bytes that keep a mute
+ * from reading as a long pause.
  */
 export function beaconPayload(body: FinishPrepSessionInput, maxBytes: number = BEACON_MAX_BYTES): string | null {
   const fits = (candidate: FinishPrepSessionInput): string | null => {
@@ -240,12 +235,17 @@ export function beaconPayload(body: FinishPrepSessionInput, maxBytes: number = B
   const noLive = fits({ ...body, turns: lean });
   if (noLive) return noLive;
 
+  const unmixed: FinishPrepSessionInput = { ...body, turns: lean };
+  delete unmixed.mix;
+  const noMix = fits(unmixed);
+  if (noMix) return noMix;
+
   const spokenCleared = lean.map((turn) => (turn.who === "user" && turn.source === "voice" ? { ...turn, text: "" } : turn));
-  const noSpoken = fits({ ...body, turns: spokenCleared });
+  const noSpoken = fits({ ...unmixed, turns: spokenCleared });
   if (noSpoken) return noSpoken;
 
   // The longest per-turn text cap that fits, by bisection.
-  const capped = (cap: number): FinishPrepSessionInput => ({ ...body, turns: spokenCleared.map((turn) => ({ ...turn, text: turn.text.slice(0, cap) })) });
+  const capped = (cap: number): FinishPrepSessionInput => ({ ...unmixed, turns: spokenCleared.map((turn) => ({ ...turn, text: turn.text.slice(0, cap) })) });
   const longest = spokenCleared.reduce((max, turn) => Math.max(max, turn.text.length), 0);
   if (!fits(capped(0))) return null;
   let low = 0;
