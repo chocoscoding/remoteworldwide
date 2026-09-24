@@ -2,7 +2,6 @@
 
 import { FC, FormEvent, useRef, useState } from "react";
 import { Check, Plus, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
 import { useUploadAvatar } from "@/hooks/mutations/useAvatarMutation";
@@ -110,6 +109,11 @@ const ProfileClient: FC = () => {
               className={cn(INPUT, "w-auto flex-none cursor-pointer")}
               value={profile.timezone}
               onChange={(e) => setProfile({ timezone: e.target.value })}>
+              {/* Without this, an unset timezone displays as the first option
+                  while "" is what's saved — and reviewers need a real one. */}
+              <option value="" disabled>
+                Timezone
+              </option>
               {TIMEZONES.map((tz) => (
                 <option key={tz} value={tz}>
                   {tz}

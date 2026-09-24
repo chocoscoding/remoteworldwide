@@ -7,9 +7,8 @@ import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
-import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import { computeFit, type FitPrefs, type FitProfile } from "@/app/lib/dashboard/fit";
-import type { RecommendationTarget } from "@/app/lib/dashboard/types";
+import type { RecommendationTarget, ReferralContact } from "@/app/lib/dashboard/types";
 
 /**
  * Every tier gets the SAME pill shape and weight, differing only in fill.
@@ -38,6 +37,8 @@ export interface FitCardProps {
   target: RecommendationTarget;
   prefs: FitPrefs;
   profile: FitProfile;
+  /** Your best warm path at the company, from your own contacts (useWarmPaths). */
+  contact?: ReferralContact;
 }
 
 /** Keeps the icon column the same width as the contact avatar so all three footers align. */
@@ -54,19 +55,21 @@ const FooterIcon: FC<{ children: ReactNode; muted?: boolean }> = ({ children, mu
 /**
  * Informational by design. Our reviewers decide who gets put in front of a
  * company, so there is no "ask for an intro" button here — that would suggest
- * the choice is yours. The only action is the warm path, which is a referral
- * you can genuinely pursue yourself.
+ * the choice is yours. The only actions are the listing itself (it is a live
+ * Remote Worldwide job — apply to it like any other) and the warm path, a
+ * referral you can genuinely pursue yourself.
  *
  * Laid out as fixed slots — identity, status, note, disclosure, footer — so
  * that every collapsed card in a row is exactly the same height. The note is
  * clamped to two lines for the same reason; the full text stays in `title`.
  */
-const FitCard: FC<FitCardProps> = ({ target, prefs, profile }) => {
-  const { contactAtCompany } = useNetwork();
+const FitCard: FC<FitCardProps> = ({ target, prefs, profile, contact }) => {
   const [open, setOpen] = useState(false);
 
   const fit = useMemo(() => computeFit(target, prefs, profile), [target, prefs, profile]);
-  const contact = contactAtCompany(target.company);
+  // What already fits reads first, then what doesn't yet. The sort is stable,
+  // so each group keeps computeFit's own order.
+  const factors = useMemo(() => [...fit.factors].sort((a, b) => Number(b.met) - Number(a.met)), [fit.factors]);
 
   return (
     <DashCard className="flex flex-col p-5">
@@ -76,7 +79,15 @@ const FitCard: FC<FitCardProps> = ({ target, prefs, profile }) => {
         <Avatar name={target.company} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold leading-tight text-primary">{target.company}</p>
-          <p className="mt-1 truncate text-xs text-black/60">{target.role}</p>
+          {target.href ? (
+            <Link
+              href={target.href}
+              className="mt-1 block truncate text-xs text-black/60 underline decoration-dotted underline-offset-2 hover:text-primary hover:decoration-solid">
+              {target.role}
+            </Link>
+          ) : (
+            <p className="mt-1 truncate text-xs text-black/60">{target.role}</p>
+          )}
           <p className="mt-1 truncate text-[11px] font-semibold tabular-nums text-black/60">
             {target.salaryText ?? "Band not published"}
           </p>
@@ -90,7 +101,6 @@ const FitCard: FC<FitCardProps> = ({ target, prefs, profile }) => {
       {/* Status — always exactly one row, so nothing below it can shift. */}
       <div className="mt-4 flex h-7 items-center gap-2">
         <Pill className={cn("flex-none", TIER_FILL[fit.tier.tone])}>{fit.tier.label}</Pill>
-        {target.onHold && <Pill variant="neutral" className="flex-none">On hold</Pill>}
       </div>
 
       <p className="mt-3 line-clamp-2 min-h-[39px] text-xs leading-relaxed text-black/65" title={target.note ?? undefined}>
@@ -108,7 +118,7 @@ const FitCard: FC<FitCardProps> = ({ target, prefs, profile }) => {
 
       {open && (
         <div className="mt-3 flex flex-col gap-2.5 border-t border-black/8 pt-3.5">
-          {fit.factors.map((f) => (
+          {factors.map((f) => (
             <div key={f.id} className="flex items-start gap-2.5">
               <span
                 className={cn(
@@ -169,7 +179,7 @@ const FitCard: FC<FitCardProps> = ({ target, prefs, profile }) => {
             </FooterIcon>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-black/70">No one in your network here</span>
-              <span className="block truncate text-[11px] text-black/60">Reviewers watch this one for you</span>
+              <span className="block truncate text-[11px] text-black/60">Reviewers see this list when they pick</span>
             </span>
           </div>
         )}
