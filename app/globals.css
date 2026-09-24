@@ -75,6 +75,42 @@ body {
   background-color: #000;
 }
 
+/* Same slim bar, but invisible until the pointer is over the region it belongs
+   to — for rails where the bar is chrome, not information (the dashboard
+   sidebar). Put .scrollbar-hover-root on the element whose hover reveals it and
+   .scrollbar-hover on the scroller inside it; they may be the same element.
+
+   The 6px gutter is reserved whether or not the thumb is painted, so revealing
+   it never reflows the content beside it. Only the colour animates. */
+.scrollbar-hover {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.18s ease;
+}
+.scrollbar-hover::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-hover::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 3px;
+  transition: background-color 0.18s ease;
+}
+.scrollbar-hover-root:hover .scrollbar-hover,
+.scrollbar-hover-root:focus-within .scrollbar-hover {
+  scrollbar-color: rgba(34, 35, 37, 0.32) transparent;
+}
+.scrollbar-hover-root:hover .scrollbar-hover::-webkit-scrollbar-thumb,
+.scrollbar-hover-root:focus-within .scrollbar-hover::-webkit-scrollbar-thumb {
+  background-color: rgba(34, 35, 37, 0.32);
+}
+.scrollbar-hover-root .scrollbar-hover::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(34, 35, 37, 0.55);
+}
+
 /* Scrolls, but shows no track or thumb — for containers where a visible bar
    would be noise (the Kanban columns, which scroll inside a board that already
    has one horizontal bar). The horizontal bar keeps .scrollbar-neo. */
