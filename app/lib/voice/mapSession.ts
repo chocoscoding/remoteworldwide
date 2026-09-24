@@ -12,13 +12,36 @@
 // and run it.
 
 import type { PrepSession, PrepTrack, TranscriptTurn } from "@/app/lib/dashboard/prep-data";
-import type { PrepSessionDetail, PrepSessionSummary, PrepTurn } from "./types";
+import type { PrepSessionDetail, PrepSessionSummary, PrepTurn, ScoreConfidence } from "./types";
 
 /**
- * A saved session's id is a Mongo ObjectId; a demo session's is `sess-…`. The
- * report route uses this to decide between the server and PrepProvider's
- * memory, so an id typed by hand never reaches the service unless it could be
- * one of its own.
+ * How a session's score reads — the one answer every surface uses: the hub's
+ * rows and its "Last session" card, the preparedness score, and the report
+ * header. They disagreed once (the hub showed 48 where the report showed "—"
+ * for the same too-short session) because each read `overallScore` its own way.
+ *
+ * - `scored`: a full score.
+ * - `provisional`: a real score from the dimensions that had evidence, for a
+ *   session too short to charge. Show it labelled; never count it towards
+ *   preparedness.
+ * - `unscored`: no score — too little evidence, locked, or not graded yet.
+ *
+ * A service older than the evidence gates sends no `scoreConfidence`; its
+ * too-short sessions had no real score (every dimension sat at its floor), so
+ * they read `unscored`.
+ */
+export type ScoreDisplay = { kind: "scored"; score: number } | { kind: "provisional"; score: number } | { kind: "unscored" };
+
+export function scoreDisplayOf(session: { overallScore: number | null; tooShort: boolean; scoreConfidence?: ScoreConfidence }): ScoreDisplay {
+  const confidence = session.scoreConfidence ?? (session.tooShort ? "none" : "full");
+  if (session.overallScore === null || confidence === "none") return { kind: "unscored" };
+  return confidence === "provisional" ? { kind: "provisional", score: session.overallScore } : { kind: "scored", score: session.overallScore };
+}
+
+/**
+ * A saved session's id is a Mongo ObjectId (and so is a saved track's). The
+ * report route checks it before asking the service, so an id typed by hand
+ * never reaches the service unless it could be one of its own.
  */
 export const SERVER_SESSION_ID = /^[0-9a-f]{24}$/i;
 
@@ -42,12 +65,17 @@ function toTranscriptTurn(turn: PrepTurn): TranscriptTurn {
  * A session without a report (still analysing, failed, or locked) maps to an
  * empty report rather than a missing one, so the shape stays whole; the report
  * page shows those states with their own components and never hands such a
- * session to PrepReport. `overallScore` falls back to 0 only for that reason:
- * nothing reads it unless `report` exists.
+ * session to PrepReport. `overallScore` falls back to 0 for that reason, and
+ * when there is no score at all (`scoreConfidence: "none"`): read it through
+ * `scoreDisplayOf`, which says so.
+ *
+ * The Positioning and Diction sections come across as they are, absent for a
+ * session analysed before they existed.
  */
 export function detailToPrepSession(detail: PrepSessionDetail): PrepSession {
   const report = detail.report;
   const summary = detail.summaryLines ?? detail.delivery?.summary;
+  const scoreConfidence = report?.scoreConfidence ?? detail.scoreConfidence;
   return {
     id: detail.id,
     serverId: detail.id,
@@ -63,7 +91,13 @@ export function detailToPrepSession(detail: PrepSessionDetail): PrepSession {
     rewrites: report?.rewrites ?? [],
     actionItems: report?.actionItems ?? [],
     coachNote: report?.coachNote ?? "",
-    tooShort: report?.tooShort ?? false,
+    tooShort: report?.tooShort ?? detail.tooShort,
+    ...(scoreConfidence ? { scoreConfidence } : {}),
+    ...(report?.scoreReason !== undefined ? { scoreReason: report.scoreReason } : {}),
+    ...(report?.scoreEvidence !== undefined ? { scoreEvidence: report.scoreEvidence } : {}),
+    ...(report?.unscoredDimensions ? { unscoredDimensions: report.unscoredDimensions } : {}),
+    ...(report?.positioning ? { positioning: report.positioning } : {}),
+    ...(report?.diction ? { diction: report.diction } : {}),
     mode: detail.mode,
     status: detail.status,
     ...(detail.delivery ? { delivery: detail.delivery } : {}),
@@ -101,7 +135,9 @@ export function summaryToPrepSession(summary: PrepSessionSummary): PrepSession {
     rewrites: [],
     actionItems: [],
     coachNote: "",
-    tooShort: false,
+    // Carried, not assumed, so `scoreDisplayOf` reads a list row the way it reads the full report.
+    tooShort: summary.tooShort,
+    ...(summary.scoreConfidence ? { scoreConfidence: summary.scoreConfidence } : {}),
     mode: summary.mode,
     status: summary.status,
     billing: { credits: summary.billing.credits, state: summary.billing.state },
@@ -118,19 +154,21 @@ export function sameCompany(a: string, b: string): boolean {
 /**
  * Whether a saved session belongs to this track.
  *
- * The id alone is not enough. Tracks still live in memory, and a track the
- * user adds gets the same generated id on every page load (`track-custom-N`
- * counts from the same start each time), so after a reload a new track can
- * carry the id of an older, different one. The company frozen into the
- * session at create is the tie-breaker.
+ * A saved track's id is an ObjectId, unique for good, so the id alone decides
+ * — and must: a track renamed from "Acme" to "Acme Inc." still owns the
+ * sessions it ran. Sessions from before tracks were saved carry the old
+ * in-memory ids (`track-vercel`, `track-custom-N`), which repeated across page
+ * loads, so for those the company frozen into the session at create stays the
+ * tie-breaker.
  */
 export function sessionBelongsTo(track: Pick<PrepTrack, "id" | "company">, summary: Pick<PrepSessionSummary, "trackId" | "company">): boolean {
-  return summary.trackId === track.id && sameCompany(summary.company, track.company);
+  if (summary.trackId !== track.id) return false;
+  return SERVER_SESSION_ID.test(track.id) || sameCompany(summary.company, track.company);
 }
 
-/** A session that counts towards preparedness: graded, readable, scored and long enough to mean something. */
+/** A session that counts towards preparedness: graded, readable, and a full score — not a provisional one, not none. */
 export function isScoredSession(summary: PrepSessionSummary): boolean {
-  return summary.status === "ready" && !summary.locked && !summary.tooShort && summary.overallScore !== null;
+  return summary.status === "ready" && !summary.locked && scoreDisplayOf(summary).kind === "scored";
 }
 
 const timeOf = (session: Pick<PrepSession, "completedAt">): number => {
@@ -179,9 +217,9 @@ function initials(name: string): string {
 
 /**
  * A stand-in track built from what the session froze at create, for a report
- * whose track is not in memory any more (a track added before a reload, or
- * the id now belongs to a different company). It has no history, panel or
- * actions of its own: the report needs only its name and round.
+ * whose track is gone (deleted, or the session predates saved tracks). It has
+ * no history or actions of its own, and no `saved` track behind it: the report
+ * needs only its name and round.
  */
 export function trackFromSnapshot(detail: Pick<PrepSessionDetail, "trackId" | "prep">): PrepTrack {
   const { company, role, roundLabel } = detail.prep.trackSnapshot;
@@ -194,8 +232,6 @@ export function trackFromSnapshot(detail: Pick<PrepSessionDetail, "trackId" | "p
     roundLabel,
     roundDate: null,
     status: "in-progress",
-    panel: [],
-    questions: [],
     sessions: [],
     actions: [],
     outcome: null,

@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,13 +18,56 @@ export interface SlidingTabsProps<T extends string> {
   options: { id: T; label: string; count?: number }[];
   onChange: (value: T) => void;
   className?: string;
+  /**
+   * Opt in to the ARIA tabs pattern, for a bar that swaps panels in place:
+   * `tablist` / `tab` roles, `aria-selected` and `aria-controls` on each tab,
+   * one tab stop, and the arrow keys (plus Home and End) moving between tabs.
+   * The consumer marks each panel up to match, with the ids from
+   * `slidingTabId` and `slidingTabPanelId`:
+   * `<div role="tabpanel" id={slidingTabPanelId(id, tab)} aria-labelledby={slidingTabId(id, tab)}>`.
+   *
+   * Left off, the bar stays a row of plain buttons with `aria-current`, which
+   * is what its filter and tone-picker consumers are: they change what one
+   * list shows rather than swapping panels.
+   */
+  tablist?: {
+    /** Unique on the page (React's `useId`); the tab and panel ids are built from it. */
+    id: string;
+    /** Names the bar for assistive tech, e.g. "Report sections". */
+    label: string;
+  };
 }
 
-export default function SlidingTabs<T extends string>({ value, options, onChange, className }: SlidingTabsProps<T>) {
+/** The id of a tab's button when the bar is a `tablist`; its panel names itself with this (`aria-labelledby`). */
+export const slidingTabId = (tablistId: string, value: string) => `${tablistId}-tab-${value}`;
+/** The id a tab's panel carries when the bar is a `tablist`; the tab points at it (`aria-controls`). */
+export const slidingTabPanelId = (tablistId: string, value: string) => `${tablistId}-panel-${value}`;
+
+export default function SlidingTabs<T extends string>({ value, options, onChange, className, tablist }: SlidingTabsProps<T>) {
   const index = Math.max(0, options.findIndex((o) => o.id === value));
+
+  // Selection follows focus: the panels are already in memory, so showing one
+  // as its tab is reached costs nothing, and saves a keypress per tab.
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, from: number) => {
+    const last = options.length - 1;
+    const moves: Partial<Record<string, number>> = {
+      // The ends wrap, so neither arrow ever stops dead.
+      ArrowRight: from === last ? 0 : from + 1,
+      ArrowLeft: from === 0 ? last : from - 1,
+      Home: 0,
+      End: last,
+    };
+    const to = moves[e.key];
+    if (to === undefined || to === from) return;
+    e.preventDefault();
+    onChange(options[to].id);
+    e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[to]?.focus();
+  };
 
   return (
     <div
+      role={tablist ? "tablist" : undefined}
+      aria-label={tablist?.label}
       className={cn("relative grid w-fit max-w-full overflow-x-auto rounded-xl border-[1.5px] border-[#222325] bg-[#f0f0ea] p-1 shadow-[3px_3px_0_0_#222325]", className)}
       // `max-content` floor, not 0: equal-width columns are what makes the
       // indicator's position pure arithmetic, but they must never shrink
@@ -36,14 +80,21 @@ export default function SlidingTabs<T extends string>({ value, options, onChange
         className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-lg bg-[#222325] transition-transform duration-200 ease-out"
         style={{ width: `calc((100% - 0.5rem) / ${options.length})`, transform: `translateX(${index * 100}%)` }}
       />
-      {options.map((o) => {
+      {options.map((o, i) => {
         const active = o.id === value;
         return (
           <button
             key={o.id}
             type="button"
             onClick={() => onChange(o.id)}
-            aria-current={active ? "page" : undefined}
+            aria-current={!tablist && active ? "page" : undefined}
+            role={tablist ? "tab" : undefined}
+            id={tablist ? slidingTabId(tablist.id, o.id) : undefined}
+            aria-selected={tablist ? active : undefined}
+            aria-controls={tablist ? slidingTabPanelId(tablist.id, o.id) : undefined}
+            // One tab stop for the whole bar; the arrow keys move inside it.
+            tabIndex={tablist ? (active ? 0 : -1) : undefined}
+            onKeyDown={tablist ? (e) => onKeyDown(e, i) : undefined}
             className={cn(
               "relative z-10 rounded-lg px-3 py-1.5 text-xs font-bold whitespace-nowrap cursor-pointer transition-colors duration-200",
               active ? "text-white" : "text-black/55 hover:text-[#222325]"

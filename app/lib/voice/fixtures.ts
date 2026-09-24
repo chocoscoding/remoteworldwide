@@ -36,6 +36,7 @@ import type {
 } from "@/app/components/dashboard/prep/delivery";
 import type {
   AnalysisStep,
+  AnswerQuote,
   DeliveryAnswer,
   DeliveryFlag,
   DeliveryMetrics,
@@ -44,7 +45,12 @@ import type {
   DeliverySummaryLine,
   DeliveryTranscriptSegment,
   DeliveryTranscriptWord,
+  DictionFinding,
+  DictionSection,
   PlaybackLink,
+  PositioningCriterion,
+  PositioningCriterionId,
+  PositioningSection,
   PrepAnalysisState,
   PrepQuestion,
   PrepReportPayload,
@@ -789,6 +795,153 @@ const ACTION_ITEMS: ActionItem[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Positioning and Diction & Grammar
+// ---------------------------------------------------------------------------
+//
+// Shaped as the AI service's `insights` step writes them. Every quote is a
+// sentence of this script (or a stretch of one), placed where it was said. The
+// demo track has no posting, so the two criteria that need one say so rather
+// than guess — the honest state a track without a saved job really shows.
+
+const said = (n: number, k: number, part?: string): AnswerQuote => {
+  const text = segment(n, k).text;
+  if (part !== undefined && !text.includes(part)) throw new Error(`fixtures: "${part}" is not in answer ${n}, sentence ${k}`);
+  return { quote: part ?? text, turnId: answer(n).turnId, question: q(SCRIPT[n - 1].questionId), atMs: segment(n, k).startMs, endMs: segment(n, k).endMs };
+};
+
+const PROBES: Record<PositioningCriterionId, PositioningCriterion["probe"]> = {
+  "values-match": {
+    format: "behavioural",
+    kind: "A values story",
+    example: "Tell me about a time you had to choose between doing something fast and doing it right. Which did you pick, and why?",
+  },
+  adaptability: { format: "behavioural", kind: "A setback story", example: "Tell me about a project that went wrong. What did you do next?" },
+  "analytical-approach": { format: "portfolio", kind: "An open-ended problem", example: "Walk me through how you broke down the least well-defined problem you've worked on." },
+  "decision-trade-offs": { format: "portfolio", kind: "A trade-off", example: "What did you cut from a project, and why that rather than something else?" },
+  "active-listening": {
+    format: "behavioural",
+    kind: "A disagreement story",
+    example: "Tell me about a time a teammate disagreed with you. How did you make sure you understood their view?",
+  },
+  "cross-functional-communication": {
+    format: "behavioural",
+    kind: "A stakeholder story",
+    example: "Tell me about a time you explained a technical decision to someone outside your field.",
+  },
+  "learning-agility": { format: "behavioural", kind: "A learning story", example: "Tell me about something you had to learn quickly for a project. How did you go about it?" },
+  "role-trajectory": { format: "behavioural", kind: "A goals question", example: "Where do you want to be in two years, and how does this role get you there?" },
+};
+
+const NO_POSTING = "This needs the job posting, and this track has none to read.";
+
+const CRITERIA: PositioningCriterion[] = [
+  { id: "values-match", area: "alignment", label: "Core Values Match", level: "not-enough-evidence", note: NO_POSTING, evidence: [], posting: [], gap: "no-posting", probe: PROBES["values-match"] },
+  {
+    id: "adaptability",
+    area: "alignment",
+    label: "Adaptability & Resilience",
+    level: "strong",
+    note: "You owned a launch that missed, found out why from the data, and changed how you choose who to research.",
+    evidence: [said(7, 3), said(7, 5)],
+    posting: [],
+    gap: null,
+    probe: PROBES.adaptability,
+  },
+  {
+    id: "analytical-approach",
+    area: "problem-solving",
+    label: "Analytical Approach",
+    level: "some-evidence",
+    note: "You checked the usage data before arguing for a design, though the story stops short of how you framed the question.",
+    evidence: [said(3, 3), said(3, 4)],
+    posting: [],
+    gap: null,
+    probe: PROBES["analytical-approach"],
+  },
+  {
+    id: "decision-trade-offs",
+    area: "problem-solving",
+    label: "Decision-Making Trade-offs",
+    level: "strong",
+    note: "You named what each cut would have cost in weeks and tied every one back to the problem you were there to fix.",
+    evidence: [said(4, 2), said(4, 4)],
+    posting: [],
+    gap: null,
+    probe: PROBES["decision-trade-offs"],
+  },
+  {
+    id: "active-listening",
+    area: "collaboration",
+    label: "Active Listening & Empathy",
+    level: "some-evidence",
+    note: "You turned a disagreement into a test the product manager could agree to, but said little about how you heard their side.",
+    evidence: [said(5, 3)],
+    posting: [],
+    gap: null,
+    probe: PROBES["active-listening"],
+  },
+  {
+    id: "cross-functional-communication",
+    area: "collaboration",
+    label: "Cross-Functional Communication",
+    level: "strong",
+    note: "You explained the cuts to sales, support and customers in their terms, before anyone had to ask.",
+    evidence: [said(4, 5), said(4, 6)],
+    posting: [],
+    gap: null,
+    probe: PROBES["cross-functional-communication"],
+  },
+  {
+    id: "learning-agility",
+    area: "growth",
+    label: "Learning Agility",
+    level: "some-evidence",
+    note: "The dashboard that missed changed a habit you still keep, which is the kind of learning a panel listens for.",
+    evidence: [said(7, 7)],
+    posting: [],
+    gap: null,
+    probe: PROBES["learning-agility"],
+  },
+  { id: "role-trajectory", area: "growth", label: "Role Trajectory", level: "not-enough-evidence", note: NO_POSTING, evidence: [], posting: [], gap: "no-posting", probe: PROBES["role-trajectory"] },
+];
+
+const POSITIONING: PositioningSection = {
+  status: "ready",
+  failure: null,
+  criteria: CRITERIA,
+  companyValues: "no-posting",
+  statedValues: [],
+  posting: { source: "none", jdHash: null, requirements: [], readAt: "2026-09-14T09:45:47.000Z" },
+};
+
+const finding = (id: string, kind: DictionFinding["kind"], quoted: AnswerQuote, note: string, suggestion: string): DictionFinding => ({ id, kind, ...quoted, note, suggestion });
+
+const DICTION: DictionSection = {
+  status: "ready",
+  failure: null,
+  enoughEvidence: true,
+  findings: [
+    finding(
+      "dg-1",
+      "fillers",
+      said(5, 1, "because we were, like, already two weeks behind on the roadmap"),
+      "“Like” lands in the middle of the reason, which is the part the panel is weighing.",
+      "because we were already two weeks behind on the roadmap"
+    ),
+    finding("dg-2", "concision", said(3, 1), "A line spent finding the story tells the panel you had not picked one yet.", "The clearest one is from the same checkout project."),
+    finding(
+      "dg-3",
+      "word-choice",
+      said(2, 1, "Honestly, the handoff started on day one"),
+      "“Honestly” suggests the rest was less so; the sentence is stronger without it.",
+      "The handoff started on day one"
+    ),
+  ],
+  fillers: { value: `${BUILT.totalFillers} across your answers`, good: BUILT.totalFillers <= 3 },
+  wordsRead: BUILT_ANSWERS.reduce((sum, a) => sum + a.wordCount, 0),
+};
+
 const OVERALL_SCORE = Math.round((DIMENSIONS.reduce((s, d) => s + d.score, 0) / DIMENSIONS.length) * 10);
 
 const REPORT: PrepReportPayload = {
@@ -799,6 +952,18 @@ const REPORT: PrepReportPayload = {
   actionItems: ACTION_ITEMS,
   coachNote: SUMMARY.map((line) => line.text).join(" "),
   tooShort: false,
+  scoreConfidence: "full",
+  scoreReason: null,
+  unscoredDimensions: [],
+  scoreEvidence: {
+    answers: BUILT_ANSWERS.length,
+    substantiveAnswers: BUILT_ANSWERS.length,
+    contentWords: BUILT.totalWords - BUILT.totalFillers,
+    speechMs: BUILT_ANSWERS.reduce((sum, a) => sum + a.speechMs, 0),
+    scoredDimensions: DIMENSIONS.length,
+  },
+  positioning: POSITIONING,
+  diction: DICTION,
 };
 
 // ---------------------------------------------------------------------------
@@ -829,7 +994,7 @@ const steps = (entries: Record<AnalysisStep, StepState>) => entries;
 
 export const FIXTURE_DELIVERY: DeliveryReport = {
   durationMs: BUILT.durationMs,
-  liveProvider: "aws-transcribe",
+  liveProvider: "elevenlabs",
   summary: SUMMARY,
   metrics: METRICS,
   flags: FLAGS,
@@ -848,6 +1013,11 @@ export const FIXTURE_REPORT: PrepReportPayload = REPORT;
 /** 5 credits for 10 minutes, +1 for each of the 4 minutes started after. */
 const CREDITS = 9;
 
+/** The share of the answer windows that timed words cover. */
+const SPEECH_COVERAGE = round2(
+  BUILT_ANSWERS.reduce((sum, a) => sum + a.words.reduce((s, w) => s + (w.e - w.s), 0), 0) / BUILT_ANSWERS.reduce((sum, a) => sum + (a.endMs - a.startMs), 0)
+);
+
 /** A finished 14-minute voice session: report, delivery and recording all present. */
 export const VOICE_READY_SESSION: PrepSessionDetail = {
   id: "66e5586801a2b3c4d5e6f701",
@@ -861,7 +1031,7 @@ export const VOICE_READY_SESSION: PrepSessionDetail = {
   completedAt: at(840 + 95),
   overallScore: OVERALL_SCORE,
   durationMs: BUILT.durationMs,
-  liveProvider: "aws-transcribe",
+  liveProvider: "elevenlabs",
   billing: { credits: CREDITS, state: "charged" },
   locked: false,
   tooShort: false,
@@ -877,9 +1047,12 @@ export const VOICE_READY_SESSION: PrepSessionDetail = {
       flags: step("done", 903),
       report: step("done", 931),
       charge: step("done", 934),
+      insights: step("done", 947),
     }),
     error: null,
     retriesLeft: 3,
+    transcriptCoverage: 1,
+    speechCoverage: SPEECH_COVERAGE,
   },
   report: REPORT,
   delivery: FIXTURE_DELIVERY,
@@ -917,9 +1090,12 @@ export const VOICE_PROCESSING_SESSION: PrepSessionDetail = {
       flags: step("pending"),
       report: step("pending"),
       charge: step("pending"),
+      insights: step("pending"),
     }),
     error: null,
     retriesLeft: 3,
+    transcriptCoverage: null,
+    speechCoverage: null,
   },
   report: undefined,
   delivery: undefined,
@@ -943,10 +1119,13 @@ export const VOICE_FAILED_SESSION: PrepSessionDetail = {
       flags: step("pending"),
       report: step("pending"),
       charge: step("pending"),
+      insights: step("pending"),
     }),
     error: "We couldn't measure your delivery this time. Your recording and transcript are safe.",
     // One retry already used, so the failed card still offers two more.
     retriesLeft: 2,
+    transcriptCoverage: 1,
+    speechCoverage: SPEECH_COVERAGE,
   },
   report: undefined,
   delivery: undefined,
@@ -1022,9 +1201,13 @@ export const TYPED_READY_SESSION: PrepSessionDetail = {
       flags: { status: "done", at: "2026-09-12T18:14:02.000Z", error: null },
       report: { status: "done", at: "2026-09-12T18:14:38.000Z", error: null },
       charge: { status: "done", at: "2026-09-12T18:14:40.000Z", error: null },
+      // Analysed before the Positioning and Diction step existed: the service reads that as `skipped` and sends no sections.
+      insights: { status: "skipped", at: null, error: null },
     },
     error: null,
     retriesLeft: 3,
+    transcriptCoverage: null,
+    speechCoverage: null,
   },
   report: {
     ...REPORT,
@@ -1034,6 +1217,11 @@ export const TYPED_READY_SESSION: PrepSessionDetail = {
     dimensions: DIMENSIONS.map((d) => ({ ...d, evidence: d.evidence.map(untimed) })),
     languageStats: LANGUAGE_STATS.map((s) => ({ ...s, evidence: s.evidence.map(untimed) })),
     coachNote: "The content is there. What's costing you points is how sure you sound saying it.",
+    // A report from before the evidence gates: the service derives `full` and has no amounts to give.
+    scoreEvidence: null,
+    // "Not analysed": absent, as the service sends a report from before the sections existed.
+    positioning: undefined,
+    diction: undefined,
   },
   rating: null,
   recording: null,
@@ -1049,13 +1237,20 @@ export const VOICE_READY_PREP_SESSION: PrepSession = {
   lengthMinutes: PREP.lengthMinutes,
   completedAt: VOICE_READY_SESSION.completedAt ?? CREATED_AT,
   transcript: FIXTURE_TURNS.map((t) => ({ id: t.id, who: t.who, text: t.text, questionId: t.questionId, startMs: t.startMs, endMs: t.endMs })),
-  overallScore: REPORT.overallScore,
+  // The constant, not REPORT's field: a payload's score may be null, a PrepSession's is always a number.
+  overallScore: OVERALL_SCORE,
   dimensions: REPORT.dimensions,
   languageStats: REPORT.languageStats,
   rewrites: REPORT.rewrites,
   actionItems: REPORT.actionItems,
   coachNote: REPORT.coachNote,
   tooShort: REPORT.tooShort,
+  scoreConfidence: "full",
+  scoreReason: null,
+  scoreEvidence: REPORT.scoreEvidence,
+  unscoredDimensions: [],
+  positioning: POSITIONING,
+  diction: DICTION,
   mode: "voice",
   status: "ready",
   delivery: FIXTURE_DELIVERY,
@@ -1063,7 +1258,7 @@ export const VOICE_READY_PREP_SESSION: PrepSession = {
   billing: VOICE_READY_SESSION.billing,
   locked: false,
   rating: null,
-  liveProvider: "aws-transcribe",
+  liveProvider: "elevenlabs",
 };
 
 /**
@@ -1095,6 +1290,24 @@ export const FIXTURE_PROPS = {
     flags: [],
     metrics: { ...FIXTURE_DELIVERY.metrics, pitchVariationSt: null, energyTrendDbPerAnswer: null },
   } satisfies DeliveryFindingsProps,
+  // The report transcript failed for good (transcriptCoverage 0): nothing measured from words.
+  findingsNoWordTimings: {
+    flags: FIXTURE_DELIVERY.flags.filter((f) => f.kind !== "rushing" && f.kind !== "fillers"),
+    metrics: { ...FIXTURE_DELIVERY.metrics, wpmMean: null, fillersPer100Words: null },
+    turns: FIXTURE_TURNS,
+    noWordTimings: true,
+  } satisfies DeliveryFindingsProps,
+  timelineNoWordTimings: {
+    delivery: {
+      ...FIXTURE_DELIVERY,
+      metrics: { ...FIXTURE_DELIVERY.metrics, wpmMean: null, fillersPer100Words: null },
+      flags: FIXTURE_DELIVERY.flags.filter((f) => f.kind !== "rushing" && f.kind !== "fillers"),
+      series: { ...FIXTURE_DELIVERY.series, pace: [] },
+      answers: FIXTURE_DELIVERY.answers.map((a) => ({ ...a, wpm: null })),
+      transcript: { segments: [], words: [] },
+    },
+    turns: FIXTURE_TURNS,
+  } satisfies DeliveryTimelineProps,
   summary: { lines: FIXTURE_SUMMARY_LINES } satisfies SummaryLinesProps,
   rating: { value: VOICE_READY_SESSION.rating?.score ?? null, onRate: resolved } satisfies AccuracyRatingProps,
   progressProcessing: {
