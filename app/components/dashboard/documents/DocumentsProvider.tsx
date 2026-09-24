@@ -13,7 +13,7 @@
 import { createContext, useContext, useMemo, type FC, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useDocumentsQuery } from "@/hooks/queries/useDocumentsQuery";
-import { useArchiveDocument, useDeleteDocument, useRenameDocument, useUploadDocument } from "@/hooks/mutations/useDocumentMutations";
+import { useArchiveDocument, useDeleteDocument, useRenameDocument, useSetMasterDocument, useUploadDocument } from "@/hooks/mutations/useDocumentMutations";
 import type { DocKind, DocSource, VaultDoc } from "@/app/lib/dashboard/types";
 
 // Re-exported so the vault, DocRow and the ATS screens keep importing their
@@ -45,16 +45,6 @@ export const KIND_LABELS: Record<DocKind, string> = {
   id: "ID document",
   other: "File",
 };
-
-export interface DriveFile {
-  id: string;
-  name: string;
-  ext?: string;
-  size?: number;
-  kind?: DocKind;
-}
-
-export const driveDocId = (fileId: string) => `doc-drive-${fileId}`;
 
 /** 1 884 160 -> "1.8 MB", 245 760 -> "240 KB". */
 export function formatSize(bytes: number): string {
@@ -118,10 +108,11 @@ interface DocumentsContextValue {
   loading: boolean;
   /** Async now: an upload is a round trip. Returns the rows the server created. */
   addUploads: (files: FileList | File[], opts?: { kind?: DocKind }) => Promise<VaultDoc[]>;
-  importFromDrive: (files: DriveFile[]) => VaultDoc[];
   rename: (id: string, name: string) => void;
   remove: (id: string) => void;
   toggleArchive: (id: string) => void;
+  /** Makes this resume the master — the one reviewers read. The server stands the old one down. */
+  setMaster: (id: string) => void;
 }
 
 const DocumentsCtx = createContext<DocumentsContextValue | null>(null);
@@ -132,6 +123,7 @@ export const DocumentsProvider: FC<{ children: ReactNode }> = ({ children }) => 
   const renameDoc = useRenameDocument();
   const archiveDoc = useArchiveDocument();
   const deleteDoc = useDeleteDocument();
+  const masterDoc = useSetMasterDocument();
 
   const docs = useMemo(() => data ?? [], [data]);
 
@@ -151,18 +143,12 @@ export const DocumentsProvider: FC<{ children: ReactNode }> = ({ children }) => 
     return created;
   }
 
-  function importFromDrive(_files: DriveFile[]): VaultDoc[] {
-    toast("Google Drive isn't connected yet", { description: "Import from your computer in the meantime." });
-    return [];
-  }
-
   return (
     <DocumentsCtx.Provider
       value={{
         docs,
         loading: isLoading,
         addUploads,
-        importFromDrive,
         rename: (id, name) => {
           const next = name.trim();
           if (next) renameDoc.mutate({ id, name: next });
@@ -172,6 +158,7 @@ export const DocumentsProvider: FC<{ children: ReactNode }> = ({ children }) => 
           const doc = docs.find((d) => d.id === id);
           if (doc) archiveDoc.mutate({ id, archived: !doc.archived });
         },
+        setMaster: (id) => masterDoc.mutate(id),
       }}>
       {children}
     </DocumentsCtx.Provider>

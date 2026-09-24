@@ -51,5 +51,11 @@ export const useArchiveDocument = () =>
     (doc) => toast.success(doc.archived ? "Archived" : "Restored", { description: doc.archived ? `${doc.name} is hidden from pickers.` : undefined }),
   );
 
+export const useSetMasterDocument = () =>
+  useDocumentAction<string, VaultDoc>(
+    (id) => apiPatch<VaultDoc>(`/api/documents/${id}`, { master: true }),
+    (doc) => toast.success(`${doc.name} is your master resume`, { description: "Reviewers read this one when they consider you." }),
+  );
+
 export const useDeleteDocument = () =>
   useDocumentAction<string, { deleted: true }>((id) => apiDelete<{ deleted: true }>(`/api/documents/${id}`), () => toast.success("Deleted"));

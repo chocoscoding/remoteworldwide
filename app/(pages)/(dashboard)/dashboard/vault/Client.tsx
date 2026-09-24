@@ -8,18 +8,18 @@
 
 import { FC, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { HardDrive, Monitor, Plus, Search, SearchX } from "lucide-react";
+import { Plus, Search, SearchX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
-import SplitButton from "@/app/components/dashboard/ui/SplitButton";
+import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { useDocuments, type DocKind, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 import DocRow, { KIND_LABELS } from "@/app/components/dashboard/vault/DocRow";
 import DropZone from "@/app/components/dashboard/vault/DropZone";
-import GoogleDriveImportDialog from "@/app/components/dashboard/vault/GoogleDriveImportDialog";
 
 type VaultTab = "all" | "resumes" | "other" | "archived";
 type SortKey = "recent" | "name" | "size";
@@ -59,7 +59,6 @@ const VaultClient: FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZE_OPTIONS[0]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [driveOpen, setDriveOpen] = useState(false);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -96,6 +95,8 @@ const VaultClient: FC = () => {
   const missing = KIT.filter((k) => !presentKinds.has(k.kind));
   const kitPct = Math.round((covered.length / KIT.length) * 100);
   const totalBytes = active.reduce((sum, d) => sum + (d.size ?? 0), 0);
+  // The resume reviewers read. Recommendations need one, so its absence is said out loud.
+  const masterResume = active.find((d) => d.master && d.kind === "resume");
 
   /** A tab change abandons browsing state — page and any in-flight rename. */
   function changeTab(next: VaultTab) {
@@ -120,20 +121,16 @@ const VaultClient: FC = () => {
           <span className="hidden truncate text-sm text-black/45 sm:inline">Everything you apply with, in one place</span>
         </div>
         <div className="flex flex-none items-center gap-2.5">
-          <SplitButton
-            label="Import"
-            icon={<Plus className="h-3.5 w-3.5" />}
-            onClick={() => fileRef.current?.click()}
-            items={[
-              { id: "computer", label: "From your computer", icon: <Monitor className="h-3.5 w-3.5" />, onSelect: () => fileRef.current?.click() },
-              { id: "drive", label: "From Google Drive", icon: <HardDrive className="h-3.5 w-3.5" />, onSelect: () => setDriveOpen(true) },
-            ]}
-          />
+          <StickerButton variant="primary" size="sm" onClick={() => fileRef.current?.click()}>
+            <Plus className="h-3.5 w-3.5" />
+            Import
+          </StickerButton>
+          <NotificationBell />
         </div>
       </header>
 
-      {/* One input serves the split button, its menu item and nothing else —
-          drag-and-drop hands files to the same addUploads. */}
+      {/* One input serves the Import button and nothing else — drag-and-drop
+          hands files to the same addUploads. */}
       <input
         ref={fileRef}
         type="file"
@@ -147,42 +144,52 @@ const VaultClient: FC = () => {
       <main className="mx-auto max-w-[1100px] px-8 py-7 pb-14">
         <DropZone onFiles={(files) => addUploads(files)}>
           {/* Application kit — derived coverage, not a hardcoded percentage. */}
-          <DashCard className="mb-6 p-6">
+          <div className="mb-6 rounded-2xl bg-[#222325] p-6 text-white">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
                 <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                  <p className="text-[15px] font-bold text-primary">
+                  <p className="text-[15px] font-bold text-white">
                     Application kit: {covered.length} of {KIT.length} covered
                   </p>
-                  <span className="text-xs text-black/55">
+                  <span className="text-xs text-white/55">
                     {counts.resumes} resume{counts.resumes === 1 ? "" : "s"} · {counts.other} other file{counts.other === 1 ? "" : "s"}
                     {totalBytes > 0 && ` · ${totalBytes >= 1_048_576 ? `${(totalBytes / 1_048_576).toFixed(1)} MB` : `${Math.round(totalBytes / 1024)} KB`}`}
                   </span>
                 </div>
-                <ProgressBar value={kitPct} className="max-w-md" />
+                <ProgressBar value={kitPct} dark className="max-w-md" />
                 {missing.length > 0 ? (
-                  <p className="mt-2.5 text-xs text-black/55">
+                  <p className="mt-2.5 text-xs text-white/55">
                     Missing:{" "}
                     {missing.map((m, i) => (
                       <span key={m.kind}>
                         {i > 0 && ", "}
                         {m.href ? (
-                          <Link href={m.href} className="font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                          <Link href={m.href} className="font-semibold text-secondary underline decoration-dotted underline-offset-2 hover:decoration-solid">
                             {m.label}
                           </Link>
                         ) : (
-                          <span className="font-semibold text-black/70">{m.label}</span>
+                          <span className="font-semibold text-white/80">{m.label}</span>
                         )}
                       </span>
                     ))}
                     {" — "}anything here can also just be dropped onto this page.
                   </p>
                 ) : (
-                  <p className="mt-2.5 text-xs text-black/55">Everything an application might ask for is on hand.</p>
+                  <p className="mt-2.5 text-xs text-white/55">Everything an application might ask for is on hand.</p>
                 )}
+                {masterResume ? (
+                  <p className="mt-1.5 text-xs text-white/55">
+                    Master resume: <span className="font-semibold text-white/80">{masterResume.name}</span> — what reviewers read when they consider you.
+                  </p>
+                ) : counts.resumes > 0 ? (
+                  <p className="mt-1.5 text-xs text-white/55">
+                    <span className="font-semibold text-secondary">No master resume yet</span> — pick one below with “Make master” so reviewers can
+                    consider you for recommendations.
+                  </p>
+                ) : null}
               </div>
             </div>
-          </DashCard>
+          </div>
 
           <div className="relative mb-5">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/35" />
@@ -248,7 +255,7 @@ const VaultClient: FC = () => {
                 body={
                   tab === "archived"
                     ? "Archive a document and it moves here — out of your pickers, never deleted."
-                    : "Import from your computer or Google Drive, or drop files anywhere on this page."
+                    : "Import from your computer, or drop files anywhere on this page."
                 }
                 ctaLabel={tab === "archived" ? "Show all documents" : "Import files"}
                 onCta={tab === "archived" ? () => changeTab("all") : () => fileRef.current?.click()}
@@ -285,8 +292,6 @@ const VaultClient: FC = () => {
           />
         </DropZone>
       </main>
-
-      <GoogleDriveImportDialog open={driveOpen} onOpenChange={setDriveOpen} />
     </div>
   );
 };

@@ -13,6 +13,7 @@ import {
   Paperclip,
   Pencil,
   ShieldCheck,
+  Star,
   Trash2,
   File as FileIcon,
 } from "lucide-react";
@@ -93,9 +94,11 @@ export interface DocRowProps {
 }
 
 const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename }) => {
-  const { remove, toggleArchive } = useDocuments();
+  const { remove, toggleArchive, setMaster } = useDocuments();
 
   const isResume = doc.kind === "resume";
+  // Only a live resume can be the master; the server refuses anything else too.
+  const canBeMaster = isResume && !doc.archived && !doc.master;
   const Icon = KIND_ICONS[doc.kind];
   const badge = sourceBadgeLabel(doc.source);
 
@@ -122,6 +125,14 @@ const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename })
       <span className="truncate text-sm font-bold text-primary underline decoration-transparent decoration-2 underline-offset-4 transition-colors group-hover/open:decoration-[#222325]">
         {doc.name}
       </span>
+      {doc.master && (
+        <span
+          className="inline-flex flex-none items-center gap-1 rounded-full bg-[#e1f073] px-2 py-0.5 text-[10px] font-bold text-[#222325]"
+          title="Your master resume — reviewers read this one when they consider you for recommendations.">
+          <Star className="h-2.5 w-2.5" strokeWidth={3} />
+          Master
+        </span>
+      )}
       {badge && <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55">{badge}</span>}
     </span>
   );
@@ -156,6 +167,16 @@ const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename })
           )}
 
           <div className="flex flex-none items-center gap-0.5">
+            {canBeMaster && (
+              <button
+                type="button"
+                className={GHOST_BTN}
+                onClick={() => setMaster(doc.id)}
+                title="Reviewers read your master resume when they consider you for recommendations">
+                <Star className="h-3.5 w-3.5" />
+                Make master
+              </button>
+            )}
             {/* Uploads hand back their original bytes; anything else gets a
                 generated summary PDF — the button always delivers a file. */}
             <button type="button" className={GHOST_BTN} onClick={() => downloadDoc(doc)}>
