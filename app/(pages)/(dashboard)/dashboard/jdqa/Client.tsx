@@ -16,37 +16,77 @@
 // or the resume tailor and coming back (or reloading) lands on the same job and
 // its answers instead of the empty state.
 
-import { FC, ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { FC, ReactNode, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Check, Clock, CreditCard, ExternalLink, Loader2, MapPin, Mic, Repeat2, RotateCcw, SendHorizontal, X } from "lucide-react";
+import {
+  AlertTriangle,
+  AudioLines,
+  Check,
+  ChevronDown,
+  Clock,
+  CreditCard,
+  ExternalLink,
+  Loader2,
+  MapPin,
+  Mic,
+  Repeat2,
+  RotateCcw,
+  SendHorizontal,
+  Square,
+  X,
+} from "lucide-react";
 import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
+import LogoMini from "@/app/components/svg/LogoMini";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
-import { JD_QUICK_QUESTIONS } from "@/app/lib/dashboard/mock-data";
+import InlineTalkBar from "@/app/components/dashboard/voice/InlineTalkBar";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
+import { useVoiceConversation } from "@/app/components/dashboard/voice/useVoiceConversation";
+import {
+  atsScoreHref,
+  coachHref,
+  coverLetterHref,
+  findReferralHref,
+  tailorResumeHref,
+  type JobContextFields,
+  type JobContextSource,
+} from "@/app/lib/dashboard/contextParams";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import { BILLING_HREF, MAX_JOB_QUESTION_CHARS, askAnnouncement, describeAskFailure, isQuickQuestionId, type AskFailure } from "@/app/lib/jobs/ask";
+import {
+  BILLING_HREF,
+  JD_QUICK_QUESTIONS,
+  MAX_JOB_QUESTION_CHARS,
+  askAnnouncement,
+  describeAskFailure,
+  isQuickQuestionId,
+  type AskFailure,
+} from "@/app/lib/jobs/ask";
 import { parseFieldSpec, toPickedJob, type PickedJob } from "@/app/lib/jobs/fields";
 import type {
   AskJobInput,
   EmploymentType,
   JdQuickQuestionId,
   JobAnswer,
+  JobNextStep,
   JobSource,
   JobThreadEntry,
   RemoteType,
   SavedJobItem,
 } from "@/app/lib/jobs/types";
 import { qk } from "@/app/lib/query/keys";
+import { isTalkActive, problemCopy } from "@/app/lib/voice/talkState";
 import { useAskJob } from "@/hooks/mutations/useAskJob";
+import { useOpenInterviewPrep, useTrackJob, type NextStepJob } from "@/hooks/mutations/useJobNextSteps";
 import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
-import { useJobThread } from "@/hooks/queries/useJobThread";
+import { refreshJobThread, useJobThread } from "@/hooks/queries/useJobThread";
+import { useVoiceConfig } from "@/hooks/queries/useVoiceConfig";
 
 // ---------------------------------------------------------------------------
 // What this screen asks the picker for. Company, role and description are
@@ -85,6 +125,13 @@ function hrefWithJob(pathname: string, params: { toString(): string }, id: strin
   else next.set(JOB_PARAM, id);
   const query = next.toString();
   return query ? `${pathname}?${query}` : pathname;
+}
+
+/** Voice minutes are counted per UTC day, so they come back at the next UTC midnight after `from`. */
+function minutesBackAt(from: number): string {
+  const at = new Date(from);
+  at.setUTCHours(24, 0, 0, 0);
+  return at.toISOString();
 }
 
 /** The chips, narrowed to the ids the AI service accepts as `questionId`. */
@@ -139,16 +186,18 @@ function whereLine(location: string | null, remoteType: RemoteType | null): stri
 }
 
 // ---------------------------------------------------------------------------
-// The transcript shows the thread's stored entries first, then the asks made
-// during this visit.
+// The transcript shows the thread's stored entries from earlier visits first,
+// then every ask made during this visit, in the order it was asked, so a new
+// answer always lands at the bottom.
 //
-// An ask stays in local state only until the thread holds its answer. A new,
-// charged answer is written into the thread's cache as it lands, so its local
-// copy steps aside and the stored entry takes its place. Two kinds of answered
-// ask stay local. One is a repeat: the thread already shows it further up, but
-// the user just asked again and should see it answered. The other is an answer
-// the service never stores, the "upload a resume" reply to "Am I a fit?".
-// Pending and failed asks only ever exist locally.
+// A new, charged answer is also written into the thread's cache as it lands.
+// The stored copy is hidden while its local ask is on screen, rather than the
+// local copy stepping aside, because the stored list renders above the local
+// asks: an answer moved there would land above an earlier local ask, such as
+// the "upload a resume" reply to "Am I a fit?", which the service never stores.
+// A repeat stays on screen twice: the thread shows it further up, and the user
+// just asked again and should see it answered. Pending and failed asks only
+// ever exist locally.
 // ---------------------------------------------------------------------------
 
 type AskState =
@@ -164,13 +213,7 @@ interface LocalAsk {
   state: AskState;
 }
 
-const CoachAvatar: FC = () => (
-  <div
-    aria-hidden
-    className="h-8 w-8 flex-none rounded-full bg-secondary text-primary font-extrabold text-[11px] flex items-center justify-center mt-0.5">
-    RW
-  </div>
-);
+const CoachAvatar: FC = () => <LogoMini aria-hidden className="h-8 w-8 flex-none mt-0.5" />;
 
 const QuestionBubble: FC<{ text: string }> = ({ text }) => (
   <div className="flex justify-end">
@@ -180,7 +223,73 @@ const QuestionBubble: FC<{ text: string }> = ({ text }) => (
   </div>
 );
 
-const AnswerBubble: FC<{ answer: JobAnswer; note: string | null }> = ({ answer, note }) => (
+/** The job an answer is about: the fields its links carry, and whether it is a Remote Worldwide listing. */
+type AnswerJob = JobContextFields & { platform: boolean };
+
+/** What an answer offered before the service chose its own next steps. */
+const DEFAULT_NEXT_STEPS: JobNextStep[] = ["tailor-resume", "find-referral"];
+
+const NEXT_STEP_LABEL: Record<JobNextStep, string> = {
+  "interview-prep": "Prep for the interview",
+  "tailor-resume": "Tailor resume",
+  "find-referral": "Find a referral",
+  "cover-letter": "Write a cover letter",
+  "ats-score": "Check ATS score",
+  track: "Add to tracker",
+  coach: "Ask the coach",
+};
+
+/** The steps that are a link to another screen, opened on this job. The rest do something here. */
+const NEXT_STEP_HREF: Partial<Record<JobNextStep, (job: JobContextFields, from: JobContextSource) => string>> = {
+  "tailor-resume": tailorResumeHref,
+  "find-referral": findReferralHref,
+  "cover-letter": coverLetterHref,
+  "ats-score": atsScoreHref,
+  coach: coachHref,
+};
+
+/**
+ * Where the answer suggests going next, in the order the service ranked them,
+ * the first as the main button. Interview prep and the tracker act in place:
+ * prep adds the job to the tracker and makes its track before opening it.
+ */
+const NextSteps: FC<{ steps: JobNextStep[]; job: AnswerJob }> = ({ steps, job }) => {
+  const prep = useOpenInterviewPrep();
+  const track = useTrackJob();
+  const actionJob: NextStepJob | null =
+    job.savedJobId && job.company && job.role ? { savedJobId: job.savedJobId, company: job.company, role: job.role, platform: job.platform } : null;
+  const acting = prep.isPending || track.isPending;
+
+  return steps.map((step, i) => {
+    const className = i === 0 ? PRIMARY_LINK_SM : OUTLINE_LINK;
+    const href = NEXT_STEP_HREF[step];
+    if (href) {
+      return (
+        <Link key={step} href={href(job, "jdqa")} className={className}>
+          {NEXT_STEP_LABEL[step]}
+        </Link>
+      );
+    }
+    const running = step === "interview-prep" ? prep.isPending : track.isPending;
+    return (
+      <button
+        key={step}
+        type="button"
+        disabled={!actionJob || acting}
+        onClick={() => {
+          if (!actionJob) return;
+          if (step === "interview-prep") prep.mutate(actionJob);
+          else track.mutate(actionJob);
+        }}
+        className={className}>
+        {running && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+        {NEXT_STEP_LABEL[step]}
+      </button>
+    );
+  });
+};
+
+const AnswerBubble: FC<{ answer: JobAnswer; note: string | null; job: AnswerJob }> = ({ answer, note, job }) => (
   <div className="flex items-start gap-2.5">
     <CoachAvatar />
     <div className="max-w-[85%] flex flex-col gap-3">
@@ -229,12 +338,7 @@ const AnswerBubble: FC<{ answer: JobAnswer; note: string | null }> = ({ answer, 
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/dashboard/resume" className={OUTLINE_LINK}>
-          Tailor resume
-        </Link>
-        <Link href="/dashboard/referrals" className={OUTLINE_LINK}>
-          Find a referral
-        </Link>
+        <NextSteps steps={answer.nextSteps?.length ? answer.nextSteps : DEFAULT_NEXT_STEPS} job={job} />
         {note && <span className="text-[11px] font-medium text-black/40">{note}</span>}
       </div>
     </div>
@@ -331,9 +435,14 @@ const JobCard: FC<{ job: AskedJob }> = ({ job }) => {
       ? { href: postingHref, label: "View the posting", mail: false }
       : null;
   const where = whereLine(job.location, job.remoteType);
+  // Below lg the card sits above the chat rather than beside it, so everything
+  // past the job's identity folds away until asked for. From lg up it is always
+  // open; the classes decide that, so the server render and hydration agree.
+  const [open, setOpen] = useState(false);
+  const detailsId = useId();
 
   return (
-    <DashCard className="p-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+    <DashCard className="p-6 lg:min-h-0 lg:overflow-y-auto">
       <div className="mb-4 flex items-start justify-between gap-3">
         <Pill variant="neutral">{SOURCE_LABEL[job.source]}</Pill>
         {logo && <CompanyLogo key={logo} src={logo} company={job.company} />}
@@ -354,37 +463,51 @@ const JobCard: FC<{ job: AskedJob }> = ({ job }) => {
         </div>
       )}
 
-      {job.summary && <p className="mt-5 text-sm text-black/70 leading-relaxed">{job.summary}</p>}
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls={detailsId}
+        className="mt-4 flex w-full items-center justify-between gap-2 rounded-lg border border-black/10 px-3.5 py-2.5 text-xs font-bold text-primary cursor-pointer transition-colors hover:bg-[#fbfbf7] lg:hidden">
+        {open ? "Hide job details" : "Show job details"}
+        <ChevronDown className={cn("h-4 w-4 flex-none transition-transform", open && "rotate-180")} aria-hidden />
+      </button>
 
-      {job.requirements.length > 0 && (
-        <div className="mt-5">
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2">What they want</p>
-          <ul className="flex flex-col gap-1.5">
-            {job.requirements.map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-black/70 leading-relaxed">
-                <span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-primary/40" />
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div id={detailsId} className={cn(open ? "block" : "hidden", "lg:block")}>
+        {job.summary && <p className="mt-5 text-sm text-black/70 leading-relaxed">{job.summary}</p>}
 
-      {link && (
-        <div className="mt-5">
-          <a
-            href={link.href}
-            target={link.mail ? undefined : "_blank"}
-            rel={link.mail ? undefined : "noopener noreferrer"}
-            className={PRIMARY_LINK_MD}>
-            {link.label}
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-          </a>
-        </div>
-      )}
+        {job.requirements.length > 0 && (
+          <div className="mt-5">
+            <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2 underline underline-offset-4">
+              What they want
+            </p>
+            <ul className="flex flex-col gap-1.5">
+              {job.requirements.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-black/70 leading-relaxed">
+                  <span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[#7fb04a]" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-      <p className="mt-6 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2">Full description</p>
-      <p className="text-sm text-black/70 leading-relaxed whitespace-pre-line break-words">{job.description}</p>
+        {link && (
+          <div className="mt-5">
+            <a
+              href={link.href}
+              target={link.mail ? undefined : "_blank"}
+              rel={link.mail ? undefined : "noopener noreferrer"}
+              className={PRIMARY_LINK_MD}>
+              {link.label}
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            </a>
+          </div>
+        )}
+
+        <p className="mt-6 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2">Full description</p>
+        <p className="text-sm text-black/70 leading-relaxed whitespace-pre-line break-words">{job.description}</p>
+      </div>
     </DashCard>
   );
 };
@@ -461,14 +584,15 @@ const JdqaScreen: FC = () => {
   // as confused.
   const busy = asks.some((ask) => ask.state.status === "pending");
 
-  const storedIds = new Set(threadItem?.entries.map((entry) => entry.id));
   const answeredIds = new Set<JdQuickQuestionId>(threadItem?.answeredQuestionIds);
-  const chargedIds = new Set(asks.flatMap((ask) => (ask.state.status === "answered" && ask.state.charged ? [ask.state.entry.id] : [])));
-  const localAsks = asks.filter((ask) => !(ask.state.status === "answered" && !ask.state.repeat && storedIds.has(ask.state.entry.id)));
+  // Answers stored during this visit are shown where they were asked, so they
+  // are left out of the earlier entries rather than jumping up into them.
+  const askedHereIds = new Set(asks.flatMap((ask) => (ask.state.status === "answered" && !ask.state.repeat ? [ask.state.entry.id] : [])));
+  const earlierEntries = threadItem?.entries.filter((entry) => !askedHereIds.has(entry.id)) ?? [];
 
   // Keep the newest exchange in view: a new ask, an answer replacing its
   // thinking bubble, or a thread opening onto earlier answers.
-  const exchangeCount = (threadItem?.entries.length ?? 0) + localAsks.length;
+  const exchangeCount = earlierEntries.length + asks.length;
   const lastStatus = asks.length > 0 ? asks[asks.length - 1].state.status : "none";
   const latest = asks.length > 0 ? asks[asks.length - 1].state : null;
   const announcement = askAnnouncement(
@@ -502,6 +626,96 @@ const JdqaScreen: FC = () => {
     dictationEpoch.current = jobEpoch.current;
     voice.startDictation();
   };
+
+  // Talk mode. A call's answers are stored on the thread, which is read back by id after each turn.
+  const voiceConfig = useVoiceConfig();
+  const talkOn = !!voiceConfig.data?.spokenEnabled && !!voiceConfig.data?.features["job-ask"].enabled;
+  const talkThreadRef = useRef<{ savedJobId: string; threadId: string } | null>(null);
+  const refreshGate = useRef({ running: false, again: false });
+  // One read in flight; whatever is asked meanwhile becomes one more after it.
+  const refreshTalkThread = useCallback(() => {
+    const gate = refreshGate.current;
+    if (gate.running) {
+      gate.again = true;
+      return;
+    }
+    gate.running = true;
+    void (async () => {
+      try {
+        do {
+          gate.again = false;
+          const target = talkThreadRef.current;
+          if (target) await refreshJobThread(queryClient, target.savedJobId, target.threadId).catch(() => undefined);
+        } while (gate.again);
+      } finally {
+        gate.running = false;
+      }
+    })();
+  }, [queryClient]);
+  // The call's end also settles its last turn (onTurnSettled); what is left is today's minutes.
+  const refreshVoiceConfig = useCallback(() => void queryClient.invalidateQueries({ queryKey: qk.voice.config() }), [queryClient]);
+  const talk = useVoiceConversation({
+    feature: "job-ask",
+    targetId: threadItem?.id ?? null,
+    enabled: talkOn,
+    onTurnSettled: refreshTalkThread,
+    onEnded: refreshVoiceConfig,
+  });
+  const { start: startTalk, end: endTalk, reset: resetTalk } = talk;
+  const talkActive = isTalkActive(talk.state);
+  const showTalk = talkActive || talk.problem !== null;
+  const outOfMinutes = voiceConfig.data?.remainingSeconds === 0;
+  const minutesBack = outOfMinutes ? minutesBackAt(voiceConfig.dataUpdatedAt) : null;
+  const talkReason = talkActive
+    ? null
+    : minutesBack !== null
+      ? problemCopy({ kind: "minutes", retryAt: minutesBack })
+      : !ready
+        ? "Available once the conversation is open"
+        : busy
+          ? "Wait for the answer to finish"
+          : null;
+  const talkLabel = talkActive ? "End voice call" : talkReason ? `Talk about this job. ${talkReason}` : "Talk about this job";
+  const talkCaption =
+    talk.state !== "live" ? "" : talk.agentCaption ? `Answer: ${talk.agentCaption}` : talk.userCaption ? `You: ${talk.userCaption}` : "";
+  const composerRef = useRef<HTMLInputElement>(null);
+  const talkButtonRef = useRef<HTMLButtonElement>(null);
+  const typeFocusRef = useRef(false);
+
+  // A tab left open past the reset asks again instead of staying locked until a reload.
+  useEffect(() => {
+    if (minutesBack === null) return;
+    const timer = setTimeout(refreshVoiceConfig, Math.max(0, Date.parse(minutesBack) - Date.now()) + 30_000);
+    return () => clearTimeout(timer);
+  }, [minutesBack, refreshVoiceConfig]);
+
+  const handleTalk = () => {
+    if (talkActive) {
+      typeFocusRef.current = true;
+      endTalk();
+      return;
+    }
+    if (!job || !threadItem) return;
+    talkThreadRef.current = { savedJobId: job.id, threadId: threadItem.id };
+    startTalk();
+  };
+
+  // Dictation and a call would share the mic.
+  useEffect(() => {
+    if (talkActive && (listening || requesting)) stopDictation();
+  }, [talkActive, listening, requesting, stopDictation]);
+
+  const handleTypeInstead = useCallback(() => {
+    resetTalk();
+    typeFocusRef.current = true;
+  }, [resetTalk]);
+
+  // The composer stays disabled until the call has ended, so focus waits for that.
+  useEffect(() => {
+    if (talkActive || !typeFocusRef.current) return;
+    typeFocusRef.current = false;
+    composerRef.current?.focus();
+  }, [talkActive, showTalk]);
 
   function resetConversation() {
     // Dictation ends with the job it was for.
@@ -545,7 +759,9 @@ const JdqaScreen: FC = () => {
   }
 
   async function send(input: AskJobInput, question: string, retryKey?: string) {
-    if (!job || !threadItem || !ready || busy) return;
+    if (!job || !threadItem || !ready || busy || talkActive) return;
+    // Any ask closes a refusal's panel, whose Retry would otherwise start a call beside it.
+    resetTalk();
     const epoch = jobEpoch.current;
     const key = retryKey ?? `ask-${++askSeq.current}`;
     if (retryKey) settle(key, { status: "pending" });
@@ -571,13 +787,19 @@ const JdqaScreen: FC = () => {
 
   const submitComposer = () => {
     const text = composerValue.trim();
-    if (!text || !ready || busy) return;
+    if (!text || !ready || busy || talkActive) return;
     // As in the coach, sending ends dictation, so the next thing said doesn't start filling the box again unasked.
     if (listening || requesting) stopDictation();
     setComposerValue("");
     void send({ question: text }, text);
   };
 
+  const answerJob: AnswerJob = {
+    savedJobId: job?.id ?? threadItem?.savedJobId,
+    company: job?.company ?? threadItem?.company,
+    role: job?.role ?? threadItem?.role,
+    platform: job?.source === "platform",
+  };
   let transcript: ReactNode;
   if (!threadItem && thread.isError) {
     transcript = (
@@ -616,7 +838,7 @@ const JdqaScreen: FC = () => {
           </div>
         )}
 
-        {threadItem.entries.length === 0 && localAsks.length === 0 && (
+        {threadItem.entries.length === 0 && asks.length === 0 && (
           <div className="m-auto max-w-[340px] text-center">
             <p className="text-sm font-semibold text-primary">Ask your first question</p>
             <p className="mt-1 text-sm text-black/50 leading-relaxed">
@@ -625,14 +847,14 @@ const JdqaScreen: FC = () => {
           </div>
         )}
 
-        {threadItem.entries.map((entry) => (
+        {earlierEntries.map((entry) => (
           <div key={entry.id} className="flex flex-col gap-5">
             <QuestionBubble text={entry.question} />
-            <AnswerBubble answer={entry.answer} note={chargedIds.has(entry.id) ? "1 credit used" : null} />
+            <AnswerBubble answer={entry.answer} note={null} job={answerJob} />
           </div>
         ))}
 
-        {localAsks.map((ask) => (
+        {asks.map((ask) => (
           <div key={ask.key} className="flex flex-col gap-5">
             <QuestionBubble text={ask.state.status === "answered" ? ask.state.entry.question : ask.question} />
             {ask.state.status === "pending" ? (
@@ -641,12 +863,13 @@ const JdqaScreen: FC = () => {
               <AnswerBubble
                 answer={ask.state.entry.answer}
                 note={ask.state.repeat ? "Asked before · no credit used" : ask.state.charged ? "1 credit used" : null}
+                job={answerJob}
               />
             ) : (
               <FailureBubble
                 failure={ask.state.failure}
                 onRetry={() => void send(ask.input, ask.question, ask.key)}
-                retryDisabled={!ready || busy}
+                retryDisabled={!ready || busy || talkActive}
               />
             )}
           </div>
@@ -655,32 +878,38 @@ const JdqaScreen: FC = () => {
     );
   }
 
+  // From lg up the screen is exactly the viewport, as the coach is: the page
+  // itself never scrolls, only the transcript and the job card inside it.
+  // Below lg the card stacks above the chat and the page scrolls as usual.
   return (
-    <div className="min-h-screen bg-[#f6f6f6]">
+    <div className="min-h-screen bg-[#f6f6f6] lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
+      <header className="sticky top-0 z-10 h-16 flex flex-none items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Ask about a job</h1>
         </div>
-        {job && (
-          <div className="flex flex-none items-center gap-2">
-            <StickerButton variant="outline" size="md" onClick={() => void chooseJob()}>
-              <Repeat2 className="h-4 w-4" />
-              Change job
-            </StickerButton>
-            <button
-              type="button"
-              onClick={clearJob}
-              aria-label="Clear this job"
-              title="Clear this job"
-              className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
-              <X className="h-4 w-4" strokeWidth={2.5} />
-            </button>
-          </div>
-        )}
+        <div className="flex flex-none items-center gap-2">
+          {job && (
+            <>
+              <StickerButton variant="outline" size="md" className="p-2" onClick={() => void chooseJob()}>
+                <Repeat2 className="h-4 w-4" />
+                Change job
+              </StickerButton>
+              <button
+                type="button"
+                onClick={clearJob}
+                aria-label="Clear this job"
+                title="Clear this job"
+                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+                <X className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            </>
+          )}
+          <NotificationBell />
+        </div>
       </header>
 
-      <main className="px-8 py-7 pb-14 max-w-[1240px] mx-auto">
+      <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto lg:w-full lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:py-4">
         {!job && restoring ? (
           <div className="flex min-h-[420px] items-center justify-center" role="status">
             <span className="inline-flex items-center gap-2 text-sm text-black/50">
@@ -724,12 +953,12 @@ const JdqaScreen: FC = () => {
             </StickerButton>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-5 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] lg:grid-rows-[minmax(0,1fr)] gap-5 items-start lg:items-stretch lg:h-full">
             {/* Left: the job, in full */}
             <JobCard job={job} />
 
             {/* Right: Q&A chat */}
-            <DashCard className="p-0 flex flex-col overflow-hidden">
+            <DashCard className="p-0 flex flex-col overflow-hidden lg:min-h-0">
               {/* Quick-question chips */}
               <div className="p-5 border-b border-black/8">
                 <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -744,13 +973,13 @@ const JdqaScreen: FC = () => {
                         key={q.id}
                         type="button"
                         onClick={() => askQuick(q.id, q.label)}
-                        disabled={answered || !ready || busy}
+                        disabled={answered || !ready || busy || talkActive}
                         title={answered ? "Answered below" : undefined}
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-default",
+                          "inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-default border border-black/12 ",
                           answered
                             ? "bg-[#f0f0ea] text-black/35"
-                            : "border border-black/12 bg-white text-primary hover:border-primary disabled:opacity-50 disabled:hover:border-black/12",
+                            : "bg-white text-primary hover:border-primary disabled:opacity-50 disabled:hover:border-black/12",
                         )}>
                         {answered && <Check className="h-3 w-3" />}
                         {q.label}
@@ -761,7 +990,9 @@ const JdqaScreen: FC = () => {
               </div>
 
               {/* Transcript */}
-              <div ref={transcriptRef} className="overflow-y-auto max-h-[520px] min-h-[360px] px-5 py-5 flex flex-col gap-5">
+              <div
+                ref={transcriptRef}
+                className="overflow-y-auto max-h-[520px] min-h-[360px] px-5 py-5 flex flex-col gap-5 lg:max-h-none lg:min-h-0 lg:flex-1">
                 {transcript}
               </div>
               {/* What the latest ask is doing, for screen readers, from one region
@@ -779,19 +1010,36 @@ const JdqaScreen: FC = () => {
                   e.preventDefault();
                   submitComposer();
                 }}>
+                {showTalk && (
+                  <InlineTalkBar
+                    talk={talk}
+                    speakingLabel="Answering"
+                    onTypeInstead={handleTypeInstead}
+                    controlRef={talkButtonRef}
+                    className={cn(
+                      "h-[42px] flex-1 rounded-full border pl-4 pr-2",
+                      talk.problem ? "border-[#b23c26]/25 bg-[#fdf4f2]" : "border-[#222325] bg-[#f6f6f6]",
+                    )}
+                  />
+                )}
                 <input
+                  ref={composerRef}
                   value={composerValue}
                   onChange={(e) => setComposerValue(e.target.value)}
                   maxLength={MAX_JOB_QUESTION_CHARS}
+                  disabled={talkActive}
                   aria-label="Ask anything about this role"
-                  placeholder={listening ? "Listening…" : "Ask anything about this role…"}
-                  className="flex-1 rounded-full border border-black/12 bg-[#f6f6f6] px-4 py-2.5 text-sm text-primary placeholder:text-black/40 focus:outline-none focus:border-primary/40"
+                  placeholder={talkActive ? "End the call to type" : listening ? "Listening…" : "Ask anything about this role…"}
+                  className={cn(
+                    "flex-1 rounded-full border border-black/12 bg-[#f6f6f6] px-4 py-2.5 text-sm text-primary placeholder:text-black/40 focus:outline-none focus:border-primary/40 disabled:cursor-not-allowed",
+                    showTalk && "hidden",
+                  )}
                 />
                 {/* The coach composer's mic, with its states. Dictated words land in the box like typing. */}
                 <button
                   type="button"
                   onClick={listening || requesting ? stopDictation : startDictation}
-                  disabled={!dictationSupported || micStatus === "denied"}
+                  disabled={!dictationSupported || micStatus === "denied" || talkActive}
                   aria-pressed={listening}
                   aria-label={listening ? "Stop dictating" : requesting ? "Cancel dictation" : "Dictate your question"}
                   title={
@@ -810,13 +1058,34 @@ const JdqaScreen: FC = () => {
                   className={cn(
                     "inline-flex h-8 w-8 flex-none items-center justify-center rounded-md cursor-pointer transition-colors disabled:opacity-30 disabled:pointer-events-none",
                     listening ? "bg-[#222325] text-[#e1f073]" : "text-black/45 hover:bg-black/5 hover:text-primary",
+                    showTalk && "hidden",
                   )}>
                   {micStatus === "requesting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
                 </button>
+                {talkOn && (
+                  // A disabled button gets no hover, so its reason rides on the wrapper's tooltip.
+                  <span className="inline-flex flex-none" title={talkReason ?? talkLabel}>
+                    <StickerButton
+                      ref={talkButtonRef}
+                      variant={talkActive ? "primary" : "secondary"}
+                      size="sm"
+                      onClick={handleTalk}
+                      disabled={talk.state === "ending" || (!talkActive && (!ready || busy || outOfMinutes))}
+                      aria-label={talkLabel}
+                      className={talkActive ? undefined : "border-[1.5px] border-[#222325] hover:shadow-[2px_2px_0_0_#222325]"}>
+                      {talkActive ? (
+                        <Square className="h-3 w-3 fill-current" aria-hidden />
+                      ) : (
+                        <AudioLines className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      {talkActive ? "End" : "Talk"}
+                    </StickerButton>
+                  </span>
+                )}
                 <button
                   type="submit"
                   aria-label="Send question"
-                  disabled={!composerValue.trim() || !ready || busy}
+                  disabled={!composerValue.trim() || !ready || busy || showTalk}
                   className="h-10 w-10 flex-none rounded-full bg-primary text-white flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-30 disabled:cursor-default">
                   <SendHorizontal className="h-4 w-4" />
                 </button>
@@ -827,6 +1096,11 @@ const JdqaScreen: FC = () => {
               {listening && interim && (
                 <p data-interim className="-mt-2 truncate px-6 pb-3 text-[11px] font-medium italic text-black/55">
                   {interim.length > INTERIM_TAIL_CHARS ? `…${interim.slice(-INTERIM_TAIL_CHARS).trimStart()}` : interim}
+                </p>
+              )}
+              {talkCaption && (
+                <p data-caption className="-mt-2 truncate px-6 pb-3 text-[11px] font-medium italic text-black/55">
+                  {talkCaption}
                 </p>
               )}
             </DashCard>
@@ -842,6 +1116,7 @@ const JdqaFallback: FC = () => (
   <div className="min-h-screen bg-[#f6f6f6]">
     <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
       <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Ask about a job</h1>
+      <NotificationBell />
     </header>
   </div>
 );

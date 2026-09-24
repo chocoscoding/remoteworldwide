@@ -9,7 +9,7 @@ import { ReactNode } from "react";
 export default function PrepPageShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
-      <main className="px-8 py-7 pb-14 max-w-[1240px] mx-auto">{children}</main>
+      <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto">{children}</main>
     </div>
   );
 }
