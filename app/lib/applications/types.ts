@@ -9,6 +9,7 @@
 // the board and the table cannot drift apart.
 
 import type { TrackerClosedReason, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
+import type { HabitItem } from "@/app/lib/streak/types";
 
 export const APPLICATION_STAGES = ["saved", "applied", "conversation", "interviewing", "offer"] as const satisfies readonly TrackerColumnId[];
 export type ApplicationStage = TrackerColumnId;
@@ -34,7 +35,17 @@ export const APPLICATION_LIMITS = {
   urlMax: 2_000,
   idempotencyKeyMax: 120,
   importMax: 500,
+  coverLetterMax: 8_000,
+  answersMax: 40,
+  questionMax: 400,
+  answerMax: 4_000,
 } as const;
+
+/** One form question and the answer sent with it: a snapshot, not a link into the saved-answer library. */
+export interface ApplicationAnswer {
+  question: string;
+  answer: string;
+}
 
 export interface ApplicationItem {
   id: string;
@@ -43,6 +54,8 @@ export interface ApplicationItem {
   location: string | null;
   url: string | null;
   savedJobId: string | null;
+  /** The linked saved job's logo, joined on read so it can't go stale against the job; null with no job or no logo. */
+  companyLogo: string | null;
   source: ApplicationSource;
   status: ApplicationStatus;
   closedFrom: ApplicationStage | null;
@@ -52,9 +65,17 @@ export interface ApplicationItem {
   roundsReached: number | null;
   duplicateOf: string | null;
   atsScore: number | null;
+  /** The ingested resume (`GET /api/ai/resume`) it was sent with, when it went through the apply wizard. */
+  resumeId: string | null;
   position: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** `GET /api/applications/:id`: the row plus what was sent, which the list leaves out. */
+export interface ApplicationDetail extends ApplicationItem {
+  coverLetter: string | null;
+  answers: ApplicationAnswer[];
 }
 
 export interface CreateApplicationInput {
@@ -69,6 +90,9 @@ export interface CreateApplicationInput {
   atsScore?: number | null;
   idempotencyKey?: string | null;
   loggedAt?: string;
+  resumeId?: string | null;
+  coverLetter?: string | null;
+  answers?: ApplicationAnswer[] | null;
 }
 
 export interface UpdateApplicationInput {
@@ -81,6 +105,9 @@ export interface UpdateApplicationInput {
   roundsReached?: number | null;
   atsScore?: number | null;
   touch?: true;
+  resumeId?: string | null;
+  coverLetter?: string | null;
+  answers?: ApplicationAnswer[] | null;
 }
 
 export interface DuplicateCheckQuery {
@@ -121,10 +148,14 @@ export interface GoalsItem {
   restDays: number[];
   huntHour: number;
   paused: boolean;
+  /** The day a pause ends (`YYYY-MM-DD`, the user's calendar); null when not paused, or paused with no end. */
+  pauseEndsOn: string | null;
+  /** The daily habits, each ticked by the action kind it is bound to. The defaults until the user edits them. */
+  habits: HabitItem[];
   boardImportedAt: string | null;
 }
 
-export type UpdateGoalsInput = Partial<Pick<GoalsItem, "weeklyTarget" | "restDays" | "huntHour" | "paused">>;
+export type UpdateGoalsInput = Partial<Pick<GoalsItem, "weeklyTarget" | "restDays" | "huntHour" | "paused" | "pauseEndsOn" | "habits">>;
 
 export interface FunnelStage {
   id: ApplicationStage;

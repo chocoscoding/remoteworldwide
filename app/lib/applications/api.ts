@@ -186,6 +186,8 @@ export function draftApplication(id: string, input: CreateApplicationInput, rows
     location: input.location ?? null,
     url: input.url ?? null,
     savedJobId: input.savedJobId ?? null,
+    // Joined by the server from the saved job; initials until its answer lands.
+    companyLogo: null,
     source: input.source ?? "external",
     status,
     closedFrom: null,
@@ -195,6 +197,7 @@ export function draftApplication(id: string, input: CreateApplicationInput, rows
     roundsReached: null,
     duplicateOf: input.duplicateOf ?? null,
     atsScore: input.atsScore ?? null,
+    resumeId: input.resumeId ?? null,
     position: topPosition(rows, status),
     createdAt: now,
     updatedAt: now,
@@ -217,6 +220,7 @@ export function applyApplicationUpdate(row: ApplicationItem, input: UpdateApplic
   if (input.url !== undefined) next.url = input.url;
   if (input.roundsReached !== undefined) next.roundsReached = input.roundsReached;
   if (input.atsScore !== undefined) next.atsScore = input.atsScore;
+  if (input.resumeId !== undefined) next.resumeId = input.resumeId;
   if (input.position !== undefined) next.position = input.position;
   if (input.touch) next.lastTouchedAt = iso;
 

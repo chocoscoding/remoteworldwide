@@ -20,6 +20,8 @@ export interface PrepEmptyStateProps {
   /** Public path to a Lottie shown instead of the icon circle — the page-level
    *  "nothing scheduled" state earns the animated figure; in-panel tabs stay quiet. */
   lottieSrc?: string;
+  /** Edge of the Lottie in px, for a card that should stay short. Defaults to EmptyStateLottie's own. */
+  lottieSize?: number;
   title: string;
   body: ReactNode;
   ctaLabel?: string;
@@ -35,10 +37,10 @@ export interface PrepEmptyStateProps {
   className?: string;
 }
 
-const PrepEmptyState: FC<PrepEmptyStateProps> = ({ icon: Icon, lottieSrc, title, body, ctaLabel, onCta, ctaHref, ctaBusy, bare, className }) => (
+const PrepEmptyState: FC<PrepEmptyStateProps> = ({ icon: Icon, lottieSrc, lottieSize, title, body, ctaLabel, onCta, ctaHref, ctaBusy, bare, className }) => (
   <div className={cn(bare ? "" : PANEL, "px-6 flex flex-col items-center text-center", lottieSrc ? "gap-2 py-6" : "gap-3.5 py-10", className)}>
     {lottieSrc ? (
-      <EmptyStateLottie src={lottieSrc} />
+      <EmptyStateLottie src={lottieSrc} size={lottieSize} />
     ) : (
       Icon && (
         <span className="h-12 w-12 rounded-full bg-[#f0f0ea] flex items-center justify-center">
