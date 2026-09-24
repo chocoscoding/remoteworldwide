@@ -30,8 +30,15 @@ const COVER_PATH = "/api/ai/cover";
 /** Where a 402 sends someone to top up. */
 export { ATS_BILLING_HREF as COVER_BILLING_HREF } from "@/app/lib/ats/api";
 
-/** What one letter costs, for the copy that warns before spending it. */
-export const COVER_CREDITS = 1;
+/** What one letter costs, for the copy that warns before spending it. Mirrors COVER_CREDITS in the service. */
+export const COVER_CREDITS = 2;
+
+/** What revising the letter to an instruction costs. Mirrors REVISE_CREDITS in the service. */
+export const COVER_REVISE_CREDITS = 1;
+
+/** Mirror the revise validator: past these the service refuses the request. */
+export const MAX_REVISE_LETTER_CHARS = 8_000;
+export const MAX_REVISE_INSTRUCTION_CHARS = 500;
 
 export const COVER_TONES = ["warm", "formal", "story", "short"] as const;
 export type CoverTone = (typeof COVER_TONES)[number];
@@ -81,6 +88,28 @@ export const generateCoverLetter = (input: CoverLetterInput) =>
     jdText: input.jdText ?? null,
     jobId: input.jobId ?? null,
     tone: input.tone,
+  });
+
+export interface ReviseCoverLetterInput {
+  /** The letter as it stands in the editor, the user's own edits included. */
+  letter: string;
+  /** "Make it warmer", "cut the second paragraph"… */
+  instruction: string;
+  company?: string | null;
+  role?: string | null;
+}
+
+/**
+ * Rewrites the letter to one instruction, for `COVER_REVISE_CREDITS`. The
+ * service adds no facts the letter does not already hold. Rejects with the
+ * service's sentence: 402 without a credit, 429/503 when the writer is busy.
+ */
+export const reviseCoverLetter = (input: ReviseCoverLetterInput) =>
+  apiPost<CoverLetterContent>(`${COVER_PATH}/revise`, {
+    letter: input.letter.slice(0, MAX_REVISE_LETTER_CHARS),
+    instruction: input.instruction.slice(0, MAX_REVISE_INSTRUCTION_CHARS),
+    company: input.company || undefined,
+    role: input.role || undefined,
   });
 
 export type CoverFailureKind =

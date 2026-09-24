@@ -27,22 +27,46 @@
 //    things that are true and checkable: which resume it was written from, the
 //    live word count, and the tone's own paragraph target.
 
-import { useCallback, useMemo, useState, type FC } from "react";
-import { Check, ChevronDown, Copy, Download, FileSignature, FileWarning, Link2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import { Suspense, useCallback, useMemo, useState, type FC } from "react";
+import { Check, ChevronDown, Copy, Download, FileSignature, FileWarning, Link2, Loader2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Pill from "@/app/components/dashboard/ui/Pill";
-import DownloadModal from "@/app/components/dashboard/modals/DownloadModal";
+import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
+import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
+import { coverToDocx, coverToMarkdown, letterheadHtml, sanitizeLetterHtml, type Letterhead, type LetterFont } from "@/app/lib/export/cover";
 import RichTextEditor from "@/app/components/dashboard/ui/RichTextEditor";
 import SplitButton from "@/app/components/dashboard/ui/SplitButton";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
-import type { PickedJob } from "@/app/lib/jobs/fields";
-import { COVER_BILLING_HREF, COVER_CREDITS, TONE_PARAGRAPHS, type CoverLetterContent, type CoverTone } from "@/app/lib/cover/api";
-import { useCoverLetter } from "@/hooks/mutations/useCoverLetter";
+import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
+import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
+import { parseFieldSpec, toPickedJob, type PickedJob } from "@/app/lib/jobs/fields";
+import type { SavedJobItem } from "@/app/lib/jobs/types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDocuments } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { fileNameOf, findIngested, resolveResumeId } from "@/app/lib/ats/api";
+import { importResumeContent, listResumeDocuments, resumeContentToText } from "@/app/lib/resume/api";
+import { mimeForFileName } from "@/app/lib/resume/mime";
+import {
+  COVER_BILLING_HREF,
+  COVER_CREDITS,
+  COVER_REVISE_CREDITS,
+  MAX_REVISE_INSTRUCTION_CHARS,
+  TONE_PARAGRAPHS,
+  describeCoverFailure,
+  reviseCoverLetter,
+  type CoverLetterContent,
+  type CoverTone,
+} from "@/app/lib/cover/api";
+import { STALE_TIME, qk } from "@/app/lib/query/keys";
+import { useCoverLetter, type CoverRunInput } from "@/hooks/mutations/useCoverLetter";
 import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
+import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
 import { useProfileSettings } from "@/hooks/queries/useSettingsQuery";
 import { Lottie } from "lottie-react";
 
@@ -57,6 +81,16 @@ type LetterheadId = "off" | "name" | "full";
 // refusal. One constant feeds both the pick and the type.
 const COVER_JOB_SPEC = "company, role, description?, requirements?";
 type CoverJob = PickedJob<typeof COVER_JOB_SPEC>;
+const COVER_JOB_SPEC_PARSED = parseFieldSpec(COVER_JOB_SPEC);
+
+/** A saved job named by a link (?job=), as the picker would have handed it back. Null when it has lost its company or role. */
+function coverJobFrom(saved: SavedJobItem): CoverJob | null {
+  try {
+    return toPickedJob<typeof COVER_JOB_SPEC>(saved, COVER_JOB_SPEC_PARSED, saved.extraction.sources);
+  } catch {
+    return null;
+  }
+}
 
 const TONE_OPTIONS: { id: CoverTone; label: string }[] = [
   { id: "warm", label: "Warm & direct" },
@@ -153,7 +187,26 @@ const ToolbarSelect: FC<{
   </label>
 );
 
-const CoverClient: FC = () => {
+/**
+ * A letter is written FROM a resume, so there is nothing to write from until
+ * the user has one — in the editor, in My documents, or already imported.
+ * Said where the Write button is, rather than on the other side of a click
+ * that could only fail.
+ */
+const NoResumeNote: FC<{ className?: string }> = ({ className }) => (
+  <div className={cn("flex items-start gap-2.5 rounded-xl border border-black/12 bg-white px-4 py-3 text-left", className)}>
+    <FileWarning className="mt-0.5 h-4 w-4 flex-none text-black/40" />
+    <p className="text-xs leading-relaxed text-black/60">
+      We write the letter from your resume — you don&apos;t have one yet.{" "}
+      <Link href="/dashboard/resume" className="font-bold text-primary underline decoration-2 underline-offset-2">
+        Add a resume
+      </Link>{" "}
+      and come back. You can still write your own in the meantime.
+    </p>
+  </div>
+);
+
+const CoverScreen: FC = () => {
   // Blank draft — true when the user started "Write your own" instead of
   // creating a letter from a job. Nothing is generated on that path.
   const [isBlankDraft, setIsBlankDraft] = useState(false);
@@ -172,6 +225,7 @@ const CoverClient: FC = () => {
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>("pdf");
 
   // The job this letter is written for. Picking one is the only way in —
   // pasting a JD now happens inside the picker, alongside the platform's own
@@ -181,10 +235,14 @@ const CoverClient: FC = () => {
 
   // Live editor contents. Seeded from the generated letter, then owned by the
   // user — every keystroke after that is theirs, and a regenerate replaces it
-  // only because they asked for one.
-  const [letterText, setLetterText] = useState("");
+  // only because they asked for one. Tagged with the `docKey` they were typed
+  // against: the editor does not report its text when a new letter is loaded
+  // into it, so edits to the previous letter must not outlive it.
+  const [edited, setEdited] = useState<{ key: string; text: string; html: string } | null>(null);
+  const [revising, setRevising] = useState(false);
+  const queryClient = useQueryClient();
 
-  const { letter, writing, failure, run, show, reset, isUnwritten } = useCoverLetter();
+  const { letter, writing, failure, run, show, reset, adopt, isUnwritten } = useCoverLetter();
 
   // Bumped every time a letter lands on the page, whether freshly written or
   // recalled from a tone already written. It is what `docKey` counts on, and it
@@ -196,12 +254,58 @@ const CoverClient: FC = () => {
 
   // The resume the letter is written from. The service needs an INGESTED
   // resume — one that has been parsed — and this screen has no picker, so it
-  // uses the most recent one that parsed cleanly and names it on the page. That
-  // is the same resume the user last uploaded, which is the one they are
-  // applying with; naming it is what makes the default checkable rather than
-  // invisible.
-  const { data: ingested, isPending: resumesPending } = useIngestedResumesQuery();
-  const resume = useMemo(() => (ingested ?? []).find((row) => row.status === "ready") ?? null, [ingested]);
+  // uses the master resume from My documents: the one the user chose to stand
+  // behind, and the one reviewers read. It is named on the page, which is what
+  // makes the default checkable rather than invisible. A master already parsed
+  // is used as is (its `aiResumeId` link, else the filename); one never parsed
+  // is imported on the way to the letter through the same bridge a scan uses,
+  // which links it, so the next letter skips the import.
+  //
+  // With no readable master — no resume in My documents at all — the old order
+  // stands in: the most recent resume that parsed cleanly, then the newest from
+  // the editor, then the newest readable file. The import dedupes on the text,
+  // so it is free, and the next letter finds the row it made.
+  const { data: ingested, isPending: ingestedPending } = useIngestedResumesQuery();
+  const { docs, loading: docsLoading } = useDocuments();
+  const library = useQuery({
+    queryKey: qk.resumes.forCover(),
+    queryFn: ({ signal }) => listResumeDocuments(signal),
+    staleTime: STALE_TIME.resumes,
+    // Someone's CV, held only while this screen is open.
+    gcTime: 0,
+  });
+  const resumesPending = ingestedPending || library.isPending || docsLoading;
+  const resume = useMemo((): { fileName: string; resumeId: CoverRunInput["resumeId"] } | null => {
+    const imported = (resumeId: string) => {
+      void queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
+      return resumeId;
+    };
+    const master = docs.find((doc) => doc.master && doc.kind === "resume" && !doc.archived && mimeForFileName(fileNameOf(doc)) !== null);
+    if (master) {
+      const parsed = findIngested(master, ingested ?? []);
+      if (parsed) return { fileName: fileNameOf(master), resumeId: parsed.resumeId };
+      return {
+        fileName: fileNameOf(master),
+        resumeId: () =>
+          resolveResumeId(master, ingested ?? []).then((id) => {
+            // The bridge has just linked the document to what it parsed.
+            void queryClient.invalidateQueries({ queryKey: qk.documents.list() });
+            return imported(id);
+          }),
+      };
+    }
+    const ready = (ingested ?? []).find((row) => row.status === "ready");
+    if (ready) return { fileName: ready.fileName, resumeId: ready.resumeId };
+    const written = (library.data ?? []).find((doc) => resumeContentToText(doc.content) !== "");
+    if (written) {
+      return { fileName: written.label, resumeId: () => importResumeContent(written.content, written.label).then((row) => imported(row.resumeId)) };
+    }
+    const file = docs
+      .filter((doc) => doc.kind === "resume" && !doc.archived && mimeForFileName(fileNameOf(doc)) !== null)
+      .sort((a, b) => b.addedAt - a.addedAt)[0];
+    if (file) return { fileName: fileNameOf(file), resumeId: () => resolveResumeId(file, ingested ?? []).then(imported) };
+    return null;
+  }, [ingested, library.data, docs, queryClient]);
 
   // The letterhead prints the USER's name and contacts, so they come from
   // settings — the letter itself carries neither, and the service is explicit
@@ -210,15 +314,47 @@ const CoverClient: FC = () => {
   const profile = settings?.profile ?? null;
 
   const started = isBlankDraft || linkedJob !== null;
+
+  // A link from a job's own screen (?job=<saved job id>) opens on that job, as
+  // if it had been picked here — linked, but nothing written. A pick writes at
+  // once because picking is the click that asks for a letter; following a link
+  // is not, so the credits still wait for Write letter. The job is read back
+  // from saved jobs rather than the link's labels, and adopted once, onto an
+  // untouched screen only. One that has gone, or lost its company or role,
+  // leaves the screen as it always opens.
+  const params = useSearchParams();
+  const context = readJobContext(params, "job");
+  const [contextFor, setContextFor] = useState<string | null>(null);
+  const [contextDismissed, setContextDismissed] = useState(false);
+  const contextPending = context.savedJobId !== null && contextFor !== context.savedJobId;
+  const saved = useSavedJobQuery(contextPending ? context.savedJobId : null);
+  const savedJob = saved.data && saved.data.id === context.savedJobId ? saved.data : null;
+  if (contextPending && (savedJob || saved.isError)) {
+    setContextFor(context.savedJobId);
+    const job = savedJob ? coverJobFrom(savedJob) : null;
+    // Nothing to reset: an untouched screen has no letters yet.
+    if (job && !started) {
+      setDraftSeq((seq) => seq + 1);
+      setLinkedJob(job);
+    }
+  }
+  // Held on a quiet line rather than the front door, which would flash up and take a click meant for this job.
+  const openingLinked = contextPending && !saved.isError && !started;
+  // Only while the letter on screen is for the job the link named; a different pick or a blank draft is not.
+  const contextJob = linkedJob && !isBlankDraft && !contextDismissed && linkedJob.id === context.savedJobId ? linkedJob : null;
+
   const paragraphTarget = TONE_PARAGRAPHS[tone];
 
   const draftLabel = isBlankDraft ? "Untitled" : (letter?.draftLabel ?? "Draft");
-  const docKey = isBlankDraft ? "blank" : `${linkedJob?.id ?? "none"}-${tone}-${draftSeq}`;
-  const initialHtml = isBlankDraft
-    ? lettersToHtml(BLANK_GREETING, BLANK_BODY, profile?.fullName ?? "")
-    : letter
-      ? lettersToHtml(letter.greeting, letter.paragraphs, letter.signOff)
+  const docKey = isBlankDraft ? `blank-${draftSeq}` : `${linkedJob?.id ?? "none"}-${tone}-${draftSeq}`;
+  // A letter on screen wins, so a revised blank draft shows its revision.
+  const initialHtml = letter
+    ? lettersToHtml(letter.greeting, letter.paragraphs, letter.signOff)
+    : isBlankDraft
+      ? lettersToHtml(BLANK_GREETING, BLANK_BODY, profile?.fullName ?? "")
       : "";
+  const letterText = edited?.key === docKey ? edited.text : "";
+  const letterHtml = edited?.key === docKey ? edited.html : "";
 
   // `letterText` is only written once the editor reports a change, so a letter
   // that has landed but not been touched has none. Its own count stands in —
@@ -257,16 +393,54 @@ const CoverClient: FC = () => {
       if (letterhead === "full") lines.push([profile.email, profile.portfolio, profile.location].filter(Boolean).join(" · "));
       lines.push("");
     }
-    // Same reason as `liveWordCount`: an untouched letter has no editor text
-    // yet, and copying an empty string would be the worst possible answer to
-    // pressing Copy on a letter that is visibly on the page.
-    const body = letterText.trim()
-      ? letterText
-      : letter && !isBlankDraft
-        ? [letter.greeting, "", ...letter.paragraphs.flatMap((para) => [para, ""]), letter.signOff].join("\n")
-        : "";
-    lines.push(body);
+    lines.push(letterBody());
     return lines.join("\n");
+  };
+
+  /**
+   * The letter as it reads in the editor. Same reason as `liveWordCount`: an
+   * untouched letter has no editor text yet, and copying (or revising) an empty
+   * string would be the worst answer for a letter visibly on the page.
+   */
+  function letterBody(): string {
+    if (letterText.trim()) return letterText;
+    return letter ? [letter.greeting, "", ...letter.paragraphs.flatMap((para) => [para, ""]), letter.signOff].join("\n") : "";
+  }
+
+  // --- Export ------------------------------------------------------------
+
+  const letterheadInfo = (): Letterhead | null =>
+    letterhead !== "off" && profile?.fullName?.trim()
+      ? { name: profile.fullName, contact: letterhead === "full" ? [profile.email, profile.portfolio, profile.location].filter(Boolean) : [] }
+      : null;
+
+  const openDownload = (format: DownloadFormat) => {
+    setDownloadFormat(format);
+    setDownloadOpen(true);
+  };
+
+  /**
+   * Prints the letter on its own, in the chosen font and spacing, with the
+   * letterhead when it is on. The editor's HTML is sanitised first; a letter
+   * nobody has touched yet prints from the letter itself, already escaped.
+   */
+  const printLetter = () =>
+    printDocument({
+      title: safeFileName(downloadFileName),
+      html: `<main class="${cn(FONT_CLASS[font], spacingCfg.text)}">${letterheadHtml(letterheadInfo())}${letterHtml ? sanitizeLetterHtml(letterHtml) : initialHtml}</main>`,
+      pageSize: "auto",
+      pageMargin: "22mm 20mm",
+      css: "main{color:#222325;}main p{margin:0 0 0.9em;}main ul,main ol{margin:0 0 0.9em 1.4em;}",
+    });
+
+  const handleDownload = async (format: DownloadFormat) => {
+    const base = safeFileName(downloadFileName);
+    const body = letterBody();
+    if (!body.trim()) throw new Error("There's no letter to download yet.");
+    if (format === "pdf") return printLetter();
+    const letterFont: LetterFont = font === "serif" ? "serif" : font === "mono" ? "mono" : "sans";
+    if (format === "docx") saveBlob(await coverToDocx(body, letterheadInfo(), letterFont), `${base}.docx`);
+    else saveText(coverToMarkdown(body, letterheadInfo()), `${base}.md`);
   };
 
   const handleCopy = async () => {
@@ -285,7 +459,6 @@ const CoverClient: FC = () => {
     if (result.status !== "picked") return;
     // A new job's letters are not the old job's letters, so the kept drafts go.
     reset();
-    setLetterText("");
     setDraftSeq((seq) => seq + 1);
     setLinkedJob(result.job);
     setIsBlankDraft(false);
@@ -322,19 +495,38 @@ const CoverClient: FC = () => {
     await write(linkedJob, tone);
   };
 
-  const handleAiSubmit = () => {
-    const prompt = aiPrompt.trim();
-    if (!prompt) return;
-    // There is no free-form rewrite route behind this — the service writes a
-    // letter for a tone, not to an instruction. Acknowledge the ask honestly
-    // rather than faking one.
-    setAiStatus(`Noted: "${prompt}". Free-form rewriting isn't available yet — pick a tone above, or edit the letter directly.`);
-    setAiPrompt("");
+  /**
+   * Rewrites the letter on screen — the user's own edits included — to the
+   * instruction in the prompt box, for `COVER_REVISE_CREDITS`. The revision
+   * lands as this tone's draft, so the editor reloads with it.
+   */
+  const handleAiSubmit = async () => {
+    const instruction = aiPrompt.trim();
+    if (!instruction || revising) return;
+    const current = letterBody().trim();
+    if (!current) {
+      setAiStatus("Write or generate a letter first, then say how to change it.");
+      return;
+    }
+    setRevising(true);
+    setAiStatus(null);
+    try {
+      const revised = await reviseCoverLetter({ letter: current, instruction, company: linkedJob?.company, role: linkedJob?.role });
+      adopt(revised, tone);
+      setDraftSeq((seq) => seq + 1);
+      setAiPrompt("");
+      setAiStatus(`Revised to “${instruction}”. Not quite right? Say what to change next, or edit it directly.`);
+    } catch (error) {
+      setAiStatus(describeCoverFailure(error).message);
+    } finally {
+      setRevising(false);
+      // Charged or refused, the balance in the header may be behind now.
+      void queryClient.invalidateQueries({ queryKey: qk.billing.overview() });
+    }
   };
 
   const startBlank = () => {
     reset();
-    setLetterText("");
     setDraftSeq((seq) => seq + 1);
     setIsBlankDraft(true);
   };
@@ -357,29 +549,48 @@ const CoverClient: FC = () => {
             </Pill>
           )}
         </div>
-        {started && (
-          <div className="flex items-center gap-2.5 flex-none">
+        <div className="flex items-center gap-2.5 flex-none">
+          {started && (
             <SplitButton
               label={copied ? "Copied" : "Copy"}
               icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               onClick={handleCopy}
               items={[
-                { id: "pdf", label: "Download as PDF", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => setDownloadOpen(true) },
+                { id: "pdf", label: "Download as PDF", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => openDownload("pdf") },
                 {
                   id: "docx",
                   label: "Download as DOCX",
                   icon: <Download className="h-3.5 w-3.5" />,
-                  onSelect: () => setDownloadOpen(true),
+                  onSelect: () => openDownload("docx"),
                 },
-                { id: "print", label: "Print", icon: <Printer className="h-3.5 w-3.5" />, onSelect: () => window.print() },
+                // The letter alone, not the dashboard around it.
+                { id: "print", label: "Print", icon: <Printer className="h-3.5 w-3.5" />, onSelect: () => void printLetter() },
               ]}
             />
-          </div>
-        )}
+          )}
+          <NotificationBell />
+        </div>
       </header>
 
       <main className="px-8 py-7 pb-14 max-w-[760px] mx-auto flex flex-col gap-5">
-        {!started ? (
+        {contextJob && (
+          <JobContextBanner
+            action="Writing a cover letter"
+            role={contextJob.role}
+            company={contextJob.company}
+            backHref={backToJobHref(context)}
+            onDismiss={() => setContextDismissed(true)}
+          />
+        )}
+
+        {openingLinked ? (
+          <div className="flex min-h-[420px] items-center justify-center">
+            <p className="inline-flex items-center gap-2 text-sm text-black/50" role="status">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              Opening the job…
+            </p>
+          </div>
+        ) : !started ? (
           /* The front door: two ways in, neither assumed. You don't need the
              job to exist anywhere to write a letter. */
           <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
@@ -406,7 +617,7 @@ const CoverClient: FC = () => {
                 </span>
                 <span className="mt-3 block text-sm font-bold">Create from a job</span>
                 <span className="mt-1 block text-xs leading-relaxed text-white/55">
-                  Pick a Remote Worldwide listing or paste any posting — we write it from your resume. {COVER_CREDITS} credit.
+                  Pick a Remote Worldwide listing or paste any posting — we write it from your resume. {COVER_CREDITS} credits.
                 </span>
               </button>
               <button
@@ -423,21 +634,7 @@ const CoverClient: FC = () => {
               </button>
             </div>
 
-            {/* A letter is written FROM a resume, so there is nothing to write
-                from until one has been imported. Said here rather than on the
-                other side of a click that could only fail. */}
-            {!resume && !resumesPending && (
-              <div className="mt-5 flex max-w-[560px] items-start gap-2.5 rounded-xl border border-black/12 bg-white px-4 py-3 text-left">
-                <FileWarning className="mt-0.5 h-4 w-4 flex-none text-black/40" />
-                <p className="text-xs leading-relaxed text-black/60">
-                  We write the letter from a resume you&apos;ve imported — there isn&apos;t one yet.{" "}
-                  <Link href="/dashboard/resume" className="font-bold text-primary underline decoration-2 underline-offset-2">
-                    Import a resume
-                  </Link>{" "}
-                  and come back. You can still write your own in the meantime.
-                </p>
-              </div>
-            )}
+            {!resume && !resumesPending && <NoResumeNote className="mt-5 max-w-[560px]" />}
           </div>
         ) : (
           <>
@@ -472,11 +669,16 @@ const CoverClient: FC = () => {
                   </StickerButton>
                   <StickerButton variant="primary" size="sm" onClick={handleRewrite} disabled={writing || !linkedJob || isBlankDraft}>
                     <RefreshCw className={cn("h-3.5 w-3.5", writing && "animate-spin")} />
-                    {writing ? "Writing…" : "Rewrite"}
+                    {/* A job opened from a link arrives with nothing written, and there is nothing to REwrite yet. */}
+                    {writing ? "Writing…" : !letter && !isBlankDraft ? "Write letter" : "Rewrite"}
                   </StickerButton>
                 </div>
               </div>
             </DashCard>
+
+            {/* Only a job opened from a link can be linked with no resume to
+                write from: the pick buttons wait for one. */}
+            {linkedJob && !isBlankDraft && !letter && !resume && !resumesPending && <NoResumeNote />}
 
             {/* A refusal, where the letter would have been. Shown inline rather
                 than as a toast: the thing that failed is on this card, and the
@@ -535,7 +737,7 @@ const CoverClient: FC = () => {
                 <div className="flex items-center gap-2">
                   {isUnwritten(tone) && (
                     <Pill variant="outline-dashed" className="flex-none">
-                      {COVER_CREDITS} credit per tone
+                      {COVER_CREDITS} credits per tone
                     </Pill>
                   )}
                   <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={(next) => void handleToneChange(next as CoverTone)} />
@@ -592,7 +794,7 @@ const CoverClient: FC = () => {
             <RichTextEditor
               docKey={docKey}
               initialHtml={initialHtml}
-              onChange={({ text }) => setLetterText(text)}
+              onChange={({ text, html }) => setEdited({ key: docKey, text, html })}
               ariaLabel="Cover letter body"
               toolbarLeading={
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -666,14 +868,23 @@ const CoverClient: FC = () => {
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAiSubmit();
+                        if (e.key === "Enter") void handleAiSubmit();
                       }}
-                      placeholder="Make it warmer, shorter, more specific…"
+                      maxLength={MAX_REVISE_INSTRUCTION_CHARS}
+                      disabled={revising}
+                      aria-label="Tell the AI how to change the letter"
+                      placeholder={revising ? "Revising your letter…" : "Make it warmer, shorter, more specific…"}
                       className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/35 outline-none"
                     />
                   </div>
-                  <StickerButton variant="primary" size="md" onClick={handleAiSubmit} disabled={!aiPrompt.trim()}>
-                    <Send className="h-4 w-4" />
+                  <span className="hidden flex-none text-[11px] font-semibold text-black/45 sm:inline">{COVER_REVISE_CREDITS} credit</span>
+                  <StickerButton
+                    variant="primary"
+                    size="md"
+                    onClick={() => void handleAiSubmit()}
+                    disabled={!aiPrompt.trim() || revising}
+                    aria-label={revising ? "Revising" : "Revise the letter"}>
+                    {revising ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </StickerButton>
                 </div>
 
@@ -694,9 +905,36 @@ const CoverClient: FC = () => {
         )}
       </main>
 
-      <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="cover letter" fileName={downloadFileName} />
+      <DownloadModal
+        key={downloadFormat}
+        open={downloadOpen}
+        onOpenChange={setDownloadOpen}
+        docLabel="cover letter"
+        fileName={safeFileName(downloadFileName)}
+        defaultFormat={downloadFormat}
+        onDownload={handleDownload}
+      />
     </div>
   );
 };
+
+/** The screen's frame, shown only if the page is ever prerendered without search params. */
+const CoverFallback: FC = () => (
+  <div className="min-h-screen bg-[#f6f6f6]">
+    <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
+      <h1 className="text-[17px] font-bold text-primary truncate">Cover letters</h1>
+      <NotificationBell />
+    </header>
+  </div>
+);
+
+// useSearchParams needs a Suspense boundary for a prerendered page. This one
+// renders per request (the dashboard layout reads the session), so the fallback
+// should never show; the boundary keeps the screen correct if that changes.
+const CoverClient: FC = () => (
+  <Suspense fallback={<CoverFallback />}>
+    <CoverScreen />
+  </Suspense>
+);
 
 export default CoverClient;

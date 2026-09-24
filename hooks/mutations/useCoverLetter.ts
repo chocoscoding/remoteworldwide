@@ -45,6 +45,13 @@ const IDLE: CoverState = { status: "idle", letter: null, failure: null };
 /** One job's letters, keyed by tone. A different job starts an empty set. */
 type Drafts = Partial<Record<CoverTone, CoverLetterContent>>;
 
+/**
+ * A letter request whose resume may not be ingested yet: `resumeId` can be the
+ * import that produces it, which runs inside the "writing" state so the slow
+ * part has the same spinner and the same failure handling as the letter.
+ */
+export type CoverRunInput = Omit<CoverLetterInput, "resumeId"> & { resumeId: string | (() => Promise<string>) };
+
 export function useCoverLetter() {
   const queryClient = useQueryClient();
   const [state, setState] = useState<CoverState>(IDLE);
@@ -84,7 +91,7 @@ export function useCoverLetter() {
    * reading state back during a render.
    */
   const run = useCallback(
-    async (input: CoverLetterInput): Promise<CoverLetterContent | null> => {
+    async (input: CoverRunInput): Promise<CoverLetterContent | null> => {
       runIdRef.current += 1;
       const runId = runIdRef.current;
       const current = () => runId === runIdRef.current;
@@ -92,7 +99,9 @@ export function useCoverLetter() {
       setState((prev) => ({ status: "writing", letter: prev.letter, failure: null }));
 
       try {
-        const letter = await generateCoverLetter(input);
+        const resumeId = typeof input.resumeId === "string" ? input.resumeId : await input.resumeId();
+        if (!current()) return null;
+        const letter = await generateCoverLetter({ ...input, resumeId });
         if (!current()) return null;
 
         setDrafts((prev) => ({ ...prev, [input.tone]: letter }));
@@ -112,8 +121,18 @@ export function useCoverLetter() {
     [queryClient],
   );
 
+  /**
+   * Puts a letter written elsewhere — a revision to the user's instruction — on
+   * screen as this tone's draft, so switching tone and back returns to it.
+   */
+  const adopt = useCallback((letter: CoverLetterContent, tone: CoverTone) => {
+    runIdRef.current += 1;
+    setDrafts((prev) => ({ ...prev, [tone]: letter }));
+    setState({ status: "done", letter, failure: null });
+  }, []);
+
   /** True for a tone that has not been written yet — the ones that cost a credit. */
   const isUnwritten = useCallback((tone: CoverTone) => drafts[tone] === undefined, [drafts]);
 
-  return { ...state, run, show, reset, isUnwritten, writing: state.status === "writing" };
+  return { ...state, run, show, reset, adopt, isUnwritten, writing: state.status === "writing" };
 }
