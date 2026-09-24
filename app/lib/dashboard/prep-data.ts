@@ -1,25 +1,35 @@
-// Interview Prep — types + mock seed data.
+// Interview Prep — the screens' shapes, plus the practice question bank.
 //
-// Mirrors the mock-data.ts / ats-stub.ts split: this file is pure data (types
-// + seed constants), app/lib/dashboard/prep-engine.ts is the pure logic that
-// operates on it. Nothing here is shared with any other screen — matches the
-// precedent the original prep stub set for itself.
+// Tracks are the user's own now, saved in the backend (app/lib/prep/types.ts)
+// and mapped into `PrepTrack` below by app/lib/prep/tracks.ts; sessions are
+// the AI service's saved interviews, graded there (app/lib/voice/mapSession.ts
+// maps them into `PrepSession`). What stays here is what the screens render
+// and the bank a live session draws its questions from. The seeded companies,
+// the invented panel research and the in-browser scorer are gone: there was
+// no source behind any of them.
 //
-// Round dates are computed relative to module-load time (same pattern as
-// mock-data.ts's POD_GOALS.proposedAt) rather than hardcoded, so the "in 2
-// days" framing never goes stale no matter when the app is opened.
-//
-// Sessions the AI service saved (Part 5) reuse these shapes with extra fields,
-// all optional, so a demo session built in memory is still a whole session.
-// The times on them are milliseconds into the session's recording.
+// The times on a session are milliseconds into its recording.
 
-import type { BillingState, DeliveryReport, DeliverySummaryLine, LiveSttProvider, PrepSessionMode, PrepSessionStatus } from "@/app/lib/voice/types";
+import type {
+  BillingState,
+  DeliveryReport,
+  DeliverySummaryLine,
+  DictionSection,
+  LiveSttProvider,
+  PositioningSection,
+  PrepSessionMode,
+  PrepSessionStatus,
+  ScoreConfidence,
+  ScoreEvidence,
+  ScoreReason,
+  UnscoredDimension,
+} from "@/app/lib/voice/types";
+import type { PrepTrackItem } from "@/app/lib/prep/types";
 
 export type SessionFormat = "behavioural" | "portfolio" | "salary";
 export type Difficulty = "warm-up" | "standard" | "tough";
 export type TrackStatus = "not-started" | "in-progress" | "awaiting-outcome" | "closed";
 export type RoundOutcome = "offer" | "rejected" | "waiting" | null;
-export type ReadinessStatus = "ready" | "needs-work" | "new";
 
 export const SESSION_LENGTHS = [6, 15, 25] as const;
 export type SessionLength = (typeof SESSION_LENGTHS)[number];
@@ -31,22 +41,6 @@ export const FORMAT_META: Record<SessionFormat, { label: string; sub: string }> 
   portfolio: { label: "Portfolio walkthrough", sub: "One project taken apart in detail" },
   salary: { label: "Salary conversation", sub: "Anchoring and handling pushback" },
 };
-
-export interface PanelMember {
-  id: string;
-  name: string;
-  role: string;
-  note: string;
-  inferred: boolean;
-}
-
-export interface LikelyQuestion {
-  id: string;
-  text: string;
-  sub: string;
-  status: ReadinessStatus;
-  format: SessionFormat;
-}
 
 /**
  * One piece of concrete backing for a score or a stat — the user's own words,
@@ -135,15 +129,29 @@ export interface PrepSession {
   /** ISO timestamp. */
   completedAt: string;
   transcript: TranscriptTurn[];
-  /** 0-100 */
+  /** 0-100; 0 when there is no score. Read it through mapSession's `scoreDisplayOf`, never on its own. */
   overallScore: number;
+  /** The judged dimensions only; the rest are in `unscoredDimensions`. */
   dimensions: DimensionScore[];
   languageStats: LanguageStat[];
   rewrites: Rewrite[];
   actionItems: ActionItem[];
   coachNote: string;
+  /** Too short to charge; any score is provisional. */
   tooShort: boolean;
-  /** The AI service's id for a saved session. Absent on a demo session, which lives in memory only. */
+  /** How far `overallScore` can be trusted. Absent: `full` unless `tooShort` (see `scoreDisplayOf`). */
+  scoreConfidence?: ScoreConfidence;
+  /** Why the score is provisional or missing. */
+  scoreReason?: ScoreReason | null;
+  /** What the verdict rests on: answers, words and seconds of voice. */
+  scoreEvidence?: ScoreEvidence | null;
+  /** Dimensions with too little evidence to judge: "not enough to judge", never a number. */
+  unscoredDimensions?: UnscoredDimension[];
+  /** The report's Positioning section. Absent: analysed before it existed. */
+  positioning?: PositioningSection;
+  /** The report's Diction and Grammar section. Absent: analysed before it existed. */
+  diction?: DictionSection;
+  /** The AI service's id for the session. Every session is a saved one now; the field stays optional for the report's own previews. */
   serverId?: string;
   mode?: PrepSessionMode;
   status?: PrepSessionStatus;
@@ -161,21 +169,33 @@ export interface PrepSession {
   liveProvider?: LiveSttProvider;
 }
 
+/**
+ * A track as the screens read it. Built from the saved track by
+ * app/lib/prep/tracks.ts `toPrepTrack`: the round label, date, status and
+ * outcome are derived from its rounds, the actions are its plan tasks, and the
+ * sessions are the AI service's scored sessions for it.
+ */
 export interface PrepTrack {
   id: string;
   company: string;
   companyMark: string;
+  /** The linked job's logo, when it has one. Optional because the stand-in a report builds from a session snapshot has no job behind it (app/lib/voice/mapSession.ts `trackFromSnapshot`). */
+  companyLogo?: string | null;
   role: string;
   location: string;
   roundLabel: string;
-  /** ISO timestamp, or null if nothing's scheduled yet. */
+  /** The current round's date (ISO), or null if nothing's scheduled yet. */
   roundDate: string | null;
   status: TrackStatus;
-  panel: PanelMember[];
-  questions: LikelyQuestion[];
   sessions: PrepSession[];
   actions: ActionItem[];
   outcome: RoundOutcome;
+  /**
+   * The saved track behind this view: rounds, links, whether a posting is on
+   * it. Absent only on the stand-in a report builds from a session's snapshot
+   * when its track is gone (app/lib/voice/mapSession.ts `trackFromSnapshot`).
+   */
+  saved?: PrepTrackItem;
 }
 
 export interface QuestionBankEntry {
@@ -187,11 +207,12 @@ export interface QuestionBankEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Question bank — drives both the Hub's "likely questions" list and what a
-// live session actually asks. Six per format; a session needing more
-// questions than a format has cycles back through the bank (see
+// Question bank — what a live practice session asks. Six per format; a session
+// needing more questions than a format has cycles back through the bank (see
 // pickQuestionsForSession in prep-engine.ts) rather than requiring a huge
-// upfront bank for the 25-minute tier.
+// upfront bank for the 25-minute tier. A track's "likely questions" are not
+// drawn from here: they are written for it from its posting and the resume
+// (app/lib/prep/api.ts `generateLikelyQuestions`).
 // ---------------------------------------------------------------------------
 
 export const QUESTION_BANK: Record<SessionFormat, QuestionBankEntry[]> = {
@@ -346,283 +367,6 @@ export const QUESTION_BANK: Record<SessionFormat, QuestionBankEntry[]> = {
     },
   ],
 };
-
-const questionText = (id: string): string => {
-  for (const bank of Object.values(QUESTION_BANK)) {
-    const hit = bank.find((q) => q.id === id);
-    if (hit) return hit.text;
-  }
-  return id;
-};
-
-/** Builds a track's "likely questions" list from bank entries with a per-track readiness state. */
-function likelyQuestions(picks: { id: string; format: SessionFormat; sub: string; status: ReadinessStatus }[]): LikelyQuestion[] {
-  return picks.map((p) => ({ id: p.id, text: questionText(p.id), sub: p.sub, status: p.status, format: p.format }));
-}
-
-// ---------------------------------------------------------------------------
-// Panel research bank — keyed by company. Populated tracks already carry
-// their panel; empty tracks pull from here when the user hits "Research the
-// panel" (see researchPanel() in prep-engine.ts).
-// ---------------------------------------------------------------------------
-
-export const PANEL_BANK: Record<string, PanelMember[]> = {
-  Vercel: [
-    {
-      id: "panel-vercel-1",
-      name: "Nadia Solis",
-      role: "Design Lead",
-      note: "Leads the round. Expect one project taken apart in detail — why that structure, what you cut, what broke.",
-      inferred: true,
-    },
-    {
-      id: "panel-vercel-2",
-      name: "Ravi Deshmukh",
-      role: "Staff Engineer",
-      note: "Joins for the last stretch and probes handoff and edge cases more than craft.",
-      inferred: true,
-    },
-  ],
-  Paystack: [
-    {
-      id: "panel-paystack-1",
-      name: "Tomiwa Balogun",
-      role: "Head of Design",
-      note: "Writes publicly about design ops — expect a question about how you'd scale a pattern across teams.",
-      inferred: true,
-    },
-    {
-      id: "panel-paystack-2",
-      name: "Grace Afolabi",
-      role: "Product Manager",
-      note: "Cares most about prioritization judgment — what you cut and why, more than what you shipped.",
-      inferred: true,
-    },
-  ],
-  Linear: [
-    {
-      id: "panel-linear-1",
-      name: "Elias Vance",
-      role: "Design Manager",
-      note: "The craft bar here is unusually high — bring interaction-level detail, not just information architecture.",
-      inferred: true,
-    },
-  ],
-  Deel: [
-    {
-      id: "panel-deel-1",
-      name: "Priya Chandran",
-      role: "Senior Recruiter",
-      note: "Runs the screen before any design round — mostly comp and logistics, light on craft.",
-      inferred: false,
-    },
-    {
-      id: "panel-deel-2",
-      name: "Marcus Lindqvist",
-      role: "Design Director",
-      note: "Asks about global/compliance-heavy design work specifically — has a background in payments himself.",
-      inferred: true,
-    },
-  ],
-  GitHub: [
-    {
-      id: "panel-github-1",
-      name: "Sam Okonkwo",
-      role: "Principal Designer",
-      note: "Known for asking candidates to critique GitHub's own product live — have an opinion ready.",
-      inferred: true,
-    },
-  ],
-  Supabase: [
-    {
-      id: "panel-supabase-1",
-      name: "Lena Fischer",
-      role: "Design Engineer",
-      note: "Half designer, half engineer — expect the conversation to get technical fast.",
-      inferred: true,
-    },
-  ],
-};
-
-const GENERIC_PANEL: Omit<PanelMember, "id">[] = [
-  { name: "Hiring Manager", role: "Design Lead", note: "Generic — we couldn't find enough public signal for this company yet.", inferred: true },
-  { name: "Cross-functional partner", role: "Product or Engineering", note: "Most loops pair a designer with a PM or engineer for the second half.", inferred: true },
-];
-
-export function panelForCompany(company: string): PanelMember[] {
-  const known = PANEL_BANK[company];
-  if (known) return known;
-  return GENERIC_PANEL.map((m, i) => ({ ...m, id: `panel-generic-${company}-${i}` }));
-}
-
-// ---------------------------------------------------------------------------
-// Seed tracks
-// ---------------------------------------------------------------------------
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const inDays = (n: number) => new Date(Date.now() + n * DAY_MS).toISOString();
-
-let seq = 0;
-const nextId = (prefix: string) => `${prefix}-${++seq}`;
-
-function baseAction(title: string, detail: string, effortMinutes: number, done: boolean, source: string): ActionItem {
-  return { id: nextId("act"), title, detail, effortMinutes, done, source };
-}
-
-export const PREP_TRACKS: PrepTrack[] = [
-  {
-    id: "track-vercel",
-    company: "Vercel",
-    companyMark: "V",
-    role: "Senior Product Designer",
-    location: "Remote, EU overlap",
-    roundLabel: "Round 3 · Design craft",
-    roundDate: inDays(2),
-    status: "in-progress",
-    panel: panelForCompany("Vercel"),
-    questions: likelyQuestions([
-      { id: "beh-owned-outcome", format: "behavioural", sub: "Asked in most Vercel design loops", status: "ready" },
-      { id: "port-handoff", format: "portfolio", sub: "Developer-tool companies ask this almost every time", status: "ready" },
-      { id: "beh-pushback-eng", format: "behavioural", sub: "Your last answer rambled at the end", status: "needs-work" },
-      { id: "sal-lowball", format: "salary", sub: "Not practised yet", status: "new" },
-    ]),
-    sessions: [],
-    actions: [
-      baseAction("Read Nadia's design-system posts", "She quotes her own writing back at candidates.", 15, true, "From panel research"),
-      baseAction("Tighten the engineering-pushback answer", "It trailed off last time — practise closing on a full stop.", 10, false, "From panel research"),
-    ],
-    outcome: null,
-  },
-  {
-    id: "track-linear",
-    company: "Linear",
-    companyMark: "LI",
-    role: "Product Designer, Growth",
-    location: "Remote",
-    roundLabel: "Round 1 · Portfolio review",
-    roundDate: inDays(9),
-    status: "in-progress",
-    panel: panelForCompany("Linear"),
-    questions: likelyQuestions([
-      { id: "port-walkthrough", format: "portfolio", sub: "The craft bar here is unusually high", status: "needs-work" },
-      { id: "port-critique", format: "portfolio", sub: "Not practised yet", status: "new" },
-      { id: "beh-async", format: "behavioural", sub: "Common for remote-first companies specifically", status: "new" },
-    ]),
-    sessions: [],
-    actions: [baseAction("Pick the sharpest portfolio piece for a craft-heavy panel", "Interaction detail over breadth.", 20, false, "From panel research")],
-    outcome: null,
-  },
-  {
-    id: "track-deel",
-    company: "Deel",
-    companyMark: "DE",
-    role: "Senior Designer",
-    location: "Remote, global",
-    roundLabel: "Round 2 · Hiring manager",
-    roundDate: inDays(6),
-    status: "in-progress",
-    panel: panelForCompany("Deel"),
-    questions: likelyQuestions([
-      { id: "beh-conflict-teammate", format: "behavioural", sub: "Follow-up question in about a third of loops", status: "ready" },
-      { id: "sal-expectations", format: "salary", sub: "Almost always the opening question in a comp conversation", status: "ready" },
-      { id: "port-scale", format: "portfolio", sub: "Common at companies past Series B", status: "new" },
-    ]),
-    sessions: [],
-    actions: [baseAction("Prep a global-payroll compliance story", "Marcus has a payments background — lead with something regulatory.", 15, false, "From panel research")],
-    outcome: null,
-  },
-  {
-    id: "track-paystack",
-    company: "Paystack",
-    companyMark: "PA",
-    role: "Design Lead",
-    location: "Lagos or remote",
-    roundLabel: "Final round",
-    roundDate: inDays(-4),
-    status: "awaiting-outcome",
-    panel: panelForCompany("Paystack"),
-    questions: likelyQuestions([
-      { id: "beh-owned-outcome", format: "behavioural", sub: "Asked in 4 of 5 Paystack design loops", status: "ready" },
-      { id: "port-cut", format: "portfolio", sub: "Grace asks project-specific follow-ups", status: "ready" },
-      { id: "sal-close", format: "salary", sub: "Expect this in the final round specifically", status: "ready" },
-    ]),
-    sessions: [],
-    actions: [
-      baseAction("Put one number on each Paystack story", "Users, latency, weeks saved. Three stories, one figure each.", 20, true, "From panel research"),
-      baseAction("Rewrite the disagreement answer with the pagination example", "Suggested wording saved to your library.", 10, true, "From panel research"),
-    ],
-    outcome: null,
-  },
-  {
-    id: "track-github",
-    company: "GitHub",
-    companyMark: "GH",
-    role: "Senior Product Designer",
-    location: "Remote, US hours",
-    roundLabel: "Round 1",
-    roundDate: inDays(-18),
-    status: "closed",
-    panel: panelForCompany("GitHub"),
-    questions: likelyQuestions([{ id: "port-metric", format: "portfolio", sub: "Sam pushes on real metrics, not vibes", status: "ready" }]),
-    sessions: [],
-    actions: [],
-    outcome: "rejected",
-  },
-  {
-    id: "track-supabase",
-    company: "Supabase",
-    companyMark: "SU",
-    role: "Design Engineer",
-    location: "Remote",
-    roundLabel: "Not scheduled yet",
-    roundDate: null,
-    status: "not-started",
-    panel: [],
-    questions: [],
-    sessions: [],
-    actions: [],
-    outcome: null,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Adding a track — the user-initiated counterpart to the seed data above.
-// ---------------------------------------------------------------------------
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  return parts
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
-}
-
-export interface NewTrackInput {
-  company: string;
-  role: string;
-  location?: string;
-}
-
-/** Builds a fresh, empty track — same starting shape as the Supabase seed track above. */
-export function createTrack(input: NewTrackInput): PrepTrack {
-  const company = input.company.trim();
-  return {
-    id: nextId("track-custom"),
-    company,
-    companyMark: initials(company),
-    role: input.role.trim(),
-    location: input.location?.trim() || "Remote",
-    roundLabel: "Not scheduled yet",
-    roundDate: null,
-    status: "not-started",
-    panel: [],
-    questions: [],
-    sessions: [],
-    actions: [],
-    outcome: null,
-  };
-}
 
 /** "Behavioural + Salary conversation" — one label for a session's format mix. */
 export function formatsLabel(formats: SessionFormat[]): string {

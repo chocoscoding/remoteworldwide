@@ -13,8 +13,8 @@
 // the same contract every chat log has.
 //
 // The scroller is its own component so that "following" resets by MOUNTING
-// rather than by an effect: the panel is unmounted while closed, so reopening
-// gives a fresh `useState(true)` and a fresh jump to the newest turn, with no
+// rather than by an effect: reopening the panel mounts a fresh scroller, so it
+// gets a fresh `useState(true)` and a fresh jump to the newest turn, with no
 // state synchronisation to get wrong.
 
 import { useCallback, useLayoutEffect, useRef, useState, type FC } from "react";
@@ -47,15 +47,20 @@ export interface InterviewTranscriptProps {
    * interview's full-height column; off for a card in a stack.
    */
   fill?: boolean;
+  /**
+   * Always open from the `lg` breakpoint up, with no toggle there: `open` and
+   * `onOpenChange` only fold it on smaller screens.
+   */
+  openOnDesktop?: boolean;
   className?: string;
 }
 
 /** How close to the bottom still counts as "following", in pixels. */
 const STICK_THRESHOLD_PX = 48;
 
-type ScrollerProps = Pick<InterviewTranscriptProps, "entries" | "interim" | "pending" | "fill"> & { dark: boolean };
+type ScrollerProps = Pick<InterviewTranscriptProps, "entries" | "interim" | "pending" | "fill"> & { dark: boolean; collapsed?: boolean };
 
-const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill, dark }) => {
+const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill, dark, collapsed }) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [following, setFollowing] = useState(true);
 
@@ -81,7 +86,13 @@ const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill
   };
 
   return (
-    <div className={cn("relative", fill ? "flex min-h-0 flex-1 flex-col" : "border-t", !fill && (dark ? "border-white/10" : "border-black/10"))}>
+    <div
+      className={cn(
+        "relative",
+        fill ? "flex min-h-0 flex-1 flex-col" : "border-t",
+        !fill && (dark ? "border-white/10" : "border-black/10"),
+        collapsed && (fill ? "hidden lg:flex" : "hidden lg:block")
+      )}>
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -90,7 +101,7 @@ const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill
         aria-live="polite"
         className={cn("flex flex-col gap-4 overflow-y-auto px-5 py-4", fill ? "min-h-0 flex-1" : "max-h-[280px]")}>
         {entries.length === 0 && !interim && (
-          <p className={cn("text-xs", dark ? "text-white/35" : "text-black/40")}>Your conversation will appear here as it happens.</p>
+          <p className={cn("text-xs", dark ? "text-white/35" : "text-black/40")}>The transcript will appear here as you talk.</p>
         )}
 
         {entries.map((entry) => (
@@ -98,7 +109,18 @@ const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill
             <p
               className={cn(
                 "mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.07em]",
-                dark ? "text-white/30" : "text-black/40"
+                // The interviewer is named in the brand green so the two voices read
+                // apart at a glance: your turns are solid green bubbles, theirs are
+                // neutral bubbles under a green name.
+                entry.who === "user"
+                  ? dark
+                    ? "text-white/30"
+                    : "text-black/40"
+                  : dark
+                    ? "text-[#e1f073]"
+                    : // The brand green is unreadable on a light panel, so the light
+                      // tone uses a darkened one rather than dropping the colour.
+                      "text-[#6b7a15]"
               )}>
               {entry.who === "user" ? "You" : "Interviewer"}
               {entry.speaking && (
@@ -114,7 +136,7 @@ const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill
                 entry.who === "user"
                   ? "bg-[#e1f073] font-medium text-[#222325]"
                   : dark
-                    ? "bg-white/8 text-white/80"
+                    ? "bg-white/10 text-white/80"
                     : "bg-[#f0f0ea] text-primary",
                 entry.who === "user" && !entry.text && "font-normal italic"
               )}>
@@ -169,10 +191,36 @@ const InterviewTranscript: FC<InterviewTranscriptProps> = ({
   onOpenChange,
   tone = "light",
   fill,
+  openOnDesktop,
   className,
 }) => {
   const dark = tone === "dark";
   const count = entries.length;
+  const headerClass = cn("flex w-full flex-none items-center gap-2.5 px-5 py-3.5 text-left", dark && "border-b border-white/10");
+
+  const heading = (
+    <>
+      <span
+        className={cn(
+          "grid h-7 w-7 flex-none place-content-center rounded-lg",
+          dark ? "bg-white/10 text-[#e1f073]" : "bg-[#f0f0ea] text-primary"
+        )}>
+        <ScrollText className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            "block text-[10.5px] font-bold uppercase tracking-[0.1em]",
+            dark ? "text-white/45" : "text-primary"
+          )}>
+          Live transcript
+        </span>
+        <span className={cn("block text-[11px]", dark ? "text-white/30" : "text-black/45")}>
+          {count === 0 ? "Nothing said yet" : `${count} ${count === 1 ? "turn" : "turns"}`}
+        </span>
+      </span>
+    </>
+  );
 
   return (
     <section
@@ -183,36 +231,23 @@ const InterviewTranscript: FC<InterviewTranscriptProps> = ({
         className
       )}
       aria-label="Live transcript">
+      {openOnDesktop && <div className={cn(headerClass, "hidden lg:flex")}>{heading}</div>}
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
         aria-expanded={open}
-        className={cn("flex w-full flex-none cursor-pointer items-center gap-2.5 px-5 py-3.5 text-left", dark && "border-b border-white/10")}>
-        <span
-          className={cn(
-            "grid h-7 w-7 flex-none place-content-center rounded-lg",
-            dark ? "bg-white/8 text-[#e1f073]" : "bg-[#f0f0ea] text-primary"
-          )}>
-          <ScrollText className="h-3.5 w-3.5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span
-            className={cn(
-              "block text-[10.5px] font-bold uppercase tracking-[0.1em]",
-              dark ? "text-white/45" : "text-primary"
-            )}>
-            Live transcript
-          </span>
-          <span className={cn("block text-[11px]", dark ? "text-white/30" : "text-black/45")}>
-            {count === 0 ? "Nothing said yet" : `${count} ${count === 1 ? "turn" : "turns"}`}
-          </span>
-        </span>
+        className={cn(headerClass, "cursor-pointer", openOnDesktop && "lg:hidden")}>
+        {heading}
         <ChevronDown
           className={cn("h-4 w-4 flex-none transition-transform", open && "rotate-180", dark ? "text-white/35" : "text-black/40")}
         />
       </button>
 
-      {open && <TranscriptScroller entries={entries} interim={interim} pending={pending} fill={fill} dark={dark} />}
+      {openOnDesktop ? (
+        <TranscriptScroller key={open ? "open" : "closed"} entries={entries} interim={interim} pending={pending} fill={fill} dark={dark} collapsed={!open} />
+      ) : (
+        open && <TranscriptScroller entries={entries} interim={interim} pending={pending} fill={fill} dark={dark} />
+      )}
     </section>
   );
 };

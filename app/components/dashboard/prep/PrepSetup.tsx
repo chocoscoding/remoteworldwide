@@ -1,19 +1,22 @@
 "use client";
 
-import { FC, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, DollarSign, Info, Keyboard, MessageCircle, Mic, Presentation } from "lucide-react";
+import { FC, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, DollarSign, FileText, Info, Loader2, MessageCircle, Presentation, Sparkles, Upload } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import { FORMAT_META, QUESTIONS_FOR_LENGTH, SESSION_LENGTHS, formatsLabel, type Difficulty, type PrepTrack, type SessionFormat, type SessionLength } from "@/app/lib/dashboard/prep-data";
+import { pickSessionQuestions, usableLikelyQuestions } from "@/app/lib/prep/sessionQuestions";
+import { SOURCE_LABELS } from "@/app/lib/prep/trackResume";
+import { RESUME_ACCEPT } from "@/app/lib/resume/mime";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
 import { usePrepVoiceConfig } from "@/hooks/queries/usePrepVoiceConfig";
-import { PREP_BILLING_HREF } from "@/app/lib/voice/api";
-import type { PrepSessionMode } from "@/app/lib/voice/types";
-import PreviewToggle from "./PreviewToggle";
-import RecordingConsent, { handConsentToLive } from "./RecordingConsent";
+import { useLikelyQuestions } from "@/hooks/queries/usePrepTrackQueries";
+import Chip from "./Chip";
+import ResumePickerDialog from "./ResumePickerDialog";
+import { useTrackResume } from "./useTrackResume";
+import { BUTTON_SOLID } from "./prep-styles";
 
 const FORMAT_ICON: Record<SessionFormat, LucideIcon> = { behavioural: MessageCircle, portfolio: Presentation, salary: DollarSign };
 
@@ -36,8 +39,6 @@ export interface SessionConfig {
   formats: SessionFormat[];
   difficulty: Difficulty;
   lengthMinutes: SessionLength;
-  /** How the answers are given. Absent means typed, as every session was before voice interviews. */
-  mode?: PrepSessionMode;
   /**
    * A voice session the balance only partly pays for: the minutes it covers.
    * The service caps the recording there itself; this picks the question set
@@ -93,10 +94,12 @@ export interface PrepSetupProps {
   track: PrepTrack;
   initialFormats?: SessionFormat[];
   onBack: () => void;
+  /** The track's Questions tab, where likely questions are written. The track's Overview when not given. */
+  onOpenQuestions?: () => void;
   onStart: (config: SessionConfig) => void;
 }
 
-const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onStart }) => {
+const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQuestions, onStart }) => {
   const [formats, setFormats] = useState<SessionFormat[]>(initialFormats?.length ? initialFormats : ["behavioural"]);
 
   // Never let the last one be unticked — a session with no format has no
@@ -106,7 +109,6 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onStart 
   }
   const [difficulty, setDifficulty] = useState<Difficulty>("standard");
   const [lengthMinutes, setLengthMinutes] = useState<SessionLength>(15);
-  const [preview, setPreview] = useState<"default" | "blocked">("default");
 
   // Read once per mount: the cap is a weekly pace, so a stale "now" is harmless.
   const [now] = useState(() => Date.now());
@@ -114,17 +116,14 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onStart 
     const at = Date.parse(session.completedAt);
     return Number.isNaN(at) || now - at < SESSION_CAP_WINDOW_MS;
   }).length;
-  const blocked = preview === "blocked" || recentSessions >= MAX_SESSIONS_PER_TRACK;
+  const blocked = recentSessions >= MAX_SESSIONS_PER_TRACK;
   const difficultyNote = DIFFICULTIES.find((d) => d.id === difficulty)?.note ?? "";
 
-  // How the answers are given. Voice is offered only when the service has it
-  // switched on, and priced from its own rule. The balance is the billing
-  // overview the sidebar meter reads, so the two never disagree.
+  // Every session is a voice interview, priced from the service's own rule.
+  // The balance is the billing overview the sidebar meter reads, so the two
+  // never disagree.
   const voiceConfig = usePrepVoiceConfig();
   const { subscription } = useBilling();
-  const [modeChoice, setModeChoice] = useState<PrepSessionMode | null>(null);
-  // Unticked every time: consent is given per session.
-  const [consent, setConsent] = useState(false);
 
   const voiceSettings = voiceConfig.data;
   const voiceOffered = voiceSettings?.interviewsEnabled === true;
@@ -136,28 +135,130 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onStart 
   const lowBalance = voiceOffered && balance !== null && balance < rule.base;
   // A known balance that covers the base but not the chosen length: offer the longest session it covers.
   const offerMinutes = voiceOffered && !lowBalance && balance !== null && voiceCost > balance ? Math.max(0, Math.min(affordableMinutesFor(balance, rule), maxMinutes)) : null;
-  const voiceAvailable = voiceOffered && !lowBalance;
-  const mode: PrepSessionMode = voiceAvailable && modeChoice !== "text" ? "voice" : "text";
   const voiceMinutes = offerMinutes ?? lengthMinutes;
   const voiceQuestionLength = offerMinutes !== null ? questionPresetFor(offerMinutes) : lengthMinutes;
-  const canStartVoice = voiceAvailable && consent && voiceSettings !== undefined && !blocked;
-  const textSession = voiceSettings?.textSession;
+  // The live screen sends the consent version from this config, and the cap above needs its rule.
+  const configLoading = voiceConfig.isPending;
 
-  function startSession(which: PrepSessionMode) {
-    if (blocked) return;
-    if (which === "voice") {
-      if (!canStartVoice || !voiceSettings) return;
-      handConsentToLive(track.id, voiceSettings.consentVersion);
-      onStart({
-        formats,
-        difficulty,
-        lengthMinutes: voiceQuestionLength,
-        mode: "voice",
-        ...(offerMinutes !== null ? { capMinutes: offerMinutes } : {}),
-      });
-      return;
-    }
-    onStart({ formats, difficulty, lengthMinutes, mode: "text" });
+  // Which questions this session will ask: the track's likely questions, or
+  // the general bank when it has none in these formats. The same pick the live
+  // screen makes, from the same cached read, so the count said here is the
+  // count asked. Only read: a set costs a credit and is written on the track.
+  const saved = track.saved;
+  const hasPosting = Boolean(saved && (saved.savedJobId || saved.hasJobDescription));
+  const likely = useLikelyQuestions(saved ? track.id : null);
+  const likelySet = likely.data?.set ?? null;
+  const plan = pickSessionQuestions({
+    formats,
+    lengthMinutes: voiceQuestionLength,
+    seed: `${track.id}-${formats.join(",")}-${voiceQuestionLength}`,
+    likely: likelySet?.questions,
+  });
+  const questionTotal = plan.length;
+  const tailoredCount = plan.filter((q) => q.tailored).length;
+  const generalCount = questionTotal - tailoredCount;
+  // Formats the set has questions in that this session leaves out: ticking one asks more of the job's own.
+  const usable = usableLikelyQuestions(likelySet?.questions);
+  const moreIn = (Object.keys(FORMAT_META) as SessionFormat[])
+    .filter((f) => !formats.includes(f) && usable.some((q) => q.format === f))
+    .map((f) => FORMAT_META[f].label)
+    .join(" or ");
+
+  // Said plainly, because it decides what the interview is about. Writing a
+  // set is the track's (a credit, from a click), so this only points there.
+  const generalLead = <b className="font-bold text-primary">These will be general practice questions</b>;
+  // Straight to the Questions tab: that is where a set is written, and the Overview only previews it.
+  const toTrack = (
+    <button type="button" onClick={onOpenQuestions ?? onBack} className="font-bold text-primary underline underline-offset-2 cursor-pointer">
+      Go to the track
+    </button>
+  );
+  let questionsNote: ReactNode = null;
+  if (!saved) {
+    // No saved track, so no set to write for it: the bank, as it always was.
+  } else if (likely.isPending) {
+    questionsNote = "Checking for questions written for this job…";
+  } else if (likely.isError && !likely.data) {
+    // A failed refetch keeps the set it had, and the live screen asks that; only a first read failing leaves nothing.
+    questionsNote = "This job's likely questions couldn't be loaded just now, so this session may ask general practice questions instead.";
+  } else if (!likelySet) {
+    questionsNote = hasPosting ? (
+      <>
+        {generalLead}, not ones written for this job. Write likely questions on the track ({plural(likely.data?.cost ?? 1, "credit")}) and the
+        interview asks those instead: questions from this posting&apos;s requirements and your resume. {toTrack}
+      </>
+    ) : (
+      <>
+        {generalLead}, not ones written for this job. Add the job posting to the track and write likely questions from it, and the interview
+        asks those instead. {toTrack}
+      </>
+    );
+  } else if (tailoredCount === 0) {
+    questionsNote = (
+      <>
+        {generalLead}: none of this job&apos;s likely questions are {formatsLabel(formats)} ones.{moreIn ? ` Add ${moreIn} to be asked them.` : ""}
+      </>
+    );
+  } else {
+    questionsNote = (
+      <>
+        {generalCount > 0 ? (
+          <>
+            <b className="font-bold text-primary">
+              {tailoredCount} of {questionTotal} questions are written for this job
+            </b>
+            , from its posting. The other {generalCount}{" "}
+            {generalCount === 1 ? "is a general practice question" : "are general practice questions"}, asked last
+            {moreIn ? ` — add ${moreIn} to be asked more of this job's own` : ""}.
+          </>
+        ) : (
+          <>
+            <b className="font-bold text-primary">All {questionTotal} questions are written for this job</b>, from its posting&apos;s requirements
+            {likelySet.grounding.resume ? " and your resume" : ""}.
+          </>
+        )}
+        {/* Still this job's questions: used as they are, with the change said. */}
+        {likely.data?.stale && " They were written before the posting or your resume last changed; you can write a fresh set on the track."}
+      </>
+    );
+  }
+
+  // The resume this job was sent. A saved track needs one in effect before a
+  // session starts, since it is what the job's questions are written from; a
+  // stand-in track with nothing saved behind it has no job to have sent one
+  // to, so it starts as it always did.
+  const resume = useTrackResume(saved);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const uploadRef = useRef<HTMLInputElement | null>(null);
+  const resumeGate = saved ? resume.gate : "ready";
+  const resumeBlocked = resumeGate === "pick" || resumeGate === "upload" || resumeGate === "checking";
+  const resumeBusy = resume.busy !== null;
+  const resumeLabel = resume.source.kind === "none" ? null : SOURCE_LABELS[resume.source.kind];
+
+  function openPicker() {
+    resume.clearError();
+    setPickerOpen(true);
+  }
+
+  async function uploadResume(file: File | undefined) {
+    if (uploadRef.current) uploadRef.current.value = "";
+    // Someone's first resume becomes their master, and with it this track's
+    // default, so setup can go on; a later one is made this track's own.
+    if (file) await resume.upload(file, "default");
+  }
+
+  async function startSession() {
+    if (blocked || configLoading || resumeBlocked || resumeBusy) return;
+    // A master document default is parsed and stored on the track here, once,
+    // so this session's questions and every later read use that parse rather
+    // than parsing the file again. A failure stays on this screen, said.
+    if (resumeGate === "store-master" && !(await resume.storeDefault())) return;
+    onStart({
+      formats,
+      difficulty,
+      lengthMinutes: voiceQuestionLength,
+      ...(offerMinutes !== null ? { capMinutes: offerMinutes } : {}),
+    });
   }
 
   return (
@@ -167,14 +268,6 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onStart 
           <ArrowLeft className="h-3.5 w-3.5" />
           {track.company} — {track.role}
         </button>
-        <PreviewToggle
-          value={preview}
-          onChange={setPreview}
-          options={[
-            { id: "default", label: "Default" },
-            { id: "blocked", label: "Blocked" },
-          ]}
-        />
       </div>
 
       <div>
@@ -183,6 +276,74 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onStart 
           {track.company} · {track.role} · {track.roundLabel}
         </p>
       </div>
+
+      {saved && (
+        <DashCard className="p-6">
+          <div className="flex items-baseline justify-between gap-3 mb-3">
+            <p className="text-[14.5px] font-bold text-primary">Resume you submitted</p>
+            {(resumeGate === "ready" || resumeGate === "store-master") && (
+              <button
+                type="button"
+                onClick={openPicker}
+                disabled={resumeBusy}
+                className="text-xs font-bold text-black/50 hover:text-primary cursor-pointer disabled:opacity-50">
+                Change
+              </button>
+            )}
+          </div>
+          {resumeGate === "ready" || resumeGate === "store-master" ? (
+            <div className="flex items-start gap-2.5">
+              <FileText className="h-4 w-4 flex-none text-black/40 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2 text-sm font-bold text-primary">
+                  <span className="truncate">{resume.name ?? (resume.naming ? "Reading…" : "A resume on file")}</span>
+                  {resume.isMaster && resume.source.kind !== "master" && <Chip tone="green">Master</Chip>}
+                </p>
+                <p className="text-xs text-black/45 mt-0.5">{resumeLabel}</p>
+              </div>
+            </div>
+          ) : resumeGate === "checking" ? (
+            <p className="text-sm text-black/50" role="status">
+              Checking your resumes…
+            </p>
+          ) : resumeGate === "upload" ? (
+            // No resume anywhere: the upload is here, not a trip to My documents and back.
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-sm text-black/60 leading-relaxed">
+                <b className="font-bold text-primary">Add your resume to start.</b> Upload the one you sent {track.company}: this job&apos;s questions are
+                written from it. It&apos;s saved to My documents as your master resume.
+              </p>
+              <input ref={uploadRef} type="file" accept={RESUME_ACCEPT} className="hidden" onChange={(e) => void uploadResume(e.target.files?.[0])} />
+              <button
+                type="button"
+                onClick={() => uploadRef.current?.click()}
+                disabled={resumeBusy}
+                className={cn(BUTTON_SOLID, "disabled:opacity-50 disabled:pointer-events-none")}>
+                {resume.busy === "upload" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {resume.busy === "upload" ? "Uploading…" : "Upload your resume"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-sm text-black/60 leading-relaxed">
+                <b className="font-bold text-primary">Pick your resume to start.</b>{" "}
+                {resume.missing
+                  ? `The one picked for this job is no longer on file. Choose the one you sent ${track.company}.`
+                  : `Choose the one you sent ${track.company}: this job's questions are written from it.`}
+              </p>
+              <button type="button" onClick={openPicker} className={BUTTON_SOLID}>
+                Pick a resume
+              </button>
+            </div>
+          )}
+          {resume.error && !pickerOpen && (
+            <p role="alert" className="mt-3 text-xs font-semibold text-red-700">
+              {resume.error}
+            </p>
+          )}
+          <ResumePickerDialog open={pickerOpen} onOpenChange={setPickerOpen} company={track.company} resume={resume} />
+        </DashCard>
+      )}
 
       <DashCard className="p-6">
         <p className="text-[14.5px] font-bold text-primary mb-3.5">Format</p>
@@ -262,163 +423,88 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onStart 
         </div>
       </DashCard>
 
-      <DashCard className="p-6">
-        <div className="flex items-baseline justify-between gap-3 mb-3.5 flex-wrap">
-          <p className="text-[14.5px] font-bold text-primary">How you&apos;ll answer</p>
-          {voiceOffered && balance !== null && <span className="text-xs text-black/50 tabular-nums">Balance: {plural(balance, "credit")}</span>}
-        </div>
-        <div role="radiogroup" aria-label="How you'll answer" className={cn("grid grid-cols-1 gap-2.5", voiceOffered && "sm:grid-cols-2")}>
-          {voiceOffered && (
-            <div className={cn("rounded-xl border p-4 flex flex-col gap-3 transition-colors", mode === "voice" ? "border-primary bg-[#fbfbf7]" : "border-black/10")}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={mode === "voice"}
-                disabled={lowBalance}
-                onClick={() => setModeChoice("voice")}
-                className="flex items-start gap-2.5 text-left cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">
-                <span className="mt-0.5 h-4 w-4 flex-none rounded-full border-2 border-[#222325] flex items-center justify-center">
-                  {mode === "voice" && <span className="h-2 w-2 rounded-full bg-[#222325]" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <Mic className="h-3.5 w-3.5 text-black/45 flex-none" />
-                    <span className="text-sm font-bold text-primary">Voice session</span>
-                  </span>
-                  <span className="block text-xs text-black/45 mt-1 leading-relaxed">
-                    Answer out loud, like the real thing. Along with the scorecard you get coaching on your pace, pauses, filler words, pitch
-                    variation and energy, and every moment can be replayed.
-                  </span>
-                </span>
-              </button>
+      {/* Where the questions come from: the live interview used to ask a
+          general bank written for design and engineering roles whatever the
+          job, while the track's own likely questions went unused. */}
+      {questionsNote && (
+        <DashCard className="p-5 flex gap-3 items-start bg-[#fbfbf7]">
+          <Sparkles className="h-4 w-4 text-black/40 flex-none mt-0.5" />
+          <p className="text-xs text-black/60 leading-relaxed" aria-live="polite">
+            {questionsNote}
+          </p>
+        </DashCard>
+      )}
 
-              <div className={cn("text-xs leading-relaxed", lowBalance ? "text-black/35" : "text-black/60")}>
-                <p>
-                  <b className="font-bold text-primary tabular-nums">{plural(voiceCost, "credit")}</b> for {lengthMinutes} minutes.
-                </p>
-                <p className="text-black/45 mt-0.5">
-                  {plural(rule.base, "credit")} cover up to {rule.includedMinutes} minutes, then +{rule.perExtraMinute} for each extra minute started,
-                  counted over the whole recording and charged once your report is ready.
-                </p>
-              </div>
-
-              {lowBalance && balance !== null && (
-                <div className="rounded-lg border border-[#b23c26]/25 bg-[#b23c26]/5 p-3 text-xs leading-relaxed text-black/70">
-                  You have {plural(balance, "credit")} — a voice session needs at least {rule.base}.{" "}
-                  <Link href={PREP_BILLING_HREF} className="font-bold text-primary underline underline-offset-2">
-                    Top up
-                  </Link>{" "}
-                  or run a typed session instead.
-                </div>
-              )}
-
-              {offerMinutes !== null && balance !== null && (
-                <div className="rounded-lg border border-black/10 bg-white p-3">
-                  <p className="text-xs font-bold text-primary">
-                    You have {plural(balance, "credit")} — enough for a {offerMinutes}-minute session.
-                  </p>
-                  <p className="text-xs text-black/50 mt-1 leading-relaxed">
-                    {QUESTIONS_FOR_LENGTH[voiceQuestionLength]} questions. Recording stops at {offerMinutes}:00, with a warning a minute before.
-                  </p>
-                  <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => startSession("voice")}
-                      disabled={!canStartVoice}
-                      title={canStartVoice ? undefined : "Tick the recording consent first"}
-                      className="rounded-lg border-[1.5px] border-[#222325] bg-secondary px-3 py-1.5 text-xs font-bold text-primary cursor-pointer shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:pointer-events-none">
-                      Start a {offerMinutes}-minute session
-                    </button>
-                    <Link href={PREP_BILLING_HREF} className="text-xs font-bold text-primary underline underline-offset-2">
-                      Top up
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {!lowBalance && (
-                <RecordingConsent
-                  checked={consent}
-                  onChange={(next) => {
-                    setConsent(next);
-                    if (next) setModeChoice("voice");
-                  }}
-                />
-              )}
-            </div>
-          )}
-
-          <div className={cn("rounded-xl border p-4 flex flex-col gap-3 transition-colors", mode === "text" ? "border-primary bg-[#fbfbf7]" : "border-black/10", lowBalance && "ring-2 ring-secondary")}>
-            <button type="button" role="radio" aria-checked={mode === "text"} onClick={() => setModeChoice("text")} className="flex items-start gap-2.5 text-left cursor-pointer">
-              <span className="mt-0.5 h-4 w-4 flex-none rounded-full border-2 border-[#222325] flex items-center justify-center">
-                {mode === "text" && <span className="h-2 w-2 rounded-full bg-[#222325]" />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5 flex-wrap">
-                  <Keyboard className="h-3.5 w-3.5 text-black/45 flex-none" />
-                  <span className="text-sm font-bold text-primary">Typed session</span>
-                  {lowBalance && <span className="text-[10px] font-bold uppercase tracking-[0.06em] bg-secondary text-primary rounded px-1.5 py-0.5">Available now</span>}
-                </span>
-                <span className="block text-xs text-black/45 mt-1 leading-relaxed">
-                  Type your answers, or dictate them through your browser&apos;s speech service. We record no audio; your answers are saved as text
-                  with the scorecard.
-                </span>
-              </span>
-            </button>
-            {textSession && (
-              <p className="text-xs text-black/60">
-                <b className="font-bold text-primary">{textSession.credits === 0 ? "Free" : plural(textSession.credits, "credit")}</b>
-                {` · up to ${textSession.perDay} a day`}
-              </p>
-            )}
-          </div>
-        </div>
-      </DashCard>
-
+      {/* Who hears the candidate's voice, for the session that will actually
+          run. It said "records… ElevenLabs… kept" whatever the mode, while
+          with recorded interviews off (the AI service's
+          VOICE_INTERVIEWS_ENABLED) nothing is recorded or kept, and the one
+          service that does hear the audio — the browser's own speech
+          recognition, Google's in Chrome — went unnamed. */}
       <DashCard className="p-5 flex gap-3 items-start bg-[#fbfbf7]">
         <Info className="h-4 w-4 text-black/40 flex-none mt-0.5" />
         <p className="text-xs text-black/60 leading-relaxed">
-          {voiceOffered && (
+          {configLoading ? (
+            "Checking how this session will handle your voice…"
+          ) : voiceOffered ? (
             <>
-              A voice session records your answers: the audio is sent to AWS to be transcribed and to our own service to measure your delivery,
-              and the recording is kept until you delete the session or your account.{" "}
+              A voice session records your answers: after the interview the recording is transcribed by ElevenLabs (Scribe) to build your
+              delivery report and measured by our own service for delivery, and it is kept until you delete the session or your account.
+              {voiceSettings?.liveProvider === "web-speech" &&
+                " The live captions during the interview come from your browser's own speech service (in Chrome, that's Google's)."}
+            </>
+          ) : (
+            <>
+              This session isn&apos;t recorded, and nothing you say is saved. Where your browser can, its own speech recognition turns what
+              you say into text as you go (in Chrome, that&apos;s Google&apos;s speech service).
             </>
           )}
-          In a typed session we record no audio. Pressing <b className="font-bold text-primary">Talk</b> sends your speech to your
-          browser&apos;s own speech service to turn it into text (in Chrome, that&apos;s Google&apos;s), and your answers are saved as text.
         </p>
       </DashCard>
 
       <div className="bg-[#222325] text-white rounded-2xl p-6 flex items-center gap-5 flex-wrap">
         <div className="flex-1 min-w-[220px]">
           <p className="text-[14.5px] font-bold mb-1">
-            {blocked
-              ? "Session limit reached for this track"
-              : `${formatsLabel(formats)} · ${difficulty} · ${mode === "voice" ? `${voiceMinutes} min · voice` : `${lengthMinutes} min`}`}
+            {blocked ? "Session limit reached for this track" : `${formatsLabel(formats)} · ${difficulty} · ${voiceMinutes} min`}
           </p>
+          {!blocked && resumeBlocked && (
+            // Said down here too, beside the button it holds back.
+            <p className="text-xs font-bold text-[#e1f073] mb-1">
+              {resumeGate === "checking" ? "Checking your resumes…" : resumeGate === "upload" ? "Add your resume above to start." : "Pick your resume above to start."}
+            </p>
+          )}
           <p className="text-xs text-white/60 leading-relaxed">
             {blocked
               ? `You've run ${MAX_SESSIONS_PER_TRACK} sessions for ${track.company} this week. Try a different track, or come back after acting on your open actions.`
-              : mode === "voice"
-                ? `${QUESTIONS_FOR_LENGTH[voiceQuestionLength]} questions, spoken answers, a scorecard and delivery coaching at the end. ${
-                    offerMinutes !== null
+              : !configLoading && !voiceOffered
+                ? // Recorded interviews are off (the AI service's VOICE_INTERVIEWS_ENABLED),
+                  // so the live screen runs unsaved: no report, so no scorecard to promise.
+                  `${questionTotal} questions, answered out loud. Practice only for now — this run won't be saved or scored.`
+                : `${questionTotal} questions, spoken answers, a scorecard and delivery coaching at the end.${
+                  !voiceOffered
+                    ? ""
+                    : offerMinutes !== null
                       ? // The recording stops at what the balance covers, so there are no extra minutes to price.
-                        `At most ${plural(creditsFor(offerMinutes * MINUTE_MS, rule), "credit")}: recording stops at ${offerMinutes}:00.`
-                      : `${plural(voiceCost, "credit")} for ${lengthMinutes} minutes, +${rule.perExtraMinute} per extra minute.`
-                  }`
-                : `${QUESTIONS_FOR_LENGTH[lengthMinutes]} questions, typed answers, a scorecard at the end.`}
+                        ` At most ${plural(creditsFor(offerMinutes * MINUTE_MS, rule), "credit")}: recording stops at ${offerMinutes}:00.`
+                      : ` ${plural(voiceCost, "credit")} for ${lengthMinutes} minutes, +${rule.perExtraMinute} per extra minute.`
+                }`}
           </p>
-          {!blocked && mode === "voice" && !consent && <p className="text-xs font-bold text-secondary mt-1.5">Tick the recording consent above to start.</p>}
         </div>
         {blocked ? (
           <span className="text-sm font-bold bg-white/10 text-white/40 rounded-lg px-5 py-3 flex-none whitespace-nowrap">Start session</span>
         ) : (
           <button
             type="button"
-            onClick={() => startSession(mode)}
-            disabled={mode === "voice" && !canStartVoice}
-            className="text-sm font-bold bg-secondary text-primary rounded-lg px-5 py-3 flex-none whitespace-nowrap cursor-pointer transition-shadow hover:shadow-[3px_3px_0_0_rgba(255,255,255,.25)] disabled:opacity-40 disabled:pointer-events-none">
-            {mode === "voice" ? (offerMinutes !== null ? `Start ${offerMinutes}-minute session` : "Start voice session") : "Start session"}
+            onClick={() => void startSession()}
+            disabled={configLoading || resumeBlocked || resumeBusy}
+            aria-busy={configLoading || resumeBusy}
+            className="inline-flex items-center gap-2 text-sm font-bold bg-secondary text-primary rounded-lg px-5 py-3 flex-none whitespace-nowrap cursor-pointer transition-shadow hover:shadow-[3px_3px_0_0_rgba(255,255,255,.25)] disabled:opacity-40 disabled:pointer-events-none">
+            {(configLoading || resumeBusy) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {resumeBusy && resumeGate === "store-master"
+              ? "Reading your resume…"
+              : offerMinutes !== null
+                ? `Start ${offerMinutes}-minute session`
+                : "Start session"}
           </button>
         )}
       </div>
