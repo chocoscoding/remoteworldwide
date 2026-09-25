@@ -106,6 +106,12 @@ export interface TrackerCard {
   lastTouchedDaysAgo?: number;
   /** How far the interview loop actually got — the funnel's late-stage signal. */
   roundsReached?: number;
+  /**
+   * The slug of the Remote Worldwide listing it was applied to (`/jobs/<slug>`),
+   * when the server linked one: the job was on the site at the application's
+   * moment. Independent of `rww`, which says it was applied to through the board.
+   */
+  listingSlug?: string;
 }
 
 /** One entry in the dashboard sidebar navigation. */

@@ -35,7 +35,7 @@ import NotificationBell from "@/app/components/dashboard/notifications/Notificat
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { apiMessage } from "@/app/lib/api/core";
 import { recordAnswerUses } from "@/app/lib/answers/api";
-import { applicationInput, isObjectId, newClientId, updateApplication, wasApplied } from "@/app/lib/applications/api";
+import { applicationInput, isObjectId, isTrackedSamePosting, newClientId, updateApplication, wasApplied } from "@/app/lib/applications/api";
 import { APPLICATION_LIMITS, type ApplicationAnswer, type UpdateApplicationInput } from "@/app/lib/applications/types";
 import { qk } from "@/app/lib/query/keys";
 import { useDuplicateApplication } from "@/hooks/queries/useApplicationsQuery";
@@ -95,6 +95,9 @@ const ApplyWizard: FC<{ job: StartedJob; onChangeJob: () => void }> = ({ job, on
   const scan = useApplyScan();
   const resumes = useIngestedResumesQuery();
   const duplicate = useDuplicateApplication({ company: job.company, role: job.role, url: job.url ?? job.applyUrl ?? undefined });
+  // The same posting, already sent this week: most often the extension logged the ATS form's submit
+  // for this RWW listing. `dataUpdatedAt` is the clock, as the tracker's is: none is read in render.
+  const alreadyTracked = isTrackedSamePosting(duplicate.data, duplicate.dataUpdatedAt);
 
   const [step, setStep] = useState<StepNum>(1);
   const [visited, setVisited] = useState<ReadonlySet<StepNum>>(() => new Set<StepNum>([1]));
@@ -141,16 +144,34 @@ const ApplyWizard: FC<{ job: StartedJob; onChangeJob: () => void }> = ({ job, on
   }
 
   /**
-   * "Track as applied". A saved card for this job moves to Applied carrying what
-   * was sent; anything else is a new application, marked as a repeat when an
-   * earlier one was actually sent. Both write behind the screen, the tracker's
-   * way: a failure comes back as a toast with Retry, and the client id makes a
-   * retried create write once.
+   * "Track as applied". The same posting already sent this week is this very
+   * application — nothing new is made, and only what that card lacks (the
+   * resume, its score) is added to it: its answers and letter came from the
+   * form that went out, the truer record. A saved card for this job moves to
+   * Applied carrying what was sent; anything else is a new application, marked
+   * as a repeat when an earlier one was actually sent. All write behind the
+   * screen, the tracker's way: a failure comes back as a toast with Retry, and
+   * the client id makes a retried create write once.
    */
   function track(answers: ApplicationAnswer[]) {
     if (tracked) return;
     const prior = duplicate.data ?? null;
     const sent = { atsScore, resumeId, coverLetter: sentLetter, answers };
+
+    if (alreadyTracked && prior) {
+      const fill: UpdateApplicationInput = {};
+      if (prior.resumeId === null && resumeId) fill.resumeId = resumeId;
+      if (prior.atsScore === null && atsScore !== null) fill.atsScore = atsScore;
+      if (Object.keys(fill).length > 0 && !moveApplication(prior.id, fill)) {
+        // A side record, as the answer log is: the application is tracked either way.
+        updateApplication(prior.id, fill)
+          .then(() => void queryClient.invalidateQueries({ queryKey: qk.activity.applications() }))
+          .catch(() => undefined);
+      }
+      toast.success(`${job.company} is already on your tracker`, { description: "Logged when you sent it, so it isn't added twice." });
+      setTracked(true);
+      return;
+    }
 
     if (prior && prior.status === "saved") {
       const patch: UpdateApplicationInput = { status: "applied", ...sent };
@@ -192,7 +213,7 @@ const ApplyWizard: FC<{ job: StartedJob; onChangeJob: () => void }> = ({ job, on
   const renderStep = (n: StepNum): ReactNode => {
     switch (n) {
       case 1:
-        return <RoleStep job={job} duplicate={duplicate.data} />;
+        return <RoleStep job={job} duplicate={duplicate.data} alreadyTracked={alreadyTracked} />;
       case 2:
         return <ResumeStep job={job} resumeId={resumeId} onResumeChange={setChosenResumeId} scan={scan} />;
       case 3:
@@ -219,6 +240,7 @@ const ApplyWizard: FC<{ job: StartedJob; onChangeJob: () => void }> = ({ job, on
             atsScore={atsScore}
             letter={sentLetter}
             duplicate={duplicate.data}
+            alreadyTracked={alreadyTracked}
             tracked={tracked}
             onTrack={track}
             onEditStep={go}

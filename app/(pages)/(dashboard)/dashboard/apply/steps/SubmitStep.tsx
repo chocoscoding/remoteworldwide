@@ -38,6 +38,8 @@ export interface SubmitStepProps {
   /** The letter as it will be recorded; null when none goes with it. */
   letter: string | null;
   duplicate: ApplicationItem | null | undefined;
+  /** `duplicate` is this same posting, already sent this week: tracking makes no second card. */
+  alreadyTracked?: boolean;
   tracked: boolean;
   onTrack: (answers: ApplicationAnswer[]) => void;
   onEditStep: (step: 2 | 3) => void;
@@ -71,7 +73,7 @@ const CHECK_BELOW = 0.6;
 const FIELD =
   "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-primary outline-none transition-colors placeholder:text-black/35 focus:border-[#222325]";
 
-const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, letter, duplicate, tracked, onTrack, onEditStep }) => {
+const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, letter, duplicate, alreadyTracked = false, tracked, onTrack, onEditStep }) => {
   const queryClient = useQueryClient();
   const nextId = useRef(1);
   const [rows, setRows] = useState<QuestionRow[]>([{ id: "q-0", question: "", answer: "", drafted: null, edited: false }]);
@@ -289,9 +291,11 @@ const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, 
               <Check className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-bold">Tracked as applied</p>
+              <p className="text-[15px] font-bold">{alreadyTracked ? "Already on your tracker" : "Tracked as applied"}</p>
               <p className="text-sm text-white/60">
-                {job.company} is under Applied on your tracker, with the resume, letter and answers you sent. Follow-ups start from today.
+                {alreadyTracked
+                  ? `${job.company} was logged when you sent it, so nothing was added twice. Follow-ups run from that day.`
+                  : `${job.company} is under Applied on your tracker, with the resume, letter and answers you sent. Follow-ups start from today.`}
               </p>
             </div>
             <div className="flex flex-none flex-wrap items-center gap-2.5">
@@ -318,6 +322,7 @@ const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, 
                   ? `We don't submit applications for you. Open the form on ${hostOf(link)}, paste your letter and answers, and send it there — then track it here so your tracker and follow-ups know.`
                   : "There's no link on file for this job, so apply wherever you found it — then track it here so your tracker and follow-ups know."}
                 {duplicate?.status === "saved" && " Tracking moves the saved card to Applied."}
+                {alreadyTracked && " It's already logged as sent this week, so tracking won't add a second card."}
               </p>
             </div>
             <div className="flex flex-none flex-wrap items-center gap-2.5">

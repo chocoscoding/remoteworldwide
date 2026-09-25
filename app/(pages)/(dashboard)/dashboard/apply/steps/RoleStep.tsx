@@ -15,13 +15,15 @@ import { AlertCircle, ArrowUpRight, Check, CopyCheck, MapPin } from "lucide-reac
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import type { ApplicationItem } from "@/app/lib/applications/types";
-import { applicationUrl, wasApplied } from "@/app/lib/applications/api";
+import { applicationUrl, sentOn, wasApplied } from "@/app/lib/applications/api";
 import { SOURCE_LABELS, hostOf, type StartedJob } from "../job";
 
 export interface RoleStepProps {
   job: StartedJob;
   /** Undefined while the check runs or when it could not be made; null when nothing matches. */
   duplicate: ApplicationItem | null | undefined;
+  /** `duplicate` is this same posting, already sent this week (`isTrackedSamePosting`): tracking adds nothing new. */
+  alreadyTracked?: boolean;
 }
 
 /** Past this the description folds, so the step still reads as a summary. */
@@ -43,7 +45,7 @@ const REMOTE_WORDS: Record<NonNullable<StartedJob["remoteType"]>, string> = { re
 
 const loggedOn = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
-const RoleStep: FC<RoleStepProps> = ({ job, duplicate }) => {
+const RoleStep: FC<RoleStepProps> = ({ job, duplicate, alreadyTracked = false }) => {
   const [expanded, setExpanded] = useState(false);
   const posting = applicationUrl(job.url);
   const body = job.description ?? job.summary ?? "";
@@ -116,7 +118,7 @@ const RoleStep: FC<RoleStepProps> = ({ job, duplicate }) => {
         )}
       </DashCard>
 
-      {duplicate && <DuplicateNote duplicate={duplicate} />}
+      {duplicate && <DuplicateNote duplicate={duplicate} alreadyTracked={alreadyTracked} />}
 
       {job.unsavedReason && <Notice>{job.unsavedReason}</Notice>}
 
@@ -130,19 +132,24 @@ const RoleStep: FC<RoleStepProps> = ({ job, duplicate }) => {
   );
 };
 
-const DuplicateNote: FC<{ duplicate: ApplicationItem }> = ({ duplicate }) => {
+const DuplicateNote: FC<{ duplicate: ApplicationItem; alreadyTracked: boolean }> = ({ duplicate, alreadyTracked }) => {
   const saved = duplicate.status === "saved";
   return (
     <div className="flex items-start gap-3 rounded-2xl border-[1.5px] border-[#222325] bg-white p-5 shadow-[4px_4px_0_0_#e1f073]">
       <CopyCheck className="mt-0.5 h-4 w-4 flex-none text-primary" aria-hidden />
       <div className="min-w-0">
-        <p className="text-sm font-bold text-primary">{saved ? "This job is already on your tracker" : "You've tracked this one before"}</p>
+        <p className="text-sm font-bold text-primary">
+          {saved || alreadyTracked ? "This job is already on your tracker" : "You've tracked this one before"}
+        </p>
         <p className="mt-1 text-xs leading-relaxed text-black/60">
           {saved
             ? `${duplicate.company} — ${duplicate.role} is in your Saved column. Tracking this application moves that card to Applied rather than adding a second one.`
-            : `${duplicate.company} — ${duplicate.role} was logged on ${loggedOn(duplicate.loggedAt)} and is ${STATUS_WORDS[duplicate.status]}. ${
-                wasApplied(duplicate) ? "You can still go ahead — it's tracked as a repeat, so it won't count twice." : "Going ahead tracks it fresh."
-              }`}
+            : alreadyTracked
+              ? // The same posting, sent this week: usually the extension logging the submit on the posting's own form.
+                `${duplicate.company} — ${duplicate.role} was sent on ${loggedOn(sentOn(duplicate))}. Tracking it here won't add a second card.`
+              : `${duplicate.company} — ${duplicate.role} was logged on ${loggedOn(duplicate.loggedAt)} and is ${STATUS_WORDS[duplicate.status]}. ${
+                  wasApplied(duplicate) ? "You can still go ahead — it's tracked as a repeat, so it won't count twice." : "Going ahead tracks it fresh."
+                }`}
         </p>
       </div>
     </div>

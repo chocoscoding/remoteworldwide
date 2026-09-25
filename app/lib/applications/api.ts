@@ -27,6 +27,7 @@ import {
   type BoardImportResult,
   type ClosedReason,
   type CreateApplicationInput,
+  type DuplicateApplicationItem,
   type DuplicateCheckQuery,
   type GoalsItem,
   type UpdateApplicationInput,
@@ -71,13 +72,46 @@ export function deleteApplication(id: string) {
 
 /**
  * The earlier application this one looks like, or null: `activity.ts`
- * `findDuplicate`'s rules, run over every row rather than the ones loaded. A
- * warning to show, never a reason to refuse the save.
+ * `findDuplicate`'s rules, run over every row rather than the ones loaded, plus
+ * the server's own probe for the same Remote Worldwide posting (`matchedBy:
+ * "posting"`), which finds the extension's application from the ATS page for an
+ * RWW card and the reverse. A warning to show, never a reason to refuse the save.
  */
 export function findDuplicateApplication(query: DuplicateCheckQuery, signal?: AbortSignal) {
   const search = new URLSearchParams({ company: query.company, role: query.role });
   if (query.url) search.set("url", query.url);
-  return apiGet<ApplicationItem | null>(`${APPLICATIONS_PATH}/duplicate?${search.toString()}`, signal);
+  return apiGet<DuplicateApplicationItem | null>(`${APPLICATIONS_PATH}/duplicate?${search.toString()}`, signal);
+}
+
+/**
+ * How many whole days a sent application for the same posting counts as
+ * "already tracked" rather than a re-apply. The extension's own rule
+ * (`SAME_SUBMISSION_DAYS`, `daysSince <= 7`), so both clients agree.
+ */
+const SAME_POSTING_WINDOW_DAYS = 7;
+
+/**
+ * Whether `prior` is this very application already tracked, so logging it again
+ * would make a second card: the same posting (`matchedBy` "link" or "posting",
+ * never a name match — people genuinely re-apply to a role with the same name),
+ * already sent, and logged in the last week. The extension logs the ATS submit
+ * itself, so a user who applies there and then finishes the site's wizard for
+ * the same RWW listing must not end up with two.
+ */
+export function isTrackedSamePosting(prior: DuplicateApplicationItem | ApplicationItem | null | undefined, now: number): boolean {
+  if (!prior || !("matchedBy" in prior) || (prior.matchedBy !== "link" && prior.matchedBy !== "posting")) return false;
+  if (!wasApplied(prior)) return false;
+  const days = daysSince(sentOn(prior), now);
+  return days !== undefined && days <= SAME_POSTING_WINDOW_DAYS;
+}
+
+/**
+ * When an application was sent: the server's `sentAt` on a duplicate check's answer, else its
+ * `loggedAt`. A card saved a month ago and applied to yesterday was sent yesterday — measured from
+ * `loggedAt`, the extension's submit a day later read as a new application and made a second card.
+ */
+export function sentOn(row: DuplicateApplicationItem | ApplicationItem): string {
+  return ("sentAt" in row && row.sentAt) || row.loggedAt;
 }
 
 /** The funnel, `diagnose()`'s sentence, follow-ups owed and the week's goal, all counted server-side. */
@@ -189,6 +223,8 @@ export function draftApplication(id: string, input: CreateApplicationInput, rows
     // Joined by the server from the saved job; initials until its answer lands.
     companyLogo: null,
     source: input.source ?? "external",
+    // The server decides it (was the job on Remote Worldwide at this moment?); its copy replaces this one.
+    listing: null,
     status,
     closedFrom: null,
     closedAt: null,
@@ -361,8 +397,11 @@ export function toTrackerCard(row: ApplicationItem, now: number): TrackerCard {
     company: row.company,
     daysAgo: daysSince(row.loggedAt, now),
     lastTouchedDaysAgo: daysSince(row.lastTouchedAt, now),
+    // The badge says how it was applied to (through the board); the link below says what it is.
     rww: row.source === "internal",
   };
+  // Its Remote Worldwide listing, when the job was on the site at the application's moment. Never from `source`.
+  if (row.listing?.slug) card.listingSlug = row.listing.slug;
   if (row.roundsReached !== null) card.roundsReached = row.roundsReached;
   if (isClosedApplicationStatus(row.status)) {
     card.closedReason = row.status;

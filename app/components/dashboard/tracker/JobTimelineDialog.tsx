@@ -225,6 +225,15 @@ const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenC
                     </div>
                     <DialogPrimitive.Description className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-black/55">
                       {card.company}
+                      {/* The listing the server linked: the job was on the site when it was applied to. Never inferred from the badge. */}
+                      {card.listingSlug && (
+                        <Link
+                          href={`/jobs/${encodeURIComponent(card.listingSlug)}`}
+                          className="inline-flex items-center gap-1 font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                          <LogoMini className="h-3 w-3 flex-none" />
+                          On Remote Worldwide ↗
+                        </Link>
+                      )}
                     </DialogPrimitive.Description>
                     <div className="mt-2">
                       <StatusMenu value={columnId} onChange={(to) => setStatus(card.id, to)} />

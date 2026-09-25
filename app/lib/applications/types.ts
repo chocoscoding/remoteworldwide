@@ -47,6 +47,17 @@ export interface ApplicationAnswer {
   answer: string;
 }
 
+/**
+ * A record's link to a Remote Worldwide listing, fixed by the server when the job was on the site
+ * at the record's moment, and never changed afterwards. The listing page is `/jobs/<slug>`. The
+ * "On Remote Worldwide" link follows this, not `source`.
+ */
+export interface ListingLink {
+  platformJobId: string;
+  slug: string;
+  companyLogo: string | null;
+}
+
 export interface ApplicationItem {
   id: string;
   company: string;
@@ -54,9 +65,16 @@ export interface ApplicationItem {
   location: string | null;
   url: string | null;
   savedJobId: string | null;
-  /** The linked saved job's logo, joined on read so it can't go stale against the job; null with no job or no logo. */
+  /** The linked saved job's logo, joined on read so it can't go stale against the job; with no job, the linked listing's; else null. */
   companyLogo: string | null;
+  /** What the client said when it was logged. The server never rewrites it; whether it is on Remote Worldwide is `listing`. */
   source: ApplicationSource;
+  /**
+   * The Remote Worldwide listing it was applied to, when that job was live on the site at the moment
+   * it was logged — or, for one logged as saved, at its first move into a stage. Server-decided, set
+   * once, never changed; a client never sends it.
+   */
+  listing: ListingLink | null;
   status: ApplicationStatus;
   closedFrom: ApplicationStage | null;
   closedAt: string | null;
@@ -114,6 +132,24 @@ export interface DuplicateCheckQuery {
   company: string;
   role: string;
   url?: string;
+}
+
+/** How a duplicate matched. "link" and "posting" both mean the same posting; "name" only the same company and role. */
+export type DuplicateMatchKind = "link" | "posting" | "name";
+
+/**
+ * `GET /api/applications/duplicate`'s answer. "posting" is a prior for the same Remote Worldwide
+ * posting found through its listings — the extension's application on the ATS page and the site's
+ * RWW card find each other. A row found several ways carries the strongest kind: link > posting > name.
+ */
+export interface DuplicateApplicationItem extends ApplicationItem {
+  matchedBy: DuplicateMatchKind;
+  /**
+   * When it was sent (ISO), or null while it never was. A card saved on the board and applied to
+   * later was sent then, not at `loggedAt` (the saving day), so "sent this week" reads this. A row
+   * from before the server recorded it answers its `loggedAt`.
+   */
+  sentAt: string | null;
 }
 
 /**
