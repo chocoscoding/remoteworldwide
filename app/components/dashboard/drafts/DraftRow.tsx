@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import Pill from "@/app/components/dashboard/ui/Pill";
+import LogoMini from "@/app/components/svg/LogoMini";
+import type { ListedDraft } from "@/app/lib/drafts/api";
 import type { ApplicationDraftAnswer, ApplicationDraftItem } from "@/app/lib/drafts/types";
 import { TRACKER_HREF, useDeleteDraft } from "@/hooks/mutations/useDraftMutations";
 import MarkAppliedDialog from "./MarkAppliedDialog";
@@ -30,6 +32,22 @@ const ago = (iso: string | null) => {
 function continueHref(draft: ApplicationDraftItem): string | null {
   const link = draft.pageUrl ?? draft.url;
   return /^https?:\/\//i.test(link) ? link : null;
+}
+
+/**
+ * The draft's Remote Worldwide listing page, when the AI service linked one: the
+ * posting was live on the site when the draft began. Only ever from the draft's
+ * own `listing`, never guessed from its company or role.
+ */
+function listingHref(draft: ApplicationDraftItem): string | null {
+  const slug = draft.listing?.slug;
+  return slug ? `/jobs/${encodeURIComponent(slug)}` : null;
+}
+
+/** The listing's logo for the avatar. http(s) only: it goes into an <img src>. */
+function listingLogo(draft: ApplicationDraftItem): string | null {
+  const logo = draft.listing?.companyLogo;
+  return logo && /^https?:\/\//i.test(logo) ? logo : null;
 }
 
 /** The answers to show, in form order, with the cover letter moved last where a long block reads best. Blanks were removals. */
@@ -84,13 +102,15 @@ const DraftAnswerCard: FC<{ answer: ApplicationDraftAnswer }> = ({ answer }) => 
 };
 
 export interface DraftRowProps {
-  draft: ApplicationDraftItem;
+  /** One job's row: the newest of its drafts, answers merged across all of them (`collapseSameJob`). */
+  draft: ListedDraft;
 }
 
 /**
  * One draft on the drafts page. In progress: Continue (the posting, in a new
  * tab, where the extension's button fills it from the draft when asked), View answers, Mark as applied and
  * Delete. Applied: when, and the way to the tracker, instead of Mark as applied.
+ * Delete takes every draft the row stands for.
  */
 const DraftRow: FC<DraftRowProps> = ({ draft }) => {
   const remove = useDeleteDraft();
@@ -115,12 +135,13 @@ const DraftRow: FC<DraftRowProps> = ({ draft }) => {
     .filter(Boolean)
     .join(" · ");
   const resume = continueHref(draft);
+  const listing = listingHref(draft);
 
   return (
     <div className={cn("flex flex-col gap-3 px-6 py-4", remove.isPending && "opacity-55")}>
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-1 items-center gap-4">
-          <Avatar name={company} src={null} />
+          <Avatar name={company} src={listingLogo(draft)} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-bold text-primary">{title}</span>
             <span className="mt-0.5 block truncate text-xs font-semibold text-black/65">{company}</span>
@@ -142,7 +163,7 @@ const DraftRow: FC<DraftRowProps> = ({ draft }) => {
                 type="button"
                 disabled={remove.isPending}
                 className={cn(GHOST_BTN, "text-[#b23c26] hover:bg-[#fdeae6] hover:text-[#b23c26]")}
-                onClick={() => remove.mutate(draft.id, { onSettled: () => setConfirming(false) })}>
+                onClick={() => remove.mutate(draft.draftIds, { onSettled: () => setConfirming(false) })}>
                 Delete
               </button>
               <button type="button" className={GHOST_BTN} onClick={() => setConfirming(false)}>
@@ -192,6 +213,13 @@ const DraftRow: FC<DraftRowProps> = ({ draft }) => {
               Mark as applied
             </button>
           </>
+        )}
+        {listing && (
+          <Link href={listing} className={GHOST_BTN}>
+            <LogoMini className="h-3.5 w-3.5" />
+            On Remote Worldwide
+            <span className="sr-only">: the listing for {title}</span>
+          </Link>
         )}
         {applied && resume && (
           <a href={resume} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>

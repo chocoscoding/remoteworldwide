@@ -20,16 +20,32 @@ export interface ApplicationDraftAnswer {
   updatedAt: string; // ISO
 }
 
+/**
+ * A draft's link to a Remote Worldwide listing, fixed when the draft was made.
+ * The listing page is `/jobs/<slug>`. Set by the AI service on the draft's
+ * first save, iff the posting was live on Remote Worldwide then; never changed
+ * later; never sent by a client.
+ */
+export interface ListingLink {
+  platformJobId: string;
+  slug: string;
+  companyLogo: string | null;
+}
+
 export interface ApplicationDraftItem {
   id: string;
   url: string;
   pageUrl: string | null;
   /** "jobs.lever.co" — for display. */
   host: string;
+  /** Which posting the draft is for: drafts that share it are the same job, however their URLs differ. Absent from a service that predates it. */
+  postingKey?: string;
   company: string | null;
   role: string | null;
   location: string | null;
   savedJobId: string | null;
+  /** The listing for this posting, when the job was on Remote Worldwide as the draft began. Never changes afterwards. */
+  listing: ListingLink | null;
   status: ApplicationDraftStatus;
   applicationId: string | null;
   appliedAt: string | null;

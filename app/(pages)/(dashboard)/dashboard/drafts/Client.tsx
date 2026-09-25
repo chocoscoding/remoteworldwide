@@ -26,6 +26,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import DraftRow from "@/app/components/dashboard/drafts/DraftRow";
 import ExtensionStrip from "@/app/components/dashboard/drafts/ExtensionStrip";
+import { collapseSameJob } from "@/app/lib/drafts/api";
 import type { ApplicationDraftItem } from "@/app/lib/drafts/types";
 import { useExtensionPresence } from "@/app/lib/extension/presence";
 import { useDraftsQuery } from "@/hooks/queries/useDraftsQuery";
@@ -58,7 +59,10 @@ const DraftsClient: FC = () => {
   const [tab, setTab] = useState<DraftsTab>("draft");
   const tabsId = useId();
 
-  const all = drafts.data ?? [];
+  // One row per job, before anything is split or counted: drafts the service
+  // holds for the same posting (one `postingKey`) are one row, whose tab is its
+  // newest draft's. The cache keeps the service's own list; this is the view.
+  const all = collapseSameJob(drafts.data ?? []);
   // A form whose every touched answer was cleared again leaves a draft with
   // nothing in it; there is nothing to pick up, so it is not listed.
   const inProgress = all.filter((draft) => draft.status === "draft" && draft.answerCount > 0);

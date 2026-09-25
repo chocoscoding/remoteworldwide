@@ -21,9 +21,9 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import { applicationInput, createApplication, findDuplicateApplication, isObjectId, updateApplication, wasApplied } from "@/app/lib/applications/api";
+import { applicationInput, createApplication, findDuplicateApplication, isObjectId, isTrackedSamePosting, updateApplication, wasApplied } from "@/app/lib/applications/api";
 import type { ApplicationItem, UpdateApplicationInput } from "@/app/lib/applications/types";
-import { deleteDraft, draftApplicationAnswers, draftCoverLetter, fuseDraft } from "@/app/lib/drafts/api";
+import { deleteDrafts, draftApplicationAnswers, draftCoverLetter, fuseDraft } from "@/app/lib/drafts/api";
 import type { ApplicationDraftItem } from "@/app/lib/drafts/types";
 import { qk } from "@/app/lib/query/keys";
 import { refreshStreak } from "./useStreakMutations";
@@ -55,19 +55,24 @@ function storeDraft(queryClient: QueryClient, draft: ApplicationDraftItem) {
   }
 }
 
+/**
+ * Takes a row's `draftIds`, not one id: a drafts-page row can stand for several
+ * drafts of one job (`collapseSameJob`), and deleting only the newest would put
+ * an older one in the row's place.
+ */
 export function useDeleteDraft() {
   const queryClient = useQueryClient();
-  return useMutation<{ deleted: true }, unknown, string, Snapshot>({
-    mutationFn: deleteDraft,
-    onMutate: async (id) => {
+  return useMutation<{ deleted: true }, unknown, readonly string[], Snapshot>({
+    mutationFn: deleteDrafts,
+    onMutate: async (ids) => {
       // Stop an in-flight refetch from landing on top of the removal.
       await queryClient.cancelQueries(listsFilter());
       const previous = queryClient.getQueriesData<ApplicationDraftItem[]>(listsFilter());
-      queryClient.setQueriesData<ApplicationDraftItem[]>(listsFilter(), (rows) => rows?.filter((row) => row.id !== id));
+      queryClient.setQueriesData<ApplicationDraftItem[]>(listsFilter(), (rows) => rows?.filter((row) => !ids.includes(row.id)));
       return { previous };
     },
     onSuccess: () => toast.success("Draft deleted"),
-    onError: (error, _id, context) => {
+    onError: (error, _ids, context) => {
       // Already gone — deleted from the extension ("Start fresh"), or in another
       // tab. That is what was asked for, so the row stays out.
       if (error instanceof BackendError && error.status === 404) {
@@ -125,7 +130,12 @@ async function markApplied({ draft, company, role }: MarkDraftAppliedVars): Prom
   const prior = await findDuplicateApplication({ company: input.company, role: input.role, url: input.url ?? undefined }).catch(() => null);
 
   let application: ApplicationItem;
-  if (prior && prior.status === "saved") {
+  if (prior && isTrackedSamePosting(prior, Date.now())) {
+    // The same posting, already sent this week (the extension logs the submit on the posting's own
+    // form): that card is this application. Nothing is created or patched; the fuse below files the
+    // draft's answers under it insert-only, so the answers sent with the form stay as they were.
+    application = prior;
+  } else if (prior && prior.status === "saved") {
     // The saved card for this job moves to Applied rather than gaining a twin.
     // What was sent rides along only when there is some: an empty list would
     // clear answers the card already holds.
