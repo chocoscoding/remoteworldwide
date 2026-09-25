@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles, LifeBuoy } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -72,6 +72,8 @@ const menuItemsForAdmin: MenuItem[] = [
       { label: "Recommendations", path: "/recommendations" },
     ],
   },
+  // Pages the extension couldn't read, sent in for review with "Request support".
+  { name: "Coverage requests", icon: LifeBuoy, path: "/coverage", section: "coverage" },
   { name: "STT lab", icon: AudioLines, path: "/stt-lab", section: "stt-lab" },
 ];
 const menuItemsForAuthor: MenuItem[] = [
@@ -107,6 +109,8 @@ const Sidebar = ({ hasAuthorProfile }: { hasAuthorProfile: boolean }) => {
       setOpenAccordion("companies");
     } else if (pathname.includes("/recommendations")) {
       setOpenAccordion("recommendations");
+    } else if (pathname.includes("/coverage")) {
+      setOpenAccordion("coverage");
     } else {
       setOpenAccordion("home");
     }
