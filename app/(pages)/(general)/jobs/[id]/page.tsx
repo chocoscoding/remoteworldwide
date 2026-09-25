@@ -95,8 +95,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const jobDetails = _jobDetails as unknown as Job;
 
   let hasUserBookmarked = undefined;
-  if (userSession?.user) {
-    const _hasUserBookmarked = await checkBookmarkForUser(userSession.user.id, jobDetails.id);
+  // The same tests requireUserAction makes, so a signed-in visitor never meets its 401, and
+  // an account locked for deletion (refused there with 423) still sees the public page.
+  if (userSession?.user?.id && !userSession.user.deletionDueAt) {
+    const _hasUserBookmarked = await checkBookmarkForUser(jobDetails.id);
     if (_hasUserBookmarked.data?.id) {
       hasUserBookmarked = true;
     }

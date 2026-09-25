@@ -1,5 +1,6 @@
 "use server";
 
+import { requireUserAction } from "@/app/lib/auth/action-guards";
 import { backend, BackendError, type BackendInit } from "@/app/lib/backend";
 import type { BillingOverview, Checkout, Subscription } from "@/app/lib/settings/types";
 
@@ -21,8 +22,20 @@ async function attempt<T>(run: () => Promise<T>): Promise<Attempt<T>> {
 
 export const getBillingOverview = async () => api<BillingOverview>("/overview");
 
-export const startPlanCheckout = async (planKey: string) => attempt(() => api<Checkout>("/checkout/plan", { method: "POST", body: { planKey } }));
+// No screen calls these three yet, but every export of a "use server" module is
+// a live endpoint all the same, so each refuses a caller with no session before
+// the backend does (its isAuthenticated and session-scoped service stay the boundary).
+export const startPlanCheckout = async (planKey: string) => {
+  await requireUserAction();
+  return attempt(() => api<Checkout>("/checkout/plan", { method: "POST", body: { planKey } }));
+};
 
-export const startCreditCheckout = async (packKey: string) => attempt(() => api<Checkout>("/checkout/credits", { method: "POST", body: { packKey } }));
+export const startCreditCheckout = async (packKey: string) => {
+  await requireUserAction();
+  return attempt(() => api<Checkout>("/checkout/credits", { method: "POST", body: { packKey } }));
+};
 
-export const cancelSubscription = async () => attempt(() => api<Subscription>("/subscription/cancel", { method: "POST" }));
+export const cancelSubscription = async () => {
+  await requireUserAction();
+  return attempt(() => api<Subscription>("/subscription/cancel", { method: "POST" }));
+};

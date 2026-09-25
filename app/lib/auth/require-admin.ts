@@ -25,6 +25,9 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   const session = await auth();
 
   if (!session?.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  // An admin who asked to be deleted is locked like anyone else. The backend answers 423
+  // on its own routes; these write the board through Prisma and never ask it.
+  if (session.user.deletionDueAt) return NextResponse.json({ message: "Account locked" }, { status: 423 });
   if (session.user.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
   return null;
