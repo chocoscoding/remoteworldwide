@@ -18,6 +18,7 @@ import {
   TERMINAL_IMPORT_STATUSES,
   type JobImportItem,
   type JobImportStatus,
+  type ListingMatch,
   type PlatformJobSearchItem,
   type SaveJobInput,
   type SavedJobItem,
@@ -54,6 +55,30 @@ function withQuery(path: string, params: Record<string, string | number | undefi
 /** Active listings, newest first. An empty `q` is the newest listings, which is what the picker opens on. */
 export function searchPlatformJobs(q: string, limit = PLATFORM_SEARCH_LIMIT, signal?: AbortSignal) {
   return apiGet<PlatformJobSearchItem[]>(withQuery(`${PLATFORM_JOBS_PATH}/search`, { q: q.trim(), limit }), signal);
+}
+
+/** The backend's ceilings on the query (platformJob.validator.ts): past them is a 400, not an answer. */
+export const MATCH_LINK_MAX = 2_000;
+const MATCH_NAME_MAX = 200;
+
+/**
+ * Whether a posting link is a live Remote Worldwide listing, and which: the
+ * backend's one matching rule, the same one that links saved jobs,
+ * applications and drafts. The company and role only settle an ambiguous link;
+ * they never make a match on their own. Null for not listed. Throws on a
+ * failure (a 429, or a link longer than MATCH_LINK_MAX, included), which
+ * callers read as "don't know" and carry on. The link is never cut: a shorter
+ * one could be a different page.
+ */
+export function matchPlatformJob(query: { url: string; company?: string | null; role?: string | null }, signal?: AbortSignal) {
+  return apiGet<ListingMatch | null>(
+    withQuery(`${PLATFORM_JOBS_PATH}/match`, {
+      url: query.url.trim(),
+      company: query.company?.trim().slice(0, MATCH_NAME_MAX),
+      role: query.role?.trim().slice(0, MATCH_NAME_MAX),
+    }),
+    signal,
+  );
 }
 
 // ---------------------------------------------------------------------------

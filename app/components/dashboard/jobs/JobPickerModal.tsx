@@ -42,7 +42,8 @@ import {
   type PickerStatus,
   type PickerTab,
 } from "@/app/lib/jobs/fields";
-import type { JobImportItem, JobSource, PlatformJobSearchItem, SavedJobItem } from "@/app/lib/jobs/types";
+import { MATCH_LINK_MAX, matchPlatformJob } from "@/app/lib/jobs/api";
+import type { JobImportItem, JobSource, ListingMatch, PlatformJobSearchItem, SaveJobInput, SavedJobItem } from "@/app/lib/jobs/types";
 import { useJobImport } from "@/hooks/queries/useJobImport";
 import { savedJobQuery, useDebouncedValue, usePlatformJobSearch, useSavedJobsQuery } from "@/hooks/queries/useJobQueries";
 import { forgetJobImport, useSaveJob, useStartJobImport, useUpdateSavedJob } from "@/hooks/mutations/useJobMutations";
@@ -65,6 +66,7 @@ import {
   stageCopy,
   watchedImportId,
   type ImportFailureCode,
+  type MatchNext,
   type RecoveryAction,
 } from "./pickerReducer";
 
@@ -116,6 +118,12 @@ const SOURCE_LABELS: Record<JobSource, string> = {
 
 /** Often enough to cross WAIT_AFTER_MS on time and to count seconds smoothly. */
 const TICK_MS = 500;
+
+/**
+ * How long the "is it on Remote Worldwide?" check may hold up a read or a save.
+ * It only offers a shortcut, so past this the read or save simply goes ahead.
+ */
+const MATCH_WAIT_MS = 4_000;
 
 /**
  * Milliseconds the run named `runKey` has been going, re-read every TICK_MS;
@@ -330,6 +338,42 @@ const RunningNotice: FC<{ stage: string; seconds: number; onCancel: () => void }
   </div>
 );
 
+/**
+ * The link is a live Remote Worldwide listing. "Use the listing" is a normal
+ * listing pick: the saved job IS the listing, the same row the list on the
+ * other tab gives, and nothing is read or paid for. Saying no goes on with what
+ * the user has — and the server still links that copy to the listing, because
+ * the job is on the site; only whose text it keeps differs.
+ */
+const ListingOffer: FC<{ match: ListingMatch; next: MatchNext; onUse: () => void; onDecline: () => void }> = ({ match, next, onUse, onDecline }) => (
+  <div role="status" className="mt-2.5 rounded-lg border-[1.5px] border-[#222325] bg-[#f7fbe4] px-3 py-2.5">
+    <div className="flex items-center gap-2.5">
+      <CompanyMark key={match.companyLogo ?? ""} company={match.company} logo={match.companyLogo} />
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 text-xs font-bold text-primary">
+          <LogoMini className="h-3 w-3 flex-none" />
+          This job is on Remote Worldwide
+        </p>
+        <p className="truncate text-xs text-black/60">
+          {match.title}
+          {match.company ? ` at ${match.company}` : ""}
+        </p>
+      </div>
+    </div>
+    <div className="mt-2 flex flex-wrap items-center gap-2 pl-[46px]">
+      <button type="button" onClick={onUse} className={RECOVERY}>
+        Use the listing
+      </button>
+      <button
+        type="button"
+        onClick={onDecline}
+        className="cursor-pointer rounded-md px-2 py-1 text-xs font-semibold text-black/60 transition-colors hover:bg-black/[0.05] hover:text-primary">
+        {next === "import" ? "Read my link instead" : "Save mine instead"}
+      </button>
+    </div>
+  </div>
+);
+
 const ErrorNotice: FC<{ message: string; children?: ReactNode }> = ({ message, children }) => (
   <div role="alert" className="mt-2.5 rounded-lg border border-[#b23c26]/25 bg-[#b23c26]/[0.04] px-3 py-2">
     <p className="flex items-start gap-1.5 text-xs font-medium leading-relaxed text-[#b23c26]">
@@ -452,6 +496,8 @@ const PickerBody: FC<PickerBodyProps> = ({
   const runRef = useRef(0);
   // The import this dialog is still responsible for; abandoned if it closes first.
   const inflightRef = useRef<string | null>(null);
+  // Listing checks answered in this dialog, by link and names, so reading a link and saving it cost one check each at most.
+  const matchesRef = useRef(new Map<string, ListingMatch | null>());
 
   // --- Lists ------------------------------------------------------------------
   const onPlatformTab = state.tab === "platform";
@@ -575,7 +621,9 @@ const PickerBody: FC<PickerBodyProps> = ({
   // --- Derived ----------------------------------------------------------------
   const importing = phase.kind === "importing";
   const saving = phase.kind === "saving";
-  const busy = importing || saving || phase.kind === "picking" || phase.kind === "enriching";
+  const matching = phase.kind === "matching" ? phase : null;
+  const offer = phase.kind === "listingOffer" ? phase : null;
+  const busy = importing || saving || matching !== null || phase.kind === "picking" || phase.kind === "enriching";
   const missingForSave = unfilledRequiredFields(state.values, plan.gate);
   const enrichView = phase.kind === "enriching" || phase.kind === "enrichError" ? phase : null;
 
@@ -612,13 +660,73 @@ const PickerBody: FC<PickerBodyProps> = ({
     }
   }
 
+  // --- Is it on Remote Worldwide? ---------------------------------------------
+  //
+  // Before a link is read (a crawl, paid in credits) or a form with a link is
+  // saved, the picker asks whether that link is a live Remote Worldwide listing
+  // and, if it is, offers the listing instead. The server links a save to its
+  // listing either way; the offer is about not paying to read a job the site
+  // already has, and about getting its complete listing rather than a page read.
+
+  /**
+   * The live listing `link` is, or null — also null when the check itself
+   * fails: it only offers a shortcut, so a failure never stands in the way of
+   * reading or saving. A failure is not remembered, so the next try asks again.
+   */
+  async function listingFor(link: string, company: string | null, role: string | null): Promise<ListingMatch | null> {
+    if (link.length > MATCH_LINK_MAX) return null;
+    const key = [link, company ?? "", role ?? ""].join("\n");
+    const known = matchesRef.current.get(key);
+    if (known !== undefined) return known;
+    try {
+      const match = await matchPlatformJob({ url: link, company, role }, AbortSignal.timeout(MATCH_WAIT_MS));
+      matchesRef.current.set(key, match);
+      return match;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Checks `link`, then offers its listing or carries on with `proceed`. A
+   * listing the user already turned down in this dialog is not offered again.
+   */
+  async function checkThen(next: MatchNext, link: string, names: { company: string | null; role: string | null }, proceed: () => void) {
+    const run = ++runRef.current;
+    const declined = state.declinedListing;
+    dispatch({ type: "matchStart", run, next, link });
+    const match = await listingFor(link, names.company, names.role);
+    if (runRef.current !== run) return;
+    if (match && match.platformJobId !== declined) dispatch({ type: "matchFound", run, match });
+    else proceed();
+  }
+
+  /** "Use the listing": exactly a pick from the list, so the saved job is the listing itself. */
+  function takeListing(match: ListingMatch) {
+    void runSave(() => saveJob.mutateAsync({ platformJobId: match.platformJobId }));
+  }
+
+  /** "No, mine": what the user asked for in the first place, without asking again. */
+  function declineListing() {
+    if (!offer) return;
+    dispatch({ type: "declineListing" });
+    if (offer.next === "import") startReading(offer.link, offer.link);
+    else void runSave(() => saveJob.mutateAsync(saveInputFrom(state)));
+  }
+
   // --- The paste tab ---------------------------------------------------------
 
   function handleFill() {
     const input = state.raw.trim();
-    if (input === "" || busy) return;
-    const run = ++runRef.current;
+    if (input === "" || busy || offer) return;
     const link = linkFrom(input);
+    if (link) void checkThen("import", link, { company: null, role: null }, () => startReading(input, link));
+    else startReading(input, null);
+  }
+
+  /** Reads what is in the box: a link is crawled, anything else is read as the posting's text. */
+  function startReading(input: string, link: string | null) {
+    const run = ++runRef.current;
     dispatch({ type: "importStart", run, input: link ? "link" : "text", link });
     startImport.mutateAsync(link ? { url: link } : { text: input }).then(
       (started) => {
@@ -666,27 +774,37 @@ const PickerBody: FC<PickerBodyProps> = ({
     }
   }
 
-  async function handleSave(event: FormEvent) {
-    event.preventDefault();
-    if (busy || missingForSave.length > 0) return;
+  /** Every way this dialog writes a job ends the same: saving, then the job delivered or the failure shown. */
+  async function runSave(write: () => Promise<SavedJobItem>) {
     const run = ++runRef.current;
-    const editing = state.editing;
     dispatch({ type: "saveStart" });
     try {
-      let job: SavedJobItem;
-      if (editing) {
-        const changes = changesForUpdate(editing, state.values);
-        job = Object.keys(changes).length > 0 ? await updateJob.mutateAsync({ id: editing.id, input: changes }) : editing;
-      } else {
-        // A 200 "Already in your jobs" lands here too: the existing row is the job.
-        job = await saveJob.mutateAsync(saveInputFrom(state));
-      }
+      const job = await write();
       if (runRef.current !== run) return;
       await deliver(job, run);
     } catch (error) {
       if (runRef.current !== run) return;
       dispatch({ type: "saveFailed", message: apiMessage(error) });
     }
+  }
+
+  function handleSave(event: FormEvent) {
+    event.preventDefault();
+    if (busy || offer || missingForSave.length > 0) return;
+    const editing = state.editing;
+    if (editing) {
+      // Finishing a job already saved: it is in "Your jobs", so there is nothing to offer instead.
+      const changes = changesForUpdate(editing, state.values);
+      void runSave(async () => (Object.keys(changes).length > 0 ? updateJob.mutateAsync({ id: editing.id, input: changes }) : editing));
+      return;
+    }
+    // Taken now, as the user sees it: the check below must not save edits made while it runs.
+    const input: SaveJobInput = saveInputFrom(state);
+    // A 200 "Already in your jobs" lands in `deliver` too: the existing row is the job.
+    const save = () => void runSave(() => saveJob.mutateAsync(input));
+    const link = linkFrom(state.values.url ?? "");
+    if (link) void checkThen("save", link, { company: state.values.company?.trim() || null, role: state.values.role?.trim() || null }, save);
+    else save();
   }
 
   // --- Enrichment -------------------------------------------------------------
@@ -880,7 +998,8 @@ const PickerBody: FC<PickerBodyProps> = ({
                         logo={job.companyLogo}
                         role={job.role}
                         subtitle={SOURCE_LABELS[job.source]}
-                        platform={job.source === "platform"}
+                        // On Remote Worldwide: a listing snapshot, or the user's own copy the server linked to its listing.
+                        platform={Boolean(job.platformJobId && job.slug)}
                         pending={pendingTarget === `saved:${job.id}`}
                         disabled={busy}
                         onPick={() => void pickSaved(job)}
@@ -972,13 +1091,16 @@ const PickerBody: FC<PickerBodyProps> = ({
               <button
                 type="button"
                 onClick={handleFill}
-                disabled={!state.raw.trim() || busy}
+                disabled={!state.raw.trim() || busy || offer !== null}
                 className="inline-flex flex-none cursor-pointer items-center gap-1.5 rounded-lg border-[1.5px] border-[#222325] bg-white px-3 py-2 text-xs font-bold text-[#222325] transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:pointer-events-none disabled:opacity-40">
-                {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                {importing ? "Reading" : "Fill fields"}
+                {importing || matching?.next === "import" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {importing ? "Reading" : matching?.next === "import" ? "Checking" : "Fill fields"}
               </button>
             </div>
 
+            {offer?.next === "import" && (
+              <ListingOffer match={offer.match} next="import" onUse={() => takeListing(offer.match)} onDecline={declineListing} />
+            )}
             {phase.kind === "importing" && waiting && (
               <RunningNotice stage={stageCopy(watch.status, phase.input)} seconds={seconds} onCancel={handleCancelImport} />
             )}
@@ -1015,6 +1137,9 @@ const PickerBody: FC<PickerBodyProps> = ({
             )}
 
             {phase.kind === "saveError" && <ErrorNotice message={phase.message} />}
+            {offer?.next === "save" && (
+              <ListingOffer match={offer.match} next="save" onUse={() => takeListing(offer.match)} onDecline={declineListing} />
+            )}
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-3">
               <p className="text-xs text-black/55">
@@ -1031,10 +1156,10 @@ const PickerBody: FC<PickerBodyProps> = ({
               </p>
               <button
                 type="submit"
-                disabled={missingForSave.length > 0 || busy}
+                disabled={missingForSave.length > 0 || busy || offer !== null}
                 className="inline-flex flex-none items-center gap-1.5 rounded-lg border-[1.5px] border-[#222325] bg-[#222325] px-3.5 py-2 text-xs font-bold text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:pointer-events-none">
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardPaste className="h-3.5 w-3.5" />}
-                {saving ? "Saving" : "Save & use this job"}
+                {saving || matching?.next === "save" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardPaste className="h-3.5 w-3.5" />}
+                {saving ? "Saving" : matching?.next === "save" ? "Checking" : "Save & use this job"}
               </button>
             </div>
           </form>

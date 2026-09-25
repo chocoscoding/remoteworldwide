@@ -190,6 +190,27 @@ export interface PlatformJobSearchItem {
   postedAt: string;
 }
 
+/**
+ * `GET /api/platform-jobs/match?url=&company=&role=`: the live Remote Worldwide
+ * listing a posting link is, or null (not listed, switched off, or ambiguous —
+ * indistinguishable on purpose). Public listing fields only, the ones its page
+ * shows. Owned by the backend (remoteworldwidebackend/src/types/jobs.ts).
+ */
+export interface ListingMatch {
+  /** Job._id: pick it with `{ platformJobId }`. */
+  platformJobId: string;
+  /** The page is `/jobs/<slug>`. */
+  slug: string;
+  /** That page on the site's own origin. */
+  url: string;
+  title: string;
+  /** null for a listing whose company row is gone. */
+  company: string | null;
+  companyLogo: string | null;
+  /** When it was posted, ISO 8601. */
+  postedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Ask about a job — owned by the AI service (remoteworldwideai/src/types/jobs.ts)
 // ---------------------------------------------------------------------------

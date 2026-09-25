@@ -37,6 +37,7 @@ import {
   type JobImportErrorCode,
   type JobImportItem,
   type JobImportStatus,
+  type ListingMatch,
   type SaveJobInput,
   type SavedJobItem,
   type UpdateSavedJobInput,
@@ -95,6 +96,14 @@ export function planForm(parsed: ParsedFieldSpec): FormPlan {
 /** What was pasted. The server makes the real call; this only picks loading and error copy. */
 export type ImportInput = "link" | "text";
 
+/**
+ * What a link check stands in front of: reading the link (an import costs a
+ * crawl) or saving the form. Either way the user is offered the Remote
+ * Worldwide listing first when the link is one, and says no at most once per
+ * listing (`PickerState.declinedListing`).
+ */
+export type MatchNext = "import" | "save";
+
 /** Why an import could not fill the form: the backend's code, or the request failing before there was one. */
 export type ImportFailureCode = JobImportErrorCode | "request-failed";
 
@@ -116,6 +125,10 @@ export type PickerPhase =
     }
   // Success: the import filled the form.
   | { kind: "filled"; origin: ImportInput }
+  // Loading: asking whether the link is already a Remote Worldwide listing, before reading or saving it.
+  | { kind: "matching"; run: number; next: MatchNext; link: string }
+  // It is: the user chooses the listing (a normal listing pick) or goes on with what they have.
+  | { kind: "listingOffer"; run: number; next: MatchNext; link: string; match: ListingMatch }
   | { kind: "saving" }
   | { kind: "saveError"; message: string }
   // Loading, then waiting: the job is saved and the derived fields the spec asked for are being extracted.
@@ -161,6 +174,13 @@ export interface PickerState {
   editing: SavedJobItem | null;
   /** A request to move focus once the next render has the element. `seq` makes a repeat request a new value. */
   focus: { target: FocusTarget; seq: number } | null;
+  /**
+   * The Remote Worldwide listing (`platformJobId`) the user already turned down
+   * in this dialog, so reading the link and then saving it asks once, not twice.
+   * The server still links what they save to it: saying no keeps their own copy
+   * of the job, not the job off the site.
+   */
+  declinedListing: string | null;
   gate: ParsedFieldSpec;
   phase: PickerPhase;
 }
@@ -181,6 +201,9 @@ export type PickerAction =
   | { type: "importRequestFailed"; run: number; code: ImportFailureCode; message: string }
   | { type: "importCancelled"; run: number }
   | { type: "pasteText" }
+  | { type: "matchStart"; run: number; next: MatchNext; link: string }
+  | { type: "matchFound"; run: number; match: ListingMatch }
+  | { type: "declineListing" }
   | { type: "saveStart" }
   | { type: "saveFailed"; message: string }
   | { type: "enrichStart"; run: number; job: SavedJobItem }
@@ -204,6 +227,7 @@ export function initialPickerState({ initialTab, gate }: { initialTab: PickerTab
     // Nothing to request on open: the dialog's onOpenAutoFocus handles that,
     // after its focus scope has taken over from any dialog underneath.
     focus: null,
+    declinedListing: null,
     gate,
     phase: IDLE,
   };
@@ -251,7 +275,8 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
         ...(leavingEdit ? { editing: null, values: {}, draft: null, importId: null, filled: null } : {}),
         tab: action.tab,
         focus: focusOn(state, action.tab === "paste" ? "paste" : "search"),
-        phase: phase.kind === "pickError" || (leavingEdit && isErrorPhase(phase)) ? IDLE : phase,
+        // An open listing offer is about the paste tab's link; the list has its own listings to pick.
+        phase: phase.kind === "pickError" || phase.kind === "listingOffer" || (leavingEdit && isErrorPhase(phase)) ? IDLE : phase,
       };
     }
 
@@ -260,19 +285,25 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
       return { ...state, query: action.query, phase: phase.kind === "pickError" ? IDLE : phase };
 
     case "raw":
-      // The error described what was in the box; editing it makes the message stale.
-      return { ...state, raw: action.raw, phase: phase.kind === "importError" ? IDLE : phase };
+      // The error, or the listing offer, described what was in the box; editing it makes the message stale.
+      return {
+        ...state,
+        raw: action.raw,
+        phase: phase.kind === "importError" || (phase.kind === "listingOffer" && phase.next === "import") ? IDLE : phase,
+      };
 
     case "field": {
       const filled =
         state.filled && state.filled.fields.includes(action.field)
           ? { ...state.filled, fields: state.filled.fields.filter((field) => field !== action.field) }
           : state.filled;
+      // An offer made for the posting link is about that link: a new one is a new question, asked on Save.
+      const staleOffer = phase.kind === "listingOffer" && phase.next === "save" && action.field === "url";
       return {
         ...state,
         values: { ...state.values, [action.field]: action.value },
         filled,
-        phase: phase.kind === "saveError" ? IDLE : phase,
+        phase: phase.kind === "saveError" || staleOffer ? IDLE : phase,
       };
     }
 
@@ -359,6 +390,17 @@ export function pickerReducer(state: PickerState, action: PickerAction): PickerS
         phase: phase.kind === "importError" ? IDLE : phase,
       };
     }
+
+    case "matchStart":
+      return { ...state, phase: { kind: "matching", run: action.run, next: action.next, link: action.link } };
+
+    case "matchFound":
+      return phase.kind === "matching" && phase.run === action.run
+        ? { ...state, phase: { kind: "listingOffer", run: action.run, next: phase.next, link: phase.link, match: action.match } }
+        : state;
+
+    case "declineListing":
+      return phase.kind === "listingOffer" ? { ...state, declinedListing: phase.match.platformJobId, phase: IDLE } : state;
 
     case "saveStart":
       return { ...state, phase: { kind: "saving" } };
@@ -484,8 +526,10 @@ export function watchedImportId(phase: PickerPhase): string | null {
 export function pickerStatusOf(phase: PickerPhase, waiting: boolean): PickerStatus {
   switch (phase.kind) {
     case "idle":
+    case "listingOffer":
       return "open";
     case "picking":
+    case "matching":
     case "saving":
       return "loading";
     case "importing":

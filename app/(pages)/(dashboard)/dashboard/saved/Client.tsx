@@ -22,6 +22,7 @@ import Avatar from "@/app/components/dashboard/ui/Avatar";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import LogoMini from "@/app/components/svg/LogoMini";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import { atsScoreHref, coverLetterHref, findReferralHref, tailorResumeHref, type JobContextFields } from "@/app/lib/dashboard/contextParams";
@@ -66,6 +67,16 @@ function postingOf(job: SavedJobItem): { href: string; external: boolean } | nul
   return link && /^https?:\/\//i.test(link) ? { href: link, external: true } : null;
 }
 
+/**
+ * The Remote Worldwide listing a job the user saved themselves (a link, a paste,
+ * the extension) was linked to by the server, because the posting was live on
+ * the site when it was saved. A listing snapshot needs none: its Posting link
+ * is already that page. Only the server sets `platformJobId` and `slug`.
+ */
+function linkedListingOf(job: SavedJobItem): string | null {
+  return job.source !== "platform" && job.platformJobId && job.slug ? `/jobs/${encodeURIComponent(job.slug)}` : null;
+}
+
 const askHref = (id: string) => `/dashboard/jdqa?job=${encodeURIComponent(id)}`;
 
 const SavedJobRow: FC<{ job: SavedJobItem }> = ({ job }) => {
@@ -76,6 +87,7 @@ const SavedJobRow: FC<{ job: SavedJobItem }> = ({ job }) => {
   const company = job.company ?? "Unknown company";
   const context: JobContextFields = { savedJobId: job.id, company: job.company, role: job.role };
   const posting = postingOf(job);
+  const listing = linkedListingOf(job);
 
   const where = job.location ?? (job.regions.length > 0 ? job.regions.join(", ") : null);
   const meta = [where, job.remoteType ? REMOTE_LABELS[job.remoteType] : null, job.salary, SOURCE_LABELS[job.source], usedLabel(job.lastUsedAt)]
@@ -105,6 +117,12 @@ const SavedJobRow: FC<{ job: SavedJobItem }> = ({ job }) => {
         </Link>
 
         <div className="flex flex-none items-center gap-0.5">
+          {listing && (
+            <Link href={listing} className={GHOST_BTN}>
+              <LogoMini className="h-3.5 w-3.5" />
+              On Remote Worldwide
+            </Link>
+          )}
           {posting &&
             (posting.external ? (
               <a href={posting.href} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>

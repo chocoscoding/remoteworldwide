@@ -322,7 +322,8 @@ const savedRow = (job: SavedJobItem): JobRow => ({
   id: job.id,
   title: job.role || "Role not named",
   meta: [job.company, job.location, job.salary].filter(Boolean).join(" · "),
-  rww: job.source === "platform",
+  // On Remote Worldwide: a listing snapshot, or the user's own copy the server linked to its listing.
+  rww: Boolean(job.platformJobId && job.slug),
 });
 
 const listingRow = (listing: PlatformJobSearchItem): JobRow => ({
