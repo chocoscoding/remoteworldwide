@@ -9,6 +9,7 @@
 
 import { headers } from "next/headers";
 import { BackendError, unwrapResponse } from "@/app/lib/api/core";
+import { clientIpHeaders } from "@/app/lib/api/clientIp";
 
 export { BackendError };
 
@@ -49,6 +50,9 @@ export async function backend<T>(path: string, init: BackendInit = {}): Promise<
   // append X-Forwarded-For itself. Identity never rides on it; that is the cookie alone.
   const forwarded = incoming.get("x-forwarded-for");
   if (forwarded) h["x-forwarded-for"] = forwarded;
+  // What the backend's limiters actually count by: X-Forwarded-For above never gets past the
+  // backend's own proxy intact, so the visitor is named in a header only this server can vouch for.
+  Object.assign(h, clientIpHeaders(incoming));
   if (init.session) {
     const cookie = incoming.get("cookie");
     if (cookie) h.cookie = cookie;
