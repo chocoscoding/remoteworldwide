@@ -278,6 +278,23 @@ const nextConfig = {
           },
         ],
       },
+      // The print pages (app/print/*) — someone's CV, rendered for the PDF renderer
+      // on the AI host — and the signed-in deep links to a document (app/open/*),
+      // which answer with a file or a redirect to a signed storage link. Never
+      // stored by any cache, never indexed, and no Referer on anything they load or
+      // link to. After the rule above on purpose: when two rules set the same key,
+      // the later one wins — and it also wins over a header the route sets itself,
+      // which is why these are here rather than only in the handlers. (A dynamic
+      // page's own Cache-Control is already private and no-store; this says so for
+      // the edge too.)
+      ...["/print/:path*", "/open/:path*"].map((source) => ({
+        source,
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      })),
     ];
   },
   images: {

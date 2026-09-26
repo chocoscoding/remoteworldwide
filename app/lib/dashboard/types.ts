@@ -202,6 +202,78 @@ export interface CoverLetterContent {
 }
 
 // ---------------------------------------------------------------------------
+// The library, reopened: saved letters and resume summaries
+// ---------------------------------------------------------------------------
+//
+// Mirrors of the AI service's `src/types/index.ts` (the `/api/ai/cover/letters`
+// and `/api/ai/resume/documents?view=summary` answers). The service sends
+// `createdAt`/`updatedAt` as ISO strings; `unwrapResponse` revives both keys, so
+// they are Dates by the time anything here reads them.
+
+/**
+ * A saved letter, as the editor last left it. The writer fills the
+ * `CoverLetterContent` half; the editor's autosave adds what is actually on the
+ * page. `html` is stored as sent — every renderer sanitises it (the browser's
+ * `sanitizeLetterHtml`, the print page's `sanitizeLetterHtmlServer`).
+ */
+export interface StoredLetterContent extends CoverLetterContent {
+  /** The letter as edited, plain text. The service caps it at 12,000 characters. */
+  text?: string;
+  /** The editor's HTML. Capped at 60,000 characters. */
+  html?: string;
+}
+
+export type LetterThemeId = "ats" | "bordered" | "warm";
+export type LetterFontId = "manrope" | "serif" | "mono";
+export type LetterSpacingId = "tight" | "normal" | "airy";
+/** Whether the letter prints the person's name (and contacts) above it. The name itself is the profile's, never stored here. */
+export type LetterheadMode = "off" | "name" | "full";
+
+/** The cover editor's four toolbar controls, saved with the letter so it reopens and prints as it was left. */
+export interface LetterDesign {
+  theme: LetterThemeId;
+  font: LetterFontId;
+  spacing: LetterSpacingId;
+  letterhead: LetterheadMode;
+}
+
+/** A letter in a list: no content. */
+export interface LetterSummary {
+  id: string;
+  label: string;
+  tone: "warm" | "formal" | "story" | "short" | null;
+  /** The saved job it was written for. */
+  jobId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LetterView {
+  id: string;
+  label: string;
+  content: StoredLetterContent;
+  /** Null until the editor saves one; the editor's defaults apply until then. */
+  design: LetterDesign | null;
+  tone: "warm" | "formal" | "story" | "short" | null;
+  jobId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A built resume in a list: no content. The whole document is `StoredResumeDocument` (app/lib/resume/api.ts). */
+export interface ResumeDocumentSummary {
+  id: string;
+  label: string;
+  template: string | null;
+  /** The saved job it was built for. */
+  jobId: string | null;
+  /** The vault file it was copied from ("Edit a copy"), so the next click reopens this copy. */
+  sourceDocumentId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ---------------------------------------------------------------------------
 // Application tracker (Kanban)
 // ---------------------------------------------------------------------------
 

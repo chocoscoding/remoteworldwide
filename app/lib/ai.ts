@@ -9,7 +9,7 @@
 // the browser, which is the NEXT_PUBLIC_BACKEND_TOKEN mistake repeated.
 //
 // Callers:
-//   server components / actions -> this file
+//   server components / actions -> this file (`aiRaw` for the PDF renderer)
 //   browser                     -> app/api/ai/[...path]/route.ts, which calls
 //                                  auth() and proxies here with the token
 //   Express backend             -> talks to 4200 directly
@@ -70,6 +70,42 @@ export async function ai<T>(path: string, init: AiInit = {}): Promise<T> {
   });
 
   return unwrapResponse<T>(res);
+}
+
+/**
+ * The raw response, for the one kind of answer that is not the JSON envelope:
+ * bytes. The PDF renderer answers a render with `application/pdf` and a
+ * refusal with JSON, so the caller reads the status and the type itself.
+ *
+ * `path` is from the service's ROOT, not under `/api/ai` — the renderer lives
+ * at `/internal/render/*` precisely so the browser's `/api/ai/*` proxy cannot
+ * reach it. Same token, same identity header and same field-by-field headers as
+ * `ai()`: nothing from the incoming request is forwarded (not its cookie, and
+ * not the client-IP token `proxy.ts` adds to /api requests).
+ */
+export async function aiRaw(path: string, init: AiInit & { accept?: string } = {}): Promise<Response> {
+  if (!AI_TOKEN) throw new BackendError(500, "AI_SERVICE_TOKEN is not configured");
+  if (!path.startsWith("/") || path.startsWith("//")) throw new BackendError(400, "That address isn't valid");
+
+  const headers: Record<string, string> = {
+    accept: init.accept ?? "application/json",
+    "x-service-token": AI_TOKEN,
+  };
+  if (init.body !== undefined) headers["content-type"] = "application/json";
+  if (init.userId) headers["x-user-id"] = init.userId;
+
+  const timeout = AbortSignal.timeout(init.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+
+  return fetch(`${AI_URL}${path}`, {
+    method: init.method ?? "GET",
+    headers,
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    cache: "no-store",
+    // The renderer never redirects; one that did would be something else answering.
+    redirect: "error",
+    signal,
+  });
 }
 
 export async function aiOrNull<T>(path: string, init: AiInit = {}): Promise<T | null> {
