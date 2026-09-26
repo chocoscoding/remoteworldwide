@@ -250,6 +250,12 @@ export interface JobAnswer {
    * `/onboarding#<id>`. Absent or empty on answers stored before the service named them.
    */
   profileGaps?: OnboardingItemId[];
+  /**
+   * False when the answer could not address the question for want of the user's own facts (it
+   * can only say what is missing): the AI service never charges for one, so "No credit used".
+   * Absent on answers stored before it, which read as answered.
+   */
+  answered?: boolean;
 }
 
 export interface JobThreadEntry {
