@@ -18,12 +18,34 @@
 // there is nothing to re-filter — and a tone the user has not generated yet
 // costs what any other letter costs. Callers are expected to keep the ones
 // already written (see `useCoverLetter`), so going back to a tone is free.
+//
+// ── Every letter is kept ───────────────────────────────────────────────────
+// The service saves each letter it writes to the library and answers with its
+// id (`documentId`), so a letter can be reopened (`/dashboard/cover?letter=`),
+// picked by the extension, and printed to PDF on the server. The editor then
+// autosaves what the person does to it (`updateLetter`, `useLetterAutosave`).
+// A save that failed after the letter was written is not a failed letter: the
+// answer is the letter with `documentId: null`, and the service's sentence
+// saying so rides along as `saveNotice`.
 
-import { apiPost } from "@/app/lib/api/client";
+import { apiGet, apiPatch, apiPostWithMessage } from "@/app/lib/api/client";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import type { CoverLetterContent } from "@/app/lib/dashboard/types";
+import type { CoverLetterContent, LetterDesign, LetterSummary, LetterView, StoredLetterContent } from "@/app/lib/dashboard/types";
 
 export type { CoverLetterContent };
+
+/**
+ * A letter as the writer (or the reviser) answers it, or as it was reopened
+ * from the library: the words, the editor's own text and HTML when a saved
+ * letter has them, and the library id — null when it is not in the library.
+ */
+export interface WrittenLetter extends StoredLetterContent {
+  documentId: string | null;
+  /** The service's own sentence when `documentId` is null because the save failed. */
+  saveNotice?: string;
+}
+
+const LETTERS_PATH = "/api/ai/cover/letters";
 
 const COVER_PATH = "/api/ai/cover";
 
@@ -80,8 +102,8 @@ export interface CoverLetterInput {
  * no experience to write from, 429 when the writer is busy, 503 when it is
  * briefly unavailable.
  */
-export const generateCoverLetter = (input: CoverLetterInput) =>
-  apiPost<CoverLetterContent>(COVER_PATH, {
+export async function generateCoverLetter(input: CoverLetterInput): Promise<WrittenLetter> {
+  const { data, message } = await apiPostWithMessage<CoverLetterContent & { documentId?: string | null }>(COVER_PATH, {
     resumeId: input.resumeId,
     company: input.company,
     role: input.role,
@@ -89,6 +111,14 @@ export const generateCoverLetter = (input: CoverLetterInput) =>
     jobId: input.jobId ?? null,
     tone: input.tone,
   });
+  return withSaveNotice(data, message);
+}
+
+/** `documentId` as the service sent it — null (never undefined) when it is not in the library — and why, when that is news. */
+function withSaveNotice(data: CoverLetterContent & { documentId?: string | null }, message: string): WrittenLetter {
+  const documentId = data.documentId ?? null;
+  return { ...data, documentId, ...(documentId === null && message ? { saveNotice: message } : {}) };
+}
 
 export interface ReviseCoverLetterInput {
   /** The letter as it stands in the editor, the user's own edits included. */
@@ -97,20 +127,66 @@ export interface ReviseCoverLetterInput {
   instruction: string;
   company?: string | null;
   role?: string | null;
+  /**
+   * The library letter being revised. The service checks it is this user's
+   * before charging, and saves the revision over it — its old text and HTML go,
+   * so the editor adopts the answer and autosaves from there.
+   */
+  documentId?: string | null;
 }
 
 /**
  * Rewrites the letter to one instruction, for `COVER_REVISE_CREDITS`. The
  * service adds no facts the letter does not already hold. Rejects with the
- * service's sentence: 402 without a credit, 429/503 when the writer is busy.
+ * service's sentence: 402 without a credit, 404 for a `documentId` that is not
+ * this user's, 429/503 when the writer is busy. Without a `documentId` nothing
+ * is saved and the answer's is null.
  */
-export const reviseCoverLetter = (input: ReviseCoverLetterInput) =>
-  apiPost<CoverLetterContent>(`${COVER_PATH}/revise`, {
+export async function reviseCoverLetter(input: ReviseCoverLetterInput): Promise<WrittenLetter> {
+  const { data, message } = await apiPostWithMessage<CoverLetterContent & { documentId?: string | null }>(`${COVER_PATH}/revise`, {
     letter: input.letter.slice(0, MAX_REVISE_LETTER_CHARS),
     instruction: input.instruction.slice(0, MAX_REVISE_INSTRUCTION_CHARS),
     company: input.company || undefined,
     role: input.role || undefined,
+    documentId: input.documentId || undefined,
   });
+  // Only news when a save was asked for: an unsaved blank draft revised is null by design.
+  return input.documentId ? withSaveNotice(data, message) : { ...data, documentId: data.documentId ?? null };
+}
+
+// ---------------------------------------------------------------------------
+// The library of letters
+// ---------------------------------------------------------------------------
+
+/** Every saved letter, most recently worked on first (at most 50). Summaries carry no content. */
+export function listLetters(view: "summary", signal?: AbortSignal): Promise<LetterSummary[]>;
+export function listLetters(view: "full", signal?: AbortSignal): Promise<LetterView[]>;
+export function listLetters(view: "summary" | "full", signal?: AbortSignal): Promise<LetterSummary[] | LetterView[]> {
+  return apiGet<LetterSummary[] | LetterView[]>(`${LETTERS_PATH}?view=${view}`, signal);
+}
+
+/** One saved letter. Another user's id, or a resume's, is a 404. */
+export const getLetter = (id: string, signal?: AbortSignal): Promise<LetterView> => apiGet<LetterView>(`${LETTERS_PATH}/${encodeURIComponent(id)}`, signal);
+
+/** What an autosave sends: `content` whole (the service recounts `wordCount` from `text`), `design` whole. */
+export interface LetterPatch {
+  label?: string;
+  content?: StoredLetterContent;
+  design?: LetterDesign;
+}
+
+/** The browser's keepalive quota is 64KB across every such request in flight; see `saveResumeDocument`. */
+const KEEPALIVE_MAX_BYTES = 48_000;
+
+/**
+ * Saves the editor's side of a letter. Over a limit (60,000 characters of HTML,
+ * 12,000 of text) the service refuses with a 400 and a sentence rather than
+ * cutting the letter short.
+ */
+export const updateLetter = (id: string, patch: LetterPatch, options: { keepalive?: boolean } = {}): Promise<{ id: string; label: string; updatedAt: Date }> => {
+  const keepalive = options.keepalive === true && new Blob([JSON.stringify(patch)]).size <= KEEPALIVE_MAX_BYTES;
+  return apiPatch<{ id: string; label: string; updatedAt: Date }>(`${LETTERS_PATH}/${encodeURIComponent(id)}`, patch, { keepalive });
+};
 
 export type CoverFailureKind =
   /** Too few credits. Nothing was written or charged. */

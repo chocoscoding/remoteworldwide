@@ -20,6 +20,19 @@
 // `activeDocId` starts as null: the screen's default is the LANDING — a
 // choice between starting from scratch, importing a resume, or opening one
 // that already exists — and the editor only mounts once a document is chosen.
+// Three links skip the landing (they arrive from the extension's View / Edit
+// links through `/open/…`, and from a job's screen):
+//
+//   ?doc=<id>     open that resume. Read on its own when it is not among the 50
+//                 the list carries; a 404 says so and leaves the landing.
+//   ?from=<id>    "Edit a copy" of a My documents file: the copy made from it
+//                 before (`sourceDocumentId`), else a new one — see
+//                 `editableCopyOf`.
+//   ?tailor=<id>  the newest resume, with Tailor aimed at that saved job.
+//
+// A document link wins over ?tailor: it names the resume, where Tailor would
+// only open whichever was saved last. The workspace mounts once whichever of
+// these is in play has settled, so it is seeded once, with the resume it opens.
 //
 // Why the provider is keyed like that: `ResumeDesignProvider` (chunk A3a)
 // owns its design/section state via an uncontrolled `useReducer` — it has no
@@ -33,14 +46,14 @@
 // HANDLERS are implemented one level down. The landing's own create/import
 // handlers live HERE instead, because with no document open there's nothing
 // to stash first.
-import { Suspense, useCallback, useState, type FC, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useState, type FC, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
 import { ResumeDesignProvider } from "@/app/components/dashboard/resume/ResumeDesignContext";
 import { createBlankContent, fromStored, importLabel, type ResumeDocument } from "@/app/components/dashboard/resume/resume-document";
-import { apiMessage } from "@/app/lib/api/core";
+import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
 import { parseFieldSpec, toPickedJob } from "@/app/lib/jobs/fields";
 import type { SavedJobItem } from "@/app/lib/jobs/types";
@@ -48,6 +61,8 @@ import { STALE_TIME, qk } from "@/app/lib/query/keys";
 import {
   createResumeDocument,
   deleteResumeDocument,
+  editableCopyOf,
+  getResumeDocument,
   importResume,
   listResumeDocuments,
   type StoredResumeDocument,
@@ -72,17 +87,26 @@ const latestDocumentId = (documents: StoredResumeDocument[]): string | null =>
   documents.reduce<StoredResumeDocument | null>((latest, d) => (!latest || d.updatedAt.getTime() > latest.updatedAt.getTime() ? d : latest), null)
     ?.id ?? null;
 
+/** A library id, as `?doc=` carries it. Anything else in the param is ignored rather than sent. */
+const OBJECT_ID = /^[a-f\d]{24}$/i;
+/** A My documents id, as `?from=` carries it. */
+const VAULT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+const paramMatching = (value: string | null, pattern: RegExp): string | null => (value && pattern.test(value) ? value : null);
+
 interface ResumeWorkspaceProps {
   initialDocuments: StoredResumeDocument[];
-  /** Open the most recently saved resume instead of the landing. */
-  openLatest: boolean;
+  /** The resume to open instead of the landing — one a link named, or the newest for Tailor. Null for the landing. */
+  initialOpenId: string | null;
   banner: ReactNode;
   tailorPreset: TailorPreset | null;
 }
 
-const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, openLatest, banner, tailorPreset }) => {
+const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOpenId, banner, tailorPreset }) => {
   const [documents, setDocuments] = useState<ResumeDocument[]>(() => initialDocuments.map(fromStored));
-  const [activeDocId, setActiveDocId] = useState<string | null>(() => (openLatest ? latestDocumentId(initialDocuments) : null));
+  const [activeDocId, setActiveDocId] = useState<string | null>(() =>
+    initialOpenId && initialDocuments.some((d) => d.id === initialOpenId) ? initialOpenId : null,
+  );
 
   const activeDoc = activeDocId !== null ? documents.find((d) => d.id === activeDocId) : undefined;
 
@@ -181,9 +205,12 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, openLates
 
 const ResumeScreen: FC = () => {
   const params = useSearchParams();
+  const docParam = paramMatching(params.get("doc"), OBJECT_ID);
+  const fromParam = docParam ? null : paramMatching(params.get("from"), VAULT_ID);
   const context = readJobContext(params, "tailor");
   const [contextDismissed, setContextDismissed] = useState(false);
-  const tailorId = contextDismissed ? null : context.savedJobId;
+  // A link to a document wins over ?tailor (see the header).
+  const tailorId = contextDismissed || docParam || fromParam ? null : context.savedJobId;
 
   const saved = useSavedJobQuery(tailorId);
   const savedJob = saved.data && saved.data.id === tailorId ? saved.data : null;
@@ -221,13 +248,84 @@ const ResumeScreen: FC = () => {
     refetchOnReconnect: false,
   });
 
-  if (library.data)
-    return <ResumeWorkspace initialDocuments={library.data} openLatest={tailorId !== null} banner={banner} tailorPreset={tailorPreset} />;
+  const listed = library.data;
+
+  // ?doc= past the 50 the list carries: read on its own, once.
+  const missingId = docParam && listed && !listed.some((d) => d.id === docParam) ? docParam : null;
+  const named = useQuery({
+    queryKey: qk.resumes.document(missingId ?? ""),
+    queryFn: ({ signal }) => getResumeDocument(missingId as string, signal),
+    enabled: missingId !== null,
+    staleTime: STALE_TIME.resumes,
+    gcTime: 0,
+    refetchOnReconnect: false,
+  });
+
+  // ?from= — "Edit a copy". Not a mutation hook on purpose: it has to run by
+  // itself on arrival, exactly once, and a query dedupes the StrictMode double
+  // mount that would otherwise create two copies. It never refetches (the key is
+  // the file, and the copy it found or made is the answer for this visit), and
+  // it never retries: a retry after a create that landed but whose answer was
+  // lost would make a second copy.
+  const copy = useQuery({
+    queryKey: qk.resumes.copyOf(fromParam ?? ""),
+    queryFn: () => editableCopyOf(fromParam as string, listed ?? []),
+    enabled: fromParam !== null && listed !== undefined,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnReconnect: false,
+  });
+
+  // A link that could not be followed says why, once, and leaves the landing.
+  const namedError = named.isError ? named.error : null;
+  useEffect(() => {
+    if (!namedError) return;
+    toast.error(
+      namedError instanceof BackendError && namedError.status === 404
+        ? "That resume couldn't be found — it may have been deleted."
+        : apiMessage(namedError),
+    );
+  }, [namedError]);
+  const copyError = copy.isError ? copy.error : null;
+  useEffect(() => {
+    if (!copyError) return;
+    toast.error(
+      copyError instanceof BackendError && copyError.status === 404
+        ? "That file couldn't be found in My documents — it may have been deleted."
+        : apiMessage(copyError),
+    );
+  }, [copyError]);
+
+  const waitingForNamed = missingId !== null && named.isPending;
+  const waitingForCopy = fromParam !== null && copy.isPending;
+
+  if (listed && !waitingForNamed && !waitingForCopy) {
+    // A resume read on its own, or a copy just made, joins the list at the top — it is the one being opened.
+    const extra = [named.data, copy.data?.created ? copy.data.document : undefined].filter((d): d is StoredResumeDocument => !!d);
+    const initialDocuments = extra.length > 0 ? [...extra, ...listed.filter((d) => !extra.some((e) => e.id === d.id))] : listed;
+    const initialOpenId = docParam ?? copy.data?.document.id ?? (tailorId !== null ? latestDocumentId(listed) : null);
+    return <ResumeWorkspace initialDocuments={initialDocuments} initialOpenId={initialOpenId} banner={banner} tailorPreset={tailorPreset} />;
+  }
 
   // Not loaded: the landing, saying so, with its two ways to start held back.
   // A resume created before the list arrives would be seeded over when it did.
+  const status = waitingForCopy ? "Making an editable copy of your file…" : waitingForNamed ? "Opening your resume…" : null;
   return (
-    <ResumeLanding library={library.isError ? "error" : "loading"} onRetry={() => void library.refetch()} documents={[]} banner={banner} />
+    <ResumeLanding
+      library={library.isError ? "error" : "loading"}
+      onRetry={() => void library.refetch()}
+      documents={[]}
+      banner={
+        status ? (
+          <p role="status" className="text-xs font-semibold text-black/55">
+            {status}
+          </p>
+        ) : (
+          banner
+        )
+      }
+    />
   );
 };
 

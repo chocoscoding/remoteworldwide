@@ -61,9 +61,18 @@ export function revive(value: unknown, key?: string): unknown {
  * the storefront's one genuinely good API convention.
  */
 export async function unwrapResponse<T>(res: Response): Promise<T> {
+  return (await unwrapEnvelope<T>(res)).data;
+}
+
+/**
+ * The same, keeping the envelope's `message` — for the rare answer that is a
+ * success with a caveat worth showing in the service's own words (a cover
+ * letter written, but not saved to the library).
+ */
+export async function unwrapEnvelope<T>(res: Response): Promise<{ data: T; message: string }> {
   const json = (await res.json().catch(() => null)) as { data?: unknown; message?: string } | null;
   if (!res.ok) throw new BackendError(res.status, json?.message ?? res.statusText);
-  return revive(json?.data) as T;
+  return { data: revive(json?.data) as T, message: json?.message ?? "" };
 }
 
 /**

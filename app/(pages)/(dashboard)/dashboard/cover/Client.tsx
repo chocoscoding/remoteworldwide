@@ -5,10 +5,17 @@
 // The letter is written by the AI service (`POST /api/ai/cover`, through the
 // session proxy) from the user's own ingested resume and the posting they
 // picked. Everything on this screen that is NOT the letter — theme, font,
-// spacing, letterhead — is a user control, persisted nowhere but the session
-// and never generated: the service emits words and says so in its own header,
-// because a generated theme would silently override a choice the user already
-// made and would arrive again with every regenerate.
+// spacing, letterhead — is a user control, never generated: the service emits
+// words and says so in its own header, because a generated theme would
+// silently override a choice the user already made and would arrive again with
+// every regenerate.
+//
+// Every letter written is saved to the library by the service, and from then
+// on this screen keeps it current: `useLetterAutosave` saves the editor's text
+// and HTML and those four controls with it, so the letter reopens — and prints
+// to PDF on the server — as it was left. `?letter=<id>` reopens one (the
+// extension's Edit link arrives here through `/open/letter/<id>`): its words,
+// its look, and the job it was written for.
 //
 // ── Two things here are deliberate and easy to get wrong ───────────────────
 //
@@ -27,17 +34,35 @@
 //    things that are true and checkable: which resume it was written from, the
 //    live word count, and the tone's own paragraph target.
 
-import { Suspense, useCallback, useMemo, useState, type FC } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type FC } from "react";
 import { Check, ChevronDown, Copy, Download, FileSignature, FileWarning, Link2, Loader2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import TimeAgo from "timeago-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
-import { coverToDocx, coverToMarkdown, letterheadHtml, sanitizeLetterHtml, type Letterhead, type LetterFont } from "@/app/lib/export/cover";
+import { coverToDocx, coverToMarkdown, letterheadHtml, sanitizeLetterHtml, textToLetterHtml, type Letterhead } from "@/app/lib/export/cover";
+import { LETTER_PAGE_MARGIN, LETTER_PAGE_SIZE, LETTER_PRINT_CSS } from "@/app/lib/export/print-css";
+import {
+  DEFAULT_LETTER_DESIGN,
+  FONT_CLASS,
+  LETTER_FONT_OPTIONS,
+  LETTERHEAD_OPTIONS,
+  SPACING_CLASS,
+  SPACING_OPTIONS,
+  THEME_CANVAS_CLASS,
+  THEME_OPTIONS,
+  letterheadFor,
+  lettersToHtml,
+  letterTextOf,
+  wordFontFor,
+} from "@/app/lib/cover/presentation";
+import type { LetterDesign, LetterFontId, LetterheadMode, LetterSpacingId, LetterThemeId, LetterView } from "@/app/lib/dashboard/types";
 import RichTextEditor from "@/app/components/dashboard/ui/RichTextEditor";
 import SplitButton from "@/app/components/dashboard/ui/SplitButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
@@ -59,21 +84,20 @@ import {
   MAX_REVISE_INSTRUCTION_CHARS,
   TONE_PARAGRAPHS,
   describeCoverFailure,
+  getLetter,
   reviseCoverLetter,
   type CoverLetterContent,
   type CoverTone,
+  type WrittenLetter,
 } from "@/app/lib/cover/api";
+import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
 import { useCoverLetter, type CoverRunInput } from "@/hooks/mutations/useCoverLetter";
+import { useLetterAutosave } from "@/hooks/mutations/useLetterAutosave";
 import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
 import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
 import { useProfileSettings } from "@/hooks/queries/useSettingsQuery";
 import { Lottie } from "lottie-react";
-
-type ThemeId = "ats" | "bordered" | "warm";
-type FontId = "manrope" | "serif" | "mono";
-type SpacingId = "tight" | "normal" | "airy";
-type LetterheadId = "off" | "name" | "full";
 
 // What a letter needs from a picked job. The posting is asked for but optional:
 // a letter can be written for a job nobody pasted the description of, and the
@@ -99,70 +123,47 @@ const TONE_OPTIONS: { id: CoverTone; label: string }[] = [
   { id: "short", label: "Short" },
 ];
 
-const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
-  { id: "ats", label: "Clean ATS" },
-  { id: "bordered", label: "Bordered" },
-  { id: "warm", label: "Warm" },
-];
-
-const FONT_OPTIONS: { id: FontId; label: string }[] = [
-  { id: "manrope", label: "Manrope" },
-  { id: "serif", label: "Serif" },
-  { id: "mono", label: "Mono" },
-];
-
-const SPACING_OPTIONS: { id: SpacingId; label: string }[] = [
-  { id: "tight", label: "Tight" },
-  { id: "normal", label: "Normal" },
-  { id: "airy", label: "Airy" },
-];
-
-const LETTERHEAD_OPTIONS: { id: LetterheadId; label: string }[] = [
-  { id: "off", label: "Off" },
-  { id: "name", label: "Name only" },
-  { id: "full", label: "Full contact" },
-];
-
 /** A blank draft, for someone writing their own with no job attached. */
 const BLANK_GREETING = "Hi there,";
 const BLANK_BODY = ["Start writing your cover letter here…"];
 
-const escapeHtml = (value: string): string =>
-  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// The theme, font, spacing and letterhead options, their classes and
+// `lettersToHtml` live in app/lib/cover/presentation.ts, shared with the print
+// page and the Word export on the server.
 
-/** Paragraphs -> the HTML the editor loads. Escaped: this is the model's text, not markup. */
-function lettersToHtml(greeting: string, paragraphs: string[], signOff: string): string {
-  const body = paragraphs
-    .filter((p) => p.trim())
-    .map((p) => `<p>${escapeHtml(p)}</p>`)
-    .join("");
-  // The sign-off is one field carrying two lines ("Best,\nJordan"), which is
-  // how the service asks for it and how a letter is actually laid out.
-  const closing = signOff
-    .split("\n")
-    .filter((line) => line.trim())
-    .map((line) => `<p><strong>${escapeHtml(line)}</strong></p>`)
-    .join("");
-  return `<p>${escapeHtml(greeting)}</p>${body}${closing}`;
+/** A library id, as `?letter=` carries it. Anything else in the param is ignored. */
+const OBJECT_ID = /^[a-f\d]{24}$/i;
+
+/**
+ * A reopened letter's job when the saved job itself cannot be read (none was
+ * linked, or it has been deleted): the company and role the letter names, with
+ * no posting, which is how the writer treats a job nobody pasted. Null when the
+ * letter names neither, and the screen opens it as a draft with no job.
+ */
+function jobFromLetter(letter: LetterView): CoverJob | null {
+  const company = letter.content.company.trim();
+  const role = letter.content.role.trim();
+  if (!company || !role) return null;
+  return {
+    // Only ever sent on as `jobId || null`, so a letter with no job sends none.
+    id: letter.jobId ?? "",
+    source: "manual",
+    company,
+    role,
+    description: null,
+    requirements: [],
+    meta: { missing: ["description", "requirements"], sources: {} },
+  };
 }
 
-const FONT_CLASS: Record<FontId, string> = {
-  manrope: "",
-  serif: "font-serif",
-  mono: "font-mono",
-};
-
-const SPACING_CLASS: Record<SpacingId, { gap: string; text: string }> = {
-  tight: { gap: "gap-3", text: "text-[13px] leading-snug" },
-  normal: { gap: "gap-5", text: "text-sm leading-relaxed" },
-  airy: { gap: "gap-7", text: "text-[15px] leading-loose" },
-};
-
-const THEME_CANVAS_CLASS: Record<ThemeId, string> = {
-  ats: "bg-white border border-black/10",
-  bordered: "bg-white border-2 border-primary/15",
-  warm: "bg-[#fbfbf7] border border-black/10",
-};
+/** The HTML a letter opens with: the editor's own, saved; else its saved text; else the letter as written. */
+function openingHtml(letter: WrittenLetter): string {
+  // Sanitised here too: the library stores the editor's HTML as sent. DOMParser
+  // is the browser's, and a reopened letter only exists after a fetch in it.
+  if (letter.html?.trim() && typeof DOMParser !== "undefined") return sanitizeLetterHtml(letter.html);
+  if (letter.text?.trim()) return textToLetterHtml(letter.text);
+  return lettersToHtml(letter.greeting, letter.paragraphs, letter.signOff);
+}
 
 /** Compact labelled select for the editor toolbar — every style control in
  *  one bar directly above the letter, not a separate card. */
@@ -214,11 +215,12 @@ const CoverScreen: FC = () => {
   const [builtOpen, setBuiltOpen] = useState(false);
   const [tone, setTone] = useState<CoverTone>("warm");
 
-  // Style controls
-  const [theme, setTheme] = useState<ThemeId>("ats");
-  const [font, setFont] = useState<FontId>("manrope");
-  const [spacing, setSpacing] = useState<SpacingId>("normal");
-  const [letterhead, setLetterhead] = useState<LetterheadId>("off");
+  // Style controls — saved with the letter (useLetterAutosave), restored when it is reopened.
+  const [theme, setTheme] = useState<LetterThemeId>(DEFAULT_LETTER_DESIGN.theme);
+  const [font, setFont] = useState<LetterFontId>(DEFAULT_LETTER_DESIGN.font);
+  const [spacing, setSpacing] = useState<LetterSpacingId>(DEFAULT_LETTER_DESIGN.spacing);
+  const [letterhead, setLetterhead] = useState<LetterheadMode>(DEFAULT_LETTER_DESIGN.letterhead);
+  const design = useMemo<LetterDesign>(() => ({ theme, font, spacing, letterhead }), [theme, font, spacing, letterhead]);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
@@ -242,7 +244,7 @@ const CoverScreen: FC = () => {
   const [revising, setRevising] = useState(false);
   const queryClient = useQueryClient();
 
-  const { letter, writing, failure, run, show, reset, adopt, isUnwritten } = useCoverLetter();
+  const { letter, writing, failure, run, show, reset, adopt, seed, isUnwritten } = useCoverLetter();
 
   // Bumped every time a letter lands on the page, whether freshly written or
   // recalled from a tone already written. It is what `docKey` counts on, and it
@@ -324,9 +326,68 @@ const CoverScreen: FC = () => {
   // leaves the screen as it always opens.
   const params = useSearchParams();
   const context = readJobContext(params, "job");
+  const letterParam = OBJECT_ID.test(params.get("letter") ?? "") ? params.get("letter") : null;
+
+  // A link to a saved letter (?letter=<id>) opens it — adopted once, like a
+  // linked job: its words become the draft on screen for its tone, its design
+  // the toolbar's, and its job the linked one. The job is read back from saved
+  // jobs (for the posting a rewrite needs); until it arrives, or if it is gone,
+  // the letter's own company and role stand in. A letter link wins over ?job=.
+  const [letterFor, setLetterFor] = useState<string | null>(null);
+  const [opened, setOpened] = useState<{ id: string; design: LetterDesign | null; updatedAt: Date; jobId: string | null } | null>(null);
+  const letterPending = letterParam !== null && letterFor !== letterParam;
+  const openedQuery = useQuery({
+    queryKey: qk.letters.one(letterParam ?? ""),
+    queryFn: ({ signal }) => getLetter(letterParam as string, signal),
+    enabled: letterPending,
+    staleTime: STALE_TIME.letters,
+    // Someone's letter, held only while this screen is open.
+    gcTime: 0,
+    refetchOnReconnect: false,
+  });
+  const openedData = openedQuery.data && openedQuery.data.id === letterParam ? openedQuery.data : null;
+  if (letterPending && (openedData || openedQuery.isError)) {
+    setLetterFor(letterParam);
+    if (openedData) {
+      const openedTone = openedData.tone ?? tone;
+      const look = openedData.design ?? DEFAULT_LETTER_DESIGN;
+      seed({ ...openedData.content, documentId: openedData.id }, openedTone);
+      setTone(openedTone);
+      setTheme(look.theme);
+      setFont(look.font);
+      setSpacing(look.spacing);
+      setLetterhead(look.letterhead);
+      setOpened({ id: openedData.id, design: openedData.design, updatedAt: openedData.updatedAt, jobId: openedData.jobId });
+      setIsBlankDraft(!jobFromLetter(openedData));
+      setLinkedJob(jobFromLetter(openedData));
+      setDraftSeq((seq) => seq + 1);
+    }
+  }
+  const openedError = openedQuery.isError ? openedQuery.error : null;
+  useEffect(() => {
+    if (!openedError) return;
+    toast.error(
+      openedError instanceof BackendError && openedError.status === 404
+        ? "That cover letter couldn't be found — it may have been deleted."
+        : apiMessage(openedError),
+    );
+  }, [openedError]);
+  // The reopened letter's saved job, for its posting. Adopted once; a job that
+  // has gone keeps the stand-in.
+  const [openedJobFor, setOpenedJobFor] = useState<string | null>(null);
+  const openedJobPending = opened !== null && opened.jobId !== null && openedJobFor !== opened.jobId;
+  const openedSaved = useSavedJobQuery(openedJobPending ? opened.jobId : null);
+  const openedSavedJob = openedSaved.data && openedSaved.data.id === opened?.jobId ? openedSaved.data : null;
+  if (openedJobPending && (openedSavedJob || openedSaved.isError)) {
+    setOpenedJobFor(opened.jobId);
+    const job = openedSavedJob ? coverJobFrom(openedSavedJob) : null;
+    // Only while that letter's job is still the one on screen.
+    if (job && linkedJob && linkedJob.id === opened.jobId) setLinkedJob(job);
+  }
+
   const [contextFor, setContextFor] = useState<string | null>(null);
   const [contextDismissed, setContextDismissed] = useState(false);
-  const contextPending = context.savedJobId !== null && contextFor !== context.savedJobId;
+  const contextPending = letterParam === null && context.savedJobId !== null && contextFor !== context.savedJobId;
   const saved = useSavedJobQuery(contextPending ? context.savedJobId : null);
   const savedJob = saved.data && saved.data.id === context.savedJobId ? saved.data : null;
   if (contextPending && (savedJob || saved.isError)) {
@@ -339,7 +400,7 @@ const CoverScreen: FC = () => {
     }
   }
   // Held on a quiet line rather than the front door, which would flash up and take a click meant for this job.
-  const openingLinked = contextPending && !saved.isError && !started;
+  const openingLinked = (contextPending && !saved.isError && !started) || (letterPending && !openedQuery.isError);
   // Only while the letter on screen is for the job the link named; a different pick or a blank draft is not.
   const contextJob = linkedJob && !isBlankDraft && !contextDismissed && linkedJob.id === context.savedJobId ? linkedJob : null;
 
@@ -348,11 +409,10 @@ const CoverScreen: FC = () => {
   const draftLabel = isBlankDraft ? "Untitled" : (letter?.draftLabel ?? "Draft");
   const docKey = isBlankDraft ? `blank-${draftSeq}` : `${linkedJob?.id ?? "none"}-${tone}-${draftSeq}`;
   // A letter on screen wins, so a revised blank draft shows its revision.
-  const initialHtml = letter
-    ? lettersToHtml(letter.greeting, letter.paragraphs, letter.signOff)
-    : isBlankDraft
-      ? lettersToHtml(BLANK_GREETING, BLANK_BODY, profile?.fullName ?? "")
-      : "";
+  const initialHtml = useMemo(
+    () => (letter ? openingHtml(letter) : isBlankDraft ? lettersToHtml(BLANK_GREETING, BLANK_BODY, profile?.fullName ?? "") : ""),
+    [letter, isBlankDraft, profile?.fullName],
+  );
   const letterText = edited?.key === docKey ? edited.text : "";
   const letterHtml = edited?.key === docKey ? edited.html : "";
 
@@ -362,6 +422,19 @@ const CoverScreen: FC = () => {
   // by construction, and the footer never reads "0 words" under a full page.
   const editedWordCount = letterText.trim() ? letterText.trim().split(/\s+/).length : 0;
   const liveWordCount = editedWordCount || (isBlankDraft ? 0 : (letter?.wordCount ?? 0));
+
+  // The library letter on screen, and its autosave. A blank draft has none —
+  // nothing was written, so there is nothing in the library to save to — and
+  // neither has a letter whose save failed.
+  const letterId = letter?.documentId ?? null;
+  const autosave = useLetterAutosave({
+    id: letterId,
+    letter,
+    edited: edited?.key === docKey ? edited : null,
+    design,
+    storedDesign: opened && opened.id === letterId ? opened.design : null,
+    savedAt: opened && opened.id === letterId ? opened.updatedAt : null,
+  });
   const spacingCfg = SPACING_CLASS[spacing];
   const downloadFileName = profile?.fullName?.trim() ? `${profile.fullName.trim().replace(/\s+/g, "-")}-Cover-Letter` : "Cover-Letter";
 
@@ -377,10 +450,13 @@ const CoverScreen: FC = () => {
         // The picker's own id, passed through the way `useScanResume` passes
         // it: the service treats it as an opaque key on the requirement cache,
         // so a letter and a scan for the same posting share the extraction.
-        jobId: job.id ?? null,
+        // Empty for a reopened letter that never had a job.
+        jobId: job.id || null,
         tone: nextTone,
       });
       if (written) setDraftSeq((seq) => seq + 1);
+      // Written and charged, but not in the library: the service says so in its own words.
+      if (written && written.documentId === null && written.saveNotice) toast.warning(written.saveNotice);
       return written;
     },
     [resume, run],
@@ -404,15 +480,14 @@ const CoverScreen: FC = () => {
    */
   function letterBody(): string {
     if (letterText.trim()) return letterText;
-    return letter ? [letter.greeting, "", ...letter.paragraphs.flatMap((para) => [para, ""]), letter.signOff].join("\n") : "";
+    // A reopened letter's saved text is the letter as it was last edited.
+    if (letter?.text?.trim()) return letter.text;
+    return letter ? letterTextOf(letter) : "";
   }
 
   // --- Export ------------------------------------------------------------
 
-  const letterheadInfo = (): Letterhead | null =>
-    letterhead !== "off" && profile?.fullName?.trim()
-      ? { name: profile.fullName, contact: letterhead === "full" ? [profile.email, profile.portfolio, profile.location].filter(Boolean) : [] }
-      : null;
+  const letterheadInfo = (): Letterhead | null => letterheadFor(letterhead, profile);
 
   const openDownload = (format: DownloadFormat) => {
     setDownloadFormat(format);
@@ -428,9 +503,10 @@ const CoverScreen: FC = () => {
     printDocument({
       title: safeFileName(downloadFileName),
       html: `<main class="${cn(FONT_CLASS[font], spacingCfg.text)}">${letterheadHtml(letterheadInfo())}${letterHtml ? sanitizeLetterHtml(letterHtml) : initialHtml}</main>`,
-      pageSize: "auto",
-      pageMargin: "22mm 20mm",
-      css: "main{color:#222325;}main p{margin:0 0 0.9em;}main ul,main ol{margin:0 0 0.9em 1.4em;}",
+      // Shared with the server's print page (print-css.ts), so the two PDFs agree.
+      pageSize: LETTER_PAGE_SIZE,
+      pageMargin: LETTER_PAGE_MARGIN,
+      css: LETTER_PRINT_CSS,
     });
 
   const handleDownload = async (format: DownloadFormat) => {
@@ -438,8 +514,7 @@ const CoverScreen: FC = () => {
     const body = letterBody();
     if (!body.trim()) throw new Error("There's no letter to download yet.");
     if (format === "pdf") return printLetter();
-    const letterFont: LetterFont = font === "serif" ? "serif" : font === "mono" ? "mono" : "sans";
-    if (format === "docx") saveBlob(await coverToDocx(body, letterheadInfo(), letterFont), `${base}.docx`);
+    if (format === "docx") saveBlob(await coverToDocx(body, letterheadInfo(), wordFontFor(font)), `${base}.docx`);
     else saveText(coverToMarkdown(body, letterheadInfo()), `${base}.md`);
   };
 
@@ -511,8 +586,12 @@ const CoverScreen: FC = () => {
     setRevising(true);
     setAiStatus(null);
     try {
-      const revised = await reviseCoverLetter({ letter: current, instruction, company: linkedJob?.company, role: linkedJob?.role });
-      adopt(revised, tone);
+      // With the library id, the service saves the revision over the letter.
+      const revised = await reviseCoverLetter({ letter: current, instruction, company: linkedJob?.company, role: linkedJob?.role, documentId: letterId });
+      if (revised.documentId === null && revised.saveNotice) toast.warning(revised.saveNotice);
+      // A revision whose save failed stays tied to the letter it revised, so the
+      // next edit's autosave still lands there.
+      adopt({ ...revised, documentId: revised.documentId ?? letterId }, tone);
       setDraftSeq((seq) => seq + 1);
       setAiPrompt("");
       setAiStatus(`Revised to “${instruction}”. Not quite right? Say what to change next, or edit it directly.`);
@@ -587,7 +666,7 @@ const CoverScreen: FC = () => {
           <div className="flex min-h-[420px] items-center justify-center">
             <p className="inline-flex items-center gap-2 text-sm text-black/50" role="status">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Opening the job…
+              {letterPending ? "Opening your letter…" : "Opening the job…"}
             </p>
           </div>
         ) : !started ? (
@@ -798,14 +877,14 @@ const CoverScreen: FC = () => {
               ariaLabel="Cover letter body"
               toolbarLeading={
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => setTheme(v as ThemeId)} />
-                  <ToolbarSelect label="Font" value={font} options={FONT_OPTIONS} onChange={(v) => setFont(v as FontId)} />
-                  <ToolbarSelect label="Spacing" value={spacing} options={SPACING_OPTIONS} onChange={(v) => setSpacing(v as SpacingId)} />
+                  <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => setTheme(v as LetterThemeId)} />
+                  <ToolbarSelect label="Font" value={font} options={LETTER_FONT_OPTIONS} onChange={(v) => setFont(v as LetterFontId)} />
+                  <ToolbarSelect label="Spacing" value={spacing} options={SPACING_OPTIONS} onChange={(v) => setSpacing(v as LetterSpacingId)} />
                   <ToolbarSelect
                     label="Letterhead"
                     value={letterhead}
                     options={LETTERHEAD_OPTIONS}
-                    onChange={(v) => setLetterhead(v as LetterheadId)}
+                    onChange={(v) => setLetterhead(v as LetterheadMode)}
                   />
                 </div>
               }
@@ -828,6 +907,34 @@ const CoverScreen: FC = () => {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-semibold text-black/45 tabular-nums">{liveWordCount} words</span>
+                  {/* Where this letter stands in the library — the resume editor's save line, in the same words. */}
+                  {autosave.status.kind !== "off" && (
+                    <span className="text-xs text-black/45" aria-live="polite">
+                      {autosave.status.kind === "saved" &&
+                        (autosave.savedAt ? (
+                          <>
+                            saved · last edited <TimeAgo datetime={autosave.savedAt} opts={{ minInterval: 10 }} />
+                          </>
+                        ) : (
+                          "saved to your library"
+                        ))}
+                      {autosave.status.kind === "saving" && "saving…"}
+                      {autosave.status.kind === "error" && (
+                        <span className="font-semibold text-[#b23c26]">
+                          {autosave.status.retrying ? (
+                            "not saved yet — we'll keep trying. Your changes are safe on this page."
+                          ) : (
+                            <>
+                              not saved — {autosave.status.message}{" "}
+                              <button type="button" onClick={autosave.flush} className="cursor-pointer underline decoration-2 underline-offset-2">
+                                Try again
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      )}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => setDetailsOpen((v) => !v)}

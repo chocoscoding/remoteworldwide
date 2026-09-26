@@ -19,6 +19,7 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/app/lib/api/client";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+import { getIngestedResume, prepareResumeForDoc } from "@/app/lib/ats/api";
 import { waitForImport, type ResumeImportAccepted, type ResumeImportView } from "./importJob";
 import { MAX_RESUME_BYTES, RESUME_TYPES_HINT, isReadableMime, mimeForFileName } from "./mime";
 
@@ -234,6 +235,8 @@ export interface StoredResumeDocument {
   design: unknown;
   sections: unknown;
   jobId: string | null;
+  /** The My documents file this is an editable copy of ("Edit a copy"). Absent on rows saved before copies existed. */
+  sourceDocumentId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -275,9 +278,54 @@ export async function listResumeDocuments(signal?: AbortSignal): Promise<StoredR
   return apiGet<StoredResumeDocument[]>(DOCUMENTS, signal);
 }
 
-/** `design` and `sections` are left out on purpose: a new resume starts at the default look, which is stored as nothing. */
-export const createResumeDocument = (input: { label: string; content: ResumeContent }): Promise<StoredResumeDocument> =>
+/**
+ * One resume by id. The list stops at the 50 most recently saved, so a link to
+ * an older one (`/dashboard/resume?doc=`) reads it on its own. Another user's
+ * id, or a cover letter's, is a 404.
+ */
+export const getResumeDocument = (id: string, signal?: AbortSignal): Promise<StoredResumeDocument> =>
+  apiGet<StoredResumeDocument>(`${DOCUMENTS}/${encodeURIComponent(id)}`, signal);
+
+/**
+ * `design` and `sections` are left out on purpose: a new resume starts at the
+ * default look, which is stored as nothing. `sourceDocumentId` marks a copy of a
+ * My documents file, so the next "Edit a copy" of that file reopens this one.
+ */
+export const createResumeDocument = (input: { label: string; content: ResumeContent; sourceDocumentId?: string }): Promise<StoredResumeDocument> =>
   tracked(apiPost<StoredResumeDocument>(DOCUMENTS, input));
+
+/** A copy made, or the one made last time. */
+export interface EditableCopy {
+  document: StoredResumeDocument;
+  created: boolean;
+}
+
+/**
+ * "Edit a copy" of an uploaded file: the library resume made from it before, or
+ * a new one.
+ *
+ * A file cannot be edited — it is bytes in storage — but what it SAYS can be:
+ * `/api/ats/resume-for-doc` imports it (free, and deduped: a file already
+ * parsed is answered from its link), the parsed content is read back, and it
+ * becomes a library resume that remembers where it came from. The earlier copy
+ * is found in `library` — the list the editor was seeded with — so clicking
+ * "Edit a copy" twice opens one resume, not two.
+ */
+export async function editableCopyOf(vaultId: string, library: readonly StoredResumeDocument[]): Promise<EditableCopy> {
+  const existing = library.find((doc) => doc.sourceDocumentId === vaultId);
+  if (existing) return { document: existing, created: false };
+
+  const prepared = await prepareResumeForDoc(vaultId);
+  const parsed = await getIngestedResume(prepared.resumeId);
+  if (!parsed.content) throw new Error("We couldn't read that file's contents, so there is nothing to edit. Try importing it from the resume screen.");
+  const label = `${importLabel(prepared.fileName || parsed.fileName)} (copy)`;
+  const document = await createResumeDocument({ label, content: parsed.content, sourceDocumentId: vaultId });
+  return { document, created: true };
+}
+
+/** The name an imported file's resume starts with: the file's name, read as words. Shared with the editor's own import. */
+export const importLabel = (fileName: string): string =>
+  fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim().slice(0, 80) || "Imported resume";
 
 // ---------------------------------------------------------------------------
 // Build with AI

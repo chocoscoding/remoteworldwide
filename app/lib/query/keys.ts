@@ -181,6 +181,15 @@ export const qk = {
     // newest one to write from. Its own key so a copy cached there is never
     // what the editor seeds itself from on the next visit.
     forCover: () => [...qk.resumes.all, "for-cover"] as const,
+    // One resume a link named (`?doc=`) that the 50-item list did not carry.
+    document: (id: string) => [...qk.resumes.all, "document", id] as const,
+    // "Edit a copy" of a My documents file (`?from=`): the copy opened or made.
+    copyOf: (vaultId: string) => [...qk.resumes.all, "copy-of", vaultId] as const,
+  },
+  // Saved cover letters. `one(id)` is the letter a link opened (`?letter=`).
+  letters: {
+    all: ["letters"] as const,
+    one: (id: string) => [...qk.letters.all, "one", id] as const,
   },
   // The ATS scorer. `ingested()` is the list of CVs that have been parsed and
   // embedded — what a scan can name, which is NOT the same set as `documents`
@@ -264,6 +273,7 @@ export const STALE_TIME: Record<QueryDomain, number> = {
   referrals: 10 * 60_000, // only a search this user runs changes it, and that search writes the cache directly
   contacts: 60_000, // only this user writes it, and every write invalidates it; the hiring flag moves with live listings
   resumes: 0, // the editor is seeded from it once per visit and autosaves past it, so a cached copy is always behind
+  letters: 0, // the same for the cover editor: it autosaves past whatever was read
   ats: 2 * 60_000, // grows only when a CV is imported, which is the same cadence as documents
   voice: 60_000, // minutes drain during every call, and a switched-off feature must stop being offered
   invites: 5 * 60_000, // moves only when someone signs up or pays on your link, which is days apart

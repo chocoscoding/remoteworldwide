@@ -13,7 +13,7 @@
 // which is an extra network round trip per request. Nothing here reads the
 // session at all.
 
-import { unwrapResponse } from "./core";
+import { unwrapEnvelope, unwrapResponse } from "./core";
 
 interface RequestInit_ {
   /** A FormData body is passed through untouched — see the note in `request`. */
@@ -28,14 +28,14 @@ interface RequestInit_ {
   keepalive?: boolean;
 }
 
-async function request<T>(method: string, path: string, init: RequestInit_ = {}): Promise<T> {
+function send(method: string, path: string, init: RequestInit_ = {}): Promise<Response> {
   const multipart = init.body instanceof FormData;
   const headers: Record<string, string> = { accept: "application/json" };
   // No content-type for multipart: only the browser knows the boundary it is
   // about to write, and setting the header by hand omits it.
   if (init.body !== undefined && !multipart) headers["content-type"] = "application/json";
 
-  const res = await fetch(path, {
+  return fetch(path, {
     method,
     headers,
     body: init.body === undefined ? undefined : multipart ? (init.body as FormData) : JSON.stringify(init.body),
@@ -45,7 +45,10 @@ async function request<T>(method: string, path: string, init: RequestInit_ = {})
     signal: init.signal,
     keepalive: init.keepalive,
   });
-  return unwrapResponse<T>(res);
+}
+
+async function request<T>(method: string, path: string, init: RequestInit_ = {}): Promise<T> {
+  return unwrapResponse<T>(await send(method, path, init));
 }
 
 export const apiGet = <T,>(path: string, signal?: AbortSignal) => request<T>("GET", path, { signal });
@@ -54,3 +57,6 @@ export const apiPut = <T,>(path: string, body?: unknown) => request<T>("PUT", pa
 export const apiPatch = <T,>(path: string, body?: unknown, options: { keepalive?: boolean } = {}) =>
   request<T>("PATCH", path, { body, keepalive: options.keepalive });
 export const apiDelete = <T,>(path: string) => request<T>("DELETE", path);
+
+/** A POST whose answer's `message` matters too — see `unwrapEnvelope`. */
+export const apiPostWithMessage = async <T,>(path: string, body?: unknown) => unwrapEnvelope<T>(await send("POST", path, { body }));

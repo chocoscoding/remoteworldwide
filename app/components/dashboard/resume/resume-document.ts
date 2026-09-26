@@ -148,10 +148,10 @@ export function cloneContent(content: ResumeContent): ResumeContent {
 
 /**
  * The name an imported resume starts with — its file name, read as words, so
- * the document reads as theirs.
+ * the document reads as theirs. Lives beside the library calls now, which name
+ * an "Edit a copy" of a file the same way.
  */
-export const importLabel = (fileName: string): string =>
-  fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim().slice(0, 80) || "Imported resume";
+export { importLabel } from "@/app/lib/resume/api";
 
 /**
  * A stored document -> the one the editor runs on. The saved look is a patch

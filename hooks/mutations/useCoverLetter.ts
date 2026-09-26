@@ -18,6 +18,10 @@
 // server state. Nothing else reads them, they are superseded by the user's own
 // edits the moment the editor is touched, and they must not outlive the screen
 // or survive to disk — a cover letter quotes someone's career history.
+//
+// Each draft carries the library id the service saved it under
+// (`WrittenLetter.documentId`), so switching tone also switches which saved
+// letter the cover screen's autosave writes to.
 
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,9 +29,9 @@ import {
   describeCoverFailure,
   generateCoverLetter,
   type CoverFailure,
-  type CoverLetterContent,
   type CoverLetterInput,
   type CoverTone,
+  type WrittenLetter,
 } from "@/app/lib/cover/api";
 import { qk } from "@/app/lib/query/keys";
 
@@ -36,14 +40,14 @@ export type CoverStatus = "idle" | "writing" | "done" | "failed";
 export interface CoverState {
   status: CoverStatus;
   /** The letter on screen — the one for the tone most recently asked for. */
-  letter: CoverLetterContent | null;
+  letter: WrittenLetter | null;
   failure: CoverFailure | null;
 }
 
 const IDLE: CoverState = { status: "idle", letter: null, failure: null };
 
 /** One job's letters, keyed by tone. A different job starts an empty set. */
-type Drafts = Partial<Record<CoverTone, CoverLetterContent>>;
+type Drafts = Partial<Record<CoverTone, WrittenLetter>>;
 
 /**
  * A letter request whose resume may not be ingested yet: `resumeId` can be the
@@ -91,7 +95,7 @@ export function useCoverLetter() {
    * reading state back during a render.
    */
   const run = useCallback(
-    async (input: CoverRunInput): Promise<CoverLetterContent | null> => {
+    async (input: CoverRunInput): Promise<WrittenLetter | null> => {
       runIdRef.current += 1;
       const runId = runIdRef.current;
       const current = () => runId === runIdRef.current;
@@ -125,14 +129,28 @@ export function useCoverLetter() {
    * Puts a letter written elsewhere — a revision to the user's instruction — on
    * screen as this tone's draft, so switching tone and back returns to it.
    */
-  const adopt = useCallback((letter: CoverLetterContent, tone: CoverTone) => {
+  const adopt = useCallback((letter: WrittenLetter, tone: CoverTone) => {
     runIdRef.current += 1;
     setDrafts((prev) => ({ ...prev, [tone]: letter }));
+    setState({ status: "done", letter, failure: null });
+  }, []);
+
+  /**
+   * Puts a SAVED letter on screen as the only draft — one reopened from the
+   * library by a link. The drafts of whatever was on screen go, as with
+   * `reset`: they belonged to another letter.
+   *
+   * Callable while rendering (the screen adopts the letter the moment it
+   * arrives, the way it adopts a linked job), so it only sets state; there is
+   * no run in flight on a screen that has just opened to cancel.
+   */
+  const seed = useCallback((letter: WrittenLetter, tone: CoverTone) => {
+    setDrafts({ [tone]: letter });
     setState({ status: "done", letter, failure: null });
   }, []);
 
   /** True for a tone that has not been written yet — the ones that cost a credit. */
   const isUnwritten = useCallback((tone: CoverTone) => drafts[tone] === undefined, [drafts]);
 
-  return { ...state, run, show, reset, adopt, isUnwritten, writing: state.status === "writing" };
+  return { ...state, run, show, reset, adopt, seed, isUnwritten, writing: state.status === "writing" };
 }
