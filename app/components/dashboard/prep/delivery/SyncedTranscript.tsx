@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { withoutAudioTags } from "@/app/lib/voice/audioTags";
 import { ariaTime, formatClock, numberAnswers, type DeliveryTurn } from "@/app/lib/voice/format";
 import type { DeliveryTranscriptSegment, DeliveryTranscriptWord } from "@/app/lib/voice/types";
 import { usePlaybackControls, usePlaybackState, usePlaybackTime } from "./PlaybackProvider";
@@ -329,7 +330,8 @@ const InterviewerTurn: FC<{ turn: DeliveryTurn; onSeek: Seek }> = ({ turn, onSee
     <p className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/35">Interviewer</p>
     <div className="flex gap-2">
       {turn.startMs !== undefined ? <RowClock atMs={turn.startMs} onSeek={onSeek} label="interviewer" /> : <span className="w-11 flex-none" />}
-      <p className="min-w-0 flex-1 border-l-2 border-black/10 pl-3 text-sm leading-relaxed text-black/55">{turn.text}</p>
+      {/* The stored question, which carries no audio tag; stripped anyway, since a tag is how a line was voiced, never what was asked. */}
+      <p className="min-w-0 flex-1 border-l-2 border-black/10 pl-3 text-sm leading-relaxed text-black/55">{withoutAudioTags(turn.text)}</p>
     </div>
   </div>
 );

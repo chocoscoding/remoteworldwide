@@ -26,6 +26,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
+import { withoutAudioTags } from "@/app/lib/voice/audioTags";
 import { interviewerAudioWanted, offerInterviewerAudio } from "@/app/lib/voice/capture/interviewerAudio";
 import { voiceSpectrumBins } from "@/app/lib/voice/frequencyBars";
 
@@ -747,12 +748,12 @@ export function useVoiceSession({ onTranscript, voiceEnabled, audio = true, onBa
     window.speechSynthesis.cancel();
   }, [stopAudio, sayEchoLoud]);
 
-  /** The browser's own voice. The fallback, and what speaks when no URL is offered. */
+  /** The browser's own voice. The fallback, and what speaks when no URL is offered. It reads "[sighs]" out loud, so it never gets an audio tag. */
   const speakInBrowser = useCallback((text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
     if (!liveRef.current) return;
-    const utter = new SpeechSynthesisUtterance(text);
+    const utter = new SpeechSynthesisUtterance(withoutAudioTags(text));
     utter.rate = 1.02;
     utter.pitch = 1;
     utteranceRef.current = utter;

@@ -12,6 +12,7 @@
 // Pure: no browser and no clock. useInterviewCapture feeds this the engine's
 // events, already on the session clock, and applies the marks it makes.
 
+import { shownInterviewerText } from "@/app/lib/voice/audioTags";
 import type { InterviewOpening, VoiceConversationConflict } from "@/app/lib/voice/conversation";
 import type { MintRefusal } from "@/app/lib/voice/conversations";
 import { isSpokenText, mintFailureOf } from "@/app/lib/voice/talkState";
@@ -126,7 +127,7 @@ export function engineProblemMessage(problem: EngineProblem): string {
 export interface EngineTurn {
   id: string;
   who: TurnSpeaker;
-  /** As the engine heard or said it, for the screen. Never sent: the service keeps its own. */
+  /** As the engine heard or said it, for the screen, with no audio tag. Never sent: the service keeps its own. */
   text: string;
   /** `typed` for an answer sent as text, which has no delivery to measure. */
   source: Extract<TurnSource, "voice" | "typed">;
@@ -146,7 +147,7 @@ export interface InterviewerTurns {
   /** User turns counted so far: the index of the interviewer turn now on the table. */
   readonly userTurns: number;
   readonly speaking: boolean;
-  /** The interviewer's latest line. */
+  /** The interviewer's latest line, as shown: its current turn so far, with no audio tag. */
   readonly aiText: string;
   speakStart: (atMs: number) => void;
   /** Debounced by engineSession: the interviewer's turn is over. */
@@ -174,6 +175,8 @@ export function createInterviewerTurns(conversationId: string, marks: EngineMark
   let open: string | null = null;
   let cutOff: string | null = null;
   let aiText = "";
+  /** Each interviewer turn's words as the engine sent them, audio tags and all. The turn shows them without (audioTags.ts). */
+  const agentSaid = new Map<string, string>();
 
   const aiTurnId = () => engineTurnId(conversationId, userTurns, "ai");
   const noteAiTurn = (id: string) => {
@@ -216,8 +219,13 @@ export function createInterviewerTurns(conversationId: string, marks: EngineMark
       heardSince = true;
       const id = aiTurnId();
       noteAiTurn(id);
-      turns = turns.map((turn) => (turn.id === id ? { ...turn, text: turn.text ? `${turn.text} ${said}` : said } : turn));
-      aiText = said;
+      // Joined before it is stripped: a tag the echo split across two chunks is only whole here.
+      const joined = agentSaid.has(id) ? `${agentSaid.get(id)} ${said}` : said;
+      agentSaid.set(id, joined);
+      const shown = shownInterviewerText(joined);
+      turns = turns.map((turn) => (turn.id === id ? { ...turn, text: shown } : turn));
+      // The line as shown, not the chunk: half a split tag ("pause] Tell me") is only gone from the whole.
+      aiText = shown;
     },
     userText(text, source = "voice", eventId) {
       const said = text.trim();

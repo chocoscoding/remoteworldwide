@@ -48,6 +48,7 @@ import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { formatsLabel, type PrepTrack, type SessionFormat } from "@/app/lib/dashboard/prep-data";
 import { qk } from "@/app/lib/query/keys";
 import { getPlaybackLink, insufficientCreditsOf } from "@/app/lib/voice/api";
+import { withoutAudioTags } from "@/app/lib/voice/audioTags";
 import { formatDuration } from "@/app/lib/voice/format";
 import { detailToPrepSession, isServerSessionId, sameCompany, trackFromSnapshot } from "@/app/lib/voice/mapSession";
 import type { PrepSessionDetail, StepState } from "@/app/lib/voice/types";
@@ -527,7 +528,8 @@ const TypedTranscript: FC<{ turns: PrepSessionDetail["turns"] }> = ({ turns }) =
     {turns.map((turn) => (
       <div key={turn.id}>
         <p className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/35 mb-1">{turn.who === "user" ? "You" : "Interviewer"}</p>
-        <p className={cn("text-sm leading-relaxed", turn.who === "user" ? "text-primary" : "text-black/60")}>{turn.text}</p>
+        {/* An interviewer line never shows an audio tag (how it was voiced, not what was asked); the answer is the candidate's own. */}
+        <p className={cn("text-sm leading-relaxed", turn.who === "user" ? "text-primary" : "text-black/60")}>{turn.who === "user" ? turn.text : withoutAudioTags(turn.text)}</p>
       </div>
     ))}
   </section>

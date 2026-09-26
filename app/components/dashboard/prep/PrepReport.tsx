@@ -15,6 +15,7 @@ import type { ActionItem, DimensionScore, LanguageStat, PrepSession, PrepTrack, 
 import { trackHref } from "@/app/lib/prep/tracks";
 import { qk } from "@/app/lib/query/keys";
 import { TASK_LIMITS, periodOf, type TaskInput, type TaskItem } from "@/app/lib/tasks/types";
+import { withoutAudioTags } from "@/app/lib/voice/audioTags";
 import { FLAG_KIND_META, SEVERITY_LABELS, formatMeasure, numberAnswers } from "@/app/lib/voice/format";
 import { scoreDisplayOf } from "@/app/lib/voice/mapSession";
 import type { DeliveryFlag, UnscoredDimension } from "@/app/lib/voice/types";
@@ -782,7 +783,8 @@ const TurnsTranscript: FC<{ turns: readonly TranscriptTurn[] }> = ({ turns }) =>
       {turns.map((t) => (
         <div key={t.id}>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/35 mb-1">{t.who === "user" ? "You" : "Interviewer"}</p>
-          <p className={cn("text-sm leading-relaxed", t.who === "user" ? "text-primary" : "text-black/60")}>{t.text}</p>
+          {/* An interviewer line never shows an audio tag: how it was voiced, not what was asked. The answer is the candidate's own. */}
+          <p className={cn("text-sm leading-relaxed", t.who === "user" ? "text-primary" : "text-black/60")}>{t.who === "user" ? t.text : withoutAudioTags(t.text)}</p>
         </div>
       ))}
     </DashCard>

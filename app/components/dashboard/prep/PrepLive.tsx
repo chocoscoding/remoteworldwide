@@ -40,6 +40,7 @@ import { pickSessionQuestions, type SessionQuestion } from "@/app/lib/prep/sessi
 import type { LikelyQuestion } from "@/app/lib/prep/types";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { PREP_BILLING_HREF, getQuestionSpeech, insufficientCreditsOf, limitedOf, openSessionOf } from "@/app/lib/voice/api";
+import { withoutAudioTags } from "@/app/lib/voice/audioTags";
 import { formatClock as formatRecordingClock } from "@/app/lib/voice/format";
 import { engineTurnId, hasEngineAnswer, type EngineProblem, type EngineProblemKind } from "@/app/lib/voice/capture/engineInterview";
 import { problemCopy } from "@/app/lib/voice/talkState";
@@ -302,6 +303,9 @@ function aiTurn(id: string, q: SessionQuestion, spoken: boolean): LiveTurn {
 
 const squash = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
 
+/** A question as the matcher reads it: squashed, square brackets read as round. The service stores a question's "[Company]" as "(Company)", so a v3 voice says it rather than performing it. */
+const questionKey = (text: string) => squash(text).replace(/\[/g, "(").replace(/\]/g, ")");
+
 /** The service's messages carry no closing stop; one is added before another sentence follows. */
 const asSentence = (text: string) => {
   const trimmed = text.trim();
@@ -338,11 +342,11 @@ function uniqueQuestions(questions: SessionQuestion[]): SessionQuestion[] {
 
 /** The question an engine interviewer's line asks ("Thanks." comes before each), or -1: the greeting, the closing line. */
 function questionAskedIn(line: string, questions: readonly SessionQuestion[]): number {
-  const said = squash(line);
+  const said = questionKey(line);
   let found = -1;
   questions.forEach((q, i) => {
-    const text = squash(q.text);
-    if (text && said.includes(text) && (found < 0 || text.length > squash(questions[found].text).length)) found = i;
+    const text = questionKey(q.text);
+    if (text && said.includes(text) && (found < 0 || text.length > questionKey(questions[found].text).length)) found = i;
   });
   return found;
 }
@@ -544,10 +548,14 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
   const engineLost = engine && capture.engineProblem?.kind === "disconnected";
   const engineAnswered = hasEngineAnswer(capture.engineTurns, capture.opening);
   const askedQuestions = uniqueQuestions(questions).slice(0, PREP_LIMITS.questionsMax);
-  /** The conversation as shown: this screen's own turns (a `browser` opening's first question), then the engine's. */
-  const shownTurns: readonly Pick<LiveTurn, "id" | "who" | "text">[] = engine
-    ? [...transcript.filter((turn) => !capture.engineTurns.some((own) => own.id === turn.id)), ...capture.engineTurns]
-    : transcript;
+  /**
+   * The conversation as shown: this screen's own turns (a `browser` opening's first question), then the engine's.
+   * No interviewer line shows an audio tag: engine turns arrive without one (engineInterview.ts), and this holds for
+   * every other line, the transcript panel, the stage card and the question matcher all read from here.
+   */
+  const shownTurns: readonly Pick<LiveTurn, "id" | "who" | "text">[] = (
+    engine ? [...transcript.filter((turn) => !capture.engineTurns.some((own) => own.id === turn.id)), ...capture.engineTurns] : transcript
+  ).map((turn) => (turn.who === "ai" && turn.text.includes("[") ? { ...turn, text: withoutAudioTags(turn.text) } : turn));
   const progress = engineProgress(shownTurns, askedQuestions);
   const engineDone = engine && progress.done;
 

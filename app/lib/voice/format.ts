@@ -11,6 +11,7 @@
 // component, because the findings list, the timeline, the summary and the
 // report mapper must all say the same thing about the same number.
 
+import { withoutAudioTags } from "./audioTags";
 import type { DeliveryFlagKind, DeliveryMeasure, TranscriptTurn } from "./types";
 
 function wholeSeconds(ms: number): number {
@@ -203,12 +204,16 @@ export function askedQuestion(text: string): string {
   return asked ?? text.trim();
 }
 
-/** The interviewer's question each answer replied to: from the nearest interviewer turn before it. */
+/**
+ * The interviewer's question each answer replied to: from the nearest interviewer turn before it. Never with an
+ * audio tag ("[warmly]"): how the line was voiced, not what was asked. The service stores none; this is the
+ * timeline's own guard.
+ */
 export function questionsByAnswer(turns: readonly DeliveryTurn[]): Map<string, string> {
   const questions = new Map<string, string>();
   let lastQuestion: string | null = null;
   for (const turn of turns) {
-    if (turn.who === "ai") lastQuestion = askedQuestion(turn.text);
+    if (turn.who === "ai") lastQuestion = askedQuestion(withoutAudioTags(turn.text));
     else if (lastQuestion !== null) questions.set(turn.id, lastQuestion);
   }
   return questions;

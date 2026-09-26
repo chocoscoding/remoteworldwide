@@ -12,6 +12,7 @@
 // and run it.
 
 import type { PrepSession, PrepTrack, TranscriptTurn } from "@/app/lib/dashboard/prep-data";
+import { withoutAudioTags } from "./audioTags";
 import type { PrepSessionDetail, PrepSessionSummary, PrepTurn, ScoreConfidence } from "./types";
 
 /**
@@ -47,12 +48,15 @@ export const SERVER_SESSION_ID = /^[0-9a-f]{24}$/i;
 
 export const isServerSessionId = (id: string): boolean => SERVER_SESSION_ID.test(id);
 
-/** The turn as the report's transcript holds it: the recording times stay, how it was captured does not. */
+/**
+ * The turn as the report's transcript holds it: the recording times stay, how it was captured does not, and an
+ * interviewer line never shows an audio tag (the service stores none; this is the report's own guard).
+ */
 function toTranscriptTurn(turn: PrepTurn): TranscriptTurn {
   return {
     id: turn.id,
     who: turn.who,
-    text: turn.text,
+    text: turn.who === "ai" ? withoutAudioTags(turn.text) : turn.text,
     ...(turn.questionId === undefined ? {} : { questionId: turn.questionId }),
     ...(turn.startMs === undefined ? {} : { startMs: turn.startMs }),
     ...(turn.endMs === undefined ? {} : { endMs: turn.endMs }),
