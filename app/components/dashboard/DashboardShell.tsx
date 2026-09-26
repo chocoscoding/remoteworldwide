@@ -29,6 +29,7 @@ import { TrackerProvider } from "./tracker/TrackerProvider";
 import RepairStreakPanel from "./streak/RepairStreakPanel";
 import { JobPickerProvider } from "./jobs/JobPickerProvider";
 import BoardImporter from "./applications/BoardImporter";
+import OnboardingBanner from "./onboarding/OnboardingBanner";
 
 const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; children: ReactNode }> = ({ settings, billing, children }) => (
   <SidebarCollapseProvider>
@@ -59,7 +60,12 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
       <TrackerProvider>
       <div className="w-full flex">
         <DashboardSidebar />
-        <div className="flex-1 min-w-0">{children}</div>
+        <div className="flex-1 min-w-0">
+          {/* Above every screen, never instead of one: setup is guidance, not
+              a lock — the banner counts what's done and points at /onboarding. */}
+          <OnboardingBanner />
+          {children}
+        </div>
       </div>
       <LogApplicationDialog />
       <GiftStore />

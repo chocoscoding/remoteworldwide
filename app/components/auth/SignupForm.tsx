@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { evaluatePassword, MIN_PASSWORD_LENGTH } from "@/app/lib/auth/password-strength";
+import { ONBOARDING_PATH } from "@/app/lib/next-url";
 import { AuthLogo, GitHubIcon, GoogleIcon } from "./AuthIcons";
 import PasswordStrength from "./PasswordStrength";
 import {
@@ -30,7 +31,7 @@ import {
 } from "./authStyles";
 
 interface SignupFormProps {
-  /** Called after a successful signup + sign-in instead of navigating to "/". */
+  /** Called after a successful signup + sign-in instead of navigating to `oauthCallbackUrl`. */
   onSuccess?: () => void;
   /** When set, "Sign in" links switch views instead of navigating to /login. */
   onSwitchToLogin?: () => void;
@@ -44,7 +45,9 @@ interface SignupFormProps {
 export default function SignupForm({
   onSuccess,
   onSwitchToLogin,
-  oauthCallbackUrl = "/",
+  // Where a new account goes when nobody said: setup (a resume and a profile), which the extension
+  // requires before it fills anything. The auth dialog passes the page it opened on instead.
+  oauthCallbackUrl = ONBOARDING_PATH,
   idPrefix = "signup",
   embedded = false,
 }: SignupFormProps) {

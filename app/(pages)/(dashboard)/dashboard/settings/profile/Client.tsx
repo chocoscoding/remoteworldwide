@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
 import { useUploadAvatar } from "@/hooks/mutations/useAvatarMutation";
 import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagList } from "@/app/components/dashboard/settings/settings-ui";
+import EducationEditor from "@/app/components/onboarding/EducationEditor";
+import { educationOf, educationProblems, type EducationRow } from "@/app/lib/onboarding/profile";
 
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
 
@@ -14,6 +16,10 @@ const ProfileClient: FC = () => {
   const [skillDraft, setSkillDraft] = useState("");
   const photoRef = useRef<HTMLInputElement | null>(null);
   const uploadPhoto = useUploadAvatar();
+
+  // Keyed by position: the saved list has no ids, and rows only move on an add or a remove.
+  const educationRows: EducationRow[] = (profile.education ?? []).map((entry, index) => ({ id: `row-${index}`, ...entry }));
+  const educationBlocked = educationProblems(educationRows).length > 0;
 
   const initials = profile.fullName
     .split(" ")
@@ -41,7 +47,7 @@ const ProfileClient: FC = () => {
         title="Profile"
         description="What recruiters see when we put your name forward."
         action={
-          <button type="button" onClick={() => save("profile")} disabled={saving} className={BUTTON_SOLID}>
+          <button type="button" onClick={() => save("profile")} disabled={saving || educationBlocked} className={BUTTON_SOLID}>
             <Check className="h-3.5 w-3.5" />
             {saving ? "Saving…" : "Save"}
           </button>
@@ -155,6 +161,12 @@ const ProfileClient: FC = () => {
           onRemove={(t) => setProfile({ skills: profile.skills.filter((s) => s !== t) })}
           emptyNote="No skills yet — add a few so we can match you properly."
         />
+      </SettingsSection>
+
+      {/* The same editor as onboarding's, so a school entered there is edited here. Saved with the
+          Profile button above; a row with no school holds it (the backend refuses those). */}
+      <SettingsSection title="Education" description="Where you studied. The extension answers education questions from it; a school's name is all an entry needs.">
+        <EducationEditor rows={educationRows} onChange={(rows) => setProfile({ education: educationOf(rows) })} />
       </SettingsSection>
     </>
   );

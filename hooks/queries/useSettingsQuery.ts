@@ -60,11 +60,17 @@ export function prefetchSettings(queryClient: QueryClient, load: () => Promise<S
  *
  * `settings` is in `PERSISTED_DOMAINS`, so this is usually served warm from
  * disk and the letterhead does not flash.
+ *
+ * `fresh` asks the server again on mount whatever the cache's age — for the
+ * onboarding page, whose checklist (`onboarding`) also moves when the profile
+ * is saved somewhere this tab never hears about (another tab's Settings). It
+ * still paints the warm copy first.
  */
-export function useProfileSettings() {
+export function useProfileSettings({ fresh = false }: { fresh?: boolean } = {}) {
   return useQuery({
     queryKey: qk.settings.me(),
     queryFn: ({ signal }) => fetchSettings(signal),
     staleTime: STALE_TIME.settings,
+    refetchOnMount: fresh ? "always" : true,
   });
 }

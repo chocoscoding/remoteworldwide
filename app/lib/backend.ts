@@ -41,7 +41,12 @@ export interface BackendInit {
 
 export async function backend<T>(path: string, init: BackendInit = {}): Promise<T> {
   const h: Record<string, string> = { accept: "application/json" };
-  if (init.body !== undefined) h["content-type"] = "application/json";
+  // A FormData body (an upload made on the user's behalf, e.g. onboarding's
+  // "save a built resume to My documents") goes as multipart, untouched: no
+  // content-type by hand, because only fetch knows the boundary it writes —
+  // the same rule as the browser's `app/lib/api/client.ts`.
+  const multipart = init.body instanceof FormData;
+  if (init.body !== undefined && !multipart) h["content-type"] = "application/json";
   const incoming = await headers();
   // The visitor's address, for the backend's per-IP limiters and logs (`trust proxy` 1
   // makes req.ip its last entry). Only as honest as the edge in front of this server:
@@ -60,7 +65,7 @@ export async function backend<T>(path: string, init: BackendInit = {}): Promise<
   const res = await fetch(`${BACKEND_URL}/api${path}`, {
     method: init.method ?? "GET",
     headers: h,
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body: init.body === undefined ? undefined : multipart ? (init.body as FormData) : JSON.stringify(init.body),
     cache: "no-store",
   });
   return unwrapResponse<T>(res);

@@ -23,6 +23,50 @@ export interface ProfileSettings {
   linkedin: string;
   github: string;
   skills: string[];
+  /**
+   * Where you studied, in the order entered. Saved whole, like `skills`: PUT /api/settings/profile
+   * replaces the array. The backend always sends it (default []); optional here because a settings
+   * object persisted to disk before it existed, or an older backend, does not carry it — read it as
+   * `profile.education ?? []`.
+   */
+  education?: ProfileEducation[];
+}
+
+/**
+ * One school on the profile. Mirrors the backend's `profile.education` entry: trimmed, `school`
+ * required (≤160), the rest may be "" (degree ≤160, dates ≤60, location ≤120, detail ≤500), at
+ * most 10 entries. No id: the list is replaced whole on save, so an editor keys its own rows.
+ */
+export interface ProfileEducation {
+  school: string;
+  degree: string;
+  dates: string;
+  location: string;
+  detail: string;
+}
+
+/**
+ * The profile checklist — the backend's `evaluateOnboarding()` (remoteworldwidebackend
+ * `src/services/onboardingReadiness.ts`, contract `src/types/onboarding.ts`), seven items in its fixed
+ * order. Guidance, never a lock (owner, 2026-09-26): nothing waits on it. A resume is not one — a
+ * resume can be built from these facts, so onboarding only OFFERS to start from one — and phone is
+ * asked for, never required. Each id is also the `/onboarding#<id>` deep link to its field, which the
+ * extension and chat link to when an item is missing.
+ */
+export type OnboardingItemId = "fullName" | "email" | "summary" | "education" | "headline" | "location" | "skills";
+
+export interface OnboardingItem {
+  id: OnboardingItemId;
+  /** Short and user-facing ("About you", "At least 3 skills"). The server owns the wording. */
+  label: string;
+  done: boolean;
+}
+
+export interface Onboarding {
+  /** Every item done: the dashboard banner goes, and the extension stops pointing at what's missing. */
+  ready: boolean;
+  items: OnboardingItem[];
+  missing: OnboardingItemId[];
 }
 
 export interface JobPreferences {
@@ -78,6 +122,12 @@ export interface Settings {
   privacy: PrivacySettings;
   extension: ExtensionSettings;
   updatedAt: Date | null;
+  /**
+   * Worked out on every read and every save (it is never stored), so a profile save's answer
+   * already carries the new checklist. Absent — an older backend, a cache persisted before it —
+   * reads as "nothing to nag about": the banner hides, the same fail-open rule the extension follows.
+   */
+  onboarding?: Onboarding;
 }
 
 export type SubscriptionStatus = "none" | "pending" | "active" | "past_due" | "canceled";

@@ -23,12 +23,14 @@
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
 import { useSettingsQuery } from "@/hooks/queries/useSettingsQuery";
 import { useSaveSettingsSection, type SettingsSection } from "@/hooks/mutations/useSettingsMutations";
+import { cleanEducation } from "@/app/lib/onboarding/profile";
 import type {
   Availability,
   ExperienceBand,
   JobPreferences,
   NotificationSettings,
   PrivacySettings,
+  ProfileEducation,
   ProfileSettings,
   RemotePolicy,
   Settings,
@@ -96,8 +98,15 @@ export const SettingsProvider: FC<{ initial: Settings; children: ReactNode }> = 
     setDrafts((prev) => ({ ...prev, [section]: { ...prev[section], ...patch } }));
 
   function save(section: SettingsSection) {
-    const patch = drafts[section];
-    if (Object.keys(patch).length === 0) return;
+    const draft = drafts[section];
+    if (Object.keys(draft).length === 0) return;
+    // Education is edited with room for a row still being typed into; the
+    // backend takes only rows that name a school (the page holds Save while a
+    // half-filled one is on screen), so the empty ones stay behind here.
+    const patch =
+      section === "profile" && drafts.profile.education
+        ? { ...drafts.profile, education: drafts.profile.education.map((entry) => cleanEducation(entry)).filter((entry): entry is ProfileEducation => entry !== null) }
+        : draft;
     mutations[section].mutate(patch as never, {
       // Only the saved section's draft clears; edits elsewhere are untouched.
       onSuccess: () => setDrafts((prev) => ({ ...prev, [section]: {} })),

@@ -11,6 +11,8 @@
 // are `Date` here because `app/lib/api/core.ts` revives those keys, while every
 // other timestamp stays an ISO string because it is not in DATE_KEYS.
 
+import type { OnboardingItemId } from "@/app/lib/settings/types";
+
 export const JOB_SOURCES = ["platform", "link", "paste", "manual"] as const;
 export type JobSource = (typeof JOB_SOURCES)[number];
 
@@ -242,6 +244,12 @@ export interface JobAnswer {
   evidence: JobAnswerEvidence[];
   /** Most useful first, at most three. Absent or empty on answers stored before the service chose them. */
   nextSteps?: JobNextStep[];
+  /**
+   * Profile items the question needed and the profile lacked when it was answered (the AI
+   * service keeps only ids that really were empty): each is a "Finish your profile" link to
+   * `/onboarding#<id>`. Absent or empty on answers stored before the service named them.
+   */
+  profileGaps?: OnboardingItemId[];
 }
 
 export interface JobThreadEntry {

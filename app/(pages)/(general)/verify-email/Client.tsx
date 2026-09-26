@@ -7,6 +7,7 @@ import { signOut } from "@/app/lib/authClient";
 import { Button } from "@/components/ui/button";
 import AuthNotice from "@/app/components/auth/AuthNotice";
 import { brutalistLink } from "@/app/components/auth/authStyles";
+import { ONBOARDING_PATH } from "@/app/lib/next-url";
 
 type Phase = "confirming" | "waiting" | "failed";
 
@@ -63,8 +64,10 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
 
       toast.success("Email confirmed");
       // The session still says unverified until its token refreshes, and the backend re-reads that
-      // flag while it is false — so a full navigation is what makes the dashboard open.
-      window.location.href = "/dashboard";
+      // flag while it is false — so a full navigation is what lets the next page open. That page is
+      // setup (a resume and a profile), where a confirmed new account goes first; anyone already
+      // done there is told so and offered Continue.
+      window.location.href = ONBOARDING_PATH;
     })();
   }, [token]);
 
@@ -101,8 +104,8 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
         return;
       }
       if (payload?.data?.sent === false) {
-        // Already verified, on a tab left open since before it was.
-        window.location.href = "/dashboard";
+        // Already verified, on a tab left open since before it was: on to setup, as a fresh confirmation goes.
+        window.location.href = ONBOARDING_PATH;
         return;
       }
 
