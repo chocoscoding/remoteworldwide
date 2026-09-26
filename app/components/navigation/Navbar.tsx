@@ -105,6 +105,9 @@ const Navbar = () => {
             <Link href="/blogs">
               <p className="text-gray-700 hover:text-gray-900">Blog</p>
             </Link>
+            <Link href="/pricing">
+              <p className="text-gray-700 hover:text-gray-900">Pricing</p>
+            </Link>
 
             <User />
           </div>
@@ -148,6 +151,11 @@ const Navbar = () => {
             <Link href="/blogs">
               <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
                 Blog
+              </p>
+            </Link>
+            <Link href="/pricing">
+              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
+                Pricing
               </p>
             </Link>
           </div>

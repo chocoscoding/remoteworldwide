@@ -21,6 +21,14 @@ const links = [
     href: "/blogs",
   },
   {
+    title: "Pricing",
+    href: "/pricing",
+  },
+  {
+    title: "Early access",
+    href: "/waitlist",
+  },
+  {
     title: "Privacy Policy",
     href: "/privacy-policy",
   },
