@@ -1028,8 +1028,8 @@ export interface LabStats {
   days: number;
   /** Transcript accuracy ratings by the provider that wrote the captions. */
   ratings: Array<{ provider: LiveSttProvider; sessions: number; meanScore: number | null }>;
-  /** Word error rate of the live captions against the batch transcript. A comparison, not accuracy. */
+  /** Median WER of what was heard live (the engine's recognition) against the report transcript (Scribe), per session. Agreement, not accuracy. */
   liveAgreement: Array<{ provider: LiveSttProvider; sessions: number; medianWer: number | null }>;
-  /** Share of voice sessions whose captions fell back from AWS to Web Speech. */
+  /** Share of voice sessions meant for the engine that started on Web Speech captions (`live.fallbackFrom`). */
   fallbackRate: number | null;
 }

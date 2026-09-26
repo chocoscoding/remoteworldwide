@@ -12,8 +12,9 @@ interface LabStatsPanelProps {
 
 /**
  * What real interviews say about the live engines, as stat tiles: each
- * engine's transcript rating, how closely its live captions matched the batch
- * transcript, and how often captions fell back from AWS to Web Speech.
+ * engine's transcript rating, how closely what it heard live matched the
+ * report transcript (Scribe, from the recording), and how often a session
+ * meant for the ElevenLabs engine started on Web Speech captions instead.
  */
 export default function LabStatsPanel({ stats, error }: LabStatsPanelProps) {
   return (
@@ -41,12 +42,18 @@ export default function LabStatsPanel({ stats, error }: LabStatsPanelProps) {
               />
             ))}
           </Tile>
-          <Tile title="Live vs batch" note="Median WER of the live captions against the batch transcript: agreement, not accuracy.">
+          <Tile
+            title="Heard live vs report"
+            note="Median WER of what was recognised live against the report transcript, over answers that have both: agreement, not accuracy. Lower means the interviewer heard what the report scored."
+          >
             {stats.liveAgreement.map((row) => (
               <Figure key={row.provider} label={LIVE_PROVIDER_LABELS[row.provider]} value={formatPct(row.medianWer)} count={row.sessions} unit="compared" />
             ))}
           </Tile>
-          <Tile title="Fell back to Web Speech" note="Voice sessions whose captions moved from AWS to the browser (quota, budget or an AWS error).">
+          <Tile
+            title="Fell back to Web Speech"
+            note="Voice sessions meant for the ElevenLabs engine that started on the browser's captions: the engine could not take calls (no key, engine or engine URL). Older sessions: from AWS."
+          >
             <p className="font-mono text-4xl font-semibold tabular-nums text-primary">{formatPct(stats.fallbackRate)}</p>
             <p className="text-xs text-gray-500">{stats.fallbackRate === null ? "No voice sessions yet." : "of voice sessions"}</p>
           </Tile>
