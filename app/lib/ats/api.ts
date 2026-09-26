@@ -18,7 +18,7 @@ import { apiGet, apiPost } from "@/app/lib/api/client";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { createSseParser } from "@/app/lib/api/sse";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
-import type { BulletRewrite, ExtractedRequirements, IngestedResume, IngestedResumeDetail, ScanInput, ScanReport, StoredScan } from "./types";
+import type { BulletRewrite, ExtractedRequirements, IngestedResume, IngestedResumeDetail, ScanInput, ScanRecord, ScanReport, StoredScan } from "./types";
 
 export const ATS_PATH = "/api/ai/scan";
 const RESUMES_PATH = "/api/ai/resume";
@@ -71,6 +71,34 @@ export function lookupStoredScan(jdText: string) {
 }
 
 /**
+ * One of this user's stored scans, by id — what the late-explanation email's
+ * link (`/dashboard/ats?scan=<id>`) opens. Free: it reads the scan back, with
+ * its write-up when that has landed and `explanationStatus` saying where it
+ * stands when it has not. Never scores and never asks the model for the rest.
+ *
+ * Another user's scan, or one that is gone, rejects with a 404 and an id that
+ * is not one with a 400 — `isScanGone` reads both the same way.
+ */
+export function getScan(scanId: string, signal?: AbortSignal) {
+  return apiGet<ScanRecord>(`${ATS_PATH}/${encodeURIComponent(scanId)}`, signal);
+}
+
+/** A linked scan that will never open: not this user's, deleted, or not an id at all. */
+export const isScanGone = (error: unknown): boolean => error instanceof BackendError && (error.status === 404 || error.status === 400);
+
+/**
+ * What the report's write-up slot says for a stored scan with no write-up to
+ * show. Null while there is one, or while one is still coming (the slot shows
+ * its "writing" state then). The general-score line is the stream's own, so a
+ * scan read back says what the same scan said live.
+ */
+export function explanationNote(record: Pick<ScanRecord, "explanationStatus">): string | null {
+  if (record.explanationStatus === "none") return "Add a job description to get a written breakdown";
+  if (record.explanationStatus === "unavailable") return "The written breakdown for this scan isn't available — your score and matches are unaffected.";
+  return null;
+}
+
+/**
  * A short, stable cache key for a posting's text (cyrb53), so the query key
  * never holds the description itself. Trimmed first, as the service trims it
  * before hashing, so the same paste is the same key.
@@ -118,6 +146,26 @@ export function findIngested(doc: Pick<VaultDoc, "name" | "ext" | "aiResumeId">,
   if (linked) return linked;
   const wanted = fileNameOf(doc).toLowerCase();
   return ready.find((resume) => resume.fileName.toLowerCase() === wanted) ?? null;
+}
+
+/**
+ * `findIngested` the other way round: the vault document a stored scan's
+ * resume came from, so a scan opened from a link sits on the same report
+ * screen — and the same Change job / General instead — as one just run.
+ *
+ * The document's link (`aiResumeId`) first, then the filename the import
+ * recorded, with the same caveats as there. Archived documents count: the scan
+ * still happened. Null when the file has since been removed from My documents.
+ */
+export function docForScan<D extends Pick<VaultDoc, "name" | "ext" | "aiResumeId" | "kind">>(
+  record: Pick<ScanRecord, "resumeId" | "fileName">,
+  docs: readonly D[],
+): D | null {
+  const resumes = docs.filter((doc) => doc.kind === "resume");
+  const linked = resumes.find((doc) => doc.aiResumeId === record.resumeId);
+  if (linked) return linked;
+  const wanted = record.fileName?.toLowerCase();
+  return wanted ? (resumes.find((doc) => fileNameOf(doc).toLowerCase() === wanted) ?? null) : null;
 }
 
 /**

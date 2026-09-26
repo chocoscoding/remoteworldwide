@@ -18,10 +18,15 @@
 // A scan costs a credit, so nothing here scores speculatively. `generalScores`
 // remembers only what was actually run, which is what the landing cards and
 // the resumes table show in place of a number they have not earned.
+//
+// One report is not run here at all: the late-explanation email links to
+// `?scan=<id>`, and that scan is read back from the service — free, and the
+// stored numbers rather than new ones.
 
-import { FC, Suspense, useCallback, useState } from "react";
+import { FC, Suspense, useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FilePlus2 } from "lucide-react";
+import { FilePlus2, Loader2, X } from "lucide-react";
+import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
@@ -31,9 +36,11 @@ import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams
 import { parseFieldSpec, toPickedJob, type PickedJob } from "@/app/lib/jobs/fields";
 import type { SavedJobItem } from "@/app/lib/jobs/types";
 import { useDocuments, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
-import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
+import { docForScan, explanationNote, isScanGone } from "@/app/lib/ats/api";
+import type { ScanRecord } from "@/app/lib/ats/types";
+import { useIngestedResumesQuery, useScanQuery } from "@/hooks/queries/useAtsQueries";
 import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
-import { useScanResume } from "@/hooks/mutations/useScanResume";
+import { useScanResume, type ScanStatus } from "@/hooks/mutations/useScanResume";
 import AtsLanding from "@/app/components/dashboard/ats/AtsLanding";
 import AtsResults from "@/app/components/dashboard/ats/AtsResults";
 import AtsResumesTable from "@/app/components/dashboard/ats/AtsResumesTable";
@@ -61,8 +68,22 @@ function atsJobFrom(saved: SavedJobItem): AtsJob | null {
   }
 }
 
+/**
+ * The file a linked scan scored, standing in once it has left My documents.
+ * The report still reads; only scoring that file again needs the file, and
+ * `startScan` finds no document behind this id, so it quietly does nothing.
+ */
+const standInResume = (record: ScanRecord): ResumeEntry => ({
+  id: `scan:${record.scanId}`,
+  name: record.fileName ?? "Your resume",
+  kind: "resume",
+  source: "uploaded",
+  addedAt: 0,
+  updatedLabel: "",
+});
+
 const AtsScreen: FC = () => {
-  const { docs, addUploads, toggleArchive } = useDocuments();
+  const { docs, loading: docsLoading, addUploads, toggleArchive } = useDocuments();
   const { pickJob } = useJobPicker();
   // The bridge's left-hand side. An empty list is not an error: it only means
   // every scan on this screen starts with an import.
@@ -94,6 +115,43 @@ const AtsScreen: FC = () => {
   const resumes = docs.filter((d) => d.kind === "resume");
   const activeResumes = resumes.filter((r) => !r.archived);
 
+  // A link from the late-explanation email (?scan=<scan id>) opens that scan's
+  // report on the same screen a scan run here uses — on the resume it scored
+  // and the saved job it was against, so Change job and General instead work
+  // from it as they would from a fresh one. Read back, never re-run: free, and
+  // the write-up shows as it stands (still being written, or the reason there
+  // is none). Running any scan, or leaving the report, lets go of it. A scan
+  // that will not open says so in one line over the screen as it always is.
+  const scanLinkId = params.get("scan")?.trim() || null;
+  const [scanLinkDismissed, setScanLinkDismissed] = useState(false);
+  const scanLinkWanted = !scanLinkDismissed && scanLinkId !== null;
+  const stored = useScanQuery(scanLinkWanted ? scanLinkId : null);
+  const record = scanLinkWanted ? (stored.data ?? null) : null;
+  const recordSaved = useSavedJobQuery(record?.jobId ?? null);
+  // Only when there is nothing to show: a poll that fails under a report already on screen leaves it be.
+  const scanLinkFailed = scanLinkWanted && stored.isError && !stored.data;
+  // The report waits for the documents and the saved job it names, rather than
+  // drawing once with a stand-in and again with the real thing.
+  const openingScan = scanLinkWanted && (stored.isPending || (record !== null && (docsLoading || (record.jobId !== null && recordSaved.isPending))));
+
+  const linkedReport = useMemo(() => {
+    if (!record || openingScan) return null;
+    const againstJob = recordSaved.data && recordSaved.data.id === record.jobId ? atsJobFrom(recordSaved.data) : null;
+    return {
+      record,
+      resume: docForScan(record, docs) ?? standInResume(record),
+      /** The saved job, for scoring again against it. Null for a general score, or a job no longer saved. */
+      scanJob: againstJob,
+      /** What the report is labelled with. A job since removed is still a job scan, not a general one. */
+      job: againstJob ?? (record.verdicts.length > 0 ? { id: record.jobId ?? undefined, company: "A posting", role: "no longer saved", description: "" } : null),
+      // "pending" is the existing writing-it-up state; the query reads the scan
+      // again while it is, and the report fills in when the write-up lands.
+      status: (record.explanationStatus === "pending" ? "explaining" : "done") as ScanStatus,
+      unexplained: explanationNote(record),
+      scannedAt: new Date(record.scannedAt),
+    };
+  }, [record, openingScan, recordSaved.data, docs]);
+
   /**
    * Runs one scan and shows it.
    *
@@ -105,6 +163,8 @@ const AtsScreen: FC = () => {
       const doc = docs.find((d) => d.id === docId);
       if (!doc) return;
 
+      // A report run here replaces one opened from a link, for good.
+      setScanLinkDismissed(true);
       // Applied fixes belong to the report that suggested them.
       setFixedIds(new Set());
       setResumeId(docId);
@@ -171,6 +231,7 @@ const AtsScreen: FC = () => {
   }
 
   function backToLanding() {
+    setScanLinkDismissed(true);
     setResumeId(null);
     setJob(null);
     setFixedIds(new Set());
@@ -198,7 +259,7 @@ const AtsScreen: FC = () => {
               { id: "resumes", label: "My resumes" },
             ]}
           />
-          {activeResume && view === "score" && (
+          {(activeResume || linkedReport) && view === "score" && (
             <StickerButton variant="primary" size="md" onClick={backToLanding}>
               <FilePlus2 className="h-4 w-4" />
               Score another resume
@@ -222,6 +283,23 @@ const AtsScreen: FC = () => {
           />
         )}
 
+        {scanLinkFailed && (
+          <div role="status" className="mb-5 flex items-center gap-3 rounded-[14px] border border-black/10 bg-white px-4 py-3">
+            <p className="min-w-0 flex-1 text-sm text-black/60">
+              {isScanGone(stored.error)
+                ? "That scan isn't available any more."
+                : "That scan couldn't be opened just now — try the link again in a moment."}
+            </p>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setScanLinkDismissed(true)}
+              className="h-6 w-6 flex-none rounded-md text-primary/50 flex items-center justify-center transition-colors hover:bg-black/10 hover:text-primary cursor-pointer">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         {view === "resumes" ? (
           <AtsResumesTable
             resumes={resumes}
@@ -229,6 +307,31 @@ const AtsScreen: FC = () => {
             onToggleArchive={toggleArchive}
             onGeneral={scoreGeneral}
             onVsJob={scoreVsJob}
+          />
+        ) : !activeResume && openingScan ? (
+          <DashCard className="flex flex-col items-center gap-4 p-12 text-center">
+            <Loader2 className="h-7 w-7 animate-spin text-black/30" />
+            <p className="text-[15px] font-bold text-primary">Opening your scan</p>
+          </DashCard>
+        ) : !activeResume && linkedReport ? (
+          // A scan opened from a link. Changing anything runs a new scan, which
+          // takes over the report exactly as it does from any other.
+          <AtsResults
+            resume={linkedReport.resume}
+            report={linkedReport.record}
+            status={linkedReport.status}
+            failure={null}
+            unexplained={linkedReport.unexplained}
+            scannedAt={linkedReport.scannedAt}
+            resumes={activeResumes.some((r) => r.id === linkedReport.resume.id) ? activeResumes : [linkedReport.resume, ...activeResumes]}
+            job={linkedReport.job}
+            fixedIds={fixedIds}
+            onToggleFix={toggleFix}
+            onChangeResume={(id) => void startScan(id, linkedReport.scanJob)}
+            onChangeJob={() => void chooseJob(linkedReport.resume.id)}
+            onRemoveJob={() => void startScan(linkedReport.resume.id, null)}
+            onRetry={() => void startScan(linkedReport.resume.id, linkedReport.scanJob)}
+            onExit={backToLanding}
           />
         ) : !activeResume ? (
           <AtsLanding

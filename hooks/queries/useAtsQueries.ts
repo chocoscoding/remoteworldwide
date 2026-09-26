@@ -7,7 +7,7 @@
 // the same reason `documents` stays out.
 
 import { useQuery } from "@tanstack/react-query";
-import { getIngestedResume, listIngestedResumes, lookupStoredScan, storedScanKey } from "@/app/lib/ats/api";
+import { getIngestedResume, getScan, listIngestedResumes, lookupStoredScan, storedScanKey } from "@/app/lib/ats/api";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
 
 /**
@@ -56,5 +56,28 @@ export function useStoredScanQuery(jdText: string | null | undefined) {
     queryFn: () => lookupStoredScan(jd),
     staleTime: 30_000,
     enabled: jd.length > 0,
+  });
+}
+
+/** How often a scan whose write-up is still on the queue is read again. One indexed read, free. */
+const PENDING_EXPLANATION_POLL_MS = 30_000;
+
+/**
+ * One stored scan, by id — what the late-explanation email's `?scan=` link
+ * opens on the ATS screen. Free: it reads a scan back and never runs one. Pass
+ * null to read nothing.
+ *
+ * Read again every half minute while its write-up is still `pending` on the
+ * service's queue, so a scan opened while its write-up is still queued fills
+ * in when it lands rather than spinning until a reload. Nothing else about a
+ * scan changes once it is stored.
+ */
+export function useScanQuery(scanId: string | null) {
+  return useQuery({
+    queryKey: qk.ats.scan(scanId ?? ""),
+    queryFn: ({ signal }) => getScan(scanId ?? "", signal),
+    staleTime: STALE_TIME.ats,
+    enabled: scanId !== null,
+    refetchInterval: (query) => (query.state.data?.explanationStatus === "pending" ? PENDING_EXPLANATION_POLL_MS : false),
   });
 }

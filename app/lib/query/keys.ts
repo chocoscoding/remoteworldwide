@@ -195,6 +195,8 @@ export const qk = {
     resume: (resumeId: string) => [...qk.ats.all, "resume", resumeId] as const,
     /** The latest stored scan against one posting, keyed by a hash of its text (`storedScanKey`) — never the text itself. */
     storedScan: (jdKey: string) => [...qk.ats.all, "stored-scan", jdKey] as const,
+    /** One stored scan by id — what the late-explanation email's `?scan=` link opens. */
+    scan: (scanId: string) => [...qk.ats.all, "scan", scanId] as const,
   },
   // Spoken conversations: whether talk mode is on per feature, and today's minutes.
   voice: {

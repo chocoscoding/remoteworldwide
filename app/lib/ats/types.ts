@@ -81,6 +81,38 @@ export interface ScanReport {
   rewrites: BulletRewrite[];
 }
 
+/**
+ * Where a stored scan's written half stands. Mirrors `EXPLANATION_STATUSES` in
+ * the service's `scanService.ts`:
+ *
+ *   ready        `explanation` is the write-up
+ *   pending      still on the service's queue — an email follows when it lands
+ *   unavailable  not written, and nothing is writing it
+ *   none         a general score, which has nothing to explain
+ */
+export const EXPLANATION_STATUSES = ["ready", "pending", "unavailable", "none"] as const;
+export type ExplanationStatus = (typeof EXPLANATION_STATUSES)[number];
+
+/**
+ * `GET /api/ai/scan/:id` — one of this user's stored scans, read back whole:
+ * the same report a live scan renders, plus which resume and posting it was,
+ * when it ran, and where its write-up stands. Free: nothing is scored or
+ * written. What the late-explanation email's link (`?scan=<id>`) opens.
+ *
+ * Mirrors `ScanRecord` in the service's `scanService.ts`.
+ */
+export interface ScanRecord extends ScanReport {
+  /** The ingested resume that was scored — an `IngestedResume["resumeId"]`, not a vault document id. */
+  resumeId: string;
+  /** The file that was scored. Null when that resume has since been removed. */
+  fileName: string | null;
+  /** The saved job it was scored against; null for a general score. */
+  jobId: string | null;
+  /** When the scan ran, ISO-8601. */
+  scannedAt: string;
+  explanationStatus: ExplanationStatus;
+}
+
 /** `POST /api/ai/scan` body. Omit `jdText` for the general score. */
 export interface ScanInput {
   resumeId: string;
