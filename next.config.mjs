@@ -205,6 +205,16 @@ const nextConfig = {
         source: "/api/recommendations/:path*",
         destination: `${backend}/api/recommendations/:path*`,
       },
+      // The extension's "Request support": a page it could not read, sent for
+      // review. Same session-cookie reasoning and one-rule-per-prefix note —
+      // the bare POST /api/coverage-requests is matched by this `:path*` rule.
+      // /admin under it is the review queue; like recommendations, the backend
+      // requires an ADMIN session there and the admin screen uses server
+      // actions (libs/coverage-admin.ts).
+      {
+        source: "/api/coverage-requests/:path*",
+        destination: `${backend}/api/coverage-requests/:path*`,
+      },
       // Same-origin door to the admin job parser, so the Auth.js cookie is sent
       // and the backend can require an admin session instead of a token that
       // used to ship to every browser.
@@ -215,6 +225,12 @@ const nextConfig = {
       {
         source: "/api/lead-magnets/claim",
         destination: `${backend}/api/blog/claims`,
+      },
+      // The /waitlist signup form. Public, no session; signups land in the
+      // backend's Subscriber collection alongside lead-magnet emails.
+      {
+        source: "/api/waitlist",
+        destination: `${backend}/api/waitlist`,
       },
       {
         source: "/api/subscribers/export",
