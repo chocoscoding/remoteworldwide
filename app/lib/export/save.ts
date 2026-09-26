@@ -8,6 +8,8 @@
 // text an ATS can read. The price is that the user picks "Save as PDF" in the
 // print dialog rather than getting the file straight away.
 
+import { printFrameCss } from "./print-css";
+
 /** Characters no filesystem accepts in a name, and the ones that would read as a path. */
 export const safeFileName = (name: string): string => name.replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, " ").trim() || "document";
 
@@ -91,8 +93,7 @@ export async function printDocument({ title, html, pageSize, pageMargin, bodyCla
     doc.open();
     doc.write(
       `<!doctype html><html class="${escapeHtml(htmlClass)}"><head><meta charset="utf-8"><base href="${escapeHtml(location.origin)}/"><title>${escapeHtml(title)}</title>${styles}` +
-        `<style>@page{size:${pageSize};margin:${pageMargin};}html,body{margin:0;padding:0;background:#fff;min-height:0;}` +
-        `*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}${css}</style></head>` +
+        `<style>${printFrameCss(pageSize, pageMargin)}${css}</style></head>` +
         `<body class="${escapeHtml(pageClass)}">${html}</body></html>`,
     );
     doc.close();

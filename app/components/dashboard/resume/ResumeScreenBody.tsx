@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
+import { resumePrintSpec } from "@/app/lib/export/print-css";
 import { resumeToDocx, resumeToMarkdown } from "@/app/lib/export/resume";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { ResumePaper, PageGuides } from "@/app/components/dashboard/resume/paper";
@@ -270,16 +271,15 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
     // and the on-screen page-break label (the break itself stays).
     const copy = paper.cloneNode(true) as HTMLElement;
     copy.querySelectorAll("[data-resume-placeholder]").forEach((node) => (node.closest("[data-resume-section]") ?? node).remove());
-    const multi = pageCount > 1;
+    // The page rules are shared with the server's print page (print-css.ts).
+    const print = resumePrintSpec(design, pageCount > 1);
     await printDocument({
       title: base,
-      html: `<div class="rww-print${multi ? " rww-print-multi" : ""}">${copy.outerHTML}</div>`,
-      pageSize: design.doc.pageFormat === "a4" ? "A4" : "Letter",
-      pageMargin: multi ? `${design.spacing.marginYmm}mm 0` : "0",
+      html: `<div class="${print.className}">${copy.outerHTML}</div>`,
+      pageSize: print.pageSize,
+      pageMargin: print.pageMargin,
       bodyClass: ALL_FONT_VARS,
-      css:
-        ".rww-print li{break-inside:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}" +
-        (multi ? ".rww-print-multi>*{min-height:0!important;padding-top:0!important;padding-bottom:0!important;}" : ""),
+      css: print.css,
     });
   };
 

@@ -4,8 +4,12 @@
 // visibility the user set, their fonts, accent colour, text size and page — not
 // from a screenshot of it. That keeps it editable and ATS-readable. It is laid
 // out in one column even when the design uses two: a Word table imitating a
-// sidebar is exactly what trips parsers, and the PDF export (the browser's
-// print of the real paper) is the one that keeps the exact look.
+// sidebar is exactly what trips parsers, and the PDF export (a print of the
+// real paper — by the browser here, by Chromium for `/print/resume/[id]`) is the
+// one that keeps the exact look.
+//
+// Pure: no DOM, no next/font (the registry comes from `font-meta.ts`), so a
+// route handler can build the same file the browser saves.
 
 import {
   AlignmentType,
@@ -19,7 +23,7 @@ import {
   TextRun,
   type ParagraphChild,
 } from "docx";
-import { FONT_REGISTRY } from "@/app/lib/dashboard/resume/fonts";
+import { FONT_REGISTRY } from "@/app/lib/dashboard/resume/font-meta";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 
@@ -61,7 +65,13 @@ function contactParts(content: ResumeContent): { text: string; link?: string }[]
 /** The sections to write, in the user's order: visible ones, minus the header (written first) and blanks. */
 const bodySections = (sections: SectionConfig[]) => sections.filter((s) => s.visible && s.kind !== "personal");
 
-export async function resumeToDocx(content: ResumeContent, design: ResumeDesign, sections: SectionConfig[]): Promise<Blob> {
+/**
+ * The Word document itself, not yet packed. One builder, two packers: the
+ * browser saves it as a Blob (`resumeToDocx`), and the extension's download
+ * route answers with a Buffer (`resumeToDocxBuffer`) — so a file from either
+ * place is the same file.
+ */
+export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, sections: SectionConfig[]): Document {
   const accent = hex(design.colors.accent, "222325");
   const text = hex(design.colors.text, "222325");
   const muted = hex(design.colors.textMuted, "5A5A5A");
@@ -191,7 +201,7 @@ export async function resumeToDocx(content: ResumeContent, design: ResumeDesign,
     }
   }
 
-  const doc = new Document({
+  return new Document({
     creator: clean(content.name) || "Remote Worldwide",
     title: `${clean(content.name) || "Resume"}${clean(content.title) ? ` — ${clean(content.title)}` : ""}`,
     styles: {
@@ -225,7 +235,16 @@ export async function resumeToDocx(content: ResumeContent, design: ResumeDesign,
       },
     ],
   });
-  return Packer.toBlob(doc);
+}
+
+// Both async, so a document that fails to build rejects like one that fails to pack.
+export async function resumeToDocx(content: ResumeContent, design: ResumeDesign, sections: SectionConfig[]): Promise<Blob> {
+  return Packer.toBlob(buildResumeDocx(content, design, sections));
+}
+
+/** Server-side: the same file as bytes, for a route handler to answer with. */
+export async function resumeToDocxBuffer(content: ResumeContent, design: ResumeDesign, sections: SectionConfig[]): Promise<Buffer> {
+  return Packer.toBuffer(buildResumeDocx(content, design, sections));
 }
 
 /** The same content as Markdown: headings, bullets and links, nothing a plain-text reader cannot follow. */

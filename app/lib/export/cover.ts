@@ -5,6 +5,7 @@
 // editor's HTML (sanitised) for print, which keeps bold, italics and lists.
 
 import { AlignmentType, Document, Packer, Paragraph, TextRun } from "docx";
+import { LETTER_BLOCKS_AS_PARAGRAPH, LETTER_DROPPED_WITH_CONTENT, LETTER_HREF, LETTER_TAGS } from "./letter-allowlist";
 
 export interface Letterhead {
   name: string;
@@ -24,7 +25,8 @@ const paragraphsOf = (text: string): string[] =>
     .map((line) => line.trim())
     .filter(Boolean);
 
-export async function coverToDocx(body: string, letterhead: Letterhead | null, font: LetterFont): Promise<Blob> {
+/** The Word document, not yet packed — see `buildResumeDocx` for why there are two packers. */
+export function buildCoverDocx(body: string, letterhead: Letterhead | null, font: LetterFont): Document {
   const children: Paragraph[] = [];
   if (letterhead && letterhead.name.trim()) {
     children.push(new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: letterhead.name.trim(), bold: true, size: 32 })] }));
@@ -33,13 +35,21 @@ export async function coverToDocx(body: string, letterhead: Letterhead | null, f
   }
   for (const line of paragraphsOf(body)) children.push(new Paragraph({ spacing: { after: 200 }, alignment: AlignmentType.LEFT, children: [new TextRun(line)] }));
 
-  const doc = new Document({
+  return new Document({
     creator: letterhead?.name.trim() || "Remote Worldwide",
     title: "Cover letter",
     styles: { default: { document: { run: { font: WORD_FONT[font], size: 22 } } } },
     sections: [{ properties: { page: { margin: { top: 1_440, bottom: 1_440, left: 1_440, right: 1_440 } } }, children }],
   });
-  return Packer.toBlob(doc);
+}
+
+export async function coverToDocx(body: string, letterhead: Letterhead | null, font: LetterFont): Promise<Blob> {
+  return Packer.toBlob(buildCoverDocx(body, letterhead, font));
+}
+
+/** Server-side: the same file as bytes, for a route handler to answer with. */
+export async function coverToDocxBuffer(body: string, letterhead: Letterhead | null, font: LetterFont): Promise<Buffer> {
+  return Packer.toBuffer(buildCoverDocx(body, letterhead, font));
 }
 
 export function coverToMarkdown(body: string, letterhead: Letterhead | null): string {
@@ -58,9 +68,12 @@ export function coverToMarkdown(body: string, letterhead: Letterhead | null): st
 // Print
 // ---------------------------------------------------------------------------
 
-const ALLOWED = new Set(["P", "BR", "STRONG", "B", "EM", "I", "U", "UL", "OL", "LI", "H1", "H2", "H3", "BLOCKQUOTE", "A"]);
-/** Block wrappers the editor or a paste may produce: kept as paragraphs, not dropped with their text. */
-const AS_PARAGRAPH = new Set(["DIV", "SECTION", "ARTICLE"]);
+// The lists are shared with the server's sanitiser (./letter-allowlist.ts);
+// `tagName` is upper case in an HTML document, so they are read that way here.
+const upper = (tags: readonly string[]) => new Set(tags.map((tag) => tag.toUpperCase()));
+const ALLOWED = upper(LETTER_TAGS);
+const AS_PARAGRAPH = upper(LETTER_BLOCKS_AS_PARAGRAPH);
+const DROPPED = upper(LETTER_DROPPED_WITH_CONTENT);
 
 const escapeHtml = (value: string): string =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -81,13 +94,13 @@ export function sanitizeLetterHtml(html: string): string {
     const tag = el.tagName;
     if (tag === "A") {
       const href = el.getAttribute("href") ?? "";
-      return /^(https?:|mailto:)/i.test(href) ? `<a href="${escapeHtml(href)}">${inner}</a>` : inner;
+      return LETTER_HREF.test(href) ? `<a href="${escapeHtml(href)}">${inner}</a>` : inner;
     }
     if (tag === "BR") return "<br>";
     if (ALLOWED.has(tag)) return `<${tag.toLowerCase()}>${inner}</${tag.toLowerCase()}>`;
     if (AS_PARAGRAPH.has(tag)) return `<p>${inner}</p>`;
     // SCRIPT, STYLE and the like carry no letter text worth keeping.
-    if (["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "IFRAME", "OBJECT"].includes(tag)) return "";
+    if (DROPPED.has(tag)) return "";
     return inner;
   };
   return Array.from(doc.body.childNodes).map(walk).join("");

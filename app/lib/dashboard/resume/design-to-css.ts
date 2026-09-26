@@ -23,7 +23,7 @@ import type {
   ResumeCssVars,
   ResumeDesign,
 } from "./design-types";
-import { FONT_REGISTRY } from "./fonts";
+import { FONT_REGISTRY } from "./font-meta";
 import { onAccent } from "./palette";
 
 const PAGE: Record<PageFormat, { w: string; h: string }> = {
