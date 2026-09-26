@@ -16,12 +16,15 @@
 // which would post nowhere and toast that the pod knows.
 
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import { useRecordJobWin } from "@/hooks/mutations/usePodMutations";
 import WinLogDialog from "./WinLogDialog";
 import WinCelebrationDialog from "./WinCelebrationDialog";
-import { podWinBody, type WinRecord } from "@/app/lib/dashboard/win";
+import { podPostAuthor, podWinBody, type WinRecord } from "@/app/lib/dashboard/win";
+import { qk } from "@/app/lib/query/keys";
+import type { Settings } from "@/app/lib/settings/types";
 
 interface WinContextValue {
   /** Opens the 90-second win log — or the celebration directly, if already logged. */
@@ -35,7 +38,8 @@ const WinCtx = createContext<WinContextValue | null>(null);
 const WinProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { current, retiredStreak, markHired } = useActivity();
   const recordJobWin = useRecordJobWin();
-  const { profile } = useSettings();
+  const { profile, privacy } = useSettings();
+  const queryClient = useQueryClient();
 
   const [win, setWin] = useState<WinRecord | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -52,7 +56,10 @@ const WinProvider: FC<{ children: ReactNode }> = ({ children }) => {
     setLogOpen(false);
     // The streak retires itself — a system event, not a button.
     if (retiredStreak === null) markHired();
-    recordJobWin.mutate(podWinBody(record, profile.fullName));
+    // Named only while the SAVED privacy lets the pod see who you are — what the
+    // board shows them — not an unsaved toggle on the privacy screen.
+    const saved = queryClient.getQueryData<Settings>(qk.settings.me())?.privacy ?? privacy;
+    recordJobWin.mutate(podWinBody(record, podPostAuthor(profile.fullName, saved.showProfileToPod !== false)));
     setCelebrationOpen(true);
   }
 

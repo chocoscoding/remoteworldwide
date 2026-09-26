@@ -3,6 +3,7 @@
 import { FC, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, Copy, Linkedin, Share2, Trophy, Twitter, UsersRound, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,8 +15,10 @@ import { useApplications } from "@/hooks/queries/useApplicationsQuery";
 import { usePodOverview } from "@/hooks/queries/usePodQuery";
 import { useInviteLink, useInviteSummary } from "@/hooks/queries/useInviteSummary";
 import { useSharePost } from "@/hooks/mutations/usePodMutations";
-import { firstNameOf, trackedLink } from "@/app/lib/dashboard/win";
+import { podPostAuthor, trackedLink } from "@/app/lib/dashboard/win";
+import { qk } from "@/app/lib/query/keys";
 import type { ApplicationItem } from "@/app/lib/applications/types";
+import type { Settings } from "@/app/lib/settings/types";
 
 /**
  * "Share a win" — an interview or an offer from the user's own tracker, told
@@ -118,7 +121,8 @@ function makeConfetti(): ConfettiPiece[] {
 }
 
 const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, applicationId }) => {
-  const { profile } = useSettings();
+  const { profile, privacy } = useSettings();
+  const queryClient = useQueryClient();
   const name = profile.fullName.trim();
   const applications = useApplications({ enabled: open });
   // Only asked for while open: whether there is a pod to post to, and who is in it.
@@ -174,7 +178,11 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
     if (!style) return;
     // What's moving shows the others no author, so the post carries the
     // profile's first name — without it the pod would read an anonymous win.
-    const text = name ? `${firstNameOf(name)} ${style.podVerb} — ${where} \u{1F389}` : `${style.title} — ${where} \u{1F389}`;
+    // With "Show my profile to my pod" off (as saved: what the board shows
+    // them), it carries "A pod member" instead, never the name.
+    const saved = queryClient.getQueryData<Settings>(qk.settings.me())?.privacy ?? privacy;
+    const author = podPostAuthor(name, saved.showProfileToPod !== false);
+    const text = author ? `${author} ${style.podVerb} — ${where} \u{1F389}` : `${style.title} — ${where} \u{1F389}`;
     // The toast comes from useSharePost, on the server's answer — as does the
     // refusal, if the pod turns out to be gone.
     sharePost.mutate({ text, hot: true }, { onSuccess: () => mark("pod", "posted") });

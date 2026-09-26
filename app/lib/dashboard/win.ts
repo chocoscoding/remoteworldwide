@@ -116,10 +116,11 @@ export function pullWinStats(
  * pod goal moves once. Same key formula as LivePodProvider's, so the two
  * paths dedupe against each other; cut to the validator's 120 characters.
  * What's moving prints no author for the others, so the text names the
- * winner by first name when the profile has one.
+ * winner — `author`, from `podPostAuthor`, which already knows whether the
+ * pod may see their name.
  */
-export function podWinBody(win: WinRecord, ownerName: string): { text: string; ref: string } {
-  const who = ownerName.trim() ? `${firstNameOf(ownerName.trim())} landed` : "Landed";
+export function podWinBody(win: WinRecord, author: string): { text: string; ref: string } {
+  const who = author ? `${author} landed` : "Landed";
   return {
     text: `${who} ${win.facts.role} at ${win.facts.company} \u{1F389}`,
     ref: `${win.facts.company}:${win.facts.role}`.toLowerCase().replace(/\s+/g, "-").slice(0, 120),
@@ -128,6 +129,22 @@ export function podWinBody(win: WinRecord, ownerName: string): { text: string; r
 
 /** First name only, for the card toggle — "Ada Obi" -> "Ada". */
 export const firstNameOf = (name: string) => name.split(" ")[0] ?? name;
+
+/** What the pod calls someone who turned "Show my profile to my pod" off — the board's own words. */
+export const POD_ANONYMOUS_NAME = "A pod member";
+
+/**
+ * Who a post the app writes for you to your pod names: your first name, or
+ * "A pod member" when you have "Show my profile to my pod" off — the same name
+ * the board gives you — or nothing ("" — the post then leads with the news)
+ * when the profile has no name. Composed here, in the browser, because the
+ * post is sent as text; pass the SAVED switch, since that is what the pod sees.
+ */
+export function podPostAuthor(fullName: string, showProfileToPod: boolean): string {
+  if (!showProfileToPod) return POD_ANONYMOUS_NAME;
+  const name = fullName.trim();
+  return name ? firstNameOf(name) : "";
+}
 
 /**
  * Attribution rides the shared link, per platform, so referral signups can be
