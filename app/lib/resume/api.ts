@@ -9,13 +9,17 @@
 // About the import:
 //
 // The file travels as base64 in a JSON body rather than as multipart. That is
-// the transport the AI service already uses for a resume — its ingest queue
-// carries the same bytes the same way — and the proxy forwards JSON, so this
-// needs no second upload path.
+// the transport the AI service takes a resume in — it decodes the bytes and
+// parks them in object storage for its worker — and the proxy forwards JSON,
+// so this needs no second upload path.
+//
+// The upload answers with a job, not the resume: the parse happens on the AI
+// service's worker, and `./importJob.ts` waits for it.
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/app/lib/api/client";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+import { waitForImport, type ResumeImportAccepted, type ResumeImportView } from "./importJob";
 import { MAX_RESUME_BYTES, RESUME_TYPES_HINT, isReadableMime, mimeForFileName } from "./mime";
 
 // The accepted types, the size ceiling and the copy live in `./mime.ts` so the
@@ -72,10 +76,16 @@ export interface ImportedResume {
   duplicate: boolean;
 }
 
+const IMPORTS = "/api/ai/resume/imports";
+
 /**
- * Sends a CV to be read and parsed. Throws `Error` for a file this side can
- * already tell is wrong, and `BackendError` (with the service's own message)
- * for anything the server refuses — an unreadable PDF, a scan with no text.
+ * Sends a CV to be read and parsed, and resolves once it has been — the upload
+ * only queues the parse, and `waitForImport` polls for the result, so a caller
+ * awaiting this keeps its spinner up for the whole of it exactly as before.
+ * Throws `Error` for a file this side can already tell is wrong, and
+ * `BackendError` (with the service's own message) for anything the server
+ * refuses — an unreadable PDF, a scan with no text — whether it refused the
+ * upload or the parse.
  */
 export async function importResume(file: File): Promise<ImportedResume> {
   const mimeType = resumeMimeType(file);
@@ -84,7 +94,8 @@ export async function importResume(file: File): Promise<ImportedResume> {
   if (file.size > MAX_RESUME_BYTES) throw new Error("That file is larger than 7MB");
 
   const data = await toBase64(file);
-  return apiPost<ImportedResume>("/api/ai/resume/imports", { fileName: file.name, mimeType, data });
+  const { job } = await apiPost<ResumeImportAccepted>(IMPORTS, { fileName: file.name, mimeType, data });
+  return waitForImport<ImportedResume>(job, (id) => apiGet<ResumeImportView<ImportedResume>>(`${IMPORTS}/${encodeURIComponent(id)}`));
 }
 
 // ---------------------------------------------------------------------------

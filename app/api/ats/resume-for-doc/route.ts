@@ -7,7 +7,9 @@
 //
 //   1. Mint a signed link for the document (the backend checks ownership).
 //   2. Read the bytes.
-//   3. Hand them to the AI service's importer, which answers with a resume id.
+//   3. Hand them to the AI service's importer, which queues the parse on its
+//      worker and answers with a job — then wait, bounded, for that job's
+//      resume id (`waitForImport`, the same loop the browser uses).
 //
 // Every step is server-side on purpose. The signed URL is a bearer credential
 // with an expiry and the object store has no CORS grant for this origin, so a
@@ -17,8 +19,8 @@
 //
 // Step 3 is idempotent: the AI service dedupes on a sha256 of the EXTRACTED
 // TEXT, not of the bytes, so importing the same CV twice returns the resume
-// that already exists (`duplicate: true`) without re-parsing or re-embedding
-// it.
+// that already exists without re-embedding it — and the same bytes within a
+// week land on the import job that already finished, without re-parsing.
 //
 // Idempotent is not free, though: steps 1-3 still download the file and
 // extract its text every time. So the answer is written back onto the document
@@ -33,11 +35,20 @@ import { auth } from "@/auth";
 import { ai } from "@/app/lib/ai";
 import { BackendError } from "@/app/lib/api/core";
 import { backend } from "@/app/lib/backend";
+import { waitForImport, type ResumeImportAccepted, type ResumeImportView } from "@/app/lib/resume/importJob";
 import { MAX_RESUME_BYTES, RESUME_TYPES_HINT, isReadableMime, mimeForFileName } from "@/app/lib/resume/mime";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
 
-/** Importing parses, chunks and embeds a CV — slower than an ordinary read. */
+/**
+ * Importing parses, chunks and embeds a CV — slower than an ordinary read. The
+ * whole of it, upload to answer: the same budget the synchronous import had,
+ * so this route takes no longer than it did, and the extension's 75s ceiling
+ * on it still covers the download in front.
+ */
 const IMPORT_TIMEOUT_MS = 60_000;
+
+/** One status read. A slow one is waited out like a slow parse, not failed on. */
+const POLL_TIMEOUT_MS = 10_000;
 
 /** Bounds the read of the object store, which is not this app's to wait on. */
 const FETCH_TIMEOUT_MS = 20_000;
@@ -145,12 +156,22 @@ export async function POST(req: Request): Promise<Response> {
   if (bytes.byteLength > MAX_RESUME_BYTES) return fail(413, "That file is larger than 7MB.");
 
   try {
-    const imported = await ai<ImportedResume>("/resume/imports", {
+    const userId = session.user.id;
+    const started = Date.now();
+    const accepted = await ai<ResumeImportAccepted>("/resume/imports", {
       method: "POST",
       body: { fileName, mimeType, data: Buffer.from(bytes).toString("base64") },
-      userId: session.user.id,
+      userId,
       timeoutMs: IMPORT_TIMEOUT_MS,
     });
+    // Whatever the upload left of the budget. A job that outlasts it is still
+    // running on the worker: the next ask for this document finds it done, or
+    // re-imports the same bytes onto the same job.
+    const imported = await waitForImport<ImportedResume>(
+      accepted.job,
+      (jobId) => ai<ResumeImportView<ImportedResume>>(`/resume/imports/${encodeURIComponent(jobId)}`, { userId, timeoutMs: POLL_TIMEOUT_MS }),
+      { timeoutMs: Math.max(0, IMPORT_TIMEOUT_MS - (Date.now() - started)) },
+    );
     // Remember it on the document, so the next ask skips all of the above.
     // Best-effort: a link that failed to save costs one more download later,
     // never this answer.
