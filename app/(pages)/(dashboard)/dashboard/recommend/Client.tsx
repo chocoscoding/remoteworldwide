@@ -227,7 +227,7 @@ const RecommendClient: FC = () => {
                 {paused
                   ? `You're hidden from reviewers — resume anytime.${pausedDaysLeft !== null ? ` ${pausedDaysLeft}d left on the pause.` : ""}`
                   : ineligible
-                    ? "Once your profile is complete, reviewers can put you in front of a company while you're available."
+                    ? "Once the checklist above is done, reviewers can put you in front of a company while you're available."
                     : "Reviewers can put you in front of a company while you're available."}
               </p>
               {masterResume && !ineligible && (

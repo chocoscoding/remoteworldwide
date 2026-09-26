@@ -17,6 +17,7 @@ const FIX_AT: Record<EligibilityRequirement, { href: string; place: string }> = 
   skills: { href: "/dashboard/settings/profile", place: "Profile" },
   targetRoles: { href: "/dashboard/settings/preferences", place: "Preferences" },
   masterResume: { href: "/dashboard/vault", place: "My documents" },
+  discoverable: { href: "/dashboard/settings/privacy", place: "Privacy" },
 };
 
 /** Where to send someone from a single "finish your profile" button: the first thing still open. */
@@ -27,8 +28,8 @@ export function firstFixHref(eligibility: RecommendationEligibility): string {
 
 /**
  * Shown only while someone is not eligible: reviewers only pick from complete
- * profiles with a master resume, so this is the one thing on the screen they
- * can actually do something about. What's done reads first, then what's left —
+ * profiles with a master resume, from people who left "Let recruiters find me"
+ * on, so this is the one thing on the screen they can actually do something about. What's done reads first, then what's left —
  * the left ones are links straight to the screen that fixes them.
  */
 const EligibilityCard: FC<{ eligibility: RecommendationEligibility }> = ({ eligibility }) => {
@@ -45,7 +46,7 @@ const EligibilityCard: FC<{ eligibility: RecommendationEligibility }> = ({ eligi
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-primary">Not in the running yet</p>
           <p className="mt-0.5 text-xs leading-relaxed text-black/55">
-            Reviewers only pick from complete profiles with a master resume. {done.length} of {total} done.
+            Reviewers only pick from complete profiles with a master resume, and only if you let recruiters find you. {done.length} of {total} done.
           </p>
           <ProgressBar value={(done.length / Math.max(total, 1)) * 100} className="mt-3 max-w-md" />
         </div>

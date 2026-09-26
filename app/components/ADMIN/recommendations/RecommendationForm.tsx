@@ -129,6 +129,12 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
         toast.error("They have no master resume yet.");
         return;
       }
+      // They turned "Let recruiters find me" off: the backend keeps the resume closed and says so.
+      if ("error" in link) {
+        tab?.close();
+        toast.error(link.error);
+        return;
+      }
       if (tab) tab.location.href = link.url;
       else window.open(link.url, "_blank", "noopener,noreferrer");
     } catch {
@@ -253,7 +259,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
             </div>
             {!editing && isMatch(candidate) && !candidate.eligible && (
               <p className="rounded-md bg-red-50 p-2 text-xs text-red-700">
-                Not eligible yet — reviewers only put forward complete profiles with a master resume. Still missing: {candidate.missing.join(", ")}.
+                Not eligible yet — reviewers only put forward complete profiles with a master resume, from people who let recruiters find them. Still missing: {candidate.missing.join(", ")}.
               </p>
             )}
           </div>
@@ -263,7 +269,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
           <SearchPicker<RecommendationCandidateMatch>
             label="Find by email"
             placeholder="name@example.com"
-            hint="Type two or more characters of their email or name. Only complete profiles with a master resume can be put forward."
+            hint="Type two or more characters of their email or name. Only complete profiles with a master resume, and “Let recruiters find me” on, can be put forward."
             search={searchRecommendationCandidates}
             keyOf={(u) => u.id}
             render={(u) => (
