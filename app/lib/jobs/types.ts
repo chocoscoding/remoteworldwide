@@ -256,6 +256,12 @@ export interface JobAnswer {
    * Absent on answers stored before it, which read as answered.
    */
   answered?: boolean;
+  /**
+   * True on the AI service's reply to a message that asked nothing about the job ("jjjj", the
+   * weather): a short steer back to what can be asked, in the verdict, never charged
+   * (`answered` is false on it too). Absent on every other answer.
+   */
+  unclear?: boolean;
 }
 
 export interface JobThreadEntry {
