@@ -3,28 +3,31 @@
 import { useState, type FC } from "react";
 import { Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ESTIMATOR_ITEMS, money, type PricingPlan } from "@/app/lib/pricing/catalogue";
+import { ESTIMATOR_ITEMS, type PricingPlan } from "@/app/lib/pricing/catalogue";
+import { ShortPrice } from "@/app/components/pricing/BillingInterval";
 
-type ItemKey = (typeof ESTIMATOR_ITEMS)[number]["key"];
-
+// Light brutalism: hairline ink outlines and one small offset shadow on the
+// thumb, not 2px borders everywhere. The owner found the heavier version too
+// dense (2026-09-26).
 const RANGE =
-  "h-3 w-full cursor-pointer appearance-none rounded-full border-2 border-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 " +
-  "[&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[2px_2px_0_0_#222325] " +
-  "[&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:bg-white";
+  "h-2 w-full cursor-pointer appearance-none rounded-full border border-primary/70 outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 " +
+  "[&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[1.5px] [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[1px_1px_0_0_#222325] " +
+  "[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[1.5px] [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:bg-white";
 
 /**
- * "How many credits would my month take?" — four sliders over the priced
- * actions people use most, and the smallest plan that covers the total.
- * Past the biggest plan it says how much would come from top-ups rather than
- * inventing a plan that doesn't exist.
+ * "How many credits would my month take?" — sliders over the priced actions
+ * people use most, and the smallest plan that covers the total and includes
+ * every tool in use (voice interviews start at Plus). Past the biggest plan
+ * it says how much would come from top-ups rather than inventing a plan that
+ * doesn't exist.
  */
 const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
-  const [counts, setCounts] = useState<Record<ItemKey, number>>(
-    () => Object.fromEntries(ESTIMATOR_ITEMS.map((item) => [item.key, item.initial])) as Record<ItemKey, number>,
-  );
+  const [counts, setCounts] = useState<Record<string, number>>(() => Object.fromEntries(ESTIMATOR_ITEMS.map((item) => [item.key, item.initial])));
 
   const total = ESTIMATOR_ITEMS.reduce((sum, item) => sum + counts[item.key] * item.credits, 0);
-  const sorted = [...plans].sort((a, b) => a.monthlyCredits - b.monthlyCredits);
+  const inUse = ESTIMATOR_ITEMS.filter((item) => counts[item.key] > 0);
+  const eligible = (plan: PricingPlan) => inUse.every((item) => !item.plans || item.plans.includes(plan.key));
+  const sorted = [...plans].filter(eligible).sort((a, b) => a.monthlyCredits - b.monthlyCredits);
   const fit = sorted.find((plan) => plan.monthlyCredits >= total) ?? null;
   const biggest = sorted[sorted.length - 1] ?? null;
   const plan = fit ?? biggest;
@@ -32,13 +35,13 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
   const usedPct = plan ? Math.min(100, Math.round((total / plan.monthlyCredits) * 100)) : 0;
 
   return (
-    <div className="grid overflow-hidden rounded-[24px] border-2 border-primary bg-white shadow-[8px_8px_0_0_#222325] lg:grid-cols-[1.25fr_1fr]">
+    <div className="grid overflow-hidden rounded-[20px] border-[1.5px] border-primary bg-white shadow-[4px_4px_0_0_#222325] lg:grid-cols-[1.25fr_1fr]">
       <div className="p-6 md:p-8">
-        <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-primary/60">
+        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary/55">
           <Calculator className="h-4 w-4" aria-hidden />
           Credit estimator
         </p>
-        <h3 className="mt-2 text-2xl font-extrabold tracking-tight text-primary md:text-3xl">What would your month take?</h3>
+        <h3 className="mt-2 text-2xl font-bold tracking-tight text-primary md:text-3xl">What would your month take?</h3>
         <p className="mt-1.5 text-sm text-primary/65">Drag to match how hard you&apos;re searching.</p>
 
         <div className="mt-7 flex flex-col gap-6">
@@ -49,11 +52,11 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
             return (
               <div key={item.key}>
                 <div className="mb-2.5 flex items-baseline justify-between gap-3">
-                  <label htmlFor={id} className="text-sm font-bold text-primary">
+                  <label htmlFor={id} className="text-sm font-semibold text-primary">
                     {item.label}
                   </label>
-                  <span className="text-xs font-semibold text-primary/55 tabular-nums">
-                    <span className="mr-1 inline-block min-w-[2.25rem] rounded-md border-2 border-primary bg-[#f9f8f1] px-1.5 py-0.5 text-center text-sm font-bold text-primary">
+                  <span className="text-xs font-medium text-primary/55 tabular-nums">
+                    <span className="mr-1 inline-block min-w-[2.25rem] rounded-md border border-primary/40 bg-[#f9f8f1] px-1.5 py-0.5 text-center text-sm font-semibold text-primary">
                       {value}
                     </span>
                     × {item.credits} = {value * item.credits}
@@ -77,11 +80,11 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
       </div>
 
       <div className="relative flex flex-col justify-between gap-8 bg-primary p-6 text-white md:p-8" aria-live="polite">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.13)_1px,transparent_1px)] bg-[length:18px_18px]" aria-hidden />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.07)_1px,transparent_1px)] bg-[length:24px_24px]" aria-hidden />
         <div className="relative">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">You&apos;d use about</p>
           <p className="mt-1 flex items-baseline gap-2">
-            <span className="text-6xl font-extrabold tracking-tight text-secondary tabular-nums">{total}</span>
+            <span className="text-6xl font-bold tracking-tight text-secondary tabular-nums">{total}</span>
             <span className="text-base font-semibold text-white/70">credits a month</span>
           </p>
         </div>
@@ -91,13 +94,13 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
             <p className="text-sm text-white/70">
               {fit ? "Your best fit" : "Go all out with"}
             </p>
-            <p className="mt-0.5 text-2xl font-extrabold">
+            <p className="mt-0.5 text-2xl font-bold">
               {plan.name}{" "}
-              <span className="text-base font-semibold text-white/60">
-                {money(plan.priceCents, plan.currency)}/{plan.interval}
+              <span className="text-base font-medium text-white/60">
+                <ShortPrice plan={plan} />
               </span>
             </p>
-            <div className="mt-4 h-3 overflow-hidden rounded-full border-2 border-white/80 bg-white/10">
+            <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/35 bg-white/10">
               <div
                 className={cn("h-full rounded-full transition-[width] duration-300", shortfall > 0 ? "bg-[#f0c86a]" : "bg-secondary")}
                 style={{ width: `${usedPct}%` }}

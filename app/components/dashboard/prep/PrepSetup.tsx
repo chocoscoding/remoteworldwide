@@ -17,6 +17,7 @@ import Chip from "./Chip";
 import ResumePickerDialog from "./ResumePickerDialog";
 import { useTrackResume } from "./useTrackResume";
 import { BUTTON_SOLID } from "./prep-styles";
+import { PlanChip, usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
 
 const FORMAT_ICON: Record<SessionFormat, LucideIcon> = { behavioural: MessageCircle, portfolio: Presentation, salary: DollarSign };
 
@@ -101,6 +102,8 @@ export interface PrepSetupProps {
 
 const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQuestions, onStart }) => {
   const [formats, setFormats] = useState<SessionFormat[]>(initialFormats?.length ? initialFormats : ["behavioural"]);
+  const { allows, openUpgrade } = usePlanGate();
+  const prepLocked = !allows("plus");
 
   // Never let the last one be unticked — a session with no format has no
   // questions to ask, so the control refuses rather than erroring later.
@@ -249,6 +252,12 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
 
   async function startSession() {
     if (blocked || configLoading || resumeBlocked || resumeBusy) return;
+    // Interview prep starts at Plus: below it, the upgrade popup rather than a session the AI
+    // service would refuse once the microphone is already asked for.
+    if (prepLocked) {
+      openUpgrade({ kind: "plan", requiredPlan: "plus", message: "Interview prep is on Plus and up." });
+      return;
+    }
     // A master document default is parsed and stored on the track here, once,
     // so this session's questions and every later read use that parse rather
     // than parsing the file again. A failure stays on this screen, said.
@@ -505,6 +514,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
               : offerMinutes !== null
                 ? `Start ${offerMinutes}-minute session`
                 : "Start session"}
+            {prepLocked ? <PlanChip plan="plus" className="bg-white" /> : null}
           </button>
         )}
       </div>

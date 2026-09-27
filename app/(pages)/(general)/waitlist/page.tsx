@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ArrowUp, Check, Handshake, MessagesSquare, Mic, PenLine, Puzzle, ScanSearch, Sparkle, SquareKanban, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, MessagesSquare, Mic, PenLine, Puzzle, ScanSearch, Sparkle, SquareKanban, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { absoluteUrl } from "@/app/lib/seo";
 import WaitlistForm, { WaitlistFormFromParams } from "@/app/components/waitlist/WaitlistForm";
@@ -9,7 +9,7 @@ import ProductCollage from "@/app/components/waitlist/ProductCollage";
 
 const TITLE = "Join the waitlist - Remote Worldwide";
 const DESCRIPTION =
-  "Get early access to Remote Worldwide's AI job-search toolkit: tailor your resume to every posting, rehearse interviews out loud, find referrals and track every application.";
+  "Get early access to Remote Worldwide's AI job-search toolkit: tailor your resume to every posting, rehearse interviews out loud and track every application.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
 };
 
-const MARQUEE = ["ATS scans", "Cover letters", "Voice mock interviews", "Referral search", "AI career coach", "Application tracker", "Browser extension", "Resume tailoring"];
+const MARQUEE = ["ATS scans", "Cover letters", "Voice mock interviews", "AI career coach", "Application tracker", "Browser extension", "Resume tailoring"];
 
 const FEATURES: { icon: LucideIcon; title: string; body: string; className?: string; dark?: boolean }[] = [
   {
@@ -32,13 +32,12 @@ const FEATURES: { icon: LucideIcon; title: string; body: string; className?: str
   { icon: ScanSearch, title: "Get past the ATS", body: "Score your resume against any posting and see exactly which keywords are missing." },
   { icon: PenLine, title: "Cover letters that fit", body: "A first draft grounded in the posting and your resume, revised to your notes." },
   { icon: MessagesSquare, title: "A coach on call", body: "Plan your week, unstick an application or prep for a call. 15 free replies a day." },
-  { icon: Handshake, title: "Find your referral", body: "People at the company who could refer you — LinkedIn first, then email." },
   { icon: SquareKanban, title: "Track every application", body: "Every role, stage and follow-up on one board, so nothing slips." },
   {
     icon: Puzzle,
     title: "Apply faster with the extension",
     body: "On Greenhouse, Lever and Ashby, fill applications from your saved answers and resume — only ever when you click.",
-    className: "md:col-span-2",
+    className: "md:col-span-3",
   },
 ];
 
@@ -75,7 +74,7 @@ export default function WaitlistPage() {
             </h1>
 
             <p className="mt-6 max-w-[540px] text-base leading-relaxed text-primary/70 md:text-lg">
-              We&apos;re building an AI toolkit around the Remote Worldwide job board: tailor your resume to every posting, rehearse interviews out loud, find someone who can refer you, and keep every application in one place.
+              We&apos;re building an AI toolkit around the Remote Worldwide job board: tailor your resume to every posting, rehearse interviews out loud, and keep every application in one place.
             </p>
 
             <Suspense fallback={<WaitlistForm initialPlan={null} />}>

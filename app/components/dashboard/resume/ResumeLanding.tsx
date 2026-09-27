@@ -6,6 +6,7 @@ import TimeAgo from "timeago-react";
 import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
 import { BUILD_CREDITS, RESUME_ACCEPT } from "@/app/lib/resume/api";
 import { isStaleCheck, type ResumeDocument } from "./resume-document";
 
@@ -37,10 +38,12 @@ export interface ResumeLandingProps {
   onDelete?: (id: string) => Promise<void>;
   /** Open "Build with AI". The caller owns the dialog and opens what it builds. */
   onBuild?: () => void;
+  /** Building with AI is above the account's plan: the card shows a lock and `onBuild` opens the upgrade popup. */
+  buildLocked?: boolean;
   banner?: ReactNode;
 }
 
-const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, onOpen, onCreateBlank, onImport, onDelete, onBuild, banner }) => {
+const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, onOpen, onCreateBlank, onImport, onDelete, onBuild, buildLocked = false, banner }) => {
   const [naming, setNaming] = useState(false);
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
@@ -160,7 +163,11 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                   Tell it the role — it writes a tailored resume from your profile or the resume you imported.
                 </span>
               </span>
-              <span className="flex-none rounded-full bg-[#222325] px-2.5 py-1 text-[11px] font-bold text-white">{BUILD_CREDITS} credits</span>
+              {buildLocked ? (
+                <PlanChip plan="basic" className="flex-none bg-white" />
+              ) : (
+                <span className="flex-none rounded-full bg-[#222325] px-2.5 py-1 text-[11px] font-bold text-white">{BUILD_CREDITS} credits</span>
+              )}
             </button>
           )}
         </div>

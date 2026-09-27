@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
-import { Check, Flame, Linkedin, Mail, Sparkle, X } from "lucide-react";
+import { Check, Flame, Sparkle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// The /waitlist hero illustration: four tool cards in a loose stack. Purely
+// The /waitlist hero illustration: three tool cards in a loose stack. Purely
 // decorative (aria-hidden) and made of markup, not screenshots, so it stays
 // sharp and costs no image weight. The people and numbers on it are samples.
 
@@ -30,14 +30,14 @@ function Gauge({ value }: { value: number }) {
 }
 
 export default function ProductCollage({ className }: { className?: string }) {
-  // Laid out on a fixed 540 × 560 stage from lg up, scaled to fit the narrower
+  // Laid out on a fixed 540 × 500 stage from lg up, scaled to fit the narrower
   // column between lg and xl, so the overlaps stay deliberate at every width.
   return (
-    <div aria-hidden className={cn("mx-auto w-full max-w-[540px] select-none lg:h-[470px] xl:h-[560px]", className)}>
-      <div className="relative lg:h-[560px] lg:w-[540px] lg:origin-top-left lg:scale-[0.84] xl:scale-100">
+    <div aria-hidden className={cn("mx-auto w-full max-w-[540px] select-none lg:h-[420px] xl:h-[500px]", className)}>
+      <div className="relative lg:h-[500px] lg:w-[540px] lg:origin-top-left lg:scale-[0.84] xl:scale-100">
         <Sparkle className="absolute -left-4 top-[250px] hidden h-8 w-8 fill-secondary text-primary lg:block" strokeWidth={1.5} />
         <Sparkle className="absolute right-6 top-[96px] hidden h-5 w-5 fill-secondary text-primary lg:block" strokeWidth={1.5} />
-        <Sparkle className="absolute bottom-[190px] left-[46%] hidden h-6 w-6 fill-white text-primary lg:block" strokeWidth={1.5} />
+        <Sparkle className="absolute bottom-[60px] right-[90px] hidden h-7 w-7 fill-white text-primary lg:block" strokeWidth={1.5} />
 
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start lg:block">
           {/* ATS match */}
@@ -94,28 +94,8 @@ export default function ProductCollage({ className }: { className?: string }) {
             </div>
           </div>
 
-          {/* Referral */}
-          <div className="rww-float relative hidden rotate-1 rounded-[20px] border-2 border-primary bg-white p-5 shadow-[6px_6px_0_0_#222325] lg:absolute lg:left-[10px] lg:top-[290px] lg:block lg:w-[270px]" style={float("-4s")}>
-            <span className={cn(LABEL, "text-primary/55")}>Referral found</span>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="grid h-11 w-11 flex-none place-content-center rounded-full border-2 border-primary bg-secondary text-sm font-extrabold text-primary">MO</span>
-              <div className="min-w-0">
-                <p className="text-sm font-extrabold text-primary">Maya O.</p>
-                <p className="text-xs text-primary/60">Design Lead · the team you applied to</p>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-bold text-primary">
-              <span className="inline-flex items-center gap-1 rounded-full border-2 border-primary px-2 py-0.5">
-                <Linkedin className="h-3 w-3" /> LinkedIn
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border-2 border-primary/30 px-2 py-0.5 text-primary/60">
-                <Mail className="h-3 w-3" /> Email · likely
-              </span>
-            </div>
-          </div>
-
           {/* Tracker */}
-          <div className="rww-float relative hidden -rotate-2 rounded-[20px] border-2 border-primary bg-secondary p-5 shadow-[6px_6px_0_0_#222325] lg:absolute lg:bottom-0 lg:right-[10px] lg:block lg:w-[250px]" style={float("-1s")}>
+          <div className="rww-float relative hidden rotate-2 rounded-[20px] border-2 border-primary bg-secondary p-5 shadow-[6px_6px_0_0_#222325] lg:absolute lg:left-[40px] lg:top-[300px] lg:block lg:w-[260px]" style={float("-1s")}>
             <span className={cn(LABEL, "text-primary/60")}>This week</span>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {[

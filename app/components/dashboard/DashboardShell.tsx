@@ -30,6 +30,7 @@ import RepairStreakPanel from "./streak/RepairStreakPanel";
 import { JobPickerProvider } from "./jobs/JobPickerProvider";
 import BoardImporter from "./applications/BoardImporter";
 import OnboardingBanner from "./onboarding/OnboardingBanner";
+import { PlanGateProvider } from "./billing/UpgradeModal";
 
 const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; children: ReactNode }> = ({ settings, billing, children }) => (
   <SidebarCollapseProvider>
@@ -40,6 +41,9 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
           ActivityProvider because asking for a referral is a logged action. */}
       <SettingsProvider initial={settings}>
       <BillingProvider initial={billing}>
+      {/* Right inside billing, which it reads: the one upgrade popup, opened by any call refused
+          for the plan (402 / 403 plan_required) or by a locked control. */}
+      <PlanGateProvider>
       <NetworkProvider>
       <AnswersProvider>
       <DocumentsProvider>
@@ -83,6 +87,7 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
       </DocumentsProvider>
       </AnswersProvider>
       </NetworkProvider>
+      </PlanGateProvider>
       </BillingProvider>
       </SettingsProvider>
     </ActivityProvider>

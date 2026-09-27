@@ -163,10 +163,15 @@ export interface Plan {
   priceCents: number;
   currency: string;
   interval: string;
+  /** A year paid up front (backend: 10% off twelve months unless set by hand); 0 for Free. */
+  yearlyPriceCents: number;
   monthlyCredits: number;
   features: string[];
   prioritySupport: boolean;
 }
+
+/** How a paid plan is paid for. Its credits refill every month either way. */
+export type BillingInterval = "month" | "year";
 
 export interface CreditPack {
   key: string;
@@ -175,14 +180,25 @@ export interface CreditPack {
   priceCents: number;
 }
 
+/** The four plan tiers, cheapest first. Free is everyone without an active paid plan. */
+export const PLAN_TIERS = ["free", "basic", "plus", "pro"] as const;
+export type PlanTier = (typeof PLAN_TIERS)[number];
+
 export interface Subscription {
   planKey: string | null;
   pendingPlanKey: string | null;
+  /** The tier the account counts as for plan gates (backend `tierOf`). */
+  tier: PlanTier;
   status: SubscriptionStatus;
+  interval: BillingInterval;
+  /** The billing of the plan waiting on payment, beside `pendingPlanKey`. */
+  pendingInterval: BillingInterval | null;
   creditBalance: number;
   monthlyCredits: number;
   periodStart: Date | null;
   periodEnd: Date | null;
+  /** When a yearly plan's next month of credits lands; null when a payment is what renews them. */
+  nextRefillAt: Date | null;
   cancelAtPeriodEnd: boolean;
   provider: string | null;
 }
@@ -200,6 +216,7 @@ export interface Checkout {
   id: string;
   kind: "subscription" | "credits";
   planKey: string | null;
+  interval: BillingInterval;
   packKey: string | null;
   credits: number;
   amountCents: number;

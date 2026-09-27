@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { apiPost } from "@/app/lib/api/client";
 import { apiMessage } from "@/app/lib/api/core";
 import { qk } from "@/app/lib/query/keys";
-import type { Checkout, Subscription } from "@/app/lib/settings/types";
+import type { BillingInterval, Checkout, Subscription } from "@/app/lib/settings/types";
 
 const PENDING_NOTE = "Payments are not connected yet — we will be in touch to finish it.";
 
@@ -30,11 +30,11 @@ function useBillingMutation<TData, TVars>(run: (vars: TVars) => Promise<TData>, 
 }
 
 export function useBuyPlan(onCheckout: (checkout: Checkout) => void) {
-  return useBillingMutation<Checkout, string>(
-    (planKey) => apiPost<Checkout>("/api/billing/checkout/plan", { planKey }),
+  return useBillingMutation<Checkout, { planKey: string; interval: BillingInterval }>(
+    ({ planKey, interval }) => apiPost<Checkout>("/api/billing/checkout/plan", { planKey, interval }),
     (checkout) => {
       onCheckout(checkout);
-      toast.success("Plan reserved", { description: PENDING_NOTE });
+      toast.success(checkout.interval === "year" ? "Plan reserved, billed yearly" : "Plan reserved", { description: PENDING_NOTE });
     },
   );
 }

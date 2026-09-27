@@ -18,6 +18,8 @@ export interface PricingPlan {
   priceCents: number;
   currency: string;
   interval: string;
+  /** A year up front, from the backend. Absent from the fallback copy, which works it out. */
+  yearlyPriceCents?: number;
   monthlyCredits: number;
   features: string[];
   prioritySupport: boolean;
@@ -36,39 +38,65 @@ export interface PricingCatalogue {
 }
 
 /** The plan the page puts forward. A recommendation, not a sales figure. */
-export const RECOMMENDED_PLAN = "growth";
+export const RECOMMENDED_PLAN = "plus";
+
+/**
+ * Yearly billing: twelve months at the monthly price, less this share. The backend owns the real
+ * figure (backend config/billing.ts YEARLY_DISCOUNT, or a price set by hand on the plan row) and
+ * sends it as `yearlyPriceCents`; this is only for a catalogue that doesn't carry one.
+ */
+export const YEARLY_DISCOUNT = 0.1;
+
+export type BillingInterval = "month" | "year";
+
+/** What a plan costs for a year up front, to the cent. */
+export const yearlyCents = (plan: PricingPlan) => plan.yearlyPriceCents ?? Math.round(plan.priceCents * 12 * (1 - YEARLY_DISCOUNT));
+
+/** What a plan comes to per month on the chosen billing: its price, or its yearly price over twelve. */
+export const perMonthCents = (plan: PricingPlan, billing: BillingInterval) =>
+  billing === "year" ? Math.round(yearlyCents(plan) / 12) : plan.priceCents;
 
 export const FALLBACK_CATALOGUE: PricingCatalogue = {
   plans: [
     {
-      key: "starter",
-      name: "Starter",
-      priceCents: 5000,
+      key: "free",
+      name: "Free",
+      priceCents: 0,
       currency: "USD",
       interval: "month",
-      monthlyCredits: 100,
+      monthlyCredits: 50,
       prioritySupport: false,
-      features: ["100 AI credits a month", "Resume tailoring and ATS scoring", "Unlimited application tracking", "Email support"],
+      features: ["50 AI credits a month", "Resume builder (one resume)", "ATS scans and cover letters", "Application tracking and drafts"],
     },
     {
-      key: "growth",
-      name: "Growth",
-      priceCents: 9900,
+      key: "basic",
+      name: "Basic",
+      priceCents: 2999,
       currency: "USD",
       interval: "month",
-      monthlyCredits: 300,
+      monthlyCredits: 120,
       prioritySupport: false,
-      features: ["300 AI credits a month", "Everything in Starter", "Interview prep sessions", "Referral introductions"],
+      features: ["120 AI credits a month", "Unlimited resumes", "AI help in the resume builder", "Email support"],
     },
     {
-      key: "scale",
-      name: "Scale",
-      priceCents: 15000,
+      key: "plus",
+      name: "Plus",
+      priceCents: 5999,
+      currency: "USD",
+      interval: "month",
+      monthlyCredits: 350,
+      prioritySupport: false,
+      features: ["350 AI credits a month", "Everything in Basic", "Interview prep sessions", "Voice mock interviews"],
+    },
+    {
+      key: "pro",
+      name: "Pro",
+      priceCents: 10000,
       currency: "USD",
       interval: "month",
       monthlyCredits: 750,
       prioritySupport: true,
-      features: ["750 AI credits a month", "Everything in Growth", "Priority support", "Early access to new tools"],
+      features: ["750 AI credits a month", "Everything in Plus", "Priority support", "Early access to new tools"],
     },
   ],
   creditPacks: [
@@ -95,7 +123,7 @@ export const CREDIT_COSTS: CreditCost[] = [
   { action: "Resume suggestion", detail: "Add missing keywords, quantify bullets, or shorten to a page.", credits: 1 },
   { action: "Ask about a job", detail: "An answer grounded in the posting and your profile.", credits: 1 },
   { action: "Likely interview questions", detail: "A tailored question set for the role you're prepping.", credits: 1 },
-  { action: "Referral search", detail: "People at the company who could refer you.", credits: 1 },
+  // Referral search (1 credit) is hidden from the public pages for now.
   { action: "Autofill an answer", detail: "Draft an application answer from your resume, in the extension.", credits: 1 },
   { action: "Cover letter revision", detail: "Rework a letter you've drafted, to your own note.", credits: 1 },
   { action: "Cover letter", detail: "A first draft from the posting and your resume.", credits: 2 },
@@ -103,16 +131,131 @@ export const CREDIT_COSTS: CreditCost[] = [
   { action: "Voice mock interview", detail: "Up to 10 minutes of recording, then 1 credit per extra minute.", credits: 5, label: "5+ credits" },
 ];
 
+/**
+ * Plans the interview-prep tools are on. The comparison table and the estimator share it, and the
+ * AI service enforces it (remoteworldwideai services/planService.ts: prep starts at Plus).
+ */
+const INTERVIEW_PLANS = ["plus", "pro"];
+
+/** Every paid plan: AI help in the resume builder, and more than one resume, start at Basic. */
+const PAID_PLANS = ["basic", "plus", "pro"];
+
+export interface EstimatorItem {
+  key: string;
+  label: string;
+  unit: string;
+  credits: number;
+  max: number;
+  initial: number;
+  /** Plans that include this tool; omitted means every plan. */
+  plans?: string[];
+}
+
 /** What the estimator on /pricing multiplies by. Kept next to CREDIT_COSTS so the two can't disagree. */
-export const ESTIMATOR_ITEMS = [
+export const ESTIMATOR_ITEMS: EstimatorItem[] = [
   { key: "scans", label: "ATS scans", unit: "scan", credits: 1, max: 80, initial: 20 },
   { key: "letters", label: "Cover letters", unit: "letter", credits: 2, max: 40, initial: 10 },
-  { key: "interviews", label: "Voice mock interviews", unit: "interview", credits: 5, max: 30, initial: 6 },
-  { key: "referrals", label: "Referral searches", unit: "search", credits: 1, max: 60, initial: 10 },
-] as const;
+  { key: "interviews", label: "Voice mock interviews", unit: "interview", credits: 5, max: 30, initial: 6, plans: INTERVIEW_PLANS },
+];
+
+export interface FeatureRow {
+  label: string;
+  /** What it is, and its price or limit, shown in grey under the label, e.g. "Score against a posting · 1 credit". */
+  note?: string;
+  /** Plan keys that include it, or every plan. A plan key missing from both reads as "—". */
+  plans: "all" | string[];
+  /** Text shown instead of a tick for a plan, e.g. "1 resume" on Free. */
+  values?: Record<string, string>;
+}
 
 /** The site-wide reward for an invite that turns into a subscriber (backend CREDITS_PER_SUBSCRIBER). */
 export const CREDITS_PER_INVITE = 5;
+
+/** Under the table's monthly-credits and per-credit rows, which it works out from the plans themselves. */
+export const CREDIT_ROWS: FeatureRow[] = [
+  { label: "Top-up credit packs", note: "Never expire, used after your monthly allowance", plans: "all" },
+  { label: "Credits for invites", note: `${CREDITS_PER_INVITE} credits for each friend who subscribes`, plans: "all" },
+];
+
+/**
+ * The comparison table under the plan cards. Free's limits (one resume, no AI in the builder) and
+ * interview prep from Plus up are enforced by the AI service; priority support and early access are
+ * the Pro plan's promise. Referral search is left out for now.
+ */
+export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
+  {
+    title: "Find and track jobs",
+    rows: [
+      { label: "Remote job board", note: "Search, save and apply to vetted remote roles", plans: "all" },
+      { label: "Import jobs", note: "From a link or a pasted posting · free", plans: "all" },
+      { label: "Saved jobs", note: "A shortlist to come back to", plans: "all" },
+      { label: "Unlimited application tracking", note: "Every application, stage by stage", plans: "all" },
+    ],
+  },
+  {
+    title: "Resumes & cover letters",
+    rows: [
+      { label: "Resume builder", plans: "all", values: { free: "1 resume", basic: "Unlimited", plus: "Unlimited", pro: "Unlimited" } },
+      { label: "Import your resume", note: "Upload a PDF, Word or text file · free", plans: "all" },
+      { label: "Build a resume with AI", note: "A full resume around a target role · 3 credits", plans: PAID_PLANS },
+      { label: "AI help in the resume builder", note: "Tailor, add keywords, quantify, shorten · 1 credit", plans: PAID_PLANS },
+      { label: "ATS scans", note: "Keyword-by-keyword score against a posting · 1 credit", plans: "all" },
+      { label: "Cover letters", note: "2 credits a draft, 1 per revision", plans: "all" },
+      { label: "Document vault", note: "Your files in one place, with a master resume", plans: "all" },
+    ],
+  },
+  {
+    title: "Applying",
+    rows: [
+      { label: "Ask about a job", note: "Answers from the posting and your profile · 1 credit", plans: "all" },
+      { label: "Saved application answers", note: "Write an answer once, reuse it anywhere · free", plans: "all" },
+      { label: "Chrome extension", note: "Save and track jobs from the application page", plans: "all" },
+      { label: "Autofill from your profile", note: "Your details and saved answers · free", plans: "all" },
+      { label: "AI answers in the extension", note: "New questions answered from your resume · 1 credit", plans: "all" },
+      { label: "Application drafts", note: "Pick an application back up later", plans: "all" },
+      { label: "Recommendations to companies", note: "Reviewers put strong profiles in front of hiring teams", plans: "all" },
+    ],
+  },
+  {
+    title: "Interview prep",
+    rows: [
+      { label: "Prep tracks for each role", note: "Built on the real posting, synced with your tracker", plans: INTERVIEW_PLANS },
+      { label: "Likely interview questions", note: "A tailored set for the role · 1 credit", plans: INTERVIEW_PLANS },
+      { label: "Voice mock interviews", note: "5 credits for up to 10 minutes, then 1 a minute", plans: INTERVIEW_PLANS },
+      { label: "Typed practice interviews", note: "Free, up to 10 a day", plans: INTERVIEW_PLANS },
+      { label: "Interview reports", note: "Scores, transcript and recording playback", plans: INTERVIEW_PLANS },
+      { label: "Delivery analysis", note: "Long pauses, filler words and pitch", plans: INTERVIEW_PLANS },
+      { label: "Positioning, diction and grammar", note: "Every point backed by a quote from your answers", plans: INTERVIEW_PLANS },
+    ],
+  },
+  {
+    title: "Coaching & momentum",
+    rows: [
+      { label: "AI career coach", note: "15 free replies a day, then 1 credit each", plans: "all" },
+      { label: "Talk it through by voice", note: "With the coach and Ask about a job", plans: "all" },
+      { label: "Daily plan and streaks", note: "Today's tasks, and a streak to keep", plans: "all" },
+      { label: "Job-search pod", note: "Weekly goals and wins with a small group", plans: "all" },
+    ],
+  },
+  {
+    title: "Support",
+    rows: [
+      { label: "Email support", plans: "all" },
+      { label: "Priority support", plans: ["pro"] },
+      { label: "Early access to new tools", plans: ["pro"] },
+    ],
+  },
+];
+
+/** The plans FEATURE_GROUPS was written for. */
+const FEATURE_PLAN_KEYS = FALLBACK_CATALOGUE.plans.map((plan) => plan.key);
+
+/** Whether a row covers a plan; null when the plan is one this table doesn't know. */
+export const rowIncludes = (row: FeatureRow, planKey: string): boolean | null => {
+  if (row.plans === "all") return true;
+  if (row.plans.includes(planKey)) return true;
+  return FEATURE_PLAN_KEYS.includes(planKey) ? false : null;
+};
 
 export const money = (cents: number, currency = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency, minimumFractionDigits: cents % 100 === 0 ? 0 : 2 }).format(cents / 100);

@@ -54,6 +54,10 @@ import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
 import { ResumeDesignProvider } from "@/app/components/dashboard/resume/ResumeDesignContext";
 import { createBlankContent, fromStored, importLabel, type ResumeDocument } from "@/app/components/dashboard/resume/resume-document";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
+import { usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
+
+/** Refused for the account's plan: the upgrade popup already says so. */
+const isPlanRefusal = (error: unknown): boolean => error instanceof BackendError && (error.code === "plan_required" || error.status === 402);
 import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
 import { parseFieldSpec, toPickedJob } from "@/app/lib/jobs/fields";
 import type { SavedJobItem } from "@/app/lib/jobs/types";
@@ -127,7 +131,8 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
     try {
       open(fromStored(await createResumeDocument({ label, content: createBlankContent() })));
     } catch (error) {
-      toast.error(apiMessage(error));
+      // A plan refusal opens the upgrade popup by itself; a toast on top would say it twice.
+      if (!isPlanRefusal(error)) toast.error(apiMessage(error));
     }
   };
 
@@ -140,14 +145,22 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
       const imported = await importResume(file);
       open(fromStored(await createResumeDocument({ label: importLabel(imported.fileName || file.name), content: imported.content })));
     } catch (error) {
-      toast.error(apiMessage(error));
+      if (!isPlanRefusal(error)) toast.error(apiMessage(error));
     }
   };
 
   // "Build with AI". The builder saved the document already, so it is opened,
   // not created again; the build spent credits, so the balance is refreshed.
+  // Building with AI is on Basic and up, so Free sees it locked and gets the
+  // upgrade popup instead of a dialog it can't finish.
   const queryClient = useQueryClient();
+  const { allows, openUpgrade } = usePlanGate();
+  const buildLocked = !allows("basic");
   const [buildOpen, setBuildOpen] = useState(false);
+  const startBuild = () =>
+    buildLocked
+      ? openUpgrade({ kind: "plan", requiredPlan: "basic", message: "Building a resume with AI is on Basic and up." })
+      : setBuildOpen(true);
   const openBuilt = (stored: StoredResumeDocument) => {
     open(fromStored(stored));
     void queryClient.invalidateQueries({ queryKey: qk.billing.overview() });
@@ -179,7 +192,8 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
           onCreateBlank={createBlankFromLanding}
           onImport={importFromLanding}
           onDelete={deleteFromLanding}
-          onBuild={() => setBuildOpen(true)}
+          onBuild={startBuild}
+          buildLocked={buildLocked}
           banner={banner}
         />
         <BuildResumeDialog open={buildOpen} onOpenChange={setBuildOpen} onBuilt={openBuilt} />

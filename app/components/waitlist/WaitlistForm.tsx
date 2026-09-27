@@ -13,7 +13,7 @@ const EMAIL_KEY = "rww_lead_email";
 /** What this browser last joined as, so coming back shows the spot instead of an empty form. */
 const JOINED_KEY = "rww_waitlist";
 
-const PLAN_NAMES: Record<string, string> = { starter: "Starter", growth: "Growth", scale: "Scale" };
+const PLAN_NAMES: Record<string, string> = { free: "Free", basic: "Basic", plus: "Plus", pro: "Pro" };
 const CONFETTI_COLORS = ["#e1f073", "#cddd54", "#f0c86a", "#222325"];
 
 type Joined = { email: string; position: number | null; returning: boolean };
@@ -56,13 +56,17 @@ const prefersReducedMotion = () => {
   }
 };
 
-/** Reads ?plan= from the URL; the page wraps this in Suspense and falls back to the plain form. */
+/** Reads ?plan= and ?billing= from the URL; the page wraps this in Suspense and falls back to the plain form. */
 export const WaitlistFormFromParams: FC = () => {
-  const plan = useSearchParams().get("plan");
-  return <WaitlistForm initialPlan={plan && PLAN_NAMES[plan] ? plan : null} />;
+  const params = useSearchParams();
+  const plan = params.get("plan");
+  const known = plan && PLAN_NAMES[plan] ? plan : null;
+  // Yearly only means something beside a paid plan, as the pricing page sends it.
+  const yearly = known !== null && known !== "free" && params.get("billing") === "year";
+  return <WaitlistForm initialPlan={known} initialYearly={yearly} />;
 };
 
-const WaitlistForm: FC<{ initialPlan: string | null }> = ({ initialPlan }) => {
+const WaitlistForm: FC<{ initialPlan: string | null; initialYearly?: boolean }> = ({ initialPlan, initialYearly = false }) => {
   const savedEmail = useSyncExternalStore(noopSubscribe, readSavedEmail, serverEmpty);
   const savedJoinedRaw = useSyncExternalStore(noopSubscribe, readJoined, serverNull);
   const savedJoined = useMemo(() => parseJoined(savedJoinedRaw), [savedJoinedRaw]);
@@ -93,7 +97,7 @@ const WaitlistForm: FC<{ initialPlan: string | null }> = ({ initialPlan }) => {
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, plan, website }),
+        body: JSON.stringify({ email, plan, billing: plan ? (initialYearly ? "year" : "month") : null, website }),
       });
       const body = (await res.json().catch(() => ({}))) as { data?: { ok?: boolean; position?: number | null; returning?: boolean } | null; message?: string };
       if (!res.ok || !body.data?.ok) {
@@ -178,6 +182,7 @@ const WaitlistForm: FC<{ initialPlan: string | null }> = ({ initialPlan }) => {
       {plan ? (
         <p className="mb-3 inline-flex items-center gap-2 rounded-full border-2 border-primary bg-white py-1 pl-3 pr-1 text-xs font-bold text-primary">
           Interested in {PLAN_NAMES[plan]}
+          {initialYearly ? ", billed yearly" : null}
           <button
             type="button"
             onClick={() => setPlan(null)}

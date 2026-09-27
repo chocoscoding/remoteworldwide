@@ -15,7 +15,7 @@
 // events, and reject like any other failed call.
 
 import { apiGet, apiPost } from "@/app/lib/api/client";
-import { BackendError, apiMessage } from "@/app/lib/api/core";
+import { BackendError, apiMessage, signalPlanLimit } from "@/app/lib/api/core";
 import { createSseParser } from "@/app/lib/api/sse";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
 import type { BulletRewrite, ExtractedRequirements, IngestedResume, IngestedResumeDetail, ScanInput, ScanRecord, ScanReport, StoredScan } from "./types";
@@ -404,8 +404,12 @@ const FINAL_STATUSES: ReadonlySet<number> = new Set([400, 401, 403, 413, 422]);
 
 export function describeScanFailure(error: unknown): ScanFailure {
   if (error instanceof ScanRequestError) {
-    // Retryable: people top up in another tab and come back to the same resume.
-    if (error.status === 402) return { kind: "credits", message: error.message, retryable: true };
+    // Retryable: people top up in another tab and come back to the same resume. The stream never
+    // reaches `unwrapEnvelope`, so the upgrade popup is asked for here.
+    if (error.status === 402) {
+      signalPlanLimit({ kind: "credits", message: error.message, requiredPlan: null });
+      return { kind: "credits", message: error.message, retryable: true };
+    }
     if (error.status === 404) return { kind: "resume", message: error.message, retryable: false };
     return { kind: "failed", message: error.message, retryable: !FINAL_STATUSES.has(error.status) };
   }

@@ -22,6 +22,7 @@ const DATE_KEYS = new Set([
   "unsubscribedAt",
   "periodStart",
   "periodEnd",
+  "nextRefillAt",
   "completedAt",
   "joinedAt",
   "subscribedAt",
@@ -31,11 +32,39 @@ export class BackendError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** A machine-readable reason, when the service sent one (e.g. "plan_required"). */
+    public code: string | null = null,
+    /** The plan tier a "plan_required" refusal asks for. */
+    public requiredPlan: string | null = null,
   ) {
     super(message);
     this.name = "BackendError";
   }
 }
+
+/**
+ * Fired on `window` when a call is refused for the account's plan: out of credits (402), or a
+ * feature above its tier (403 "plan_required"). The dashboard's upgrade popup listens for it, so no
+ * screen has to wire the popup itself; each keeps its own inline message as before.
+ */
+export const PLAN_LIMIT_EVENT = "rww:plan-limit";
+
+export interface PlanLimitDetail {
+  kind: "credits" | "plan";
+  message: string;
+  requiredPlan: string | null;
+}
+
+/** Opens the upgrade popup from a path that does not end in `unwrapEnvelope` (the streamed ATS scan). */
+export const signalPlanLimit = (detail: PlanLimitDetail): void => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<PlanLimitDetail>(PLAN_LIMIT_EVENT, { detail }));
+};
+
+const announcePlanLimit = (error: BackendError): void => {
+  const kind = error.status === 402 ? "credits" : error.code === "plan_required" ? "plan" : null;
+  if (kind) signalPlanLimit({ kind, message: error.message, requiredPlan: error.requiredPlan });
+};
 
 /**
  * Walks a parsed JSON payload turning known date keys into `Date` objects.
@@ -71,7 +100,17 @@ export async function unwrapResponse<T>(res: Response): Promise<T> {
  */
 export async function unwrapEnvelope<T>(res: Response): Promise<{ data: T; message: string }> {
   const json = (await res.json().catch(() => null)) as { data?: unknown; message?: string } | null;
-  if (!res.ok) throw new BackendError(res.status, json?.message ?? res.statusText);
+  if (!res.ok) {
+    const reason = (json?.data ?? null) as { code?: unknown; requiredPlan?: unknown } | null;
+    const error = new BackendError(
+      res.status,
+      json?.message ?? res.statusText,
+      typeof reason?.code === "string" ? reason.code : null,
+      typeof reason?.requiredPlan === "string" ? reason.requiredPlan : null,
+    );
+    announcePlanLimit(error);
+    throw error;
+  }
   return { data: revive(json?.data) as T, message: json?.message ?? "" };
 }
 

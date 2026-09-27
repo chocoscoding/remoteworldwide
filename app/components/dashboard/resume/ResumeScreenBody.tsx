@@ -51,6 +51,7 @@ import CustomizeNav from "./CustomizeNav";
 import CustomizePanelsRail from "./CustomizePanelsRail";
 import AiAssistRail from "./AiAssistRail";
 import AiToolsList from "./AiToolsList";
+import { PlanChip, usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import type { PickedJob } from "@/app/lib/jobs/fields";
 // `applyQuantify` is the one tool function still executed in the browser, and
@@ -142,6 +143,16 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   const [docTab, setDocTab] = useState<DocTab>(tailorPreset ? "ai" : "content");
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [newResumeOpen, setNewResumeOpen] = useState(false);
+  // Free keeps one resume and the builder without its AI: both show a lock and open the upgrade
+  // popup instead. The AI service enforces the same, so this only saves a refused request.
+  const { allows, openUpgrade } = usePlanGate();
+  const aiLocked = !allows("basic");
+  const moreResumesLocked = aiLocked && documents.length >= 1;
+  const lockedAi = () => openUpgrade({ kind: "plan", requiredPlan: "basic", message: "AI help with your resume is on Basic and up." });
+  const startNewResume = () =>
+    moreResumesLocked
+      ? openUpgrade({ kind: "plan", requiredPlan: "basic", message: "Free includes one resume — edit it to tailor it, or upgrade to Basic to build more." })
+      : setNewResumeOpen(true);
   const [creatingResume, setCreatingResume] = useState(false);
 
   // The active document's live content — captured here for the same reason
@@ -729,9 +740,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
         <div className="flex items-center gap-2.5 flex-none">
           <DocumentSwitcher documents={documents} activeDocId={activeDocId} onSwitch={switchTo} />
-          <StickerButton type="button" variant="outline" size="md" onClick={() => setNewResumeOpen(true)}>
+          <StickerButton type="button" variant="outline" size="md" onClick={startNewResume}>
             <Plus className="h-4 w-4" />
             New resume
+            {moreResumesLocked ? <PlanChip plan="basic" /> : null}
           </StickerButton>
           <StickerButton type="button" variant="primary" size="md" onClick={() => setDownloadOpen(true)}>
             <Download className="h-4 w-4" />
@@ -764,12 +776,21 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
 
                 {docTab === "customize" && <CustomizeNav activeItem={activeCustomizeItem} onSelect={scrollToSetting} />}
 
+                {docTab === "ai" && aiLocked && (
+                  <button
+                    type="button"
+                    onClick={lockedAi}
+                    className="mb-2.5 flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-[1.5px] border-[#222325]/15 bg-[#f4f7d4] px-3 py-2.5 text-left text-xs leading-snug text-black/70 transition-colors hover:border-[#222325]">
+                    <span>AI help in the builder is on Basic and up. Free keeps the builder itself.</span>
+                    <PlanChip plan="basic" className="flex-none bg-white" />
+                  </button>
+                )}
                 {docTab === "ai" && (
                   <AiToolsList
                     aiRunning={aiRunning}
                     aiDone={aiDone}
                     captions={aiCaptions}
-                    onRun={runAiTool}
+                    onRun={aiLocked ? lockedAi : runAiTool}
                     tailorFor={tailorPreset}
                     onPickTailorJob={() => void pickJobFor("tailor")}
                     rewriteVariants={rewriteOptions}
