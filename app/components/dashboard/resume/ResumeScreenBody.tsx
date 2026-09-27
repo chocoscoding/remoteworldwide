@@ -194,8 +194,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   // down to fit when it doesn't. `mat`/`wrap` sizes are read via
   // `clientWidth`/`scrollWidth`/`scrollHeight` — all transform-invariant — so
   // this is safe to recompute from a plain ResizeObserver without a feedback
-  // loop, and `PageGuides`' own page-count ruler was updated to use
-  // `offsetHeight` (also transform-invariant) so scaling this doesn't skew it.
+  // loop, and `PageGuides` counts pages from the paper's `offsetHeight` and
+  // computed `min-height` (also transform-invariant) so scaling this doesn't
+  // skew it.
   // Never scales below 50% — past that the document stops being legible, so
   // it falls back to the mat's horizontal scrollbar instead.
   const matRef = useRef<HTMLDivElement>(null);
