@@ -6,9 +6,7 @@
 import { apiPost } from "@/app/lib/api/client";
 import { getIngestedResume, prepareResumeForDoc } from "@/app/lib/ats/api";
 import type { ResumeContent, VaultDoc } from "@/app/lib/dashboard/types";
-
-/** Where the onboarding page (`ONBOARDING_PATH` in next-url.ts) goes once everything is in. */
-export const ONBOARDING_DONE_PATH = "/onboarding/done";
+import { ONBOARDING_DONE_PATH } from "@/app/lib/next-url";
 
 /**
  * The resume read's mutation key, so the page can hold its "done" navigation
@@ -18,7 +16,7 @@ export const ONBOARDING_DONE_PATH = "/onboarding/done";
 export const READ_RESUME_KEY = ["onboarding", "read-resume"] as const;
 
 /**
- * `/onboarding/done`, carrying `next` on when there is one. A client-side push
+ * `/dashboard/onboarding/done`, carrying `next` on when there is one. A client-side push
  * to it is a route change, which is what makes the extension (listening on the
  * site for exactly that) ask again whether setup is finished.
  */

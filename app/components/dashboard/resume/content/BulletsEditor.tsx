@@ -20,6 +20,10 @@ export interface BulletsEditorProps {
   bullets: string[];
   onChange: (bullets: string[]) => void;
   isActive?: boolean;
+  /** At most this many rows: Enter stops splitting, a paste keeps the first lines that fit, and "Add" goes. Unlimited when absent. */
+  max?: number;
+  /** Characters a row may hold (the textarea's own `maxLength`). Unlimited when absent. */
+  maxLength?: number;
 }
 
 // A pasted list brings its own markers ("• Shipped…", "- Led…"); the paper
@@ -27,7 +31,7 @@ export interface BulletsEditorProps {
 // trailing whitespace is required so "-5% churn" keeps its minus sign.
 const LEADING_MARKER = /^\s*[•●◦▪■*\-–—]\s+/;
 
-const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = false }) => {
+const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = false, max, maxLength }) => {
   const rowRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   // Where the caret should land once the rows for the NEXT render exist — a
   // row added by this keystroke has no element to focus until React commits it.
@@ -45,6 +49,7 @@ const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = f
   });
 
   const replace = (index: number, next: string[]) => onChange([...bullets.slice(0, index), ...next, ...bullets.slice(index + 1)]);
+  const full = max !== undefined && bullets.length >= max;
 
   const handleChange = (index: number, value: string) => {
     if (!/[\r\n]/.test(value)) {
@@ -55,7 +60,9 @@ const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = f
     const lines = value
       .split(/\r?\n/)
       .map((line) => line.replace(LEADING_MARKER, "").trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      // This row plus whatever room is left.
+      .slice(0, max === undefined ? undefined : Math.max(1, max - bullets.length + 1));
     if (lines.length === 0) return;
     replace(index, lines);
     pendingFocus.current = { index: index + lines.length - 1, caret: "end" };
@@ -68,8 +75,8 @@ const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = f
 
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      // Nothing to split off an empty row — a second empty one helps nobody.
-      if (!el.value.trim()) return;
+      // Nothing to split off an empty row — a second empty one helps nobody. Nor past the limit.
+      if (!el.value.trim() || full) return;
       const before = el.value.slice(0, el.selectionStart).trimEnd();
       const after = el.value.slice(el.selectionEnd).trimStart();
       replace(index, [before, after]);
@@ -109,6 +116,7 @@ const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = f
             // is one line tall. Where it is unsupported the row stays at
             // `rows` and scrolls, which is how the other textareas behave.
             rows={2}
+            maxLength={maxLength}
             className={cn(
               FIELD_CLASS,
               "min-w-0 flex-1 resize-none rounded-md leading-relaxed [field-sizing:content] [scrollbar-width:none] hover:[scrollbar-width:auto] [&::-webkit-scrollbar]:hidden hover:[&::-webkit-scrollbar]:block",
@@ -125,13 +133,17 @@ const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = f
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={add}
-        className="inline-flex items-center gap-1.5 self-start rounded-lg px-1.5 py-1 text-xs font-semibold text-black/55 transition-colors hover:text-primary cursor-pointer">
-        <Plus className="h-3.5 w-3.5" />
-        Add a bullet
-      </button>
+      {full ? (
+        <p className="px-1.5 py-1 text-xs text-black/45">Up to {max} bullets.</p>
+      ) : (
+        <button
+          type="button"
+          onClick={add}
+          className="inline-flex items-center gap-1.5 self-start rounded-lg px-1.5 py-1 text-xs font-semibold text-black/55 transition-colors hover:text-primary cursor-pointer">
+          <Plus className="h-3.5 w-3.5" />
+          Add a bullet
+        </button>
+      )}
     </div>
   );
 };

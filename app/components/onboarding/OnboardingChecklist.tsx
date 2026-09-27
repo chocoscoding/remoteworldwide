@@ -3,10 +3,11 @@
 // The profile's seven items, live: the server's `onboarding.items` (the
 // EligibilityCard pattern — the server owns the rule and the labels, this only
 // knows where on the page each one is fixed: `#onb-<id>`, the same field
-// `/onboarding#<id>` opens at). Guidance, not a gate: the extension works
-// without them, and names the missing ones with a link back here. An item the
-// form already satisfies but that is not saved yet says so, so "why is this
-// still open?" has its answer on screen.
+// `/dashboard/onboarding#<id>` opens at). The page hands in the list as the
+// FORM stands (`liveOnboarding`), so an item ticks the moment it is filled,
+// saved or not; the save bar is what says there are unsaved changes. Guidance,
+// not a gate: the extension works without them, and names the missing ones
+// with a link back here. Work experience is on the form but not on this list.
 
 import type { FC } from "react";
 import { ArrowRight, Check, CircleDashed } from "lucide-react";
@@ -15,14 +16,12 @@ import type { OnboardingItem, OnboardingItemId } from "@/app/lib/settings/types"
 
 export interface OnboardingChecklistProps {
   items: OnboardingItem[];
-  /** Filled in on the form, not saved yet. */
-  pending: ReadonlySet<OnboardingItemId>;
   /** Scrolls to where an open item is fixed. */
   onJump: (id: OnboardingItemId) => void;
   className?: string;
 }
 
-const OnboardingChecklist: FC<OnboardingChecklistProps> = ({ items, pending, onJump, className }) => {
+const OnboardingChecklist: FC<OnboardingChecklistProps> = ({ items, onJump, className }) => {
   const done = items.filter((item) => item.done).length;
   const total = items.length;
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -50,15 +49,17 @@ const OnboardingChecklist: FC<OnboardingChecklistProps> = ({ items, pending, onJ
           <div className="h-full rounded-full bg-secondary transition-[width] duration-300" style={{ width: `${pct}%` }} />
         </div>
 
-        {/* Two columns on a phone, where this sits above the steps and has to stay short; one at the side on a wide screen. */}
-        <ul className="mt-4 grid grid-cols-2 gap-1.5 lg:grid-cols-1" aria-live="polite">
+        {/* Two columns while this sits above the steps and has to stay short; one at the side once the
+            page is wide enough to put it there (the page's container query, not the viewport's: the
+            dashboard's sidebar takes its share of the screen). Labels wrap rather than cut off. */}
+        <ul className="mt-4 grid grid-cols-2 gap-1.5 [@container(min-width:960px)]:grid-cols-1" aria-live="polite">
           {items.map((item) =>
             item.done ? (
               <li key={item.id} className="flex min-h-9 items-center gap-2.5 rounded-lg px-2 py-1.5">
                 <span className="grid h-4 w-4 flex-none place-content-center rounded bg-secondary">
                   <Check className="h-2.5 w-2.5 text-primary" strokeWidth={3.5} aria-hidden />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-xs font-medium text-white/60">
+                <span className="min-w-0 flex-1 break-words text-xs font-medium leading-snug text-white/60">
                   {item.label}
                   <span className="sr-only"> — done</span>
                 </span>
@@ -69,11 +70,8 @@ const OnboardingChecklist: FC<OnboardingChecklistProps> = ({ items, pending, onJ
                   type="button"
                   onClick={() => onJump(item.id)}
                   className="group flex min-h-9 w-full items-center gap-2.5 rounded-lg border border-white/15 px-2 py-1.5 text-left transition-colors hover:border-secondary cursor-pointer">
-                  <CircleDashed className={cn("h-4 w-4 flex-none", pending.has(item.id) ? "text-secondary" : "text-white/40")} aria-hidden />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold text-white">{item.label}</span>
-                    {pending.has(item.id) && <span className="block truncate text-[11px] text-secondary/90">Filled in, not saved</span>}
-                  </span>
+                  <CircleDashed className="h-4 w-4 flex-none text-white/40" aria-hidden />
+                  <span className="min-w-0 flex-1 break-words text-xs font-semibold leading-snug text-white">{item.label}</span>
                   <ArrowRight className="hidden h-3.5 w-3.5 flex-none text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-secondary sm:block" aria-hidden />
                 </button>
               </li>

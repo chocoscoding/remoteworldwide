@@ -62,7 +62,8 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
         <DashboardSidebar />
         <div className="flex-1 min-w-0">
           {/* Above every screen, never instead of one: setup is guidance, not
-              a lock — the banner counts what's done and points at /onboarding. */}
+              a lock — the banner counts what's done and points at
+              /dashboard/onboarding, the one screen it stays off. */}
           <OnboardingBanner />
           {children}
         </div>

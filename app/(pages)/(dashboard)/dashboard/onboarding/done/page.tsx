@@ -1,15 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, Check, FileCheck, Mail, MessagesSquare, MousePointerClick } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSettings } from "@/libs/settings";
-import { ONBOARDING_PATH } from "@/app/lib/next-url";
-import { ONBOARDING_DONE_PATH } from "@/app/lib/onboarding/api";
-import OnboardingHeader from "@/app/components/onboarding/OnboardingHeader";
+import { ONBOARDING_DONE_PATH, ONBOARDING_PATH } from "@/app/lib/next-url";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, STEP_CARD } from "@/app/components/onboarding/ui";
-import { askedNext, onboardingSession, withNext } from "../../guard";
+import { askedNext, onboardingSession, withNext } from "../guard";
 
-export const metadata = { title: "You're set" };
+export const metadata: Metadata = { title: "You're set", robots: { index: false, follow: false } };
 
 /** What a complete profile feeds in the extension. Nothing there was locked; these now have everything. */
 const POWERED = [
@@ -23,6 +22,7 @@ const POWERED = [
  * Where onboarding lands when the checklist (seven profile items) completes. Arriving here is the
  * point: the page's client-side push to this route is the site navigation the extension hears
  * (`rww/visit`), and it asks the account again and drops its "Finish your profile" prompts.
+ * Inside the dashboard like the page it follows: the sidebar stays, nothing sits above it.
  *
  * Checked, not trusted: someone who types this address with the list still open is sent back to
  * it. A backend that doesn't compute onboarding yet (or can't be read right now) shows the page —
@@ -30,13 +30,12 @@ const POWERED = [
  */
 export default async function OnboardingDonePage({ searchParams }: { searchParams: Promise<{ next?: string | string[] }> }) {
   const next = askedNext((await searchParams).next);
-  const user = await onboardingSession(ONBOARDING_DONE_PATH, next);
+  await onboardingSession(ONBOARDING_DONE_PATH, next);
   const settings = await getSettings().catch(() => null);
   if (settings?.onboarding && !settings.onboarding.ready) redirect(withNext(ONBOARDING_PATH, next));
 
   return (
-    <>
-      <OnboardingHeader email={user.email ?? null} />
+    <div className="min-h-screen bg-primary2">
       <main className="mx-auto flex w-full max-w-[1120px] justify-center px-4 pb-20 pt-10 md:px-8 md:pt-16">
         <section className={cn(STEP_CARD, "w-full max-w-xl p-6 text-center md:p-10")} aria-labelledby="onb-done-title">
           <span className="mx-auto grid h-14 w-14 place-content-center rounded-full border-[1.5px] border-primary bg-secondary" aria-hidden>
@@ -86,6 +85,6 @@ export default async function OnboardingDonePage({ searchParams }: { searchParam
           </p>
         </section>
       </main>
-    </>
+    </div>
   );
 }

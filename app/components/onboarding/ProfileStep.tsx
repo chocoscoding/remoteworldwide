@@ -1,9 +1,14 @@
 "use client";
 
 // Step 2: the profile the extension fills forms from — name, email, headline,
-// location, About, skills, education (the checklist's seven), phone and links
-// (optional). Each item's wrapper is `#onb-<id>`: where the checklist and the
-// `/onboarding#<id>` deep link land.
+// location, About, skills, education (the checklist's seven), then work
+// experience, phone and links (optional: owner, 2026-09-27, "experience not
+// required, can be skipped"). Each field's wrapper is `#onb-<id>`: where the
+// checklist and the `/dashboard/onboarding#<id>` deep link land
+// (`#experience` too, though it is not an item).
+//
+// Its columns follow the card's own width (a container query), not the
+// screen's: inside the dashboard the sidebar takes its share of the screen.
 //
 // Presentational: the page owns the form's state (saved profile + unsaved
 // edits, `app/lib/onboarding/profile.ts`) and the save. The controls are the
@@ -20,12 +25,16 @@ import { ArrowUpRight, Check, LoaderCircle, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SkillsEditor from "@/app/components/dashboard/resume/content/SkillsEditor";
 import { FIELD_CLASS, FIELD_TONE } from "@/app/components/dashboard/resume/content/FormField";
-import { FIELD_LABELS, MIN_SKILLS, PROFILE_LIMITS, cleanSkills, schoolCount, type ProfileField, type ProfileForm } from "@/app/lib/onboarding/profile";
+import { FIELD_LABELS, MIN_SKILLS, PROFILE_LIMITS, cleanSkills, roleCount, schoolCount, type ProfileField, type ProfileForm } from "@/app/lib/onboarding/profile";
 import EducationEditor from "./EducationEditor";
+import ExperienceEditor from "./ExperienceEditor";
 import StepHeading from "./StepHeading";
 import { BUTTON_PRIMARY, EYEBROW, HINT, STEP_CARD } from "./ui";
 
 const INPUT = cn(FIELD_CLASS, "w-full rounded-sm focus:shadow-[2px_2px_0_0_#e1f073]", FIELD_TONE.idle);
+
+/** A field that spans both columns once the card is wide enough to have two. */
+const WIDE = "[@container(min-width:560px)]:col-span-2";
 
 /**
  * A labelled field with the anchor the checklist scrolls to (`#onb-<id>`). `group` for the two that
@@ -76,20 +85,26 @@ export interface ProfileStepProps {
   done: boolean;
   prefilled: ProfileField[] | null;
   prefilledFrom: string | null;
-  /** Rows the backend would refuse (a degree with no school); Save waits for them. */
-  blocked: boolean;
+  /** Skills the resume had past the 60 a profile keeps, named in the notice. */
+  skillsLeftOut: string[];
+  /**
+   * Why Save waits, when a row is one the backend would refuse (a degree with no school, a role
+   * with neither a title nor a company); null when nothing does.
+   */
+  blocked: string | null;
   saving: boolean;
   edit: (patch: Partial<ProfileForm>) => void;
   dismissPrefill: () => void;
   onSave: () => void;
 }
 
-const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled, prefilledFrom, blocked, saving, edit, dismissPrefill, onSave }) => {
+const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled, prefilledFrom, skillsLeftOut, blocked, saving, edit, dismissPrefill, onSave }) => {
   const skills = cleanSkills(form.skills).length;
+  const roles = roleCount(form.experience);
   const emailIsAccounts = saved.email.trim().length > 0;
 
   return (
-    <section id="onb-profile" aria-labelledby="onb-profile-title" className={cn(STEP_CARD, "scroll-mt-6 p-5 md:p-7")}>
+    <section id="onb-profile" aria-labelledby="onb-profile-title" className={cn(STEP_CARD, "scroll-mt-6 p-5 [container-type:inline-size] md:p-7")}>
       <StepHeading
         n={2}
         id="onb-profile-title"
@@ -107,6 +122,12 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
               <>
                 Filled from <span className="font-semibold">{prefilledFrom ?? "your resume"}</span>: {prefilled.map((field) => FIELD_LABELS[field]).join(", ")}. Check them, then
                 save.
+                {skillsLeftOut.length > 0 && (
+                  <span className="mt-1 block text-primary/70">
+                    It listed more skills than the {PROFILE_LIMITS.skills} a profile keeps, so the first {PROFILE_LIMITS.skills} are in. Left out:{" "}
+                    {skillsLeftOut.join(", ")}.
+                  </span>
+                )}
               </>
             ) : (
               <>
@@ -124,7 +145,7 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
         </div>
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-5 [@container(min-width:560px)]:grid-cols-2">
         <Field id="fullName" label="Name">
           <input id="onb-input-fullName" className={INPUT} autoComplete="name" maxLength={PROFILE_LIMITS.fullName} value={form.fullName} onChange={(e) => edit({ fullName: e.target.value })} />
         </Field>
@@ -196,7 +217,7 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
         <Field
           id="summary"
           label="About"
-          className="md:col-span-2"
+          className={WIDE}
           aside={
             <span className="text-[11px] text-primary/45 tabular-nums">
               {form.summary.length}/{PROFILE_LIMITS.summary}
@@ -217,7 +238,7 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
           id="skills"
           label="Skills"
           group
-          className="md:col-span-2"
+          className={WIDE}
           aside={
             <span className={cn("text-[11px] font-semibold tabular-nums", skills >= MIN_SKILLS ? "text-[#5c7a14]" : "text-primary/45")}>
               {skills >= MIN_SKILLS ? `${skills} added` : `${skills} of ${MIN_SKILLS} minimum`}
@@ -231,14 +252,26 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
           id="education"
           label="Education"
           group
-          className="md:col-span-2"
+          className={WIDE}
           aside={<span className="text-[11px] text-primary/45 tabular-nums">{schoolCount(form.education) > 0 ? `${schoolCount(form.education)} added` : "At least one"}</span>}>
           <EducationEditor rows={form.education} onChange={(rows) => edit({ education: rows })} />
         </Field>
 
-        <div className="md:col-span-2">
+        {/* Optional (owner, 2026-09-27): not a checklist item, and an empty list holds nothing up. */}
+        <Field
+          id="experience"
+          label="Work experience"
+          optional
+          group
+          className={WIDE}
+          aside={<span className="text-[11px] text-primary/45 tabular-nums">{roles > 0 ? `${roles} added` : "Can be skipped"}</span>}
+          hint="Most recent first. Resumes, cover letters and answers draw on it when it's here; leave it empty and nothing waits on it.">
+          <ExperienceEditor rows={form.experience} onChange={(rows) => edit({ experience: rows })} />
+        </Field>
+
+        <div className={WIDE}>
           <p className={EYEBROW}>Links · optional</p>
-          <div className="mt-2.5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="mt-2.5 grid grid-cols-1 gap-4 [@container(min-width:560px)]:grid-cols-3">
             {(["linkedin", "github", "portfolio"] as const).map((key) => (
               <Field key={key} id={key} label={FIELD_LABELS[key]}>
                 <input
@@ -259,9 +292,9 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
       {/* Sticky so Save is in reach on a phone without scrolling back past the list. */}
       <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-7 flex flex-wrap items-center justify-between gap-3 rounded-b-[18px] border-t border-primary/15 bg-white/95 px-5 py-3.5 backdrop-blur-sm md:-mx-7 md:-mb-7 md:px-7">
         <p className={cn("text-xs", blocked ? "font-semibold text-[#b23c26]" : "text-primary/55")} aria-live="polite">
-          {blocked ? "One education entry needs a school name." : dirty ? "Unsaved changes." : "Everything here is saved."}
+          {blocked ?? (dirty ? "Unsaved changes." : "Everything here is saved.")}
         </p>
-        <button type="button" className={BUTTON_PRIMARY} disabled={!dirty || saving || blocked} onClick={onSave}>
+        <button type="button" className={BUTTON_PRIMARY} disabled={!dirty || saving || blocked !== null} onClick={onSave}>
           {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : <Check className="h-4 w-4" aria-hidden />}
           {saving ? "Saving…" : "Save profile"}
         </button>

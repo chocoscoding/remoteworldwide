@@ -7,7 +7,8 @@ import { useSettings } from "../SettingsProvider";
 import { useUploadAvatar } from "@/hooks/mutations/useAvatarMutation";
 import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagList } from "@/app/components/dashboard/settings/settings-ui";
 import EducationEditor from "@/app/components/onboarding/EducationEditor";
-import { educationOf, educationProblems, type EducationRow } from "@/app/lib/onboarding/profile";
+import ExperienceEditor from "@/app/components/onboarding/ExperienceEditor";
+import { educationOf, educationProblems, experienceOf, experienceProblems, type EducationRow, type ExperienceRow } from "@/app/lib/onboarding/profile";
 
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
 
@@ -20,6 +21,9 @@ const ProfileClient: FC = () => {
   // Keyed by position: the saved list has no ids, and rows only move on an add or a remove.
   const educationRows: EducationRow[] = (profile.education ?? []).map((entry, index) => ({ id: `row-${index}`, ...entry }));
   const educationBlocked = educationProblems(educationRows).length > 0;
+  // The same, for roles (a role needs a title or a company).
+  const experienceRows: ExperienceRow[] = (profile.experience ?? []).map((entry, index) => ({ id: `role-${index}`, ...entry }));
+  const experienceBlocked = experienceProblems(experienceRows).length > 0;
 
   const initials = profile.fullName
     .split(" ")
@@ -47,7 +51,7 @@ const ProfileClient: FC = () => {
         title="Profile"
         description="What recruiters see when we put your name forward."
         action={
-          <button type="button" onClick={() => save("profile")} disabled={saving || educationBlocked} className={BUTTON_SOLID}>
+          <button type="button" onClick={() => save("profile")} disabled={saving || educationBlocked || experienceBlocked} className={BUTTON_SOLID}>
             <Check className="h-3.5 w-3.5" />
             {saving ? "Saving…" : "Save"}
           </button>
@@ -161,6 +165,12 @@ const ProfileClient: FC = () => {
           onRemove={(t) => setProfile({ skills: profile.skills.filter((s) => s !== t) })}
           emptyNote="No skills yet — add a few so we can match you properly."
         />
+      </SettingsSection>
+
+      {/* The same editor as onboarding's, and optional there too, so a role entered in one is edited in the other. Saved with the
+          Profile button above; a role with neither a title nor a company holds it (the backend refuses those). */}
+      <SettingsSection title="Work experience" description="Where you've worked, most recent first. Resumes, cover letters and answers draw on it; it's optional.">
+        <ExperienceEditor rows={experienceRows} onChange={(rows) => setProfile({ experience: experienceOf(rows) })} />
       </SettingsSection>
 
       {/* The same editor as onboarding's, so a school entered there is edited here. Saved with the

@@ -4,7 +4,8 @@
 // wall: every screen stays usable, and the X puts it away until the next full
 // load. Nothing is locked anywhere (owner, 2026-09-26); the profile is what
 // the extension fills forms and builds resumes from, so this says what's left
-// and links straight to the first open field (`/onboarding#<id>`).
+// and links straight to the first open field (`/dashboard/onboarding#<id>`).
+// Never on the setup page itself: nothing sits above it (owner, 2026-09-27).
 //
 // Reads the settings the layout already fetched (same cache key as
 // SettingsProvider, so no extra request), and hides when `onboarding` is
@@ -31,6 +32,7 @@ const OnboardingBanner: FC = () => {
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed || !onboarding || onboarding.ready) return null;
+  if (pathname === ONBOARDING_PATH || pathname?.startsWith(`${ONBOARDING_PATH}/`)) return null;
   if (FULL_HEIGHT_SCREENS.some((screen) => pathname === screen || pathname?.startsWith(`${screen}/`))) return null;
 
   const done = onboarding.items.filter((item) => item.done).length;

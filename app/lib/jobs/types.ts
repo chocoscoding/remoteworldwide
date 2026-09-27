@@ -247,7 +247,7 @@ export interface JobAnswer {
   /**
    * Profile items the question needed and the profile lacked when it was answered (the AI
    * service keeps only ids that really were empty): each is a "Finish your profile" link to
-   * `/onboarding#<id>`. Absent or empty on answers stored before the service named them.
+   * `/dashboard/onboarding#<id>`. Absent or empty on answers stored before the service named them.
    */
   profileGaps?: OnboardingItemId[];
   /**

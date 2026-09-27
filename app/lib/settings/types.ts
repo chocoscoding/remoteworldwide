@@ -30,6 +30,27 @@ export interface ProfileSettings {
    * `profile.education ?? []`.
    */
   education?: ProfileEducation[];
+  /**
+   * Where you have worked, in the order entered (most recent first, by convention). Saved whole
+   * like `education`. Optional on the profile (owner, 2026-09-27: "experience not required, can be
+   * skipped"): it is not a checklist item. The backend always sends it (default []); optional here
+   * for a settings object persisted before it, or an older backend — read it as
+   * `profile.experience ?? []`.
+   */
+  experience?: ProfileExperience[];
+}
+
+/**
+ * One role on the profile. Mirrors the backend's `profile.experience` entry: every field trimmed,
+ * a non-empty `company` OR `title` required (each ≤160), dates ≤60, location ≤120, at most 12
+ * bullets of ≤500 (empty ones dropped), at most 20 entries. No id, like education.
+ */
+export interface ProfileExperience {
+  company: string;
+  title: string;
+  dates: string;
+  location: string;
+  bullets: string[];
 }
 
 /**
@@ -50,8 +71,9 @@ export interface ProfileEducation {
  * `src/services/onboardingReadiness.ts`, contract `src/types/onboarding.ts`), seven items in its fixed
  * order. Guidance, never a lock (owner, 2026-09-26): nothing waits on it. A resume is not one — a
  * resume can be built from these facts, so onboarding only OFFERS to start from one — and phone is
- * asked for, never required. Each id is also the `/onboarding#<id>` deep link to its field, which the
- * extension and chat link to when an item is missing.
+ * asked for, never required. Each id is also the `/dashboard/onboarding#<id>` deep link to its field,
+ * which the extension and chat link to when an item is missing. Work experience is on the form
+ * (`#experience`) but is not an item: it can be skipped (owner, 2026-09-27).
  */
 export type OnboardingItemId = "fullName" | "email" | "summary" | "education" | "headline" | "location" | "skills";
 
