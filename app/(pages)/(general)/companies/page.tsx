@@ -5,11 +5,12 @@ import { Metadata } from "next";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Remote Companies Hiring - Remote Worldwide",
+  title: "Companies – Remote companies hiring now | Remote Worldwide",
   description:
     "Explore companies hiring for remote positions worldwide. Discover remote job opportunities from top companies across various industries and locations.",
+  alternates: { canonical: "/companies" },
   openGraph: {
-    title: "Remote Companies Hiring - Remote Worldwide",
+    title: "Companies – Remote companies hiring now | Remote Worldwide",
     description:
       "Explore companies hiring for remote positions worldwide. Discover remote job opportunities from top companies across various industries and locations.",
     url: `${process.env.NEXT_PUBLIC_SITE_URL}/companies`,
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Remote Companies Hiring - Remote Worldwide",
+    title: "Companies – Remote companies hiring now | Remote Worldwide",
     description:
       "Explore companies hiring for remote positions worldwide. Discover remote job opportunities from top companies across various industries and locations.",
     images: [`${process.env.NEXT_PUBLIC_SITE_URL}/api/og/company`],

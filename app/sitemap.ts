@@ -20,7 +20,7 @@ const fetchJobMetaData_Jobs = async () => {
 
 const fetchCompaniesMetaData = async () => {
   try {
-    return await prisma.company.findMany({ select: { slug: true } });
+    return await prisma.company.findMany({ select: { slug: true, updatedAt: true } });
   } catch {
     return [];
   }
@@ -62,7 +62,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     routes.push({ url: `/jobs/${job.slug}`, changeFrequency: "daily", priority: 0.6, lastModified: job.updatedAt });
   }
   for (const company of companies) {
-    routes.push({ url: `/companies/${company.slug}`, changeFrequency: "weekly", priority: 0.5, lastModified: now });
+    // Its real edit date: a lastmod that is always "now" teaches Google to ignore lastmod entirely.
+    routes.push({ url: `/companies/${company.slug}`, changeFrequency: "weekly", priority: 0.5, lastModified: company.updatedAt });
   }
   for (const author of authors) {
     routes.push({ url: `/author/${author.slug}`, changeFrequency: "weekly", priority: 0.4, lastModified: newestPost ?? now });

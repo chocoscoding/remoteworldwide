@@ -26,9 +26,8 @@ export const metadata: Metadata = {
   description: "Get worldwide remote jobs and get hired in no time! - With Remote Worldwide",
   icons: "/favicon.ico",
   metadataBase: new URL(SITE_URL),
-  alternates: {
-    canonical: "/",
-  },
+  // No canonical here: every page without its own inherited "/", which told Google
+  // those pages were copies of the homepage. The homepage sets "/" itself.
   openGraph: {
     type: "website",
     siteName: SITE_NAME,

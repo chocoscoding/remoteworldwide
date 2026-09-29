@@ -96,7 +96,7 @@ const Navbar = () => {
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-4">
             <Link href="/jobs">
-              <p className="text-gray-700 hover:text-gray-900">Find jobs</p>
+              <p className="text-gray-700 hover:text-gray-900">Jobs</p>
             </Link>
             <Link href="/companies">
               <p className="text-gray-700 hover:text-gray-900">Companies</p>
@@ -104,9 +104,9 @@ const Navbar = () => {
             <Link href="/blogs">
               <p className="text-gray-700 hover:text-gray-900">Blog</p>
             </Link>
-            <Link href="/pricing">
+            {/* <Link href="/pricing">
               <p className="text-gray-700 hover:text-gray-900">Pricing</p>
-            </Link>
+            </Link> */}
 
             <User />
           </div>

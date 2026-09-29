@@ -13,7 +13,8 @@ import PostGrid, { BlogPagination } from "@/app/components/blog/PostGrid";
 
 type Search = { searchParams: Promise<{ category?: string; page?: string }> };
 
-const TITLE = `${SITE_NAME} Blog — Get hired remotely, faster`;
+// "Blog" leads so Google's sitelink for this page reads "Blog".
+const TITLE = `Blog – Get hired remotely, faster | ${SITE_NAME}`;
 const DESCRIPTION = "Practical guides on resumes, interviews and the remote job search, written by people who hire remotely.";
 
 export async function generateMetadata({ searchParams }: Search): Promise<Metadata> {
