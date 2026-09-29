@@ -51,9 +51,9 @@ const SearchBar: React.FC<{ activeSearch?: boolean; alwaysActive?: boolean }> = 
       onSubmit={onSubmit}
       className={cn(
         alwaysActive && "shadow-[5px_5px_0_0_#e1f073]",
-        "w-full h-[3.5rem] md:h-[4.1rem] outline outline-2 outline-black rounded-md bg-white p-1.5 md:p-2.5 flex transition-shadow duration-150 ease-out focus-within:shadow-[5px_5px_0_0_#e1f073]",
+        "w-full h-[3.5rem] md:h-[4rem] outline outline-2 outline-black rounded-md bg-white p-1.5 md:p-2 flex transition-shadow duration-150 ease-out focus-within:shadow-[5px_5px_0_0_#e1f073]",
       )}>
-      <div className="flex flex-1 items-center gap-4 px-3">
+      <div className="flex flex-1 items-center gap-4 px-2">
         {searchValue.length <= 0 && <Search className="text-primary hidden md:block" />}
         <input
           className="h-full w-full outline-none border-none text-sm md:text-xl"

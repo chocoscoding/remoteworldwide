@@ -1,42 +1,39 @@
 "use client";
-import FilterSection from "@/app/components/main/FilterSection";
-import { Settings2 } from "lucide-react";
-import FilterSectionMobile from "@/app/components/main/FilterSectionMobile";
-import { useFilter } from "@/provider/FilterProvider";
+import SearchBar from "@/app/components/SearchBar";
+import FilterBar from "@/app/components/main/FilterBar";
+import AdSlot from "@/app/components/main/AdSlot";
 import JobsContainerForSearch from "@/app/components/main/JobsContainerForSearch";
+import ScrollToTop from "@/app/components/main/ScrollToTop";
+import { cn } from "@/lib/utils";
 
-const Client = () => {
-  const { toggleMobileFilter, activeFilterCount } = useFilter();
-
+// `showAds` comes from the server (app/lib/ads.ts): true for Free and signed-out visitors, false for Pro and Ultra.
+const Client = ({ showAds }: { showAds: boolean }) => {
   return (
     <div className="w-full">
-      <section className="w-full grid grid-cols-12 relative">
-        <section className="col-span-full sm:col-span-8 xl:col-span-9 sm:pr-4 md:px-3 lg:px-0 md:mr-6">
-          <div className="mb-5 w-full">
-            <div className="w-full flex justify-between items-center">
-              <p className="text-xl md:text-2xl font-extralight text-gray-400 mb-2">
-                <span className="font-bold text-primary">Job Opportunities</span>
-              </p>
+      <SearchBar activeSearch />
+      <FilterBar className="mt-4 mb-10" />
 
-              <div className="relative block sm:hidden">
-                <Settings2 className="" onClick={toggleMobileFilter} />
-                {activeFilterCount > 0 ? (
-                  <span className=" absolute -right-2 -top-2.5 px-1 bg-primary font-light text-white rounded-full text-[0.5rem] ml-[6px]">
-                    {activeFilterCount}
-                  </span>
-                ) : null}
-              </div>
-            </div>
+      {/* With ads they flank the list: none on mobile, slim on tablet, wider from lg up, where the
+          list takes 3/5 of the row (the old sidebar layout gave it 3/4). Without ads the list is full width. */}
+      <section
+        className={cn(
+          "w-full grid grid-cols-1 gap-4 lg:gap-6",
+          showAds && "md:grid-cols-[minmax(0,1fr)_minmax(0,6fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)_minmax(0,1fr)]",
+        )}>
+        {showAds ? <AdSlot slot="jobs-left" className="hidden md:block !hidden" /> : null}
+        {/* Pinned to the middle column so an ad can never pull the list into its slot. */}
+        <section className={cn("min-w-0", showAds && "md:col-span-6")}>
+          {/* <div className="mb-5 w-full">
+            <p className="text-xl md:text-2xl font-bold text-primary mb-2">Jobs</p>
             <hr />
-          </div>
+          </div> */}
 
           <JobsContainerForSearch />
         </section>
-        <FilterSection className="sm:block hidden" isMobile={false} />
+        {showAds ? <AdSlot slot="jobs-right" className="hidden md:block !hidden" /> : null}
       </section>
       <br />
-
-      <FilterSectionMobile className="block sm:hidden" isMobile={true} />
+      <ScrollToTop />
     </div>
   );
 };
