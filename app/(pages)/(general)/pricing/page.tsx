@@ -11,10 +11,10 @@ import { BillingIntervalProvider, BillingToggle, PerCredit, PlanCardPrice } from
 import {
   CREDITS_PER_INVITE,
   RECOMMENDED_PLAN,
-  YEARLY_DISCOUNT,
   fetchCatalogue,
   money,
   perCredit,
+  yearlySavingLabel,
   type PricingPlan,
 } from "@/app/lib/pricing/catalogue";
 
@@ -35,15 +35,14 @@ export const metadata: Metadata = {
 
 const TAGLINES: Record<string, string> = {
   free: "To get started",
-  basic: "For a focused search",
-  plus: "For an active search",
-  pro: "For an all-out search",
+  pro: "For a focused search",
+  ultra: "For an all-out search",
 };
 
 const FAQ: { q: string; a: React.ReactNode }[] = [
   {
     q: "What do I get on Free?",
-    a: "50 credits every month, topped back up to 50 at the start of each month, for ATS scans, cover letters, questions about a job and autofill. You also get the resume builder for one resume, application tracking and drafts. AI help inside the resume builder and interview prep are on the paid plans.",
+    a: "50 credits every month, topped back up to 50 at the start of each month, for ATS scans, cover letters, questions about a job and autofill. You also get the resume builder for one resume, application tracking and drafts. AI help inside the resume builder comes with Pro, and interview prep with Ultra.",
   },
   {
     q: "Do unused credits roll over?",
@@ -51,7 +50,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Can I change or cancel my plan?",
-    a: `Whenever you like. Pay monthly, or yearly for ${Math.round(YEARLY_DISCOUNT * 100)}% off, and nothing is locked in — cancel and your plan runs to the end of the period you've paid for.`,
+    a: "Whenever you like. Pay monthly, or yearly for less, and nothing is locked in — cancel and your plan runs to the end of the period you've paid for.",
   },
   {
     q: "Do yearly plans get a year of credits at once?",
@@ -63,7 +62,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "How are voice mock interviews billed?",
-    a: "Interview prep is on Plus and Pro. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
+    a: "Interview prep is on Ultra. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
   },
   {
     q: "Can I earn credits instead of buying them?",
@@ -189,13 +188,13 @@ export default async function PricingPage() {
                 <Check className="h-4 w-4" aria-hidden /> Job board always free
               </li>
             </ul>
-            <BillingToggle className="mt-8" />
+            <BillingToggle saving={yearlySavingLabel(plans)} className="mt-8" />
           </div>
         </section>
 
         {/* Plans */}
-        <section className="relative mx-auto -mt-12 max-w-[1240px] px-4" aria-label="Plans">
-          <div className="grid gap-8 md:grid-cols-2 md:gap-6 lg:grid-cols-4 lg:gap-5 lg:pt-3">
+        <section className="relative mx-auto -mt-12 max-w-[1140px] px-4" aria-label="Plans">
+          <div className="grid gap-8 md:grid-cols-3 md:gap-5 lg:gap-6 lg:pt-3">
             {plans.map((plan) => (
               <PlanCard key={plan.key} plan={plan} />
             ))}

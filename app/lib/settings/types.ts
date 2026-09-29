@@ -181,7 +181,7 @@ export interface CreditPack {
 }
 
 /** The four plan tiers, cheapest first. Free is everyone without an active paid plan. */
-export const PLAN_TIERS = ["free", "basic", "plus", "pro"] as const;
+export const PLAN_TIERS = ["free", "pro", "ultra"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
 
 export interface Subscription {

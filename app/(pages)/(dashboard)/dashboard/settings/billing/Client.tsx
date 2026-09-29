@@ -5,7 +5,7 @@ import { Check, CreditCard, Sparkles, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import { BillingSwitch } from "@/app/components/pricing/BillingInterval";
-import { YEARLY_DISCOUNT, yearlyCents } from "@/app/lib/pricing/catalogue";
+import { yearlyCents, yearlySavingLabel } from "@/app/lib/pricing/catalogue";
 import type { BillingInterval, Plan } from "@/app/lib/settings/types";
 import { useBilling } from "../BillingProvider";
 import { BUTTON_OUTLINE, BUTTON_SOLID, CARD, SettingsRow, SettingsSection } from "@/app/components/dashboard/settings/settings-ui";
@@ -18,7 +18,7 @@ const day = (date: Date | null) => (date ? date.toLocaleDateString("en-US", { da
 /** What one period of a plan costs on the given billing. */
 const periodPrice = (p: Plan, billing: BillingInterval) => (billing === "year" ? yearlyCents(p) : p.priceCents);
 
-/** "Plus", or "Plus, billed yearly". */
+/** "Ultra", or "Ultra, billed yearly". */
 const planLabel = (name: string, billing: BillingInterval | null) => (billing === "year" ? `${name}, billed yearly` : name);
 
 /** @param initialBilling The billing picked on /pricing, when the visitor came from there (`?billing=year`). */
@@ -97,9 +97,9 @@ const BillingClient: FC<{ initialBilling?: BillingInterval }> = ({ initialBillin
 
       <SettingsSection
         title="Plans"
-        description={`Pay monthly, or yearly for ${Math.round(YEARLY_DISCOUNT * 100)}% off. Credits refill every month either way. Change or cancel whenever.`}
-        action={<BillingSwitch value={billing} onChange={setBilling} size="sm" />}>
-        <div className="grid gap-3 py-1 sm:grid-cols-2 lg:grid-cols-4">
+        description="Pay monthly, or yearly for less. Credits refill every month either way. Change or cancel whenever."
+        action={<BillingSwitch value={billing} onChange={setBilling} saving={yearlySavingLabel(plans)} size="sm" />}>
+        <div className="grid gap-3 py-1 sm:grid-cols-3">
           {plans.map((p) => {
             const samePlan = p.key === currentKey;
             // Free is current however it's shown; a paid plan only on the billing it's paid on.

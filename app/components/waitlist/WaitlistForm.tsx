@@ -13,7 +13,7 @@ const EMAIL_KEY = "rww_lead_email";
 /** What this browser last joined as, so coming back shows the spot instead of an empty form. */
 const JOINED_KEY = "rww_waitlist";
 
-const PLAN_NAMES: Record<string, string> = { free: "Free", basic: "Basic", plus: "Plus", pro: "Pro" };
+const PLAN_NAMES: Record<string, string> = { free: "Free", pro: "Pro", ultra: "Ultra" };
 const CONFETTI_COLORS = ["#e1f073", "#cddd54", "#f0c86a", "#222325"];
 
 type Joined = { email: string; position: number | null; returning: boolean };

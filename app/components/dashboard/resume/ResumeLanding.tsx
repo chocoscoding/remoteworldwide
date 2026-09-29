@@ -164,7 +164,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                 </span>
               </span>
               {buildLocked ? (
-                <PlanChip plan="basic" className="flex-none bg-white" />
+                <PlanChip plan="pro" className="flex-none bg-white" />
               ) : (
                 <span className="flex-none rounded-full bg-[#222325] px-2.5 py-1 text-[11px] font-bold text-white">{BUILD_CREDITS} credits</span>
               )}

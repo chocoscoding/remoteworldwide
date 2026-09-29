@@ -38,12 +38,12 @@ export interface PricingCatalogue {
 }
 
 /** The plan the page puts forward. A recommendation, not a sales figure. */
-export const RECOMMENDED_PLAN = "plus";
+export const RECOMMENDED_PLAN = "ultra";
 
 /**
- * Yearly billing: twelve months at the monthly price, less this share. The backend owns the real
- * figure (backend config/billing.ts YEARLY_DISCOUNT, or a price set by hand on the plan row) and
- * sends it as `yearlyPriceCents`; this is only for a catalogue that doesn't carry one.
+ * Yearly billing for a plan that carries no `yearlyPriceCents`: twelve months at the monthly price,
+ * less this share. The backend owns the real figure (each seeded plan sets its own yearly price) and
+ * sends it; this is only a fallback.
  */
 export const YEARLY_DISCOUNT = 0.1;
 
@@ -55,6 +55,21 @@ export const yearlyCents = (plan: PricingPlan) => plan.yearlyPriceCents ?? Math.
 /** What a plan comes to per month on the chosen billing: its price, or its yearly price over twelve. */
 export const perMonthCents = (plan: PricingPlan, billing: BillingInterval) =>
   billing === "year" ? Math.round(yearlyCents(plan) / 12) : plan.priceCents;
+
+/**
+ * What paying yearly saves, as the Monthly / Yearly switch says it: "Save 10%", or "Save up to 10%"
+ * when the plans save different amounts. Rounded down, so it never claims more than a plan gives.
+ */
+export const yearlySavingLabel = (plans: PricingPlan[]): string | null => {
+  const savings = plans
+    .filter((plan) => plan.priceCents > 0)
+    // The nudge keeps an exact 10% (1 - 0.9 is 0.0999… in floating point) from reading as 9%.
+    .map((plan) => Math.floor((1 - yearlyCents(plan) / (plan.priceCents * 12)) * 100 + 1e-6))
+    .filter((percent) => percent > 0);
+  if (savings.length === 0) return null;
+  const best = Math.max(...savings);
+  return savings.every((percent) => percent === best) ? `Save ${best}%` : `Save up to ${best}%`;
+};
 
 export const FALLBACK_CATALOGUE: PricingCatalogue = {
   plans: [
@@ -69,34 +84,26 @@ export const FALLBACK_CATALOGUE: PricingCatalogue = {
       features: ["50 AI credits a month", "Resume builder (one resume)", "ATS scans and cover letters", "Application tracking and drafts"],
     },
     {
-      key: "basic",
-      name: "Basic",
-      priceCents: 2999,
-      currency: "USD",
-      interval: "month",
-      monthlyCredits: 120,
-      prioritySupport: false,
-      features: ["120 AI credits a month", "Unlimited resumes", "AI help in the resume builder", "Email support"],
-    },
-    {
-      key: "plus",
-      name: "Plus",
-      priceCents: 5999,
-      currency: "USD",
-      interval: "month",
-      monthlyCredits: 350,
-      prioritySupport: false,
-      features: ["350 AI credits a month", "Everything in Basic", "Interview prep sessions", "Voice mock interviews"],
-    },
-    {
       key: "pro",
       name: "Pro",
-      priceCents: 10000,
+      priceCents: 2500,
+      yearlyPriceCents: 26988,
       currency: "USD",
       interval: "month",
-      monthlyCredits: 750,
+      monthlyCredits: 150,
+      prioritySupport: false,
+      features: ["150 AI credits a month", "Unlimited resumes", "AI help in the resume builder", "Email support"],
+    },
+    {
+      key: "ultra",
+      name: "Ultra",
+      priceCents: 5500,
+      yearlyPriceCents: 59988,
+      currency: "USD",
+      interval: "month",
+      monthlyCredits: 400,
       prioritySupport: true,
-      features: ["750 AI credits a month", "Everything in Plus", "Priority support", "Early access to new tools"],
+      features: ["400 AI credits a month", "Everything in Pro", "Interview prep and voice mock interviews", "Priority support and early access"],
     },
   ],
   creditPacks: [
@@ -133,12 +140,12 @@ export const CREDIT_COSTS: CreditCost[] = [
 
 /**
  * Plans the interview-prep tools are on. The comparison table and the estimator share it, and the
- * AI service enforces it (remoteworldwideai services/planService.ts: prep starts at Plus).
+ * AI service enforces it (remoteworldwideai services/planService.ts: prep is on Ultra).
  */
-const INTERVIEW_PLANS = ["plus", "pro"];
+const INTERVIEW_PLANS = ["ultra"];
 
-/** Every paid plan: AI help in the resume builder, and more than one resume, start at Basic. */
-const PAID_PLANS = ["basic", "plus", "pro"];
+/** Every paid plan: AI help in the resume builder, and more than one resume, start at Pro. */
+const PAID_PLANS = ["pro", "ultra"];
 
 export interface EstimatorItem {
   key: string;
@@ -179,8 +186,8 @@ export const CREDIT_ROWS: FeatureRow[] = [
 
 /**
  * The comparison table under the plan cards. Free's limits (one resume, no AI in the builder) and
- * interview prep from Plus up are enforced by the AI service; priority support and early access are
- * the Pro plan's promise. Referral search is left out for now.
+ * interview prep on Ultra are enforced by the AI service; priority support and early access are
+ * the Ultra plan's promise. Referral search is left out for now.
  */
 export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
@@ -195,7 +202,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
     title: "Resumes & cover letters",
     rows: [
-      { label: "Resume builder", plans: "all", values: { free: "1 resume", basic: "Unlimited", plus: "Unlimited", pro: "Unlimited" } },
+      { label: "Resume builder", plans: "all", values: { free: "1 resume", pro: "Unlimited", ultra: "Unlimited" } },
       { label: "Import your resume", note: "Upload a PDF, Word or text file · free", plans: "all" },
       { label: "Build a resume with AI", note: "A full resume around a target role · 3 credits", plans: PAID_PLANS },
       { label: "AI help in the resume builder", note: "Tailor, add keywords, quantify, shorten · 1 credit", plans: PAID_PLANS },
@@ -241,8 +248,8 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     title: "Support",
     rows: [
       { label: "Email support", plans: "all" },
-      { label: "Priority support", plans: ["pro"] },
-      { label: "Early access to new tools", plans: ["pro"] },
+      { label: "Priority support", plans: ["ultra"] },
+      { label: "Early access to new tools", plans: ["ultra"] },
     ],
   },
 ];

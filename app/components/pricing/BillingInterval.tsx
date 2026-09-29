@@ -3,7 +3,6 @@
 import { createContext, useContext, useMemo, useState, type FC, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
-  YEARLY_DISCOUNT,
   money,
   perCredit,
   perMonthCents,
@@ -34,13 +33,17 @@ const OPTIONS: { value: BillingInterval; label: string }[] = [
   { value: "year", label: "Yearly" },
 ];
 
-/** The Monthly / Yearly pill on its own, for any screen that keeps the choice itself (the billing settings). */
-export const BillingSwitch: FC<{ value: BillingInterval; onChange: (billing: BillingInterval) => void; size?: "md" | "sm"; className?: string }> = ({
-  value,
-  onChange,
-  size = "md",
-  className,
-}) => (
+/**
+ * The Monthly / Yearly pill on its own, for any screen that keeps the choice itself (the billing
+ * settings). `saving` is the badge on Yearly, from `yearlySavingLabel` over the live plans.
+ */
+export const BillingSwitch: FC<{
+  value: BillingInterval;
+  onChange: (billing: BillingInterval) => void;
+  saving?: string | null;
+  size?: "md" | "sm";
+  className?: string;
+}> = ({ value, onChange, saving, size = "md", className }) => (
   <div role="group" aria-label="Billing" className={cn("inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white p-1", className)}>
     {OPTIONS.map((option) => {
       const active = value === option.value;
@@ -56,10 +59,8 @@ export const BillingSwitch: FC<{ value: BillingInterval; onChange: (billing: Bil
             active ? "bg-primary text-white" : "text-primary/60 hover:text-primary",
           )}>
           {option.label}
-          {option.value === "year" ? (
-            <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-primary">
-              Save {Math.round(YEARLY_DISCOUNT * 100)}%
-            </span>
+          {option.value === "year" && saving ? (
+            <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-primary">{saving}</span>
           ) : null}
         </button>
       );
@@ -68,9 +69,9 @@ export const BillingSwitch: FC<{ value: BillingInterval; onChange: (billing: Bil
 );
 
 /** The switch on /pricing, wired to the page's shared choice. */
-export const BillingToggle: FC<{ className?: string }> = ({ className }) => {
+export const BillingToggle: FC<{ saving?: string | null; className?: string }> = ({ saving, className }) => {
   const { billing, setBilling } = useBillingInterval();
-  return <BillingSwitch value={billing} onChange={setBilling} className={className} />;
+  return <BillingSwitch value={billing} onChange={setBilling} saving={saving} className={className} />;
 };
 
 /** A plan card's big price, per month on either billing, and how it's billed underneath. */

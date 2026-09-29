@@ -17,12 +17,12 @@ import { PLAN_TIERS, type Plan, type PlanTier } from "@/app/lib/settings/types";
  *   `unwrapEnvelope` for a 402 or a 403 "plan_required"), so no screen wires it by hand;
  * - from a locked control, via `usePlanGate().openUpgrade`, before any request is made.
  *
- * Out of credits: the next tier up and the top-up packs (Pro sees packs only). A feature above the
+ * Out of credits: the next tier up and the top-up packs (Ultra sees packs only). A feature above the
  * tier: the plan that unlocks it. Choosing either reserves it through the same `buyPlan` /
  * `buyCredits` the billing screen uses, since card payments aren't connected yet.
  */
 
-const RANK: Record<PlanTier, number> = { free: 0, basic: 1, plus: 2, pro: 3 };
+const RANK: Record<PlanTier, number> = { free: 0, pro: 1, ultra: 2 };
 const isTier = (value: unknown): value is PlanTier => typeof value === "string" && (PLAN_TIERS as readonly string[]).includes(value);
 
 interface PlanGate {
@@ -184,6 +184,6 @@ export const PlanChip: FC<{ plan: PlanTier; className?: string }> = ({ plan, cla
       (className ?? "")
     }>
     <Lock className="h-2.5 w-2.5" strokeWidth={3} aria-hidden />
-    {plan === "basic" ? "Basic" : plan === "plus" ? "Plus" : plan === "pro" ? "Pro" : "Free"}
+    {plan === "pro" ? "Pro" : plan === "ultra" ? "Ultra" : "Free"}
   </span>
 );
