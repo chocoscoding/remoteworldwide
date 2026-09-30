@@ -18,13 +18,13 @@ import { FC, FormEvent, Suspense, UIEvent, useCallback, useEffect, useRef, useSt
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ArrowRight, AudioLines, Clock, CreditCard, Loader2, Mic, Plus, RotateCcw, RotateCw, Send, Square } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, AudioLines, Clock, CreditCard, Loader2, Mic, Plus, RotateCcw, RotateCw, Send, Square, User } from "lucide-react";
 import { Lottie } from "lottie-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
-import { initialsOf } from "@/app/components/dashboard/ui/Avatar";
+import LogoMini from "@/app/components/svg/LogoMini";
 import PlanPanel from "@/app/components/dashboard/plan/PlanPanel";
 import ProposalCard from "@/app/components/dashboard/coach/ProposalCard";
 import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
@@ -108,28 +108,33 @@ function storeTalkSession(queryClient: QueryClient, { session, usage }: CreateCo
   }
 }
 
-const CoachBadge: FC = () => (
-  <div className="h-7 w-7 flex-none rounded-full bg-secondary text-primary font-extrabold text-[10px] flex items-center justify-center mt-0.5">
-    RW
-  </div>
-);
+/** The Remote Worldwide mark, as Ask about a job shows it. */
+const CoachBadge: FC = () => <LogoMini aria-hidden className="h-7 w-7 flex-none mt-0.5" />;
 
-const UserBadge: FC<{ initials: string }> = ({ initials }) => (
-  <div className="h-7 w-7 flex-none rounded-full bg-primary text-secondary font-extrabold text-[10px] flex items-center justify-center mt-0.5">
-    {initials}
-  </div>
-);
+/** The account's photo, the same one the sidebar shows, or a plain person icon without one. */
+const UserBadge: FC = () => {
+  const { profile } = useSettings();
+  return (
+    <div className="h-7 w-7 flex-none overflow-hidden rounded-full bg-primary text-secondary flex items-center justify-center mt-0.5">
+      {profile.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <User className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+      )}
+    </div>
+  );
+};
 
 interface MessageRowProps {
   from: "coach" | "user";
   text: string;
   card?: CoachMessageCard | null;
   proposal?: CoachProposalItem | null;
-  initials: string;
 }
 
 /** One message in the transcript, stored or still arriving. */
-const MessageRow: FC<MessageRowProps> = ({ from, text, card = null, proposal = null, initials }) => {
+const MessageRow: FC<MessageRowProps> = ({ from, text, card = null, proposal = null }) => {
   // A card whose link is not a dashboard screen is not shown at all.
   const cardHref = card ? coachCardHref(card) : null;
   return (
@@ -156,7 +161,7 @@ const MessageRow: FC<MessageRowProps> = ({ from, text, card = null, proposal = n
         )}
         {proposal && <ProposalCard proposal={proposal} />}
       </div>
-      {from === "user" && <UserBadge initials={initials} />}
+      {from === "user" && <UserBadge />}
     </div>
   );
 };
@@ -238,21 +243,20 @@ interface TurnRowsProps {
   turn: CoachTurn;
   /** The user's message is already among the session's stored messages, which show it. */
   userStored: boolean;
-  initials: string;
   onRetry: (turnKey: string) => void;
   retryDisabled: boolean;
 }
 
 /** A turn on its way into the session: the message, the reply as it arrives, and a failure if there is one. */
-const TurnRows: FC<TurnRowsProps> = ({ turn, userStored, initials, onRetry, retryDisabled }) => {
+const TurnRows: FC<TurnRowsProps> = ({ turn, userStored, onRetry, retryDisabled }) => {
   const { final } = turn;
   const text = final ? final.text : turn.reply;
   const card = final ? final.card : turn.card;
   const proposal = final ? final.proposal : turn.proposal;
   return (
     <>
-      {!userStored && <MessageRow from="user" text={turn.userMessage?.text ?? turn.text} initials={initials} />}
-      {(text || card || proposal) && <MessageRow from="coach" text={text} card={card} proposal={proposal} initials={initials} />}
+      {!userStored && <MessageRow from="user" text={turn.userMessage?.text ?? turn.text} />}
+      {(text || card || proposal) && <MessageRow from="coach" text={text} card={card} proposal={proposal} />}
       {turn.failure && <FailureRow failure={turn.failure} onRetry={() => onRetry(turn.key)} retryDisabled={retryDisabled} />}
     </>
   );
@@ -313,9 +317,7 @@ const CoachScreen: FC = () => {
   // The typing bubble lasts until the first words arrive, then the reply bubble takes its place.
   const typing = lastTurn !== undefined && isTurnInFlight(lastTurn) && lastTurn.reply === "";
 
-  const { profile, privacy } = useSettings();
-  // The same account the sidebar shows: the settings profile, not a mock.
-  const initials = initialsOf(profile.fullName) || "?";
+  const { privacy } = useSettings();
   // Off means the context bundle carries no applications, outcomes or goal, and
   // the coach says it can't see them. Read from what is SAVED: useSettings()
   // layers unsaved edits over it, and a toggle flipped on the privacy screen but
@@ -701,7 +703,7 @@ const CoachScreen: FC = () => {
                 ) : null)}
 
               {stored.map((m) => (
-                <MessageRow key={m.id} from={m.from} text={m.text} card={m.card} proposal={m.proposal} initials={initials} />
+                <MessageRow key={m.id} from={m.from} text={m.text} card={m.card} proposal={m.proposal} />
               ))}
 
               {liveTurns.map((turn) => (
@@ -709,7 +711,6 @@ const CoachScreen: FC = () => {
                   key={turn.key}
                   turn={turn}
                   userStored={turn.userMessage !== null && storedIds.has(turn.userMessage.id)}
-                  initials={initials}
                   onRetry={handleRetry}
                   retryDisabled={talking}
                 />
