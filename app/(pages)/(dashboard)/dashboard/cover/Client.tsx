@@ -34,16 +34,16 @@
 //    things that are true and checkable: which resume it was written from, the
 //    live word count, and the tone's own paragraph target.
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type FC } from "react";
-import { Check, ChevronDown, Copy, Download, FileSignature, FileWarning, Link2, Loader2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
+import { ArrowUpRight, Check, ChevronDown, ChevronLeft, Copy, Download, FileSignature, FileWarning, Link2, Loader2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import TimeAgo from "timeago-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import Pill from "@/app/components/dashboard/ui/Pill";
+import Pill, { pillVariants } from "@/app/components/dashboard/ui/Pill";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
 import { coverToDocx, coverToMarkdown, letterheadHtml, sanitizeLetterHtml, textToLetterHtml, type Letterhead } from "@/app/lib/export/cover";
@@ -82,9 +82,12 @@ import {
   COVER_CREDITS,
   COVER_REVISE_CREDITS,
   MAX_REVISE_INSTRUCTION_CHARS,
+  RECENT_LETTERS,
   TONE_PARAGRAPHS,
+  createLetter,
   describeCoverFailure,
   getLetter,
+  listLetters,
   reviseCoverLetter,
   type CoverLetterContent,
   type CoverTone,
@@ -156,6 +159,54 @@ function jobFromLetter(letter: LetterView): CoverJob | null {
   };
 }
 
+/**
+ * The line a recent letter is recognised by: the first one of its own text past
+ * the greeting ("Dear…," or "Hi there,"), else the greeting, else nothing yet.
+ */
+function snippetOf(letter: LetterView): string {
+  const text = letter.content.text?.trim() || [letter.content.greeting, ...letter.content.paragraphs].join("\n");
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.find((line) => !/[,:]$/.test(line)) ?? lines[0] ?? "Nothing written yet";
+}
+
+/**
+ * The front door's "pick up where you left off": the last few letters worked
+ * on, written ones and "Write your own" drafts alike, each reopened by its link
+ * (`?letter=`), which restores its words, its look and its job.
+ */
+const RecentLetters: FC<{ letters: LetterView[] }> = ({ letters }) => (
+  <section aria-labelledby="recent-letters" className="mt-10 w-full max-w-[560px] text-left">
+    <h2 id="recent-letters" className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-black/45">
+      Pick up where you left off
+    </h2>
+    <ul className="overflow-hidden rounded-2xl border border-black/10 bg-white">
+      {letters.map((letter, i) => {
+        const forJob = Boolean(letter.content.company.trim() && letter.content.role.trim());
+        return (
+          <li key={letter.id} className={cn(i > 0 && "border-t border-black/[0.07]")}>
+            <Link href={`/dashboard/cover?letter=${encodeURIComponent(letter.id)}`} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#fafaf6]">
+              <span className="grid h-8 w-8 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
+                {forJob ? <Link2 className="h-3.5 w-3.5 text-primary" aria-hidden /> : <FileSignature className="h-3.5 w-3.5 text-primary" aria-hidden />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-primary">{letter.label}</span>
+                <span className="block truncate text-xs text-black/50">{snippetOf(letter)}</span>
+              </span>
+              <span className="flex-none text-[11px] text-black/40">
+                <TimeAgo datetime={letter.updatedAt} opts={{ minInterval: 60 }} />
+              </span>
+              <ArrowUpRight className="h-3.5 w-3.5 flex-none text-black/30 transition-colors group-hover:text-primary" aria-hidden />
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  </section>
+);
+
 /** The HTML a letter opens with: the editor's own, saved; else its saved text; else the letter as written. */
 function openingHtml(letter: WrittenLetter): string {
   // Sanitised here too: the library stores the editor's HTML as sent. DOMParser
@@ -204,6 +255,41 @@ const NoResumeNote: FC<{ className?: string }> = ({ className }) => (
       </Link>{" "}
       and come back. You can still write your own in the meantime.
     </p>
+  </div>
+);
+
+/** A saved job's own screen, where the saved jobs list opens it too. */
+const jobHref = (savedJobId: string) => `/dashboard/jdqa?job=${encodeURIComponent(savedJobId)}`;
+
+/** Line widths for one skeleton paragraph; the last line runs short, the way a paragraph ends. */
+const SKELETON_LINES = ["w-full", "w-[97%]", "w-[99%]", "w-[62%]"];
+
+/**
+ * Stands in for the letter while a new one is written, so the page says a
+ * letter is on its way instead of swapping the text out from under the user
+ * when it lands. Shaped like what is coming: a greeting, the tone's paragraph
+ * count, a sign-off.
+ */
+const LetterSkeleton: FC<{ paragraphs: number; label: string }> = ({ paragraphs, label }) => (
+  <div className="flex min-h-[320px] flex-col gap-5 px-8 py-7" role="status" aria-live="polite">
+    <p className="inline-flex items-center gap-2 text-xs font-semibold text-black/45">
+      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+      {label}
+    </p>
+    <div className="flex flex-col gap-5 motion-safe:animate-pulse" aria-hidden>
+      <div className="h-3 w-32 rounded-full bg-black/[0.08]" />
+      {Array.from({ length: paragraphs }, (_, p) => (
+        <div key={p} className="flex flex-col gap-2.5">
+          {SKELETON_LINES.map((width, l) => (
+            <div key={l} className={cn("h-3 rounded-full bg-black/[0.08]", width)} />
+          ))}
+        </div>
+      ))}
+      <div className="flex flex-col gap-2.5">
+        <div className="h-3 w-20 rounded-full bg-black/[0.08]" />
+        <div className="h-3 w-40 rounded-full bg-black/[0.08]" />
+      </div>
+    </div>
   </div>
 );
 
@@ -335,6 +421,9 @@ const CoverScreen: FC = () => {
   // the letter's own company and role stand in. A letter link wins over ?job=.
   const [letterFor, setLetterFor] = useState<string | null>(null);
   const [opened, setOpened] = useState<{ id: string; design: LetterDesign | null; updatedAt: Date; jobId: string | null } | null>(null);
+  // Back at the front door (no link in the address): forget which link was
+  // adopted, so the same letter picked again from the recent list reopens.
+  if (letterParam === null && letterFor !== null) setLetterFor(null);
   const letterPending = letterParam !== null && letterFor !== letterParam;
   const openedQuery = useQuery({
     queryKey: qk.letters.one(letterParam ?? ""),
@@ -423,17 +512,68 @@ const CoverScreen: FC = () => {
   const editedWordCount = letterText.trim() ? letterText.trim().split(/\s+/).length : 0;
   const liveWordCount = editedWordCount || (isBlankDraft ? 0 : (letter?.wordCount ?? 0));
 
-  // The library letter on screen, and its autosave. A blank draft has none —
-  // nothing was written, so there is nothing in the library to save to — and
-  // neither has a letter whose save failed.
+  // The library letter on screen, and its autosave. A letter whose save failed
+  // has none. A blank draft has none until its first keystroke, when it is
+  // saved (below) and gets one.
   const letterId = letter?.documentId ?? null;
+
+  // "Write your own" is saved on its first keystroke, with what is on the page
+  // by then, and adopted as this draft's letter so the autosave writes into it
+  // from there on. Nothing is generated or charged. Once per draft (`docKey`):
+  // a refusal is said once and not retried; anything else tries again on the
+  // next keystroke. `blankSaved` is what the library took, so anything typed
+  // while that request was in flight still counts as unsaved.
+  const [blankSaved, setBlankSaved] = useState<{ id: string; edited: NonNullable<typeof edited>; design: LetterDesign; updatedAt: Date } | null>(null);
+  const blankSaving = useRef<string | null>(null);
+  const blankToasted = useRef<string | null>(null);
+  const docKeyNow = useRef(docKey);
+  useEffect(() => {
+    docKeyNow.current = docKey;
+  });
+  const blankEdit = isBlankDraft && !letter && edited?.key === docKey ? edited : null;
+  useEffect(() => {
+    if (!blankEdit || blankSaving.current === docKey) return;
+    const key = docKey;
+    const sentDesign = design;
+    blankSaving.current = key;
+    const content = { company: "", role: "", draftLabel: "", greeting: "", paragraphs: [], signOff: "", wordCount: 0, text: blankEdit.text, html: sanitizeLetterHtml(blankEdit.html) };
+    createLetter({ content, design: sentDesign })
+      .then((saved) => {
+        // Only onto the draft it was typed in: a job picked meanwhile is another letter.
+        if (docKeyNow.current !== key) return;
+        setBlankSaved({ id: saved.id, edited: blankEdit, design: sentDesign, updatedAt: saved.updatedAt });
+        adopt({ ...content, documentId: saved.id }, tone);
+        void queryClient.invalidateQueries({ queryKey: qk.letters.recent() });
+      })
+      .catch((error: unknown) => {
+        const refused = error instanceof BackendError && error.status >= 400 && error.status < 500;
+        if (!refused && blankSaving.current === key) blankSaving.current = null;
+        if (blankToasted.current === key) return;
+        blankToasted.current = key;
+        toast.error(`This draft isn't saved: ${apiMessage(error)}`);
+      });
+  }, [blankEdit, docKey, design, adopt, tone, queryClient]);
+  const savedBlank = blankSaved && blankSaved.id === letterId ? blankSaved : null;
+
   const autosave = useLetterAutosave({
     id: letterId,
     letter,
     edited: edited?.key === docKey ? edited : null,
     design,
-    storedDesign: opened && opened.id === letterId ? opened.design : null,
-    savedAt: opened && opened.id === letterId ? opened.updatedAt : null,
+    storedDesign: opened && opened.id === letterId ? opened.design : (savedBlank?.design ?? null),
+    savedAt: opened && opened.id === letterId ? opened.updatedAt : (savedBlank?.updatedAt ?? null),
+    ...(savedBlank ? { heldEdited: savedBlank.edited } : {}),
+  });
+
+  // The front door's recent letters, fetched whenever it is shown.
+  const recent = useQuery({
+    queryKey: qk.letters.recent(),
+    // Sliced as well: a service from before `limit` sends up to its whole page.
+    queryFn: async ({ signal }) => (await listLetters("full", signal, RECENT_LETTERS)).slice(0, RECENT_LETTERS),
+    enabled: !started,
+    staleTime: STALE_TIME.letters,
+    // Someone's letters, held only while this screen is open.
+    gcTime: 0,
   });
   const spacingCfg = SPACING_CLASS[spacing];
   const downloadFileName = profile?.fullName?.trim() ? `${profile.fullName.trim().replace(/\s+/g, "-")}-Cover-Letter` : "Cover-Letter";
@@ -610,17 +750,52 @@ const CoverScreen: FC = () => {
     setIsBlankDraft(true);
   };
 
+  // Back to the front door and its recent letters. Clearing the letter hands
+  // the autosave its last word on the one being left (it flushes when the
+  // letter on screen changes), and the address loses its ?letter=/?job= so
+  // nothing reopens by itself.
+  const router = useRouter();
+  const backToLetters = () => {
+    reset();
+    setLinkedJob(null);
+    setIsBlankDraft(false);
+    setOpened(null);
+    setEdited(null);
+    setDraftSeq((seq) => seq + 1);
+    router.replace("/dashboard/cover", { scroll: false });
+    void queryClient.invalidateQueries({ queryKey: qk.letters.recent() });
+  };
+
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
       {/* Header */}
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
+          {started && (
+            <button
+              type="button"
+              onClick={backToLetters}
+              title="All cover letters"
+              aria-label="Back to all cover letters"
+              className="-ml-2 grid h-8 w-8 flex-none cursor-pointer place-content-center rounded-lg text-black/45 transition-colors hover:bg-black/[0.05] hover:text-primary">
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </button>
+          )}
           <h1 className="text-[17px] font-bold text-primary truncate">
-            {!started
-              ? "Cover letters"
-              : isBlankDraft
-                ? "Cover letter — New draft"
-                : `Cover letter — ${linkedJob!.company}, ${linkedJob!.role}`}
+            {!started ? (
+              "Cover letters"
+            ) : (
+              <>
+                <span className="text-[13px] font-semibold text-black/45">Cover letter —</span>{" "}
+                {isBlankDraft ? (
+                  "New draft"
+                ) : (
+                  <span className="text-[#6c7a1e]">
+                    {linkedJob!.company}, {linkedJob!.role}
+                  </span>
+                )}
+              </>
+            )}
           </h1>
           {started && (
             <Pill variant="neutral" className="flex-none">
@@ -714,34 +889,46 @@ const CoverScreen: FC = () => {
             </div>
 
             {!resume && !resumesPending && <NoResumeNote className="mt-5 max-w-[560px]" />}
+
+            {recent.data && recent.data.length > 0 && <RecentLetters letters={recent.data} />}
           </div>
         ) : (
           <>
             {/* Linked job — one row, one way to change it. */}
             <DashCard className="p-4">
               <div className="flex flex-wrap items-center gap-3">
-                <div className="h-9 w-9 flex-none rounded-full bg-[#f0f0ea] flex items-center justify-center">
-                  <Link2 className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+                
+                <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
                   {linkedJob && !isBlankDraft ? (
                     <>
-                      <span className="text-sm text-black/50">Written for</span>
-                      <Pill variant="active">
-                        {linkedJob.company} · {linkedJob.role}
-                      </Pill>
+                      <span className="text-[11px] font-semibold leading-none text-black/45">Written for</span>
+                      {/* Opens the job itself. A reopened letter whose job was never saved has no id, so nothing to open. */}
+                      {linkedJob.id ? (
+                        <Link
+                          href={jobHref(linkedJob.id)}
+                          title={`Open ${linkedJob.company} · ${linkedJob.role}`}
+                          className={cn(
+                            pillVariants({ variant: "positive" }),
+                            "max-w-full gap-1 transition-shadow duration-100 hover:shadow-[2px_2px_0_0_#222325] hover:underline",
+                          )}>
+                          <span className="min-w-0 truncate">
+                            {linkedJob.company} · {linkedJob.role}
+                          </span>
+                          <ArrowUpRight className="h-3 w-3 flex-none" aria-hidden />
+                        </Link>
+                      ) : (
+                        <Pill variant="positive" className="max-w-full">
+                          <span className="min-w-0 truncate">
+                            {linkedJob.company} · {linkedJob.role}
+                          </span>
+                        </Pill>
+                      )}
                     </>
                   ) : (
                     <span className="text-sm text-black/50">Not linked to a job — pick one to have a letter written.</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-none">
-                  {!isBlankDraft && (
-                    <StickerButton variant="outline" size="sm" onClick={startBlank}>
-                      <FileSignature className="h-3.5 w-3.5" />
-                      Write from scratch
-                    </StickerButton>
-                  )}
                   <StickerButton variant="outline" size="sm" onClick={handlePickJob} disabled={writing || !resume}>
                     <Link2 className="h-3.5 w-3.5" />
                     {linkedJob && !isBlankDraft ? "Change job" : "Pick a job"}
@@ -749,7 +936,7 @@ const CoverScreen: FC = () => {
                   <StickerButton variant="primary" size="sm" onClick={handleRewrite} disabled={writing || !linkedJob || isBlankDraft}>
                     <RefreshCw className={cn("h-3.5 w-3.5", writing && "animate-spin")} />
                     {/* A job opened from a link arrives with nothing written, and there is nothing to REwrite yet. */}
-                    {writing ? "Writing…" : !letter && !isBlankDraft ? "Write letter" : "Rewrite"}
+                    {writing ? "Writing…" : !letter && !isBlankDraft ? "Write letter" : "Redo"}
                   </StickerButton>
                 </div>
               </div>
@@ -804,7 +991,7 @@ const CoverScreen: FC = () => {
                   type="button"
                   onClick={() => setBuiltOpen((v) => !v)}
                   className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline cursor-pointer">
-                  What this was written from
+                  Format
                   <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", builtOpen && "rotate-180")} />
                 </button>
               )}
@@ -900,6 +1087,18 @@ const CoverScreen: FC = () => {
               }
               surfaceClassName={THEME_CANVAS_CLASS[theme]}
               contentClassName={cn(FONT_CLASS[font], spacingCfg.text, "text-primary [&>p]:mb-4 last:[&>p]:mb-0")}
+              busy={
+                writing || revising ? (
+                  <LetterSkeleton
+                    paragraphs={paragraphTarget}
+                    label={
+                      revising
+                        ? "Revising your letter…"
+                        : `Writing your ${TONE_OPTIONS.find((option) => option.id === tone)?.label.toLowerCase() ?? ""} letter…`
+                    }
+                  />
+                ) : undefined
+              }
             />
 
             {/* Footer: word count, details, AI rewrite */}

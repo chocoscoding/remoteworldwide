@@ -186,10 +186,12 @@ export const qk = {
     // "Edit a copy" of a My documents file (`?from=`): the copy opened or made.
     copyOf: (vaultId: string) => [...qk.resumes.all, "copy-of", vaultId] as const,
   },
-  // Saved cover letters. `one(id)` is the letter a link opened (`?letter=`).
+  // Saved cover letters. `one(id)` is the letter a link opened (`?letter=`);
+  // `recent()` the last few the cover screen offers to pick back up.
   letters: {
     all: ["letters"] as const,
     one: (id: string) => [...qk.letters.all, "one", id] as const,
+    recent: () => [...qk.letters.all, "recent"] as const,
   },
   // The ATS scorer. `ingested()` is the list of CVs that have been parsed and
   // embedded — what a scan can name, which is NOT the same set as `documents`

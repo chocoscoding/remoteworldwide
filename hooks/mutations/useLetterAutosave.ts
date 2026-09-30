@@ -56,6 +56,13 @@ export interface LetterAutosaveOptions {
   storedDesign: LetterDesign | null;
   /** When the library last took a save of it, when known. */
   savedAt: Date | null;
+  /**
+   * What the library holds for this letter's words when it arrives, when that is not "whatever
+   * the editor reports right now": a blank draft is saved with the edit that created it, and
+   * anything typed while that save was in flight must still count as unsaved. Omitted: the edit
+   * on screen when the letter arrives is taken as already saved.
+   */
+  heldEdited?: EditedLetter | null;
 }
 
 export type LetterSaveStatus =
@@ -113,12 +120,13 @@ function patchFor(now: Snapshot, held: Held): LetterPatch {
 /** A 4xx is a refusal (a letter past the service's limits); everything else may pass on its own. */
 const isTransient = (error: unknown): boolean => !(error instanceof BackendError && error.status >= 400 && error.status < 500);
 
-export function useLetterAutosave({ id, letter, edited, design, storedDesign, savedAt: loadedAt }: LetterAutosaveOptions): LetterAutosave {
+export function useLetterAutosave({ id, letter, edited, design, storedDesign, savedAt: loadedAt, heldEdited }: LetterAutosaveOptions): LetterAutosave {
   const snapshot: Snapshot | null = id && letter ? { id, letter, edited, design } : null;
+  const arrivedWith = heldEdited !== undefined ? heldEdited : edited;
 
   // What the library holds for the letter on screen. State, because "is there
   // anything to save" is read during render.
-  const [held, setHeld] = useState<Held>(() => ({ id, edited, design: storedDesign ?? DEFAULT_LETTER_DESIGN }));
+  const [held, setHeld] = useState<Held>(() => ({ id, edited: arrivedWith, design: storedDesign ?? DEFAULT_LETTER_DESIGN }));
   const [savedAt, setSavedAt] = useState<Date | null>(loadedAt);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ id: string; message: string; transient: boolean } | null>(null);
@@ -127,7 +135,7 @@ export function useLetterAutosave({ id, letter, edited, design, storedDesign, sa
   // Another letter on screen: it starts from what it arrived with. Set while
   // rendering, the React way to reset state when an input changes.
   if (held.id !== id) {
-    setHeld({ id, edited, design: storedDesign ?? DEFAULT_LETTER_DESIGN });
+    setHeld({ id, edited: arrivedWith, design: storedDesign ?? DEFAULT_LETTER_DESIGN });
     setSavedAt(loadedAt);
   }
 

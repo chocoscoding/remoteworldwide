@@ -26,9 +26,10 @@
 // autosaves what the person does to it (`updateLetter`, `useLetterAutosave`).
 // A save that failed after the letter was written is not a failed letter: the
 // answer is the letter with `documentId: null`, and the service's sentence
-// saying so rides along as `saveNotice`.
+// saying so rides along as `saveNotice`. A blank draft ("Write your own") is
+// saved too, on its first keystroke (`createLetter`), for free.
 
-import { apiGet, apiPatch, apiPostWithMessage } from "@/app/lib/api/client";
+import { apiGet, apiPatch, apiPost, apiPostWithMessage } from "@/app/lib/api/client";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import type { CoverLetterContent, LetterDesign, LetterSummary, LetterView, StoredLetterContent } from "@/app/lib/dashboard/types";
 
@@ -158,12 +159,27 @@ export async function reviseCoverLetter(input: ReviseCoverLetterInput): Promise<
 // The library of letters
 // ---------------------------------------------------------------------------
 
-/** Every saved letter, most recently worked on first (at most 50). Summaries carry no content. */
-export function listLetters(view: "summary", signal?: AbortSignal): Promise<LetterSummary[]>;
-export function listLetters(view: "full", signal?: AbortSignal): Promise<LetterView[]>;
-export function listLetters(view: "summary" | "full", signal?: AbortSignal): Promise<LetterSummary[] | LetterView[]> {
-  return apiGet<LetterSummary[] | LetterView[]>(`${LETTERS_PATH}?view=${view}`, signal);
+/** How many letters the cover screen offers to pick back up. */
+export const RECENT_LETTERS = 5;
+
+/**
+ * Saved letters, most recently worked on first: every one up to 50, or the newest `limit`.
+ * Summaries carry no content.
+ */
+export function listLetters(view: "summary", signal?: AbortSignal, limit?: number): Promise<LetterSummary[]>;
+export function listLetters(view: "full", signal?: AbortSignal, limit?: number): Promise<LetterView[]>;
+export function listLetters(view: "summary" | "full", signal?: AbortSignal, limit?: number): Promise<LetterSummary[] | LetterView[]> {
+  return apiGet<LetterSummary[] | LetterView[]>(`${LETTERS_PATH}?view=${view}${limit ? `&limit=${limit}` : ""}`, signal);
 }
+
+/**
+ * Saves a blank draft ("Write your own") with what is on the page, and answers
+ * its library id for the autosave to write into from then on. Nothing is
+ * generated or charged. A 409 carries the service's sentence when the person
+ * already has as many saved letters as it keeps.
+ */
+export const createLetter = (input: { content?: StoredLetterContent; design?: LetterDesign }): Promise<{ id: string; label: string; updatedAt: Date }> =>
+  apiPost<{ id: string; label: string; updatedAt: Date }>(LETTERS_PATH, input);
 
 /** One saved letter. Another user's id, or a resume's, is a 404. */
 export const getLetter = (id: string, signal?: AbortSignal): Promise<LetterView> => apiGet<LetterView>(`${LETTERS_PATH}/${encodeURIComponent(id)}`, signal);
