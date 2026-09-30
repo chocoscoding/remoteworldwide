@@ -46,7 +46,7 @@
 // HANDLERS are implemented one level down. The landing's own create/import
 // handlers live HERE instead, because with no document open there's nothing
 // to stash first.
-import { Suspense, useCallback, useEffect, useState, type FC, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type FC, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -102,15 +102,35 @@ interface ResumeWorkspaceProps {
   initialDocuments: StoredResumeDocument[];
   /** The resume to open instead of the landing — one a link named, or the newest for Tailor. Null for the landing. */
   initialOpenId: string | null;
+  /**
+   * The library list, once it is in. On the plain landing the workspace mounts
+   * before it arrives, so starting a resume never waits on it; when it lands,
+   * its documents JOIN the workspace's — any already here keep the editor's
+   * copy, so nothing made in the meantime is seeded over.
+   */
+  libraryDocuments: StoredResumeDocument[] | undefined;
+  library: "loading" | "error" | "ready";
+  onRetryLibrary: () => void;
   banner: ReactNode;
   tailorPreset: TailorPreset | null;
 }
 
-const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOpenId, banner, tailorPreset }) => {
+const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOpenId, libraryDocuments, library, onRetryLibrary, banner, tailorPreset }) => {
   const [documents, setDocuments] = useState<ResumeDocument[]>(() => initialDocuments.map(fromStored));
   const [activeDocId, setActiveDocId] = useState<string | null>(() =>
     initialOpenId && initialDocuments.some((d) => d.id === initialOpenId) ? initialOpenId : null,
   );
+  // Deleted this visit: a list that was already on its way must not bring one back.
+  const removed = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!libraryDocuments) return;
+    setDocuments((prev) => {
+      const here = new Set(prev.map((d) => d.id));
+      const joining = libraryDocuments.filter((d) => !here.has(d.id) && !removed.current.has(d.id)).map(fromStored);
+      return joining.length > 0 ? [...prev, ...joining] : prev;
+    });
+  }, [libraryDocuments]);
 
   const activeDoc = activeDocId !== null ? documents.find((d) => d.id === activeDocId) : undefined;
 
@@ -169,6 +189,7 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
   const deleteFromLanding = async (id: string) => {
     try {
       await deleteResumeDocument(id);
+      removed.current.add(id);
       setDocuments((prev) => prev.filter((d) => d.id !== id));
     } catch (error) {
       toast.error(apiMessage(error));
@@ -186,7 +207,8 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
     return (
       <>
         <ResumeLanding
-          library="ready"
+          library={library}
+          onRetry={onRetryLibrary}
           documents={documents}
           onOpen={setActiveDocId}
           onCreateBlank={createBlankFromLanding}
@@ -313,17 +335,31 @@ const ResumeScreen: FC = () => {
 
   const waitingForNamed = missingId !== null && named.isPending;
   const waitingForCopy = fromParam !== null && copy.isPending;
+  // No link naming a resume to open, so nothing here needs the list to decide
+  // anything: the workspace mounts at once and the list joins it when it lands.
+  const plainLanding = docParam === null && fromParam === null && tailorId === null;
 
-  if (listed && !waitingForNamed && !waitingForCopy) {
+  if ((listed && !waitingForNamed && !waitingForCopy) || plainLanding) {
     // A resume read on its own, or a copy just made, joins the list at the top — it is the one being opened.
     const extra = [named.data, copy.data?.created ? copy.data.document : undefined].filter((d): d is StoredResumeDocument => !!d);
-    const initialDocuments = extra.length > 0 ? [...extra, ...listed.filter((d) => !extra.some((e) => e.id === d.id))] : listed;
-    const initialOpenId = docParam ?? copy.data?.document.id ?? (tailorId !== null ? latestDocumentId(listed) : null);
-    return <ResumeWorkspace initialDocuments={initialDocuments} initialOpenId={initialOpenId} banner={banner} tailorPreset={tailorPreset} />;
+    const base = listed ?? [];
+    const initialDocuments = extra.length > 0 ? [...extra, ...base.filter((d) => !extra.some((e) => e.id === d.id))] : base;
+    const initialOpenId = docParam ?? copy.data?.document.id ?? (tailorId !== null && listed ? latestDocumentId(listed) : null);
+    return (
+      <ResumeWorkspace
+        initialDocuments={initialDocuments}
+        initialOpenId={initialOpenId}
+        libraryDocuments={listed}
+        library={listed ? "ready" : library.isError ? "error" : "loading"}
+        onRetryLibrary={() => void library.refetch()}
+        banner={banner}
+        tailorPreset={tailorPreset}
+      />
+    );
   }
 
-  // Not loaded: the landing, saying so, with its two ways to start held back.
-  // A resume created before the list arrives would be seeded over when it did.
+  // A link is waiting on the list to know which resume it opens: the landing,
+  // saying so, with nothing to start from until it does.
   const status = waitingForCopy ? "Making an editable copy of your file…" : waitingForNamed ? "Opening your resume…" : null;
   return (
     <ResumeLanding

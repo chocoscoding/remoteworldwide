@@ -153,14 +153,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           </div>
           <p className="text-xs text-black/55 mt-2">Add a summary, experience, or skills to see an ATS score here.</p>
         </DashCard>
-
-        <DashCard className="border-2 border-[#222325] p-3.5">
-          <p className="text-sm font-bold text-primary">Nothing to suggest yet</p>
-          <p className="text-xs text-black/60 leading-relaxed mt-1">
-            Once you&apos;ve added some content, we&apos;ll surface suggestions to strengthen this resume — and you can tailor it to a specific job from
-            the AI Tools tab.
-          </p>
-        </DashCard>
       </div>
     );
   }
@@ -343,29 +335,28 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
             );
           })}
         </div>
-      ) : (
+      ) : check ? (
+        // With no check yet there is nothing to say here, so nothing is shown.
         <DashCard className="border-2 border-[#222325] p-3.5">
           {/* The write-up — and the rewrites that come with it — lands after
               the score, so "nothing found" waits until it has. */}
-          {check && checkStatus === "explaining" ? (
+          {checkStatus === "explaining" ? (
             <p className="flex items-center gap-2 text-xs text-black/55">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Reading through this check for what to fix…
             </p>
           ) : (
             <>
-              <p className="text-sm font-bold text-primary">{check ? "Nothing to fix from this check" : "Nothing to suggest yet"}</p>
+              <p className="text-sm font-bold text-primary">Nothing to fix from this check</p>
               <p className="text-xs text-black/60 leading-relaxed mt-1">
-                {check
-                  ? check.job
-                    ? "It found no missing keywords, bullet rewrites or weak spots to act on."
-                    : "A general check found no weak spots to act on. Check it against a job to see what a posting wants."
-                  : "Check this resume against a job and we'll surface what to strengthen for it here."}
+                {check.job
+                  ? "It found no missing keywords, bullet rewrites or weak spots to act on."
+                  : "A general check found no weak spots to act on. Check it against a job to see what a posting wants."}
               </p>
             </>
           )}
         </DashCard>
-      )}
+      ) : null}
 
       {/* Ask for a rewrite — the AI service's `ask` tool, on the text as it
           stands. The price is on the box, before it is spent. */}

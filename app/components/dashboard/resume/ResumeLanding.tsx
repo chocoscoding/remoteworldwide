@@ -12,9 +12,10 @@ import { isStaleCheck, type ResumeDocument } from "./resume-document";
 
 export interface ResumeLandingProps {
   /**
-   * Whether the user's saved resumes are in. Until they are, the two ways to
-   * start are held back as well as the list: a resume made before the list
-   * arrives would be seeded over when it did.
+   * Whether the user's saved resumes are in. Only the list waits for them: the
+   * ways to start work at once, because the workspace merges the list in when
+   * it lands rather than seeding over what was made meanwhile. A way to start
+   * is held back only when its handler is missing.
    */
   library: "loading" | "error" | "ready";
   /** Ask for the list again — offered when `library` is "error". */
@@ -52,8 +53,6 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-
-  const ready = library === "ready";
 
   async function create() {
     if (!onCreateBlank || creating) return;
@@ -110,7 +109,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             type="button"
             onClick={() => setNaming((v) => !v)}
             aria-expanded={naming}
-            disabled={!ready}
+            disabled={!onCreateBlank}
             className="group rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-5 text-left text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#e1f073] hover:shadow-[4px_4px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-50">
             <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
               <FilePlus2 className="h-4 w-4 text-[#e1f073]" />
@@ -123,7 +122,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             aria-busy={importing}
             className={cn(
               "group rounded-2xl border-[1.5px] border-black/15 bg-white p-5 text-left transition-[transform,box-shadow,border-color] duration-100 ease-out",
-              !ready
+              !onImport
                 ? "pointer-events-none opacity-50"
                 : importing
                   ? "cursor-wait opacity-70"
@@ -142,7 +141,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
               ref={fileRef}
               type="file"
               accept={RESUME_ACCEPT}
-              disabled={importing || !ready}
+              disabled={importing || !onImport}
               className="sr-only"
               onChange={(e) => void handleFile(e.target.files?.[0])}
             />
@@ -152,7 +151,6 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             <button
               type="button"
               onClick={onBuild}
-              disabled={!ready}
               className="group flex items-center gap-4 rounded-2xl border-[1.5px] border-[#222325] bg-[#e1f073] p-5 text-left text-primary cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-50 sm:col-span-2">
               <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
                 <Sparkles className="h-4 w-4 text-[#e1f073]" />

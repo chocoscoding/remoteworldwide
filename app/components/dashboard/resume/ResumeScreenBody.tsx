@@ -97,13 +97,13 @@ const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
         // columns, not 3, so the freed width goes to the center, not to a
         // reserved-but-empty column.
         overview: "grid-cols-[1fr_360px]",
-        content: "grid-cols-[380px_1fr_350px]",
+        content: "grid-cols-[346px_1fr_350px]",
         customize: "grid-cols-[180px_1fr_450px]",
         ai: "grid-cols-[300px_1fr_360px]",
       }
     : {
         overview: "grid-cols-[1fr_324px]",
-        content: "grid-cols-[360px_1fr_320px]",
+        content: "grid-cols-[328px_1fr_320px]",
         customize: "grid-cols-[188px_1fr_404px]",
         ai: "grid-cols-[308px_1fr_324px]",
       };
