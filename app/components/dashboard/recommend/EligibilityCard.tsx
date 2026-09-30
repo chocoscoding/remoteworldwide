@@ -46,7 +46,7 @@ const EligibilityCard: FC<{ eligibility: RecommendationEligibility }> = ({ eligi
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-primary">Not in the running yet</p>
           <p className="mt-0.5 text-xs leading-relaxed text-black/55">
-            Reviewers only pick from complete profiles with a master resume, and only if you let recruiters find you. {done.length} of {total} done.
+            Reviewers only pick complete profiles with a master resume and recruiter visibility on. {done.length} of {total} done.
           </p>
           <ProgressBar value={(done.length / Math.max(total, 1)) * 100} className="mt-3 max-w-md" />
         </div>

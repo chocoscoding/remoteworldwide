@@ -87,6 +87,8 @@ export function toWatchTarget(job: PlatformJobSearchItem, now: number = Date.now
     role: job.role,
     timezoneOffsets: anywhere ? [] : offsetsFor(job.regions),
     anywhere,
+    seniority: job.seniority,
+    postedAt: Date.parse(job.postedAt) || undefined,
     skills: [],
     note: [job.seniority, job.regions.join(" / ") || null, posted(job.postedAt, now)].filter(Boolean).join(" · "),
     href: `/jobs/${encodeURIComponent(job.slug)}`,

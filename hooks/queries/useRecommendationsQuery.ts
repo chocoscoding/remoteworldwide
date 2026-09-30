@@ -60,19 +60,25 @@ export function useRecommendation(id: string) {
   });
 }
 
-/** Target-role searches per screen: each is one platform-job search, and three roles cover what people set. */
-const ROLE_SEARCHES = 3;
+/** Title searches per screen, from `watchSearchTerms`: your target roles first, then what you've applied to. */
+export const WATCH_SEARCHES = 8;
+/** The most one search returns (the backend's own cap). A few thousand listings are live and only dozens are new each week, so each search reaches back. */
+const WATCH_SEARCH_LIMIT = 50;
 
 /**
- * The pool of live listings the "worth watching" list is scored from: the
- * newest listings, plus a search per target role (the listing search matches a
- * title or company substring, so "Product Designer" finds "Senior Product
- * Designer"). Deduplicated by listing; scoring and ranking are the caller's,
- * because they read the user's unsaved preference edits too.
+ * The pool of live listings the "worth watching" list is scored from: a
+ * search per term (the listing search matches a title or company substring,
+ * so "Product Designer" finds "Senior Product Designer"), plus the newest
+ * listings so one posted today can make it in. Deduplicated by listing;
+ * scoring, the relevance cut and ranking are the caller's, because they read
+ * the user's unsaved preference edits too.
  */
-export function useWatchPool(targetRoles: readonly string[]) {
-  const roles = [...new Set(targetRoles.map((r) => r.trim()).filter(Boolean))].slice(0, ROLE_SEARCHES);
-  return useQueries({ queries: ["", ...roles].map((q) => platformJobSearchQuery(q, PLATFORM_SEARCH_LIMIT)), combine: combinePool });
+export function useWatchPool(terms: readonly string[]) {
+  const searches = [...new Set(terms.map((t) => t.trim()).filter(Boolean))].slice(0, WATCH_SEARCHES);
+  return useQueries({
+    queries: [platformJobSearchQuery("", PLATFORM_SEARCH_LIMIT), ...searches.map((q) => platformJobSearchQuery(q, WATCH_SEARCH_LIMIT))],
+    combine: combinePool,
+  });
 }
 
 /**

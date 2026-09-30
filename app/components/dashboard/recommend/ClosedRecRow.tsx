@@ -23,13 +23,13 @@ const ClosedRecRow: FC<ClosedRecRowProps> = ({ entry }) => {
       <Avatar name={entry.company} size="sm" src={null} className={entry.outcome === "connected" ? undefined : "opacity-55"} />
       <p className="min-w-0 flex-1 text-sm leading-relaxed text-black/55">
         {entry.outcome === "connected" ? (
-          <>You and {company} are connected — they took it from here.</>
+          <>You and {company} are connected.</>
         ) : entry.outcome === "passed" ? (
-          <>{company} went another direction — reviewers keep looking for your next fit.</>
+          <>{company} went another direction.</>
         ) : hadQuestions ? (
-          <>{company} — this one timed out, no answer sent.</>
+          <>{company} closed before you answered.</>
         ) : (
-          <>{company} — this one closed before they sent questions.</>
+          <>{company} closed before sending questions.</>
         )}
       </p>
       <span className="flex-none text-[11px] text-black/40">

@@ -81,7 +81,7 @@ const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
             <p className="text-[15px] font-bold text-primary">{gone ? "This recommendation isn't here" : "We couldn't load this recommendation"}</p>
             <p className="mx-auto mt-1.5 max-w-[380px] text-sm leading-relaxed text-black/55">
               {gone
-                ? "It may have been removed, or the link is stale. Your recommendations are all on the main list."
+                ? "It may have been removed, or the link is out of date."
                 : "Something went wrong on our side. Try again, or head back to the list."}
             </p>
             <div className="mt-5 flex items-center justify-center gap-2.5">

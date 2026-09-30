@@ -519,6 +519,10 @@ export interface RecommendationTarget {
   timezoneOffsets: number[];
   /** Open to hires anywhere — the timezone factor is met outright. */
   anywhere?: boolean;
+  /** The listing's own level, e.g. "Senior" or "Entry & mid-level". Null when it doesn't say. */
+  seniority?: string | null;
+  /** When it was posted, epoch ms — breaks ties toward the fresher listing. */
+  postedAt?: number;
   skills: string[];
   /** A one-line summary under the name: seniority, regions, how fresh. */
   note?: string;

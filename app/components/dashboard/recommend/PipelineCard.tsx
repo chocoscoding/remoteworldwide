@@ -25,8 +25,8 @@ export interface PipelineCardProps {
 
 /** Closed copy, never "rejected": the pass is theirs to explain, not ours to announce. */
 const CLOSED_LINE: Record<NonNullable<IntroPipelineEntry["outcome"]>, (company: string) => string> = {
-  connected: (company) => `You and ${company} are connected — they took it from here.`,
-  passed: (company) => `${company} went another direction. Reviewers keep looking for your next fit.`,
+  connected: (company) => `You and ${company} are connected.`,
+  passed: (company) => `${company} went another direction.`,
   expired: (company) => `This one closed before ${company} heard back from you.`,
 };
 
@@ -100,7 +100,7 @@ const PipelineCard: FC<PipelineCardProps> = ({ entry, warmPath }) => {
           <Quote className="mt-0.5 h-3.5 w-3.5 flex-none text-[#6c7a1e]" />
           <div className="min-w-0">
             <p className="whitespace-pre-line text-sm leading-relaxed text-black/70">{entry.note}</p>
-            {entry.reviewerName && <p className="mt-1 text-[11px] font-semibold text-black/45">— {entry.reviewerName}, Remote Worldwide</p>}
+            {entry.reviewerName && <p className="mt-1 text-[11px] font-semibold text-black/45">{entry.reviewerName}, Remote Worldwide</p>}
           </div>
         </div>
       )}
@@ -122,7 +122,7 @@ const PipelineCard: FC<PipelineCardProps> = ({ entry, warmPath }) => {
             <div className="mt-3.5 flex items-start gap-2">
               <CalendarClock className="mt-0.5 h-3.5 w-3.5 flex-none text-[#6c7a1e]" />
               <p className="text-xs leading-relaxed text-black/60">
-                Sent. {entry.company} reaches out directly to book the conversation — there&apos;s nothing else for you to do here.
+                Sent. {entry.company} will reach out to book a call.
               </p>
             </div>
           )}
@@ -135,7 +135,7 @@ const PipelineCard: FC<PipelineCardProps> = ({ entry, warmPath }) => {
 
       {!closed && !awaitingYou && !answered && (
         <p className="mt-4 border-t border-black/10 pt-4 text-xs leading-relaxed text-black/60">
-          Our reviewers have put you in front of {entry.company}. If they want to take it further, their questions land here.
+          You&apos;re in front of {entry.company}. If they want to go further, their questions will show up here.
         </p>
       )}
     </DashCard>
