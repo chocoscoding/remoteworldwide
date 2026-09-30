@@ -440,9 +440,14 @@ const JobCard: FC<{ job: AskedJob }> = ({ job }) => {
   // open; the classes decide that, so the server render and hydration agree.
   const [open, setOpen] = useState(false);
   const detailsId = useId();
+  // "What they want" folds away at every size, and opens into its own ink box (owner, 2026-09-30).
+  const [wantsOpen, setWantsOpen] = useState(false);
+  const wantsId = useId();
 
   return (
-    <DashCard className="p-6 lg:min-h-0 lg:overflow-y-auto">
+    // Stacked above the chat (md to lg) the card takes at most 40% of the screen and scrolls inside;
+    // beside it (lg up) it fills the column's height.
+    <DashCard className="p-6 md:max-h-[40vh] md:overflow-y-auto lg:max-h-none lg:min-h-0">
       <div className="mb-4 flex items-start justify-between gap-3">
         <Pill variant="neutral">{SOURCE_LABEL[job.source]}</Pill>
         {logo && <CompanyLogo key={logo} src={logo} company={job.company} />}
@@ -478,13 +483,21 @@ const JobCard: FC<{ job: AskedJob }> = ({ job }) => {
 
         {job.requirements.length > 0 && (
           <div className="mt-5">
-            <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2 underline underline-offset-4">
-              What they want
-            </p>
-            <ul className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => setWantsOpen((value) => !value)}
+              aria-expanded={wantsOpen}
+              aria-controls={wantsId}
+              className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/45 cursor-pointer transition-colors hover:text-primary">
+              <span>
+                What they want <span className="font-semibold normal-case tracking-normal text-black/35">· {job.requirements.length}</span>
+              </span>
+              <ChevronDown className={cn("h-4 w-4 flex-none transition-transform", wantsOpen && "rotate-180")} aria-hidden />
+            </button>
+            <ul id={wantsId} className={cn(wantsOpen ? "flex" : "hidden", "mt-2 flex-col gap-2 rounded-md bg-[#222325] p-4")}>
               {job.requirements.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-black/70 leading-relaxed">
-                  <span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[#7fb04a]" />
+                <li key={i} className="flex items-start gap-2.5 text-sm text-white/85 leading-relaxed">
+                  <span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[#e1f073]" />
                   {item}
                 </li>
               ))}
@@ -878,11 +891,13 @@ const JdqaScreen: FC = () => {
     );
   }
 
-  // From lg up the screen is exactly the viewport, as the coach is: the page
-  // itself never scrolls, only the transcript and the job card inside it.
-  // Below lg the card stacks above the chat and the page scrolls as usual.
+  // From md up (tablets and desktops) the screen is exactly the viewport, as the
+  // coach is: the page itself never scrolls, only the transcript and the job
+  // card inside it, and the two fill the height that is left (owner,
+  // 2026-09-30). From lg they sit side by side; from md to lg the card stacks
+  // above the chat, capped at 40% of the screen. Below md the page scrolls.
   return (
-    <div className="min-h-screen bg-[#f6f6f6] lg:flex lg:h-screen lg:flex-col lg:overflow-hidden">
+    <div className="min-h-screen bg-[#f6f6f6] md:flex md:h-screen md:flex-col md:overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-10 h-16 flex flex-none items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
@@ -909,7 +924,7 @@ const JdqaScreen: FC = () => {
         </div>
       </header>
 
-      <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto lg:w-full lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:py-4">
+      <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto md:w-full md:flex-1 md:min-h-0 md:overflow-y-auto md:py-4">
         {!job && restoring ? (
           <div className="flex min-h-[420px] items-center justify-center" role="status">
             <span className="inline-flex items-center gap-2 text-sm text-black/50">
@@ -953,12 +968,12 @@ const JdqaScreen: FC = () => {
             </StickerButton>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] lg:grid-rows-[minmax(0,1fr)] gap-5 items-start lg:items-stretch lg:h-full">
+          <div className="grid grid-cols-1 gap-5 items-start md:h-full md:grid-rows-[auto_minmax(0,1fr)] md:items-stretch lg:grid-cols-[420px_1fr] lg:grid-rows-[minmax(0,1fr)]">
             {/* Left: the job, in full */}
             <JobCard job={job} />
 
             {/* Right: Q&A chat */}
-            <DashCard className="p-0 flex flex-col overflow-hidden lg:min-h-0">
+            <DashCard className="p-0 flex flex-col overflow-hidden md:min-h-0">
               {/* Quick-question chips */}
               <div className="p-5 border-b border-black/8">
                 <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -992,7 +1007,7 @@ const JdqaScreen: FC = () => {
               {/* Transcript */}
               <div
                 ref={transcriptRef}
-                className="overflow-y-auto max-h-[520px] min-h-[360px] px-5 py-5 flex flex-col gap-5 lg:max-h-none lg:min-h-0 lg:flex-1">
+                className="overflow-y-auto max-h-[520px] min-h-[360px] px-5 py-5 flex flex-col gap-5 md:max-h-none md:min-h-0 md:flex-1">
                 {transcript}
               </div>
               {/* What the latest ask is doing, for screen readers, from one region

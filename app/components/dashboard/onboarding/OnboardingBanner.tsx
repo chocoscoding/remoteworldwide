@@ -21,10 +21,11 @@ import { useProfileSettings } from "@/hooks/queries/useSettingsQuery";
 
 /**
  * Screens that are exactly one viewport tall (`h-screen overflow-hidden`: the coach's chat, the
- * tracker's board). A bar above them would push their bottom edge — the composer, the columns'
- * ends — below the fold, so it stays off there; every other screen carries it.
+ * tracker's board, Ask about a job). A bar above them would push their bottom edge — the
+ * composer, the columns' ends — below the fold, so it stays off there; every other screen
+ * carries it.
  */
-const FULL_HEIGHT_SCREENS = ["/dashboard/coach", "/dashboard/tracker"];
+const FULL_HEIGHT_SCREENS = ["/dashboard/coach", "/dashboard/tracker", "/dashboard/jdqa"];
 
 const OnboardingBanner: FC = () => {
   const pathname = usePathname();
