@@ -407,89 +407,89 @@ const PrepReport: FC<PrepReportProps> = ({
 
         {!legacyTooShort && (
           <>
-            {(hasScorecard || hasSummary) && (
-              <div className={cn("grid grid-cols-1 gap-5 items-start", hasScorecard && hasSummary && "md:grid-cols-2")}>
-                {hasScorecard && (
-                  <DashCard className="p-6">
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                      <h3 className="text-[14.5px] font-bold text-primary">Scorecard</h3>
-                      {display.kind === "provisional" && <Chip tone="blue">Provisional</Chip>}
-                    </div>
-                    <div className="flex flex-col gap-3.5">
-                      {session.dimensions.map((d) => (
-                        <button
-                          key={d.id}
-                          type="button"
-                          onClick={() => setOpenDetail(d)}
-                          className="group text-left w-full cursor-pointer rounded-lg -mx-2 px-2 py-1.5 hover:bg-[#fbfbf7] transition-colors">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-sm font-bold text-primary inline-flex items-center gap-1">
-                              {d.label}
-                              <ChevronRight className="h-3.5 w-3.5 text-black/25 group-hover:text-black/60 transition-colors" />
-                            </span>
-                            <span className="text-sm font-bold text-primary tabular-nums">{d.score}</span>
-                          </div>
-                          <ProgressBar value={d.score * 10} fillColor={d.score < 7 ? "#cddd54" : "#e1f073"} height="h-1.5" className="mb-1.5" />
-                          <p className="text-xs text-black/50 leading-relaxed">{d.note}</p>
-                        </button>
-                      ))}
-                      {unscoredDimensions.map((d) => (
-                        <UnjudgedRow key={d.id} dimension={d} />
-                      ))}
-                    </div>
-                  </DashCard>
-                )}
-
-                {hasSummary && (
-                  <div className="flex flex-col gap-5">
-                    {/* A saved report writes its note a line at a time, each tied to a
-                        moment in the recording; the joined note is the fallback. */}
-                    {session.summary && session.summary.length > 0 ? (
-                      <SummaryLines lines={session.summary} />
-                    ) : (
-                      <div className="bg-[#222325] text-white rounded-2xl p-5">
-                        <p className="text-[11px] font-bold tracking-[0.1em] uppercase text-secondary mb-2.5">Coach note</p>
-                        <p className="text-sm text-white/80 leading-relaxed">{session.coachNote}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {delivery}
+            {/* One column, read top to bottom: what to fix first, then each
+                answer, then the numbers behind it. Nothing sits beside
+                anything else, so the eye never has to cross the page. */}
+            {hasSummary &&
+              // A saved report writes its note a line at a time, each tied to a
+              // moment in the recording; the joined note is the fallback.
+              (session.summary && session.summary.length > 0 ? (
+                <SummaryLines lines={session.summary} title="Fix these first" />
+              ) : (
+                <div className="bg-[#222325] text-white rounded-2xl p-5">
+                  <p className="text-[11px] font-bold tracking-[0.1em] uppercase text-secondary mb-2.5">Fix these first</p>
+                  <p className="text-sm text-white/80 leading-relaxed">{session.coachNote}</p>
+                </div>
+              ))}
 
             {session.rewrites.length > 0 && (
               <DashCard className="p-0 overflow-hidden">
-                <p className="text-[14.5px] font-bold text-primary px-6 py-4 border-b border-black/8">
-                  {session.rewrites.length === 1 ? "One answer worth revisiting" : `${session.rewrites.length} answers worth revisiting`}
-                </p>
-                {session.rewrites.map((r) => (
+                <div className="px-6 py-4 border-b border-black/8">
+                  <p className="text-[14.5px] font-bold text-primary">Question by question</p>
+                  <p className="mt-0.5 text-xs text-black/50">What you said, what it was missing, and how it could land.</p>
+                </div>
+                {session.rewrites.map((r, index) => (
                   <div key={r.id} className="px-6 py-5 border-b border-black/6 last:border-b-0">
+                    <p className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-black/40 mb-1">Question {index + 1}</p>
                     <p className="text-sm font-bold text-primary mb-3">{r.question}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div className="rounded-xl border border-black/8 bg-[#fbfbf7] p-3.5">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <p className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-black/40">{session.mode === "voice" ? "What you said" : "What you typed"}</p>
-                          {r.atMs !== undefined && <TimestampChip atMs={r.atMs} endMs={r.endMs} />}
-                        </div>
-                        <p className="text-sm text-black/65 leading-relaxed">{r.said}</p>
-                      </div>
-                      <div className="rounded-xl border-2 border-[#222325] p-3.5 shadow-[3px_3px_0_0_#e1f073]">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-primary">A stronger version</p>
-                          <button type="button" onClick={() => navigator.clipboard?.writeText(r.better)} className="text-black/40 hover:text-primary cursor-pointer">
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <p className="text-sm text-primary leading-relaxed">{r.better}</p>
-                      </div>
+                    <div className="flex items-start gap-2.5 mb-2">
+                      <p className="min-w-0 flex-1 border-l-2 border-black/15 pl-3 text-sm italic text-black/60 leading-relaxed">“{r.said}”</p>
+                      {r.atMs !== undefined && <TimestampChip atMs={r.atMs} endMs={r.endMs} />}
                     </div>
-                    <p className="text-xs text-black/45 mt-2.5">{r.why}</p>
+                    <p className="text-sm text-black/65 leading-relaxed mb-3">
+                      <span className="font-bold text-primary">What it needed: </span>
+                      {r.why}
+                    </p>
+                    <div className="rounded-xl border-2 border-[#222325] p-3.5 shadow-[3px_3px_0_0_#e1f073]">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-primary">A stronger version</p>
+                        <button
+                          type="button"
+                          aria-label="Copy the stronger version"
+                          onClick={() => navigator.clipboard?.writeText(r.better)}
+                          className="text-black/40 hover:text-primary cursor-pointer">
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-sm text-primary leading-relaxed">{r.better}</p>
+                    </div>
                   </div>
                 ))}
               </DashCard>
             )}
+
+            {hasScorecard && (
+              <DashCard className="p-6">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h3 className="text-[14.5px] font-bold text-primary">Scorecard</h3>
+                  {display.kind === "provisional" && <Chip tone="blue">Short session</Chip>}
+                </div>
+                <div className="flex flex-col gap-3">
+                  {session.dimensions.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setOpenDetail(d)}
+                      className="group text-left w-full cursor-pointer rounded-lg -mx-2 px-2 py-1.5 hover:bg-[#fbfbf7] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="w-[150px] flex-none text-sm font-bold text-primary inline-flex items-center gap-1">
+                          {d.label}
+                          <ChevronRight className="h-3.5 w-3.5 text-black/25 group-hover:text-black/60 transition-colors" />
+                        </span>
+                        <ProgressBar value={d.score * 10} fillColor={d.score < 7 ? "#cddd54" : "#e1f073"} height="h-1.5" className="min-w-0 flex-1" />
+                        <span className="w-10 flex-none text-right text-sm font-bold text-primary tabular-nums">{d.score}/10</span>
+                      </div>
+                      <p className="mt-1 text-xs text-black/55 leading-relaxed">{d.note}</p>
+                    </button>
+                  ))}
+                  {unscoredDimensions.map((d) => (
+                    <UnjudgedRow key={d.id} dimension={d} />
+                  ))}
+                </div>
+              </DashCard>
+            )}
+
+            {delivery}
 
             <DashCard className="p-6">
               <div className="flex items-baseline justify-between mb-3.5">
@@ -577,7 +577,7 @@ const PrepReport: FC<PrepReportProps> = ({
     diction: (
       <>
         {(wordStats.length > 0 || confidence || confidenceUnjudged) && (
-          <div className={cn("grid grid-cols-1 gap-5 items-start", wordStats.length > 0 && (confidence || confidenceUnjudged) && "md:grid-cols-2")}>
+          <div className="flex flex-col gap-5">
             {wordStats.length > 0 && (
               <DashCard className="p-6">
                 <h3 className="text-[14.5px] font-bold text-primary mb-3.5">How you spoke</h3>
@@ -605,7 +605,7 @@ const PrepReport: FC<PrepReportProps> = ({
                   <h3 className="text-[14.5px] font-bold text-primary">{confidence.label}</h3>
                   <span className="text-sm font-bold text-primary tabular-nums">
                     {confidence.score} / 10
-                    {display.kind === "provisional" && <span className="font-normal text-black/50"> · provisional</span>}
+                    {display.kind === "provisional" && <span className="font-normal text-black/50"> · short session</span>}
                   </span>
                 </div>
                 <ProgressBar value={confidence.score * 10} fillColor={confidence.score < 7 ? "#cddd54" : "#e1f073"} height="h-1.5" className="mb-3" />
@@ -655,7 +655,7 @@ const PrepReport: FC<PrepReportProps> = ({
   const shown = tabs.some((t) => t.id === tab) ? tab : DEFAULT_REPORT_TAB;
 
   return (
-    <div className="max-w-[1000px] mx-auto flex flex-col gap-5">
+    <div className="max-w-[820px] mx-auto flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 hover:text-primary cursor-pointer w-fit">
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -680,7 +680,7 @@ const PrepReport: FC<PrepReportProps> = ({
           {/* Marked in words at the number itself, not only in the line beside it. */}
           {display.kind === "provisional" && (
             <Chip tone="blue" className="mb-0.5">
-              Provisional
+              Short session
             </Chip>
           )}
           {delta !== null && (

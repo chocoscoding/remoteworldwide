@@ -131,6 +131,8 @@ export interface EngineTurn {
   text: string;
   /** `typed` for an answer sent as text, which has no delivery to measure. */
   source: Extract<TurnSource, "voice" | "typed">;
+  /** An interviewer line as far as it has been spoken so far, shown while it is spoken. Display only. */
+  heard?: string;
 }
 
 /** What the turns do to the capture's timings. Times are on the session clock. */
@@ -155,6 +157,8 @@ export interface InterviewerTurns {
   /** The user talked over the interviewer; the turn's end follows. */
   interrupted: () => void;
   agentText: (text: string) => void;
+  /** The line being spoken, as far as it has been heard (engineSession's `onAgentHeard`). */
+  agentHeard: (textSoFar: string) => void;
   /**
    * A user turn, or null when it is noise or not a new one. With `eventId` a spoken
    * transcript is the same turn only when that id was heard already (or it is
@@ -226,6 +230,14 @@ export function createInterviewerTurns(conversationId: string, marks: EngineMark
       turns = turns.map((turn) => (turn.id === id ? { ...turn, text: shown } : turn));
       // The line as shown, not the chunk: half a split tag ("pause] Tell me") is only gone from the whole.
       aiText = shown;
+    },
+    agentHeard(textSoFar) {
+      // A tag still being spoken ("[warm") is not shown half-way; the rest goes the way `agentText` does.
+      const shown = shownInterviewerText(textSoFar.replace(/\[[^\]]*$/, ""));
+      if (!shown) return;
+      const id = aiTurnId();
+      noteAiTurn(id);
+      turns = turns.map((turn) => (turn.id === id ? { ...turn, heard: shown } : turn));
     },
     userText(text, source = "voice", eventId) {
       const said = text.trim();

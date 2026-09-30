@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FC, type KeyboardEvent } from "react";
-import { AlertTriangle, Loader2, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
+import { AlertTriangle, ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiMessage } from "@/app/lib/api/core";
 import { ariaTime, formatClock } from "@/app/lib/voice/format";
 import type { PlaybackLink } from "@/app/lib/voice/types";
@@ -366,38 +367,46 @@ const Scrubber: FC<ScrubberProps> = ({ title, durationMs, playing, disabled, con
   );
 };
 
-const RATE_LABEL: Record<PlaybackRate, string> = { 1: "1×", 1.25: "1.25×", 1.5: "1.5×" };
+const rateLabel = (rate: PlaybackRate) => `${rate}×`;
 
-/** Three pressed-state buttons on wide screens; one cycling button where the bar is narrow. */
+/** The speed it's playing at, with the others a click away. */
 const RateControl: FC<{ rate: PlaybackRate; disabled: boolean; onRate: (rate: PlaybackRate) => void }> = ({ rate, disabled, onRate }) => {
-  const next = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(rate) + 1) % PLAYBACK_RATES.length];
+  const [open, setOpen] = useState(false);
   return (
-    <>
-      <div role="group" aria-label="Playback speed" className="hidden flex-none items-center gap-0.5 rounded-lg bg-white/10 p-1 sm:inline-flex">
-        {PLAYBACK_RATES.map((r) => (
-          <button
-            key={r}
-            type="button"
-            disabled={disabled}
-            aria-pressed={r === rate}
-            onClick={() => onRate(r)}
-            className={cn(
-              "cursor-pointer rounded-md px-2 py-1 text-[11px] font-bold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-40",
-              r === rate ? "bg-white text-[#222325]" : "text-white/60 hover:text-white"
-            )}>
-            {RATE_LABEL[r]}
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onRate(next)}
-        aria-label={`Playback speed ${RATE_LABEL[rate]}. Change to ${RATE_LABEL[next]}`}
-        className="inline-flex h-9 min-w-[44px] flex-none cursor-pointer items-center justify-center rounded-lg bg-white/10 px-2 text-[11px] font-bold tabular-nums text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-40 sm:hidden">
-        {RATE_LABEL[rate]}
-      </button>
-    </>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={`Playback speed ${rateLabel(rate)}`}
+          className="inline-flex h-9 flex-none cursor-pointer items-center gap-1 rounded-lg bg-white/10 pl-2.5 pr-2 text-[11px] font-bold tabular-nums text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-40">
+          {rateLabel(rate)}
+          <ChevronDown className={cn("h-3.5 w-3.5 text-white/60 transition-transform", open && "rotate-180")} aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={6} className="w-28 rounded-xl border border-white/10 bg-[#222325] p-1 text-white shadow-lg">
+        <div role="listbox" aria-label="Playback speed" className="flex flex-col">
+          {PLAYBACK_RATES.map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="option"
+              aria-selected={r === rate}
+              onClick={() => {
+                onRate(r);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-bold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073]",
+                r === rate ? "bg-white text-[#222325]" : "text-white/70 hover:bg-white/10 hover:text-white",
+              )}>
+              {rateLabel(r)}
+              {r === 1 && <span className={cn("text-[10px] font-semibold", r === rate ? "text-black/45" : "text-white/35")}>Normal</span>}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 

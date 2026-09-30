@@ -71,7 +71,7 @@ export interface SeekOptions {
   play?: boolean;
 }
 
-export const PLAYBACK_RATES = [1, 1.25, 1.5] as const;
+export const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
 export type PlaybackRate = (typeof PLAYBACK_RATES)[number];
 
 export interface PlaybackControls {

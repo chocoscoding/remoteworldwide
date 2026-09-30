@@ -1020,6 +1020,11 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
           turns.agentText(text);
           publishInterviewer();
         },
+        onAgentHeard: (text) => {
+          if (closed) return;
+          turns.agentHeard(text);
+          publishInterviewer();
+        },
         onUserText: (text, _atMs, eventId) => {
           if (closed) return;
           turns.userText(text, "voice", eventId);

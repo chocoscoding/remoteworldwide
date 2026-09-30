@@ -24,22 +24,15 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 export const isLegacyTooShort = (session: Pick<PrepSession, "scoreEvidence" | "tooShort">): boolean => !session.scoreEvidence && session.tooShort;
 
 /**
- * Why there is no overall score, from the gates: too few dimensions judged, or
- * enough of them but too few about what was said (`minContentDimensions`).
+ * Why there is no overall score. Every session is scored now, so only a report
+ * written while dimensions were gated on evidence has none; it says so, and
+ * that a session run today would be scored.
  */
-function missingScoreReason(evidence: ScoreEvidence, total: number): { short: string; long: string } {
-  const { scoredDimensions: judged } = evidence;
-  // "1 of 6 parts", but "1 part" on its own.
-  const some = total > judged ? `${judged} of ${total} parts` : count(judged, "part");
-  if (judged < SCORE_RULES.minScoredDimensions) {
-    return {
-      short: judged === 0 ? "no part of the scorecard had enough to judge" : `only ${some} of the scorecard had enough to judge`,
-      long: `${judged === 0 ? "No part" : `Only ${some}`} of the scorecard had enough of your answers to judge, and an overall score needs at least ${SCORE_RULES.minScoredDimensions}.`,
-    };
-  }
+function missingScoreReason(evidence: ScoreEvidence): { short: string; long: string } {
+  const judged = evidence.scoredDimensions;
   return {
-    short: "too little about what you said could be judged",
-    long: `${count(judged, "part")} of the scorecard could be judged, but an overall score also needs at least ${SCORE_RULES.minContentDimensions} of them to be about what you said (how your answers were built and what was in them), and this session had fewer.`,
+    short: "this report is from before every session was scored",
+    long: `This report was written when a score needed enough of your answers to judge, and ${judged === 0 ? "no part" : `only ${count(judged, "part")}`} of the scorecard had it. Every session you run now is scored, however short.`,
   };
 }
 
@@ -84,23 +77,24 @@ function provisionalReason(session: ScoreFacts): { short: string; long: string }
  */
 export function scoreHeadline(display: ScoreDisplay, session: ScoreFacts): string | null {
   if (display.kind === "scored") return null;
-  if (display.kind === "provisional") return `Provisional — ${provisionalReason(session).short}`;
+  if (display.kind === "provisional") return `Short session — ${provisionalReason(session).short}`;
   if (isLegacyTooShort(session)) return "Not scored — the session was too short to score";
   const evidence = session.scoreEvidence;
   if (!evidence) return "Not scored — there wasn't enough to judge";
-  return `Not scored — ${missingScoreReason(evidence, session.dimensions.length + (session.unscoredDimensions?.length ?? 0)).short}`;
+  return `Not scored — ${missingScoreReason(evidence).short}`;
 }
 
-/** The Overall tab's explanation of a provisional or missing score, in full sentences. Null for a full score. */
+/**
+ * The Overall tab's explanation of a missing score, in full sentences. Null for
+ * any score: a short session's is real, and the header's one line says what it
+ * rests on — a card above the feedback would only push the feedback down.
+ */
 export function scoreExplanation(display: ScoreDisplay, session: ScoreFacts): string | null {
-  if (display.kind === "scored") return null;
-  if (display.kind === "provisional") {
-    return `${provisionalReason(session).long} So treat the score as a first read rather than a verdict: it doesn't count towards how prepared you are.`;
-  }
+  if (display.kind !== "unscored") return null;
   if (isLegacyTooShort(session)) return legacyTooShortReason(session);
   const evidence = session.scoreEvidence;
   if (!evidence) return "There wasn't enough in your answers to judge.";
-  return missingScoreReason(evidence, session.dimensions.length + (session.unscoredDimensions?.length ?? 0)).long;
+  return missingScoreReason(evidence).long;
 }
 
 /**

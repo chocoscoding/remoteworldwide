@@ -34,7 +34,7 @@ export function trackState(track: PrepTrack, now: Date): TrackState {
     // Derived from a past date, but it asks for an outcome rather than naming
     // a time — a clock in front of it would read as the interview being AT
     // "how did it go".
-    if (days < 0) return { label: "How did it go?", tone: "red", timed: false };
+    if (days < 0) return { label: "How did it go?", tone: "slate", timed: false };
     if (days === 0) return { label: "Today", tone: "red", timed: true };
     if (days === 1) return { label: "Tomorrow", tone: "red", timed: true };
     if (days <= 7) return { label: `In ${days} days`, tone: "blue", timed: true };

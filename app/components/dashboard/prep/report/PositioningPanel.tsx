@@ -4,7 +4,7 @@ import { useId, type FC } from "react";
 import { format as formatDate } from "date-fns";
 import { CircleCheck, CircleDashed, CircleDot, Quote, TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FORMAT_META, type TranscriptTurn } from "@/app/lib/dashboard/prep-data";
+import type { TranscriptTurn } from "@/app/lib/dashboard/prep-data";
 import {
   POSITIONING_AREAS,
   POSITIONING_AREA_LABELS,
@@ -116,7 +116,7 @@ const ReadyPositioning: FC<{ section: PositioningSection; index: AnswerIndex }> 
         </p>
         {nothingJudged && (
           <p className="mt-3 max-w-[600px] text-sm leading-relaxed text-black/70">
-            Nothing here could be judged yet, which is usual after a short interview. Each criterion names the kind of question that would show it.
+            None of these came up in this interview. The list below names a question for each, to practise with next time.
           </p>
         )}
         {tally.length > 0 && (
@@ -143,9 +143,49 @@ const ReadyPositioning: FC<{ section: PositioningSection; index: AnswerIndex }> 
       {criteria.length === 0 ? (
         <p className={cn(PANEL, "p-6 text-sm leading-relaxed text-black/55")}>The analysis finished without any criteria to show.</p>
       ) : (
-        POSITIONING_AREAS.map((area) => <AreaSection key={area} area={area} criteria={criteria.filter((c) => c.area === area)} posting={section.posting} index={index} />)
+        <>
+          {/* Judged criteria get the room; the rest are one compact list, not a card each. */}
+          {POSITIONING_AREAS.map((area) => (
+            <AreaSection
+              key={area}
+              area={area}
+              criteria={criteria.filter((c) => c.area === area && c.level !== "not-enough-evidence")}
+              index={index}
+            />
+          ))}
+          <NotShown criteria={criteria.filter((c) => c.level === "not-enough-evidence")} posting={section.posting} />
+        </>
       )}
     </>
+  );
+};
+
+/**
+ * The criteria this interview gave nothing on, in one list: each with the
+ * question that would show it, so the next session can go after them.
+ */
+const NotShown: FC<{ criteria: readonly PositioningCriterion[]; posting: PostingUsed | null }> = ({ criteria, posting }) => {
+  const headingId = useId();
+  if (criteria.length === 0) return null;
+  const needsPosting = criteria.some((c) => c.gap === "no-posting") && posting?.source !== "unavailable";
+  return (
+    <section aria-labelledby={headingId} className={cn(PANEL, "p-6")}>
+      <h4 id={headingId} className="text-[14.5px] font-bold text-primary">
+        Not shown in this interview
+      </h4>
+      <p className="mt-1 text-xs leading-relaxed text-black/50">
+        Nothing you said showed these either way. Practise with questions like these to show them next time.
+        {needsPosting && " Some need the job posting on this track first."}
+      </p>
+      <ul className="mt-4 flex flex-col divide-y divide-black/8">
+        {criteria.map((c) => (
+          <li key={c.id} className="flex flex-col gap-0.5 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:gap-4">
+            <span className="flex-none text-sm font-bold text-primary sm:w-[200px]">{c.label}</span>
+            <span className="min-w-0 text-sm leading-relaxed text-black/60">{c.probe.example.trim() ? `“${c.probe.example.trim()}”` : c.note}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 };
 
@@ -240,12 +280,7 @@ const RequirementTag: FC<{ n: number }> = ({ n }) => (
 // Areas and criteria
 // ---------------------------------------------------------------------------
 
-const AreaSection: FC<{ area: PositioningArea; criteria: readonly PositioningCriterion[]; posting: PostingUsed | null; index: AnswerIndex }> = ({
-  area,
-  criteria,
-  posting,
-  index,
-}) => {
+const AreaSection: FC<{ area: PositioningArea; criteria: readonly PositioningCriterion[]; index: AnswerIndex }> = ({ area, criteria, index }) => {
   const headingId = useId();
   if (criteria.length === 0) return null;
   return (
@@ -255,14 +290,14 @@ const AreaSection: FC<{ area: PositioningArea; criteria: readonly PositioningCri
       </h4>
       <div className="divide-y divide-black/10">
         {criteria.map((criterion) => (
-          <Criterion key={criterion.id} criterion={criterion} posting={posting} index={index} />
+          <Criterion key={criterion.id} criterion={criterion} index={index} />
         ))}
       </div>
     </section>
   );
 };
 
-const Criterion: FC<{ criterion: PositioningCriterion; posting: PostingUsed | null; index: AnswerIndex }> = ({ criterion: c, posting, index }) => (
+const Criterion: FC<{ criterion: PositioningCriterion; index: AnswerIndex }> = ({ criterion: c, index }) => (
   <article className="px-5 py-5 sm:px-6">
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
       <h5 className="text-sm font-bold text-primary">{c.label}</h5>
@@ -308,38 +343,5 @@ const Criterion: FC<{ criterion: PositioningCriterion; posting: PostingUsed | nu
       </div>
     )}
 
-    {c.level === "not-enough-evidence" && <Probe criterion={c} posting={posting} />}
   </article>
 );
-
-/**
- * For a criterion with no evidence: the kind of question that would give it
- * some. The note above already says why there is none; when that is the
- * posting rather than the answers, the question comes with what it needs
- * first, since no answer can make up for a posting that wasn't there.
- */
-const Probe: FC<{ criterion: PositioningCriterion; posting: PostingUsed | null }> = ({ criterion: { gap, probe }, posting }) => {
-  const lead =
-    gap === "no-posting"
-      ? posting?.source === "unavailable"
-        ? "With the posting read, a question like this would show it:"
-        : "Add the job posting to this track, and then a question like this would show it:"
-      : gap === "values-not-stated"
-        ? "Against a posting that states the company's values, a question like this would show it:"
-        : "A question like this would show it:";
-  const example = probe.example.trim();
-  return (
-    <div className="mt-3.5 rounded-xl border border-dashed border-black/20 bg-[#fbfbf7] p-3.5">
-      <p className={LABEL}>What would show this</p>
-      {example && (
-        <p className="mt-1.5 text-sm leading-relaxed text-black/70">
-          {lead} <span className="text-primary">“{example}”</span>
-        </p>
-      )}
-      <p className="mt-1.5 text-[11.5px] text-black/50">
-        {probe.kind.trim() && <>{probe.kind.trim()} · </>}
-        {FORMAT_META[probe.format].label} question
-      </p>
-    </div>
-  );
-};

@@ -32,6 +32,12 @@ export interface EngineOptions {
   /** Debounced: see AGENT_DRAIN_SETTLE_MS. */
   onAgentSpeakEnd: (atMs: number) => void;
   onAgentText: (text: string, atMs: number) => void;
+  /**
+   * The interviewer's current line as far as it has been SPOKEN, from the
+   * character timings the engine sends with its audio (`heardLine`). Never
+   * fires when the engine sends none; `onAgentText` still carries the line.
+   */
+  onAgentHeard?: (textSoFar: string) => void;
   /** `eventId`: the transcript's event_id when the client gives one; a redelivery repeats it. */
   onUserText: (text: string, atMs: number, eventId?: number) => void;
   onInterrupted: (atMs: number) => void;
@@ -219,6 +225,76 @@ const readSpectrum = (read: () => Uint8Array): Uint8Array | null => {
   }
 };
 
+/** One chunk's character timings, as `onAudioAlignment` gives them. */
+export interface AlignmentChunk {
+  chars: string[];
+  char_start_times_ms: number[];
+  char_durations_ms: number[];
+}
+
+/** How often the heard line is brought up to date while characters are due. */
+const HEARD_TICK_MS = 40;
+/** A character that ends a word. */
+const WORD_END = /[\s.,!?;:—–-]/;
+
+/**
+ * The interviewer's line as it is heard. Each audio chunk comes with the time
+ * of every character in it; a chunk plays once the one before it has finished,
+ * so its characters are due from then, and they are released as their moment
+ * passes. `stop` drops what was queued but not yet due — the rest of a line
+ * the candidate talked over was never heard — and `reset` starts a new line.
+ */
+export function heardLine(emit: (textSoFar: string) => void, clock: () => number = () => performance.now()) {
+  let heard = "";
+  let due: { at: number; ch: string }[] = [];
+  let playEnd = 0;
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  let emitted = "";
+  const tick = () => {
+    const t = clock();
+    while (due.length > 0 && due[0].at <= t) heard += due.shift()!.ch;
+    // Word by word, up to the last whole word — a line growing a letter at a
+    // time would re-render the screen for every one. Found by looking back
+    // rather than at the last letter, because a background tab's timer can
+    // release several words in one tick. A line with nothing left to come ends whole.
+    let whole = heard.length;
+    if (due.length > 0) while (whole > 0 && !WORD_END.test(heard[whole - 1])) whole--;
+    if (whole > emitted.length) {
+      emitted = heard.slice(0, whole);
+      emit(emitted);
+    }
+    if (due.length === 0 && timer !== null) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+  const stop = () => {
+    due = [];
+    if (timer !== null) clearInterval(timer);
+    timer = null;
+  };
+
+  return {
+    add({ chars, char_start_times_ms: starts, char_durations_ms: durations }: AlignmentChunk) {
+      if (!Array.isArray(chars) || chars.length === 0) return;
+      const start = Math.max(clock(), playEnd);
+      chars.forEach((ch, i) => due.push({ at: start + (Number(starts[i]) || 0), ch }));
+      const last = chars.length - 1;
+      playEnd = start + (Number(starts[last]) || 0) + (Number(durations[last]) || 0);
+      timer ??= setInterval(tick, HEARD_TICK_MS);
+      tick();
+    },
+    stop,
+    reset() {
+      stop();
+      heard = "";
+      emitted = "";
+      playEnd = 0;
+    },
+  };
+}
+
 /**
  * Starts a conversation on a minted signed URL. Null when it could not start,
  * after `onError` has said why. For the interview that is fatal: abandon the
@@ -234,6 +310,12 @@ export async function startEngine(o: EngineOptions, deps: EngineDeps = defaultDe
   let status: "connecting" | "connected" | "disconnected" | null = null;
 
   const now = () => o.clock.now();
+  const onHeard = o.onAgentHeard;
+  const heard = onHeard
+    ? heardLine((text) => {
+        if (!ended) onHeard(text);
+      })
+    : null;
   const setStatus = (next: "connecting" | "connected" | "disconnected") => {
     if (status === next || status === "disconnected") return;
     status = next;
@@ -245,6 +327,8 @@ export async function startEngine(o: EngineOptions, deps: EngineDeps = defaultDe
   };
   const closeAgentTurn = (atMs: number) => {
     cancelSettle();
+    // The next line is heard from its own first character.
+    heard?.reset();
     if (!agentSpeaking) return;
     agentSpeaking = false;
     o.onAgentSpeakEnd(atMs);
@@ -286,9 +370,14 @@ export async function startEngine(o: EngineOptions, deps: EngineDeps = defaultDe
         closeAgentTurn(settleFrom);
       }, AGENT_DRAIN_SETTLE_MS);
     },
+    onAudioAlignment: (alignment) => {
+      if (!ended) heard?.add(alignment);
+    },
     onInterruption: () => {
       if (ended) return;
       const at = now();
+      // What was queued past this point was never heard.
+      heard?.stop();
       cancelSettle();
       o.onInterrupted(at);
       closeAgentTurn(at);
@@ -309,6 +398,7 @@ export async function startEngine(o: EngineOptions, deps: EngineDeps = defaultDe
       report(code, code === "mic" || code === "auth" || !isOpen());
     },
     onDisconnect: (details) => {
+      heard?.stop();
       closeAgentTurn(turnEndAt());
       if (details.reason === "error" && details.context?.type !== "max_duration_exceeded") {
         const code = classifyEngineError({ message: details.message, closeCode: details.closeCode, closeReason: details.closeReason }, details.context);

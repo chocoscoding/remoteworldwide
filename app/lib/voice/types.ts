@@ -162,27 +162,23 @@ export const PREP_LIMITS = {
 } as const;
 
 /**
- * When a report has a score, and how far it can be trusted. The first three
- * are the charge rule (under any of them a session is `tooShort` and not
- * charged); the rest are the evidence gates a dimension must pass to be scored.
+ * The charge rule (under any of the first three a session is `tooShort`, not
+ * charged, and provisional), and what counts as an answer. Every session is
+ * scored, however short.
  */
 export const SCORE_RULES = {
   minAnswers: 2,
   minSpeechMs: 30_000,
   minTypedWords: 30,
   minAnswerWords: 5,
-  minContentWords: 30,
-  minFirstPersonMentions: 3,
-  minJudgedSpeechMs: 15_000,
-  minScoredDimensions: 4,
-  minContentDimensions: 2,
 } as const;
 
 /**
- * - `full`: long enough to charge, and enough dimensions had evidence.
- * - `provisional`: too short to charge, but scored from the dimensions that had
- *   evidence. Show it labelled; it never counts towards preparedness.
- * - `none`: too few dimensions had evidence; there is no overall score.
+ * - `full`: long enough to charge.
+ * - `provisional`: too short to charge. Scored all the same; show it labelled
+ *   as a short session. It never counts towards preparedness.
+ * - `none`: no overall score — only on reports written before every session
+ *   was scored.
  */
 export const SCORE_CONFIDENCES = ["full", "provisional", "none"] as const;
 export type ScoreConfidence = (typeof SCORE_CONFIDENCES)[number];
@@ -191,7 +187,7 @@ export type ScoreConfidence = (typeof SCORE_CONFIDENCES)[number];
 export const SCORE_REASONS = ["few-answers", "little-speech", "few-words", "little-evidence"] as const;
 export type ScoreReason = (typeof SCORE_REASONS)[number];
 
-/** The evidence gate an unscored dimension missed. */
+/** The evidence gate an unscored dimension missed, on a report written while dimensions were gated; new reports have none. */
 export const DIMENSION_GATES = ["few-words", "few-mentions", "no-questions", "little-speech", "no-timings", "short-session"] as const;
 export type DimensionGate = (typeof DIMENSION_GATES)[number];
 

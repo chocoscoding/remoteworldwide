@@ -487,7 +487,7 @@ const PrepHub: FC<PrepHubProps> = ({
                     : lastSession.score === null
                       ? "not scored"
                       : lastSession.provisional
-                        ? `${lastSession.score}/100 · provisional`
+                        ? `${lastSession.score}/100 · short session`
                         : `${lastSession.score}/100`}
                 </p>
                 <button type="button" onClick={() => onViewReport(lastSession.id)} className={BUTTON_OUTLINE}>
@@ -577,7 +577,7 @@ const PrepHub: FC<PrepHubProps> = ({
                     <span className="block text-xs text-black/45">
                       {formatDate(new Date(s.at), "EEE d MMM")} · {s.length}
                       {s.cost && ` · ${s.cost}`}
-                      {s.provisional && " · provisional score"}
+                      {s.provisional && " · short session"}
                     </span>
                   </button>
                   {chip ? (

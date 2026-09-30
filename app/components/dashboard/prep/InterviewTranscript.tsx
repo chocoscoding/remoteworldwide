@@ -17,7 +17,7 @@
 // gets a fresh `useState(true)` and a fresh jump to the newest turn, with no
 // state synchronisation to get wrong.
 
-import { useCallback, useLayoutEffect, useRef, useState, type FC } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FC } from "react";
 import { ArrowDown, ChevronDown, Loader2, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +27,56 @@ export interface TranscriptEntry {
   text: string;
   /** Marks the turn being spoken right now, so it can be flagged as live. */
   speaking?: boolean;
+  /**
+   * How a line being spoken is shown: `heard` is already only what has been
+   * said (the engine's audio timings); `paced` is the whole line, revealed a
+   * word at a time at speaking pace. Absent: shown whole.
+   */
+  stream?: "heard" | "paced";
 }
+
+/** Roughly how fast the interviewer talks, for a line with no timings of its own. */
+const PACED_WORDS_PER_SECOND = 2.8;
+
+/**
+ * A spoken line, streamed. `paced` counts from when the line started being
+ * spoken (this mounted with it, as "…"), not from when its words arrived, so
+ * words that land late catch up with the voice instead of starting over.
+ */
+const StreamedLine: FC<{ text: string; stream?: TranscriptEntry["stream"] }> = ({ text, stream }) => {
+  const startedAt = useRef<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const pieces = text.split(/(\s+)/);
+  const words = pieces.filter((p) => p.trim()).length;
+  const shown = stream === "paced" ? Math.floor((elapsedMs / 1000) * PACED_WORDS_PER_SECOND) + 1 : words;
+  const done = shown >= words;
+  useEffect(() => {
+    startedAt.current = performance.now();
+  }, []);
+  useEffect(() => {
+    if (stream !== "paced" || done) return;
+    const id = setInterval(() => setElapsedMs(performance.now() - (startedAt.current ?? performance.now())), 1000 / PACED_WORDS_PER_SECOND);
+    return () => clearInterval(id);
+  }, [stream, done]);
+
+  let out = text;
+  if (stream === "paced" && !done) {
+    let seen = 0;
+    out = "";
+    for (const piece of pieces) {
+      if (piece.trim() && ++seen > shown) break;
+      out += piece;
+    }
+  }
+  return (
+    <>
+      {out}
+      {stream && !(stream === "paced" && done) && (
+        <span aria-hidden className="ml-0.5 inline-block h-3.5 w-[2px] translate-y-0.5 animate-pulse rounded-full bg-current opacity-60" />
+      )}
+    </>
+  );
+};
 
 export interface InterviewTranscriptProps {
   entries: TranscriptEntry[];
@@ -140,7 +189,11 @@ const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill
                     : "bg-[#f0f0ea] text-primary",
                 entry.who === "user" && !entry.text && "font-normal italic"
               )}>
-              {entry.text || "Answered out loud. Your report will show what you said."}
+              {entry.stream ? (
+                <StreamedLine text={entry.text} stream={entry.stream} />
+              ) : (
+                entry.text || "Answered out loud. Your report will show what you said."
+              )}
             </p>
           </div>
         ))}

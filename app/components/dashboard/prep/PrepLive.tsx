@@ -683,7 +683,6 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
     },
     [start],
   );
-  const totalSeconds = config.lengthMinutes * 60;
   const interim = engine
     ? ""
     : recording
@@ -1654,10 +1653,15 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
   );
 
   /** The transcript, in the shape the panel takes. An engine turn speaking before its words arrive shows as "…". */
-  const transcriptEntries: TranscriptEntry[] = shownTurns.flatMap((turn, i) => {
+  const transcriptEntries: TranscriptEntry[] = shownTurns.flatMap((turn, i): TranscriptEntry[] => {
     const speaking = agentSpeaking && turn.who === "ai" && i === shownTurns.length - 1;
     if (turn.who === "ai" && !turn.text && !speaking) return [];
-    return [{ id: turn.id, who: turn.who, text: turn.who === "ai" && !turn.text ? "…" : turn.text, speaking }];
+    // A line being spoken streams in rather than landing whole: word by word as
+    // it is heard when the engine times its audio, else paced from the line.
+    const heard = speaking ? capture.engineTurns.find((own) => own.id === turn.id)?.heard : undefined;
+    if (heard) return [{ id: turn.id, who: turn.who, text: heard, speaking, stream: "heard" as const }];
+    // Paced from the "…" on: the line's clock starts when the voice does, not when its words arrive.
+    return [{ id: turn.id, who: turn.who, text: turn.who === "ai" && !turn.text ? "…" : turn.text, speaking, ...(speaking ? { stream: "paced" as const } : {}) }];
   });
 
   // The engine's latest line: shown as the session's question when it asks one.
@@ -1721,10 +1725,9 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
             +{perExtra} credit{perExtra === 1 ? "" : "s"} per extra minute
           </span>
         )}
+        {/* Time so far only: the session's limit isn't a countdown to watch, and the minute-left warning still says when it's close. */}
         <span className="text-xs font-bold tabular-nums flex-none">
-          {recording
-            ? `${formatRecordingClock(capture.elapsedMs)} / ${formatRecordingClock(capture.capMs ?? 0)}`
-            : `${formatClock(elapsedSeconds)} / ${formatClock(totalSeconds)}`}
+          {recording ? formatRecordingClock(capture.elapsedMs) : formatClock(elapsedSeconds)}
         </span>
         <div className="flex gap-2 flex-none">
           {/* The candidate's own mic, in every kind of session. Muted is red
