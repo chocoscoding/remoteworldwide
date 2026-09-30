@@ -44,16 +44,6 @@ export interface ReferralPerson {
   email: ReferralEmail | null;
 }
 
-export interface ReferralOpenRole {
-  url: string;
-  title: string;
-  /** The title names what the job being referred for does. */
-  sameRole: boolean;
-  /** On the company's own site or job board rather than an aggregator. */
-  official: boolean;
-  publishedDate: string | null;
-}
-
 export interface ReferralInbox {
   email: string;
   source: string;
@@ -75,7 +65,6 @@ export interface ReferralSearchItem {
   company: string;
   role: string;
   people: ReferralPerson[];
-  openRoles: ReferralOpenRole[];
   inboxes: ReferralInbox[];
   companyPhone: ReferralPhone | null;
   emailFormat: ReferralEmailFormat | null;

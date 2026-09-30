@@ -1,7 +1,7 @@
 "use client";
 
 // Referral search results for one saved job: the people at its company that a
-// web search found, the open roles near it, and how to reach the company.
+// web search found, and how to reach the company.
 //
 // Nothing searches on its own. A search costs a credit, so it runs from a click
 // and is stored; opening the screen again shows the stored one for free, and
@@ -18,7 +18,7 @@
 
 import { FC, Fragment, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BookmarkCheck, BookmarkPlus, Briefcase, Copy, Globe, Linkedin, Loader2, Mail, PenLine, Phone, RotateCw, Search, SearchX } from "lucide-react";
+import { BookmarkCheck, BookmarkPlus, Copy, Globe, Linkedin, Loader2, Mail, PenLine, Phone, RotateCw, Search, SearchX } from "lucide-react";
 import TimeAgo from "timeago-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -130,7 +130,7 @@ const StartCard: FC<{ company: string; role: string; onStart: () => void }> = ({
         <p className="text-[15px] font-bold text-primary">Find the people who can get you into {company}</p>
         <p className="mt-1.5 text-sm leading-relaxed text-black/60">
           We search LinkedIn and the web for whoever is likely hiring for {role || "this role"}, the recruiters, and the team doing the
-          work, with profile links, likely work emails and open roles near this one.
+          work, with profile links and likely work emails.
         </p>
         <p className="mt-2 text-xs text-black/50">1 credit per search, and only when it finds someone. Coming back to it later is free.</p>
       </div>
@@ -176,7 +176,7 @@ const Results: FC<ResultsProps> = ({ search, company, askedIds, draftingId, onDr
   const total = search.people.length;
   const kept = useKeptPeople(search.people, company);
   const groups = GROUPS.map((g) => ({ ...g, people: search.people.filter((p) => p.group === g.id) })).filter((g) => g.people.length > 0);
-  const nothing = total === 0 && search.openRoles.length === 0;
+  const nothing = total === 0;
 
   return (
     <>
@@ -219,7 +219,6 @@ const Results: FC<ResultsProps> = ({ search, company, askedIds, draftingId, onDr
         </Fragment>
       ))}
 
-      {search.openRoles.length > 0 && <OpenRoles search={search} company={company} />}
       <ReachingCompany search={search} company={company} />
     </>
   );
@@ -419,57 +418,6 @@ const PersonRow: FC<PersonRowProps> = ({ person, asked, selected, onDraft, saved
         </StickerButton>
       )}
     </div>
-  );
-};
-
-const OpenRoles: FC<{ search: ReferralSearchItem; company: string }> = ({ search, company }) => {
-  const [showAll, setShowAll] = useState(false);
-  const roles = showAll ? search.openRoles : search.openRoles.slice(0, PREVIEW);
-
-  return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-bold text-primary">
-          Open roles near this one <span className="font-normal text-black/45 tabular-nums">{search.openRoles.length}</span>
-        </h3>
-        <span className="text-xs text-black/55">From {company}&apos;s job board and around the web</span>
-      </div>
-      <DashCard className="overflow-hidden p-0">
-        <ul className="flex flex-col divide-y divide-black/8">
-          {roles.map((r) => (
-            <li key={r.url}>
-              <a
-                href={r.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="group flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[#fbfbf7]">
-                <span className="grid h-8 w-8 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
-                  <Briefcase className="h-4 w-4 text-[#222325]" aria-hidden />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-primary">{r.title}</span>
-                  <span className="block truncate text-[11px] text-black/50">
-                    {hostOf(r.url)}
-                    {r.publishedDate && ` · posted ${new Date(r.publishedDate).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
-                  </span>
-                </span>
-                {r.sameRole && <Pill variant="positive">This role</Pill>}
-                {r.official && <Pill variant="neutral">Company board</Pill>}
-                <ArrowUpRight className="h-4 w-4 flex-none text-black/35 transition-colors group-hover:text-primary" aria-hidden />
-              </a>
-            </li>
-          ))}
-        </ul>
-        {search.openRoles.length > PREVIEW && (
-          <button
-            type="button"
-            onClick={() => setShowAll((v) => !v)}
-            className="w-full cursor-pointer border-t border-black/8 px-5 py-2.5 text-left text-xs font-semibold text-black/55 transition-colors hover:bg-[#fbfbf7] hover:text-primary">
-            {showAll ? "Show fewer" : `Show all ${search.openRoles.length}`}
-          </button>
-        )}
-      </DashCard>
-    </section>
   );
 };
 

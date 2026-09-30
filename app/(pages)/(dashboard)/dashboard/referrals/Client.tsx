@@ -6,7 +6,7 @@
 // reach them, and what do I say? So you pick a job (one of ours, or paste any
 // posting), and everything below is about that job: the people you already
 // know at its company, a web search for the people there (WebReferrals —
-// LinkedIn profiles, likely work emails, open roles near it) and an intro
+// LinkedIn profiles, likely work emails) and an intro
 // written for that person and that role.
 //
 // Your own network is the other tab: the contacts you brought in — LinkedIn
