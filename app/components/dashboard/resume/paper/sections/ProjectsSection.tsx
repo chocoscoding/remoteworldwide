@@ -19,7 +19,7 @@ export interface ProjectsSectionProps {
  */
 const ProjectsSection: FC<ProjectsSectionProps> = ({ content, design }) => {
   if (content.projects.length === 0) {
-    return <p className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No projects added yet.</p>;
+    return <p data-resume-placeholder className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No projects added yet.</p>;
   }
   const LinkIcon = ICON_SETS[design.header.iconSet].link;
   return (

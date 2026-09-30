@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { requireAdmin } from "@/app/lib/auth/require-admin";
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import slugify from "slugify";
@@ -49,9 +49,8 @@ export async function GET(req: NextRequest) {
 //create one company
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const denied = await requireAdmin();
+    if (denied) return denied;
 
     const { name, about, logo, website, linkedin, twitter, facebook } = await req.json();
     const slug = slugify(name, {

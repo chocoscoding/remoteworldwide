@@ -12,7 +12,10 @@ import "react-toastify/dist/ReactToastify.css";
 import Script from "next/script";
 import SiteJsonLd from "./components/SiteJsonLd";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "./lib/seo";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Downtime from "./components/Downtime";
+
 const font = Manrope({
   subsets: ["latin-ext"],
   weight: ["200", "300", "400", "500", "700"],
@@ -23,9 +26,8 @@ export const metadata: Metadata = {
   description: "Get worldwide remote jobs and get hired in no time! - With Remote Worldwide",
   icons: "/favicon.ico",
   metadataBase: new URL(SITE_URL),
-  alternates: {
-    canonical: "/",
-  },
+  // No canonical here: every page without its own inherited "/", which told Google
+  // those pages were copies of the homepage. The homepage sets "/" itself.
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
@@ -43,6 +45,11 @@ export const metadata: Metadata = {
   keywords: ["job", "remote", "remote work", "remote worldwide", "work", "remote jobs", "tech jobs", "worldwide jobs"],
 };
 
+// Server-only, so the banner costs nothing until there is an incident. Setting
+// it needs an env change and a redeploy; if you ever need it without one, read
+// it here from Edge Config or the backend's /api/status instead.
+const downtimeMessage = process.env.DOWNTIME_MESSAGE?.trim();
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -51,8 +58,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script strategy="afterInteractive" src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_TOKEN}`} />
-        <Script strategy="afterInteractive" id="google-analytics">
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_TOKEN}`}
+        />
+        <Script
+          strategy="afterInteractive"
+          id="google-analytics">
           {`
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
@@ -60,7 +72,9 @@ export default function RootLayout({
 
   gtag('config', '${process.env.GOOGLE_ANALYTICS_TOKEN}');`}
         </Script>
-        <Script strategy="afterInteractive" id="hotjar">
+        <Script
+          strategy="afterInteractive"
+          id="hotjar">
           {`(function(h,o,t,j,a,r){
         h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
         h._hjSettings={hjid:6481023,hjsv:6};
@@ -72,9 +86,15 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`${font.className} antialiased`}>
+        <Analytics />
+        <SpeedInsights />
         <SiteJsonLd />
-        <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
-        <Downtime />
+        <NextTopLoader
+          color="#000000"
+          shadow="0 0 10px #000000,0 0 5px #000000"
+          showSpinner={false}
+        />
+        {downtimeMessage && <Downtime message={downtimeMessage} />}
         <ToastContainer
           className={"z-50"}
           position="bottom-right"

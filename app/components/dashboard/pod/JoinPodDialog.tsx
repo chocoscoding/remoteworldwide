@@ -25,8 +25,10 @@ const JoinPodDialog: FC<JoinPodDialogProps> = ({ open, onOpenChange }) => {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  function submit() {
-    const result = joinWithCode(value);
+  // Awaited rather than called plainly: the mock provider answers synchronously
+  // and the live one goes to the API, and `await` reads both the same way.
+  async function submit() {
+    const result = await joinWithCode(value);
     if (result !== "joined") {
       setError(JOIN_REFUSAL[result]);
       return;

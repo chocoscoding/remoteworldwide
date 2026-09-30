@@ -25,7 +25,7 @@ const BookmarkClient = () => {
     const fetchBookmarks = async () => {
       setLoading(true); // Set loading to true before fetching data
       try {
-        const { data: fetchedJobs, count: total } = await getAllBookmarksForUser(data.user!.id, currentPage);
+        const { data: fetchedJobs, count: total } = await getAllBookmarksForUser(currentPage);
         setBookmarks(fetchedJobs);
         console.log(total);
         setTotalBookmarks(total);
@@ -55,7 +55,7 @@ const BookmarkClient = () => {
     try {
       setBookmarks((prevJobs) => prevJobs.filter((bookmark) => bookmark.job.id !== id));
       setTotalBookmarks((prevTotal) => prevTotal - 1);
-      await deleteBookmarkForUser(data!.user!.id, id);
+      await deleteBookmarkForUser(id);
     } catch {
       toast.error("Error encountered removing bookmark");
     }

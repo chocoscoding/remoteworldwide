@@ -23,17 +23,20 @@
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
 import { useSettingsQuery } from "@/hooks/queries/useSettingsQuery";
 import { useSaveSettingsSection, type SettingsSection } from "@/hooks/mutations/useSettingsMutations";
+import { cleanEducation, experienceToSave } from "@/app/lib/onboarding/profile";
 import type {
   Availability,
+  ExperienceBand,
   JobPreferences,
   NotificationSettings,
   PrivacySettings,
+  ProfileEducation,
   ProfileSettings,
   RemotePolicy,
   Settings,
 } from "@/app/lib/settings/types";
 
-export type { Availability, RemotePolicy };
+export type { Availability, ExperienceBand, RemotePolicy };
 export type ProfileState = ProfileSettings;
 export type PreferencesState = JobPreferences;
 export type NotificationsState = NotificationSettings;
@@ -95,8 +98,16 @@ export const SettingsProvider: FC<{ initial: Settings; children: ReactNode }> = 
     setDrafts((prev) => ({ ...prev, [section]: { ...prev[section], ...patch } }));
 
   function save(section: SettingsSection) {
-    const patch = drafts[section];
-    if (Object.keys(patch).length === 0) return;
+    const draft = drafts[section];
+    if (Object.keys(draft).length === 0) return;
+    // Education is edited with room for a row still being typed into; the
+    // backend takes only rows that name a school (the page holds Save while a
+    // half-filled one is on screen), so the empty ones stay behind here. Work
+    // experience the same way: only roles with a title or a company, cleaned.
+    let patch = draft;
+    if (section === "profile" && drafts.profile.education)
+      patch = { ...patch, education: drafts.profile.education.map((entry) => cleanEducation(entry)).filter((entry): entry is ProfileEducation => entry !== null) };
+    if (section === "profile" && drafts.profile.experience) patch = { ...patch, experience: experienceToSave(drafts.profile.experience) };
     mutations[section].mutate(patch as never, {
       // Only the saved section's draft clears; edits elsewhere are untouched.
       onSuccess: () => setDrafts((prev) => ({ ...prev, [section]: {} })),

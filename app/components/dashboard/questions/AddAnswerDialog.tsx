@@ -25,6 +25,7 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
   const [q, setQ] = useState("");
   const [a, setA] = useState("");
   const [cat, setCat] = useState<QaItem["cat"]>("screening");
+  const [saving, setSaving] = useState(false);
 
   function reset() {
     setQ("");
@@ -32,18 +33,24 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
     setCat("screening");
   }
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!q.trim() || !a.trim()) return;
+    if (!q.trim() || !a.trim() || saving) return;
 
-    const result = addAnswer({ q, a, cat });
+    setSaving(true);
+    const result = await addAnswer({ q, a, cat });
+    setSaving(false);
+    // Null: the save failed and the provider already said why. The dialog stays
+    // open with what was typed, so nothing is lost.
+    if (!result) return;
     if (result.added) {
-      toast.success("Answer saved", { description: "Available to the extension on every future application." });
+      toast.success("Answer saved", { description: "Reused whenever we draft answers for an application." });
       reset();
       onOpenChange(false);
     } else {
-      // Dedupe surfaces rather than silently creating a second entry that
-      // would make the extension's pick ambiguous.
+      // The server's key decided this is a question already saved. Surfaced
+      // rather than silently creating a second entry that would make the pick
+      // ambiguous.
       toast("You've already answered that", { description: result.existing.q });
     }
   }
@@ -83,6 +90,8 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="e.g. What's your preferred start date?"
                   required
+                  // The library keys a question on its first 400 characters, so it refuses longer ones.
+                  maxLength={400}
                   className={cn(FIELD, "h-10")}
                 />
               </div>
@@ -106,8 +115,8 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                     </span>
                     <span className="mt-2.5 block text-xs font-semibold normal-case tracking-normal text-primary">Demographics</span>
                     <span className="mt-0.5 block text-xs font-normal normal-case leading-relaxed tracking-normal text-black/55">
-                      Optional diversity questions — gender, ethnicity, veteran status. Never required, and the extension leaves them blank
-                      unless you turn that on.
+                      Optional diversity questions — gender, ethnicity, veteran status. Never required, and never guessed: only an answer
+                      you save here is ever used.
                     </span>
                   </DashTooltip>
                 </div>
@@ -130,8 +139,8 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
             </div>
 
             <div className="mt-6 flex items-center gap-2.5">
-              <StickerButton type="submit" variant="primary" size="md" disabled={!q.trim() || !a.trim()}>
-                Save answer
+              <StickerButton type="submit" variant="primary" size="md" disabled={!q.trim() || !a.trim() || saving}>
+                {saving ? "Saving…" : "Save answer"}
               </StickerButton>
               <button
                 type="button"

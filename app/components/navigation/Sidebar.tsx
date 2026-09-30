@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles, LifeBuoy } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -61,6 +61,20 @@ const menuItemsForAdmin: MenuItem[] = [
     path: "/automation",
     section: "automation",
   },
+  // The reviewer programme: put a candidate in front of a company.
+  {
+    name: "Recommendations",
+    icon: Sparkles,
+    path: "/recommendations",
+    section: "recommendations",
+    subItems: [
+      { label: "New recommendation", path: "/recommendations/create" },
+      { label: "Recommendations", path: "/recommendations" },
+    ],
+  },
+  // Pages the extension couldn't read, sent in for review with "Request support".
+  { name: "Coverage requests", icon: LifeBuoy, path: "/coverage", section: "coverage" },
+  { name: "STT lab", icon: AudioLines, path: "/stt-lab", section: "stt-lab" },
 ];
 const menuItemsForAuthor: MenuItem[] = [
   { name: "Home", icon: Home, path: "/", section: "home" },
@@ -93,6 +107,10 @@ const Sidebar = ({ hasAuthorProfile }: { hasAuthorProfile: boolean }) => {
       setOpenAccordion("filters");
     } else if (pathname.includes("/companies")) {
       setOpenAccordion("companies");
+    } else if (pathname.includes("/recommendations")) {
+      setOpenAccordion("recommendations");
+    } else if (pathname.includes("/coverage")) {
+      setOpenAccordion("coverage");
     } else {
       setOpenAccordion("home");
     }

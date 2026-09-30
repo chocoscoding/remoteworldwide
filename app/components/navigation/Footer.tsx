@@ -7,9 +7,10 @@ import { FaTelegram } from "react-icons/fa6";
 import { LinkedInIcon } from "@/components/ui/linkedin-icon";
 import { TwitterIcon } from "@/components/ui/twitter-icon";
 
+// Same words as the navbar: Google leans on consistent link text when it names sitelinks.
 const links = [
   {
-    title: "Find Jobs",
+    title: "Jobs",
     href: "/jobs",
   },
   {
@@ -17,8 +18,16 @@ const links = [
     href: "/companies",
   },
   {
-    title: "Blogs",
+    title: "Blog",
     href: "/blogs",
+  },
+  {
+    title: "Pricing",
+    href: "/pricing",
+  },
+  {
+    title: "Early access",
+    href: "/waitlist",
   },
   {
     title: "Privacy Policy",

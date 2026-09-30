@@ -50,3 +50,26 @@ export const publisherNode = {
   url: SITE_URL,
   logo: { "@type": "ImageObject", url: LOGO_URL },
 };
+
+/**
+ * Structured data as the body of a `<script type="application/ld+json">`. Every `<`
+ * is escaped, so text from a scraped posting (a job description is HTML) can never
+ * close the script tag early and inject markup into the page.
+ */
+export function jsonLd(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
+/** A BreadcrumbList, so Google shows "Remote Worldwide › Jobs › …" in place of a bare URL. */
+export function breadcrumbJsonLd(items: { name: string; path: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: absoluteUrl(item.path),
+    })),
+  };
+}

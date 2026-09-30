@@ -6,28 +6,32 @@ import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { scoreApplication } from "@/app/lib/dashboard/ats-stub";
 import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 
 /**
- * Every resume, scored live — the same scoreApplication() the results view
- * uses, so this table can never disagree with a scan. Actions thread into the
- * real flow rather than jumping to a view about a different resume. Archive
- * state lives on the shared document itself, so My documents agrees.
+ * Every resume, with the scores actually run against it.
+ *
+ * A score costs a credit, so this table shows what has been scanned rather
+ * than scoring a dozen resumes to draw a column — which is what it did while
+ * the number came from a mock. Actions thread into the real flow rather than
+ * jumping to a view about a different resume. Archive state lives on the
+ * shared document itself, so My documents agrees.
  */
 export interface AtsResumesTableProps {
   resumes: VaultDoc[];
+  /** General scores from scans run this session, by document id. */
+  scores: ReadonlyMap<string, number>;
   onToggleArchive: (id: string) => void;
   onGeneral: (id: string) => void;
   onVsJob: (id: string) => void;
 }
 
-const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, onToggleArchive, onGeneral, onVsJob }) => (
+const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, scores, onToggleArchive, onGeneral, onVsJob }) => (
   <DashCard className="p-0 overflow-hidden">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/8 px-6 py-4">
       <p className="text-[15px] font-bold text-primary">All your resumes, scored</p>
-      <p className="text-xs text-black/45">General is against your target niche; job scores are against a specific posting</p>
+      <p className="text-xs text-black/45">General reads the resume on its own; a job score is against a specific posting</p>
     </div>
 
     <div className="hidden items-center gap-4 border-b border-black/6 bg-[#fbfbf7] px-6 py-2.5 text-[11px] font-bold uppercase tracking-[0.06em] text-black/40 sm:flex">
@@ -40,7 +44,7 @@ const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, onToggleArchive, o
     {resumes.map((r) => {
       const archived = !!r.archived;
       const badge = sourceBadgeLabel(r.source);
-      const general = scoreApplication(r.id, undefined).score;
+      const general = scores.get(r.id);
       return (
         <div
           key={r.id}
@@ -56,8 +60,14 @@ const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, onToggleArchive, o
           </div>
 
           <div className="flex w-28 flex-none items-center gap-2">
-            <span className="text-base font-bold text-primary tabular-nums">{general}</span>
-            <ProgressBar value={general} fillColor={general >= 80 ? "#e1f073" : "#cddd54"} height="h-1.5" className="w-11" />
+            {general == null ? (
+              <span className="text-xs text-black/40">Not scored yet</span>
+            ) : (
+              <>
+                <span className="text-base font-bold text-primary tabular-nums">{general}</span>
+                <ProgressBar value={general} fillColor={general >= 80 ? "#e1f073" : "#cddd54"} height="h-1.5" className="w-11" />
+              </>
+            )}
           </div>
 
           <div className="w-32 flex-none">

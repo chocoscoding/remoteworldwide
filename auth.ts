@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import type { Session } from "next-auth";
+import { clientIpHeaders } from "@/app/lib/api/clientIp";
 
 /**
  * Authentication is owned by the Express backend (@auth/express) — see
@@ -14,7 +15,8 @@ export const auth = async (): Promise<Session | null> => {
   // Outside the try/catch on purpose: during prerendering headers() throws a
   // DynamicServerError that Next.js uses to mark the route dynamic (the same
   // behavior the previous NextAuth auth() had) — it must not be swallowed.
-  const cookie = (await headers()).get("cookie");
+  const incoming = await headers();
+  const cookie = incoming.get("cookie");
   if (!cookie) {
     console.debug("[auth] no cookies on request — treating as signed out");
     return null;
@@ -22,7 +24,8 @@ export const auth = async (): Promise<Session | null> => {
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/auth/session`, {
-      headers: { cookie },
+      // Named as the visitor, or every page render by anyone shares one auth budget on the backend.
+      headers: { cookie, ...clientIpHeaders(incoming) },
       cache: "no-store",
     });
     if (!response.ok) {

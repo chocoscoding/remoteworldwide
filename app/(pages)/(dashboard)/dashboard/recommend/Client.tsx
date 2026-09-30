@@ -8,43 +8,114 @@
 // messaging UI here and no "ask for an intro" button: you don't choose to be
 // recommended, and answering the questions IS the conversation.
 //
-// Fit scores are computed from your preferences (lib/dashboard/fit.ts), not
-// stored — change a preference and every number on this screen moves.
+// Both halves are real now. "Companies you're in front of" is the backend's
+// recommendations, written by reviewers from the admin screens. "Worth
+// watching" is live Remote Worldwide listings found and scored in the browser
+// from your target roles and the roles you've been applying to
+// (lib/dashboard/fit.ts) — computed, never stored, so change a preference or
+// log an application and every card on this screen re-ranks.
 
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { BadgeCheck, Check, ChevronDown, ChevronUp, RotateCw, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import Pill from "@/app/components/dashboard/ui/Pill";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { useNetwork } from "@/app/components/dashboard/network/NetworkProvider";
 import { useSettings } from "../settings/SettingsProvider";
 import ClosedRecRow from "@/app/components/dashboard/recommend/ClosedRecRow";
+import EligibilityCard, { firstFixHref } from "@/app/components/dashboard/recommend/EligibilityCard";
 import FitCard from "@/app/components/dashboard/recommend/FitCard";
 import PipelineSummaryCard from "@/app/components/dashboard/recommend/PipelineSummaryCard";
+import { companyKeyOf } from "@/app/lib/contacts/people";
+import { computeFit, recentApplications, roleTokens, watchSearchTerms, type FitHistory, type FitPrefs, type FitProfile } from "@/app/lib/dashboard/fit";
+import { toPipelineEntry, toWatchTarget } from "@/app/lib/recommendations/view";
+import { useApplications } from "@/hooks/queries/useApplicationsQuery";
+import { WATCH_SEARCHES, useRecommendationEligibility, useRecommendations, useWarmPaths, useWatchPool } from "@/hooks/queries/useRecommendationsQuery";
 
 const WHAT_WE_LOOK_FOR = [
   "A portfolio that shows decisions, not just screens.",
-  "Evidence you've shipped with engineers, not thrown work over a wall.",
-  "Written communication — most of these teams are async by default.",
-  "A resume that survives a 20-second skim.",
-  "Fit against what you told us you want, scored live from your preferences.",
+  "Proof you've shipped work with engineers.",
+  "Clear writing. Most of these teams work async.",
+  "A resume that holds up in a 20-second skim.",
+  "A match with your preferences and recent applications.",
 ];
 
+/** One company + role, however it was typed — an application and a listing for the same job share it. */
+const jobKey = (company: string, role: string) => `${companyKeyOf(company)}|${[...roleTokens(role)].sort().join(" ")}`;
+
+/** Listings shown under "worth watching": the best fits from the pool, two rows of three. */
+const WATCH_SHOWN = 6;
+
+/** Flat pulse blocks in the summary card's own layout, while the list loads. */
+const PipelineSkeleton: FC = () => (
+  <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading your recommendations">
+    {[0, 1].map((i) => (
+      <DashCard key={i} className="p-5">
+        <div className="flex items-center gap-3">
+          <span className="h-10 w-10 flex-none animate-pulse rounded-full bg-black/[0.07]" />
+          <div className="min-w-0 flex-1">
+            <span className="block h-4 w-36 animate-pulse rounded bg-black/[0.07]" />
+            <span className="mt-2 block h-3 w-52 animate-pulse rounded bg-black/[0.06]" />
+          </div>
+        </div>
+        <span className="mt-4 block h-1.5 w-full animate-pulse rounded bg-black/[0.06]" />
+      </DashCard>
+    ))}
+  </div>
+);
+
+const FitSkeleton: FC = () => (
+  <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-label="Loading listings">
+    {[0, 1, 2].map((i) => (
+      <DashCard key={i} className="p-5">
+        <span className="block h-4 w-28 animate-pulse rounded bg-black/[0.07]" />
+        <span className="mt-2 block h-3 w-40 animate-pulse rounded bg-black/[0.06]" />
+        <span className="mt-5 block h-6 w-24 animate-pulse rounded-full bg-black/[0.06]" />
+        <span className="mt-4 block h-[52px] w-full animate-pulse rounded-xl bg-black/[0.05]" />
+      </DashCard>
+    ))}
+  </div>
+);
+
+/** A read that failed, with the one thing to do about it. */
+const RetryCard: FC<{ title: string; onRetry: () => void }> = ({ title, onRetry }) => (
+  <DashCard className="flex flex-wrap items-center justify-between gap-3 p-5">
+    <p className="text-sm font-semibold text-primary">{title}</p>
+    <StickerButton variant="outline" size="sm" onClick={onRetry}>
+      <RotateCw className="h-3.5 w-3.5" />
+      Try again
+    </StickerButton>
+  </DashCard>
+);
+
 const RecommendClient: FC = () => {
-  const { pipeline, targets } = useNetwork();
   const { goals, pausedDaysLeft, resumeSearch } = useActivity();
   const { preferences, profile } = useSettings();
+  const recommendations = useRecommendations();
+  // The application trend: what you've logged in the tracker lately.
+  const applications = useApplications();
+  const history: FitHistory = useMemo(() => ({ applied: recentApplications(applications.data ?? []) }), [applications.data]);
+  const searchTerms = useMemo(() => watchSearchTerms(preferences, history, WATCH_SEARCHES), [preferences, history]);
+  const pool = useWatchPool(searchTerms);
+  // The server's verdict, not one worked out here from `profile`: that object
+  // carries unsaved edits, and a reviewer only ever sees what was saved.
+  const eligibility = useRecommendationEligibility();
+  const ineligible = eligibility.data && !eligibility.data.eligible ? eligibility.data : null;
+  const masterResume = eligibility.data?.masterResume ?? null;
 
   const [lookForOpen, setLookForOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
 
   const paused = goals.paused;
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Mapped once per fetch: the day counts are read off the clock here, not on every render.
+  const pipeline = useMemo(() => (recommendations.data ?? []).map((item) => toPipelineEntry(item)), [recommendations.data]);
 
   // Live cards, recently closed rows, and the >7-day history behind a
   // disclosure — a pass never renders as a card and never says "rejected".
@@ -53,20 +124,46 @@ const RecommendClient: FC = () => {
   const recentClosed = closedPipeline.filter((e) => (e.outcomeAgoDays ?? 0) <= 7);
   const historyClosed = closedPipeline.filter((e) => (e.outcomeAgoDays ?? 0) > 7);
 
-  const awaitingYou = pipeline.filter((e) => e.questions?.some((q) => !q.answer)).length;
-  const pipelineTargetIds = new Set(pipeline.map((e) => e.targetId));
-  const watching = targets.filter((t) => !t.onHold && !pipelineTargetIds.has(t.id)).length;
+  const awaitingYou = activePipeline.filter((e) => e.questions?.some((q) => !q.answer)).length;
 
-  const prefs = {
-    targetRoles: preferences.targetRoles,
-    minSalary: preferences.minSalary,
-    remotePolicy: preferences.remotePolicy,
-  };
-  const fitProfile = { skills: profile.skills, timezone: profile.timezone };
+  const prefs: FitPrefs = useMemo(
+    () => ({ targetRoles: preferences.targetRoles, experienceLevel: preferences.experienceLevel, remotePolicy: preferences.remotePolicy }),
+    [preferences.targetRoles, preferences.experienceLevel, preferences.remotePolicy],
+  );
+  const fitProfile: FitProfile = useMemo(() => ({ timezone: profile.timezone }), [profile.timezone]);
+  // Neither target roles nor applications: nothing to say what's worth watching.
+  const nothingToGoOn = searchTerms.length === 0 && !applications.isPending;
+
+  // The best fits in the pool that relate to your roles or applications, minus
+  // any listing you're already in front of or have applied to. Scored here, not
+  // stored: the ranking moves the moment a preference does.
+  const watched = useMemo(() => {
+    const inPipeline = new Set(pipeline.map((e) => e.platformJobId).filter(Boolean));
+    const applied = new Set((applications.data ?? []).flatMap((a) => (a.listing ? [a.listing.platformJobId] : [])));
+    const appliedJobs = new Set((applications.data ?? []).map((a) => jobKey(a.company, a.role)));
+    // The same job listed twice shows once — the fresher listing, since the sort puts it first.
+    const shown = new Set<string>();
+    return pool.jobs
+      .filter((job) => !inPipeline.has(job.id) && !applied.has(job.id) && !appliedJobs.has(jobKey(job.company, job.role)))
+      .map((job) => toWatchTarget(job))
+      .map((target) => ({ target, fit: computeFit(target, prefs, fitProfile, history) }))
+      .filter(({ fit }) => fit.relevant)
+      .sort((a, b) => b.fit.score - a.fit.score || (b.target.postedAt ?? 0) - (a.target.postedAt ?? 0))
+      .filter(({ target }) => {
+        const key = jobKey(target.company, target.role);
+        if (shown.has(key)) return false;
+        shown.add(key);
+        return true;
+      })
+      .slice(0, WATCH_SHOWN);
+  }, [pool.jobs, pipeline, applications.data, prefs, fitProfile, history]);
+
+  const warmPathAt = useWarmPaths(watched.map((w) => w.target.company));
+  const watching = watched.length;
 
   const STATS: { value: number; label: string; note: string }[] = [
-    { value: awaitingYou, label: "Waiting on you", note: awaitingYou === 1 ? "answer their questions" : "nothing to answer" },
-    { value: watching, label: "Being watched", note: "on your list for the next round" },
+    { value: awaitingYou, label: "Waiting on you", note: awaitingYou > 0 ? "questions to answer" : "nothing to answer" },
+    { value: watching, label: "Worth watching", note: "live listings that fit you" },
   ];
 
   return (
@@ -75,16 +172,19 @@ const RecommendClient: FC = () => {
         <div className="flex min-w-0 items-center gap-3">
           <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Recommendations</h1>
           <Pill variant="neutral" className="hidden sm:inline-flex">
-            Picked by humans at Remote Worldwide
+            Picked by our reviewers
           </Pill>
         </div>
-        <button
-          type="button"
-          onClick={() => setLookForOpen((v) => !v)}
-          className="inline-flex flex-none cursor-pointer items-center gap-1 text-xs font-semibold text-primary hover:underline">
-          What we look for
-          {lookForOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-        </button>
+        <div className="flex flex-none items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setLookForOpen((v) => !v)}
+            className="inline-flex flex-none cursor-pointer items-center gap-1 text-xs font-semibold text-primary hover:underline">
+            What we look for
+            {lookForOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+          <NotificationBell />
+        </div>
       </header>
 
       <main className="mx-auto max-w-[1100px] px-8 py-7 pb-14">
@@ -115,12 +215,11 @@ const RecommendClient: FC = () => {
             How recommendations work
           </div>
           <p className="mt-3 max-w-2xl text-[22px] font-bold leading-snug text-white">
-            We pick one or two people a week and put them straight in front of a company — no application, no queue.
+            Each week we put one or two people straight in front of a company. No application, no queue.
           </p>
           <p className="mt-2.5 max-w-2xl text-sm leading-relaxed text-white/60">
-            A reviewer here reads your work and decides. If a company wants to go further, they send a question or two; you answer them
-            below, and you&apos;re talking to their hiring team directly. You can&apos;t request this — keeping your profile sharp is what
-            puts you in the running.
+            A reviewer reads your work and decides. If the company wants to go further, it sends a question or two. Answer them here and
+            you&apos;re talking to its hiring team. You can&apos;t request a pick. A sharp profile is what gets you one.
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -134,19 +233,33 @@ const RecommendClient: FC = () => {
           </div>
         </div>
 
-        {/* Eligibility — reads the real paused state, not a local flag. */}
+        {/* Eligibility — a complete profile and a master resume, as the server
+            judges it. Only shown while something is missing. */}
+        {ineligible && <EligibilityCard eligibility={ineligible} />}
+
+        {/* Availability — reads the real paused state, not a local flag. */}
         <DashCard className="mb-8 flex flex-wrap items-center justify-between gap-4 bg-[#fbfbf7] p-5">
           <div className="flex min-w-0 items-start gap-3">
             <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#e1f073]">
               <BadgeCheck className="h-4 w-4 text-[#222325]" />
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-primary">{paused ? "You're Unavailable" : "You're Available"}</p>
+              <p className="text-sm font-bold text-primary">{paused ? "You're unavailable" : "You're available"}</p>
               <p className="mt-0.5 text-xs leading-relaxed text-black/55">
                 {paused
-                  ? `You're hidden from reviewers — resume anytime.${pausedDaysLeft !== null ? ` ${pausedDaysLeft}d left on the pause.` : ""}`
-                  : `Reviewers are matching you against ${watching} ${watching === 1 ? "company" : "companies"} this week.`}
+                  ? `Reviewers can't see you.${pausedDaysLeft !== null ? ` ${pausedDaysLeft}d left on the pause.` : ""}`
+                  : ineligible
+                    ? "Finish the checklist above so reviewers can pick you."
+                    : "Reviewers can pick you while you're available."}
               </p>
+              {masterResume && !ineligible && (
+                <p className="mt-1 text-xs leading-relaxed text-black/55">
+                  They&apos;ll read <span className="font-semibold text-primary">{masterResume.name}</span>, your master resume.{" "}
+                  <Link href="/dashboard/vault" className="font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                    Change
+                  </Link>
+                </p>
+              )}
             </div>
           </div>
           {/* No ink here — the page's one primary is "Send answers" on the
@@ -179,14 +292,28 @@ const RecommendClient: FC = () => {
             )}
           </div>
 
-          {activePipeline.length === 0 ? (
-            <DashEmptyState
-              icon={Sparkles}
-              title="Nothing yet"
-              body="Reviewers are looking this week. A sharp resume and clear preferences are what get you looked at."
-              ctaLabel="Update your preferences"
-              ctaHref="/dashboard/settings/preferences"
-            />
+          {recommendations.isPending ? (
+            <PipelineSkeleton />
+          ) : recommendations.isError && pipeline.length === 0 ? (
+            <RetryCard title="We couldn't load your recommendations." onRetry={() => void recommendations.refetch()} />
+          ) : activePipeline.length === 0 ? (
+            ineligible ? (
+              <DashEmptyState
+                icon={Sparkles}
+                title="Nothing yet"
+                body="Finish the checklist above to be considered."
+                ctaLabel="Finish your profile"
+                ctaHref={firstFixHref(ineligible)}
+              />
+            ) : (
+              <DashEmptyState
+                icon={Sparkles}
+                title="Nothing yet"
+                body="Reviewers pick every week. Keep your resume and preferences current."
+                ctaLabel="Update your preferences"
+                ctaHref="/dashboard/settings/preferences"
+              />
+            )
           ) : (
             <div className="flex flex-col gap-3">
               {activePipeline.map((entry) => (
@@ -198,7 +325,7 @@ const RecommendClient: FC = () => {
           {recentClosed.length > 0 && (
             <div className="mt-4 flex flex-col gap-2">
               {recentClosed.map((entry) => (
-                <ClosedRecRow key={entry.id} entry={entry} watchlists={watching} />
+                <ClosedRecRow key={entry.id} entry={entry} />
               ))}
             </div>
           )}
@@ -216,7 +343,7 @@ const RecommendClient: FC = () => {
               {historyOpen && (
                 <div className="mt-2 flex flex-col gap-2">
                   {historyClosed.map((entry) => (
-                    <ClosedRecRow key={entry.id} entry={entry} watchlists={watching} />
+                    <ClosedRecRow key={entry.id} entry={entry} />
                   ))}
                 </div>
               )}
@@ -228,17 +355,38 @@ const RecommendClient: FC = () => {
           <div className="mb-3.5">
             {/* Quiet tier on purpose: this list is context for the reviewers'
                 next pick, not a peer of the pipeline above it. */}
-            <h2 className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55">Companies we think you fit</h2>
-            <p className="mt-1 text-xs text-black/55">
-              Scored live against your preferences — reviewers use this as one input when they pick.
-            </p>
+            <h2 className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/55">Jobs worth watching</h2>
+            <p className="mt-1 text-xs text-black/55">Live listings like your target roles and recent applications.</p>
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {targets.map((t) => (
-              <FitCard key={t.id} target={t} prefs={prefs} profile={fitProfile} />
-            ))}
-          </div>
+          {/* The applications are waited for: the trend decides what is searched and how it ranks, so cards would reshuffle when they landed. */}
+          {pool.loading || applications.isPending ? (
+            <FitSkeleton />
+          ) : nothingToGoOn ? (
+            <DashEmptyState
+              icon={Sparkles}
+              title="Tell us what you're after"
+              body="Add a target role or log an application to see matching listings here."
+              ctaLabel="Set your target roles"
+              ctaHref="/dashboard/settings/preferences"
+            />
+          ) : pool.failed ? (
+            <RetryCard title="We couldn't load listings to score." onRetry={pool.retry} />
+          ) : watched.length === 0 ? (
+            <DashEmptyState
+              icon={Sparkles}
+              title="Nothing close right now"
+              body="No live listings match your target roles or recent applications yet. New ones arrive daily."
+              ctaLabel="Browse all jobs"
+              ctaHref="/jobs"
+            />
+          ) : (
+            <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {watched.map(({ target, fit }) => (
+                <FitCard key={target.id} target={target} fit={fit} contact={warmPathAt(target.company)} />
+              ))}
+            </div>
+          )}
         </section>
       </main>
 

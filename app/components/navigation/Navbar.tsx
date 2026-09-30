@@ -10,6 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
 import { cn } from "@/app/lib/utils";
+import StickerButton from "../dashboard/ui/StickerButton";
 const Navbar = () => {
   const pathname = usePathname();
   const { status, data } = useSession();
@@ -19,11 +20,9 @@ const Navbar = () => {
   const User = () => (
     <>
       {status === "unauthenticated" ? (
-        <button
-          onClick={() => openAuthModal("login")}
-          className="p-1.5 px-6 gap-2 transition-all rounded-md bg-primary text-white flex items-center">
-          <span>Sign In</span>
-        </button>
+        <StickerButton className="" onClick={() => openAuthModal("login")}>
+          Sign In
+        </StickerButton>
       ) : null}
       {status === "loading" ? <LoaderCircle className="gap-2  text-primary" /> : null}
 
@@ -97,7 +96,7 @@ const Navbar = () => {
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-4">
             <Link href="/jobs">
-              <p className="text-gray-700 hover:text-gray-900">Find jobs</p>
+              <p className="text-gray-700 hover:text-gray-900">Jobs</p>
             </Link>
             <Link href="/companies">
               <p className="text-gray-700 hover:text-gray-900">Companies</p>
@@ -105,6 +104,9 @@ const Navbar = () => {
             <Link href="/blogs">
               <p className="text-gray-700 hover:text-gray-900">Blog</p>
             </Link>
+            {/* <Link href="/pricing">
+              <p className="text-gray-700 hover:text-gray-900">Pricing</p>
+            </Link> */}
 
             <User />
           </div>
@@ -137,7 +139,7 @@ const Navbar = () => {
           <div className="px-2 pt-2 pb-3 space-y-1">
             <Link href="/jobs">
               <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
-                Find jobs
+                Jobs
               </p>
             </Link>
             <Link href="/companies">
@@ -150,6 +152,11 @@ const Navbar = () => {
                 Blog
               </p>
             </Link>
+            {/* <Link href="/pricing">
+              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
+                Pricing
+              </p>
+            </Link> */}
           </div>
         </div>
       )}

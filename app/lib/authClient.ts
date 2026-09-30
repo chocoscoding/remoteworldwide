@@ -1,5 +1,6 @@
 "use client";
 import { signIn as nextAuthSignIn, signOut as nextAuthSignOut } from "next-auth/react";
+import { clearQueryCache } from "@/app/lib/query/client";
 
 /**
  * Drop-in replacements for next-auth/react's signIn/signOut that log each
@@ -26,6 +27,8 @@ export const signIn = (async (provider?: string, options?: object, authorization
 
 export const signOut = (async (options?: object) => {
   console.info(`[auth] signOut started`);
+  // Before the redirect, which usually navigates away before signOut resolves.
+  clearQueryCache();
   try {
     const result = await (nextAuthSignOut as CallableFunction)(options);
     console.info(`[auth] signOut completed`, result ?? "");

@@ -57,7 +57,7 @@ const SectionRenderer: FC<SectionRendererProps> = ({ items, content, design }) =
 
         if (item.kind === "page-break") {
           return (
-            <div key={item.id} aria-hidden className="flex break-after-page items-center gap-[8pt]">
+            <div key={item.id} aria-hidden data-resume-page-break className="flex break-after-page items-center gap-[8pt]">
               <span className="h-0 flex-1 border-t border-dashed border-[color:var(--r-rule)]" />
               <span className="text-[length:var(--r-fs-small)] uppercase tracking-[0.08em] text-[color:var(--r-text-muted)]">
                 Page break
@@ -68,8 +68,10 @@ const SectionRenderer: FC<SectionRendererProps> = ({ items, content, design }) =
         }
 
         const Body = SECTION_BODY[item.kind];
+        // `data-resume-section` lets the PDF export drop a section whose body
+        // is only its "No … added yet." placeholder (`data-resume-placeholder`).
         return (
-          <div key={item.id}>
+          <div key={item.id} data-resume-section={item.kind}>
             <SectionHeading config={item} design={design} />
             <div className="mt-[var(--r-gap-half)]">
               <Body content={content} design={design} />

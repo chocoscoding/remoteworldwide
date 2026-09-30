@@ -19,7 +19,7 @@ export interface SkillsSectionProps {
  */
 const SkillsSection: FC<SkillsSectionProps> = ({ content }) => {
   if (content.skills.length === 0) {
-    return <p className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No skills added yet.</p>;
+    return <p data-resume-placeholder className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No skills added yet.</p>;
   }
   return (
     <div className="flex flex-wrap gap-[6pt]">

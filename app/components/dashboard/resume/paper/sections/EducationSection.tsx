@@ -10,7 +10,7 @@ export interface EducationSectionProps {
 
 const EducationSection: FC<EducationSectionProps> = ({ content, design }) => {
   if (content.education.length === 0) {
-    return <p className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No education added yet.</p>;
+    return <p data-resume-placeholder className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No education added yet.</p>;
   }
   return (
     <div className="flex flex-col gap-[var(--r-gap)]">

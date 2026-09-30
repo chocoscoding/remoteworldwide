@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { toast } from "react-toastify";
 import { signIn } from "@/app/lib/authClient";
+import { signInErrorMessage } from "@/app/lib/auth/sign-in-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,7 +54,9 @@ export default function LoginForm({
     try {
       const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) {
-        toast.error("Wrong email or password");
+        // `code` carries the only reason worth distinguishing — an account with no password,
+        // because it signs in through Google or GitHub. See app/lib/auth/sign-in-error.
+        toast.error(signInErrorMessage(result.code));
         return;
       }
       toast.success("Signed in successfully");
@@ -120,9 +123,16 @@ export default function LoginForm({
             />
           </div>
           <div className="space-y-2">
-            <Label className="font-bold" htmlFor={`password-${idPrefix}`}>
-              Password
-            </Label>
+            <div className="flex items-baseline justify-between gap-3">
+              <Label className="font-bold" htmlFor={`password-${idPrefix}`}>
+                Password
+              </Label>
+              {/* Next to the field it belongs to, which is where someone looks the moment the
+                  password they typed does not work. */}
+              <Link className={cn(brutalistLink, "text-sm")} href="/forgot-password">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Input
                 autoComplete="current-password"

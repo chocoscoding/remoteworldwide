@@ -24,11 +24,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { PersistQueryClientProvider, type PersistedClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { getQueryClient } from "@/app/lib/query/client";
+import { QUERY_CACHE_STORAGE_KEY, getQueryClient } from "@/app/lib/query/client";
 import { isPersistable } from "@/app/lib/query/keys";
 import { revive } from "@/app/lib/api/core";
 
-const CACHE_KEY = "rww.query-cache";
+const CACHE_KEY = QUERY_CACHE_STORAGE_KEY;
 const MAX_AGE = 24 * 60 * 60_000;
 
 /**

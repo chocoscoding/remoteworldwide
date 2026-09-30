@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { format, subDays } from "date-fns";
 import { ArrowLeft, ArrowRight, CalendarDays, Download, PartyPopper, PenLine, Search, Trophy, X } from "lucide-react";
@@ -9,14 +9,17 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
-import JobPickerDialog from "@/app/components/dashboard/jobs/JobPickerDialog";
+import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
-import { PLATFORM_JOBS, createPastedJob, type JobOption, type PastedJobInput } from "@/app/lib/dashboard/job-options";
-import { TRACKER_COLUMNS } from "@/app/lib/dashboard/mock-data";
-import { WIN_SALARY_PREFILL, WIN_STATS_PULL, type WinJourneyStep, type WinRecord } from "@/app/lib/dashboard/win";
+import { compareByPosition, toTrackerCard } from "@/app/lib/applications/api";
+import type { ApplicationItem } from "@/app/lib/applications/types";
+import type { PickedJob } from "@/app/lib/jobs/fields";
+import { pullWinStats, type WinJourneyStep, type WinRecord } from "@/app/lib/dashboard/win";
 import type { TrackerColumnId } from "@/app/lib/dashboard/types";
+import { useApplicationSummary, useApplications } from "@/hooks/queries/useApplicationsQuery";
+import { useReferralRequests } from "@/hooks/queries/useContactsQuery";
 
 /**
  * The win log. Four screens, each one question deep: which application won,
@@ -47,6 +50,11 @@ const FIELD =
 
 const LABEL = "mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-black/50";
 
+// An imported win keeps only the two facts the record does. One constant feeds
+// both the pick and the type, so they cannot drift.
+const WIN_JOB_SPEC = "company, role";
+type ImportedJob = PickedJob<typeof WIN_JOB_SPEC>;
+
 interface TrackerJobRow {
   cardId: string;
   title: string;
@@ -57,20 +65,26 @@ interface TrackerJobRow {
 }
 
 /**
- * Every card on the board, most advanced stage first — the job that won is
- * almost always near the offer end. Reads the tracker's seed data; a real
- * build reads the live board.
+ * Every open application, most advanced stage first — the job that won is
+ * almost always near the offer end — and in board order within a stage.
+ *
+ * Built from the applications list, not `useTracker()`: WinProvider renders
+ * this dialog beside TrackerProvider rather than inside it (the tracker sits
+ * inside WinProvider so that landing in Offer can open the win log), so the
+ * tracker's context is out of reach here. It is the same cached list the board
+ * groups, so the two cannot disagree.
  */
-const TRACKER_JOBS: TrackerJobRow[] = [...STATUS_ORDER].reverse().flatMap((columnId) =>
-  (TRACKER_COLUMNS.find((c) => c.id === columnId)?.cards ?? []).map((card) => ({
-    cardId: card.id,
-    title: card.title,
-    company: card.company,
-    columnId,
-    daysAgo: card.daysAgo,
-    rww: card.rww,
-  })),
-);
+function trackerJobsFrom(rows: readonly ApplicationItem[], now: number): TrackerJobRow[] {
+  return [...STATUS_ORDER].reverse().flatMap((columnId) =>
+    rows
+      .filter((row) => row.status === columnId)
+      .sort(compareByPosition)
+      .map((row) => {
+        const card = toTrackerCard(row, now);
+        return { cardId: card.id, title: card.title, company: card.company, columnId, daysAgo: card.daysAgo, rww: card.rww };
+      }),
+  );
+}
 
 /** The five milestones a road can carry, in order. Empty dates fall off the card. */
 const ROAD_STEPS: { id: string; label: (rww: boolean) => string }[] = [
@@ -93,7 +107,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<TrackerJobRow | null>(null);
   const [manual, setManual] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const { pickJob } = useJobPicker();
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [isRww, setIsRww] = useState(false);
@@ -102,12 +116,17 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
   const [road, setRoad] = useState<RoadDates>({ offer: today });
 
   // --- Steps 3+4 -------------------------------------------------------------
-  const [salary, setSalary] = useState(WIN_SALARY_PREFILL);
+  // Empty, not a sample figure: whatever sits here is frozen into the record
+  // and can end up on a public card, so only the user may put a number in it.
+  const [salary, setSalary] = useState("");
   const [story, setStory] = useState("");
   const [shareAnonymously, setShareAnonymously] = useState(true);
   const [featureWithName, setFeatureWithName] = useState(false);
 
-  const filtered = TRACKER_JOBS.filter((j) => `${j.company} ${j.title}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const applications = useApplications();
+  // Day counts run from `today`, the same moment the road's dates are seeded from.
+  const trackerJobs = useMemo(() => trackerJobsFrom(applications.data ?? [], today.getTime()), [applications.data, today]);
+  const filtered = trackerJobs.filter((j) => `${j.company} ${j.title}`.toLowerCase().includes(query.trim().toLowerCase()));
 
   /** Selecting a card seeds the road with everything the tracker knows. */
   function pickTrackerJob(job: TrackerJobRow) {
@@ -127,14 +146,23 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
   }
 
   /** An imported job has no tracker history — the road starts at the offer. */
-  function pickImportedJob(job: JobOption) {
+  function pickImportedJob(job: ImportedJob) {
     setPicked(null);
     setManual(true);
     setCompany(job.company);
     setRole(job.role);
     setIsRww(job.source === "platform");
     setRoad({ offer: today });
-    setImportOpen(false);
+  }
+
+  /**
+   * The same picker the tracker's "Add job" uses, opened over this dialog by
+   * the dashboard shell's provider. Cancelling it changes nothing here, so the
+   * draft survives.
+   */
+  async function importJob() {
+    const result = await pickJob(WIN_JOB_SPEC);
+    if (result.status === "picked") pickImportedJob(result.job);
   }
 
   function startManual() {
@@ -151,11 +179,21 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
   // One popover open at a time — selecting a day closes it.
   const [openRoadId, setOpenRoadId] = useState<string | null>(null);
 
+  // The numbers are the user's own: the server's funnel over every
+  // application, and the referral asks they recorded for this company.
+  const summary = useApplicationSummary();
+  const referralAsks = useReferralRequests();
+  const pulled = pullWinStats(summary.data?.funnel, referralAsks.data, company);
+  const statsLoading = summary.isPending || referralAsks.isPending;
   const pulledStats = [
-    { id: "apps", value: WIN_STATS_PULL.applications, label: "applications sent" },
-    { id: "loops", value: WIN_STATS_PULL.interviewLoops, label: "interview loops" },
+    { id: "apps", value: pulled.applications, label: pulled.applications === 1 ? "application sent" : "applications sent" },
+    { id: "loops", value: pulled.interviewLoops, label: pulled.interviewLoops === 1 ? "interview loop" : "interview loops" },
     { id: "streak", value: streak, label: "day streak" },
-    { id: "referral", value: WIN_STATS_PULL.referralsUsed, label: "referral used" },
+    {
+      id: "referral",
+      value: pulled.referralsUsed,
+      label: `referral ${pulled.referralsUsed === 1 ? "ask" : "asks"} at ${company.trim() || "this company"}`,
+    },
   ];
 
   function submit() {
@@ -167,7 +205,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
 
     onComplete({
       facts: { company: company.trim(), role: role.trim(), offerDateLabel: format(road.offer ?? today, "d MMMM") },
-      stats: { ...WIN_STATS_PULL, streak, salaryDelta: salary.trim() === "" ? null : salary.trim() },
+      stats: { ...pulled, streak, salaryDelta: salary.trim() === "" ? null : salary.trim() },
       journey,
       story: story.trim(),
       shareAnonymously,
@@ -243,7 +281,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                   })}
                   {filtered.length === 0 && (
                     <p className="rounded-xl border border-dashed border-black/20 px-3 py-4 text-center text-xs text-black/55">
-                      Nothing on your board matches — import it or enter it below.
+                      {applications.isPending ? "Loading your tracker…" : "Nothing on your board matches — import it or enter it below."}
                     </p>
                   )}
                 </div>
@@ -251,7 +289,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                 <div className="flex items-center gap-2 pb-1">
                   <button
                     type="button"
-                    onClick={() => setImportOpen(true)}
+                    onClick={importJob}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-black/15 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:border-[#222325]">
                     <Download className="h-3.5 w-3.5" />
                     Import a job
@@ -363,7 +401,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                 <div className="grid grid-cols-2 gap-2.5">
                   {pulledStats.map((s) => (
                     <div key={s.id} className="rounded-xl border border-black/10 bg-[#fbfbf7] px-4 py-3">
-                      <p className="text-2xl font-bold leading-none tabular-nums text-primary">{s.value}</p>
+                      <p className="text-2xl font-bold leading-none tabular-nums text-primary">{statsLoading && s.id !== "streak" ? "…" : s.value}</p>
                       <p className="mt-1.5 text-xs text-black/60">{s.label}</p>
                     </div>
                   ))}
@@ -444,7 +482,9 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
               <StickerButton
                 variant="primary"
                 size="md"
-                disabled={(step === 0 && !jobValid) || (step === 1 && !roadValid)}
+                // The numbers are frozen into the record on submit, so they
+                // must have arrived before anyone moves past them.
+                disabled={(step === 0 && !jobValid) || (step === 1 && !roadValid) || (step === 2 && statsLoading)}
                 onClick={() => setStep((s) => s + 1)}>
                 Continue
                 <ArrowRight className="h-4 w-4" />
@@ -466,15 +506,6 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
           )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
-
-      {/* Same import flow the tracker's "Add job" uses. */}
-      <JobPickerDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        jobs={PLATFORM_JOBS}
-        onPick={pickImportedJob}
-        onCreate={(input: PastedJobInput) => pickImportedJob(createPastedJob(input))}
-      />
     </DialogPrimitive.Root>
   );
 };

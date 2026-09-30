@@ -11,6 +11,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import TokenTextarea from "@/app/components/dashboard/answers/TokenTextarea";
 import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
 import type { QaItem } from "@/app/lib/dashboard/types";
+import { EXTENSION_URL } from "@/app/lib/extension/presence";
 import AnswerText from "./AnswerText";
 
 /** Quiet inline control — reserved weight goes to the row's real decisions. */
@@ -72,6 +73,10 @@ const AnswerRow: FC<AnswerRowProps> = ({ item, open, onToggle }) => {
 
   const pill = kindPill(item.kind);
   const skippedByExtension = item.cat === "demographics" && !extension.fillDemographics;
+  // Present tense the moment the extension is real — running in this browser,
+  // or published and installable. Only one nobody can get is spoken of in the
+  // future, and it is the same sentence either way but for its first clause.
+  const extensionExists = extension.connected || Boolean(EXTENSION_URL);
 
   async function copyAnswer() {
     try {
@@ -139,7 +144,9 @@ const AnswerRow: FC<AnswerRowProps> = ({ item, open, onToggle }) => {
               </div>
               {skippedByExtension && (
                 <p className="mt-2 text-xs text-black/40">
-                  The extension leaves demographics blank — turn it on in extension settings if you&apos;d rather it filled these.
+                  {extensionExists
+                    ? "The browser extension leaves demographics blank — allow it in extension settings if you'd rather it filled these."
+                    : "Once the browser extension is available it will leave demographics blank — allow it in extension settings if you'd rather it filled these."}
                 </p>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-1">

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireUserAction } from "@/app/lib/auth/action-guards";
 import { backend, BackendError, type BackendInit } from "@/app/lib/backend";
 import type { JobPreferences, NotificationSettings, PrivacySettings, ProfileSettings, Settings } from "@/app/lib/settings/types";
 
@@ -21,10 +22,25 @@ async function attempt<T>(run: () => Promise<T>): Promise<Attempt<T>> {
 
 export const getSettings = async () => api<Settings>("/me");
 
-export const saveProfile = async (input: Partial<ProfileSettings>) => attempt(() => api<Settings>("/profile", { method: "PUT", body: input }));
+// The settings screen saves through the browser (useSaveSettingsSection), so
+// nothing imports these four, yet each is still a live endpoint: refuse a
+// caller with no session here. The backend scopes every write to that session.
+export const saveProfile = async (input: Partial<ProfileSettings>) => {
+  await requireUserAction();
+  return attempt(() => api<Settings>("/profile", { method: "PUT", body: input }));
+};
 
-export const savePreferences = async (input: Partial<JobPreferences>) => attempt(() => api<Settings>("/preferences", { method: "PUT", body: input }));
+export const savePreferences = async (input: Partial<JobPreferences>) => {
+  await requireUserAction();
+  return attempt(() => api<Settings>("/preferences", { method: "PUT", body: input }));
+};
 
-export const saveNotifications = async (input: Partial<NotificationSettings>) => attempt(() => api<Settings>("/notifications", { method: "PUT", body: input }));
+export const saveNotifications = async (input: Partial<NotificationSettings>) => {
+  await requireUserAction();
+  return attempt(() => api<Settings>("/notifications", { method: "PUT", body: input }));
+};
 
-export const savePrivacy = async (input: Partial<PrivacySettings>) => attempt(() => api<Settings>("/privacy", { method: "PUT", body: input }));
+export const savePrivacy = async (input: Partial<PrivacySettings>) => {
+  await requireUserAction();
+  return attempt(() => api<Settings>("/privacy", { method: "PUT", body: input }));
+};

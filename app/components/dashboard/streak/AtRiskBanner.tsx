@@ -3,9 +3,10 @@
 // The one in-app nudge.
 //
 // §8 asks for a notification at the user's hunt hour plus an at-risk banner
-// after 8pm local. Push and email need a backend and a scheduler, neither of
-// which exists here, so this build ships the banner and the `huntHour` model
-// behind it — the part that can be honest without a server.
+// after 8pm local. Push and email need a scheduler, which does not exist yet,
+// so this build ships the banner and the `huntHour` model behind it. "Local"
+// is the user's own clock as the server reads it (their settings timezone),
+// and the day ends at the 4am grace hour, not at midnight.
 //
 // Three things it will not do: appear on a rest day, appear while the search
 // is paused, or say anything about a streak you have already lost. There is no
@@ -32,7 +33,7 @@ const AtRiskBanner: FC = () => {
     <div className="mb-5 flex flex-wrap items-center gap-3 rounded-[14px] border-2 border-[#222325] bg-[#e1f073] px-4 py-3">
       <AlertTriangle className="h-4 w-4 flex-none text-primary" />
       <p className="min-w-0 flex-1 text-sm font-bold text-primary">
-        Your {current}-day streak ends at midnight. One application keeps it
+        Your {current}-day streak ends tonight. One application keeps it
         {freezes > 0 ? " — and if today gets away from you, a freeze has it covered." : "."}
       </p>
       <StickerButton variant="primary" size="sm" onClick={openLog}>

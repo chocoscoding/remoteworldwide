@@ -6,15 +6,15 @@ import { differenceInCalendarDays, format as formatDate } from "date-fns";
 import { cn } from "@/lib/utils";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import { computePreparedness } from "@/app/lib/dashboard/prep-engine";
-import type { NewTrackInput, PrepTrack, SessionFormat } from "@/app/lib/dashboard/prep-data";
-import Chip from "./Chip";
+import type { PrepTrack, SessionFormat } from "@/app/lib/dashboard/prep-data";
+import type { CreatePrepTrackInput } from "@/app/lib/prep/types";
 import PrepEmptyState from "./PrepEmptyState";
-import PreviewToggle from "./PreviewToggle";
 import AddTrackDialog from "./AddTrackDialog";
+import TrackMark from "./TrackMark";
+import TrackStateChip from "./TrackStateChip";
 import { trackState } from "./track-state";
 import { BUTTON_ACCENT, BUTTON_SOLID, FIELD_SHELL, ICON_BUTTON, ICON_BUTTON_PRESS, PANEL, RAISED_DARK } from "./prep-styles";
 
-const EMPTY_TRACKS: PrepTrack[] = [];
 const PAGE_SIZE = 5;
 
 type Filter = "all" | "scheduled" | "needs-prep";
@@ -41,18 +41,15 @@ export interface PrepIndexProps {
   now: Date;
   onOpenTrack: (trackId: string) => void;
   onQuickPractice: (trackId: string, formats?: SessionFormat[]) => void;
-  onAddTrack: (input: NewTrackInput) => void;
+  /** Creates a saved track; rejects with the server's refusal, which the add dialog shows. */
+  onAddTrack: (input: CreatePrepTrackInput) => Promise<void>;
 }
 
-const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, onQuickPractice, onAddTrack }) => {
+const PrepIndex: FC<PrepIndexProps> = ({ tracks, now, onOpenTrack, onQuickPractice, onAddTrack }) => {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
-  const [preview, setPreview] = useState<"default" | "empty">("default");
   const [addOpen, setAddOpen] = useState(false);
-  // Stable reference (not a fresh `[]` literal) so memoized derivations below
-  // don't recompute every render while previewing the empty state.
-  const tracks = preview === "empty" ? EMPTY_TRACKS : tracksProp;
 
   function setQueryAndResetPage(v: string) {
     setQuery(v);
@@ -96,14 +93,6 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
           <Plus className="h-3.5 w-3.5" />
           Prep for a new job
         </button>
-        <PreviewToggle
-          value={preview}
-          onChange={setPreview}
-          options={[
-            { id: "default", label: "Default" },
-            { id: "empty", label: "Empty" },
-          ]}
-        />
       </div>
 
       {/* Top band: what's next, and where you stand. */}
@@ -136,10 +125,11 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
             <PrepEmptyState
               className="w-full justify-center"
               lottieSrc="/Lottie/neobrutalism/Video_Vlog_lottie.json"
+              lottieSize={120}
               title="Nothing scheduled yet"
-              body="Prep gets built around a job you're already talking to someone about — once one shows up in your tracker as Interviewing, it'll show up here too."
-              ctaLabel="View your applications"
-              ctaHref="/dashboard/tracker"
+              body={tracks.length === 0 ? "Add a job you're interviewing for." : "No rounds booked ahead yet."}
+              ctaLabel={tracks.length === 0 ? "Prep for a new job" : undefined}
+              onCta={tracks.length === 0 ? () => setAddOpen(true) : undefined}
             />
           )}
         </div>
@@ -164,7 +154,7 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
                 bare
                 icon={Target}
                 title="Nothing to average yet"
-                body="Fills in once a job is actively interviewing."
+                body="Shows once a job is interviewing."
               />
             )}
           </div>
@@ -210,23 +200,25 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
         </div>
 
         {filtered.length === 0 ? (
-          <PrepEmptyState bare icon={Search} title="No interviews match" body="Try another filter, or clear the search." />
+          tracks.length === 0 ? (
+            <PrepEmptyState bare icon={Target} title="No prep tracks yet" body="Each job you're interviewing for gets a track: its rounds, likely questions, practice sessions and actions." ctaLabel="Prep for a new job" onCta={() => setAddOpen(true)} />
+          ) : (
+            <PrepEmptyState bare icon={Search} title="No interviews match" body="Try another filter, or clear the search." />
+          )
         ) : (
           pageItems.map((t) => {
             const score = computePreparedness(t);
             const state = trackState(t, now);
             return (
               <div key={t.id} className="group flex items-center gap-4 px-5 py-3 border-b border-black/10 last:border-b-0 hover:bg-[#fbfbf7] transition-colors">
-                <span className="h-9 w-9 flex-none rounded-lg bg-[#f0f0ea] flex items-center justify-center text-[11px] font-extrabold text-black/60">
-                  {t.companyMark}
-                </span>
+                <TrackMark mark={t.companyMark} logo={t.companyLogo} surface="row" />
 
                 <button type="button" onClick={() => onOpenTrack(t.id)} className="min-w-0 flex-1 text-left cursor-pointer">
                   <span className="flex items-center gap-2.5 min-w-0">
                     <span className="text-sm font-bold text-primary truncate group-hover:underline underline-offset-2">
                       {t.company} — {t.role}
                     </span>
-                    <Chip tone={state.tone}>{state.label}</Chip>
+                    <TrackStateChip state={state} />
                   </span>
                   <span className="block text-xs text-black/45 truncate mt-0.5">{t.location}</span>
                 </button>
@@ -287,7 +279,7 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks: tracksProp, now, onOpenTrack, o
         </div>
       </div>
 
-      <AddTrackDialog open={addOpen} onOpenChange={setAddOpen} onAdd={onAddTrack} existingTracks={tracksProp} />
+      <AddTrackDialog open={addOpen} onOpenChange={setAddOpen} onAdd={onAddTrack} onOpenTrack={onOpenTrack} existingTracks={tracks} />
     </div>
   );
 };

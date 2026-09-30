@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useActivity, type LogApplicationResult } from "@/app/components/dashboard/activity/ActivityProvider";
 import { looksLikeUrl, parseFreeText, parseJobUrl } from "@/app/lib/dashboard/parse-jd";
 import { shortDateLabel } from "@/app/lib/dashboard/streak";
+import { useStoredScanQuery } from "@/hooks/queries/useAtsQueries";
 import PayoffPanel from "./PayoffPanel";
 
 type Phase = "input" | "confirm" | "payoff";
@@ -50,6 +51,11 @@ const LogFlow: FC<{ onClose: () => void; onPhaseChange: (p: Phase) => void }> = 
   // Lazy initialiser so the clock is read once on mount, never during a
   // re-render — the react-hooks purity rule rejects Date.now() in render.
   const [startedAtMs] = useState(() => Date.now());
+  // Whether this posting was already scanned — asked the moment its text is
+  // known, so the answer is usually in by the time Save is pressed and can be
+  // stamped on the application. Free: it reads a stored scan, never runs one.
+  // The payoff panel reads the same cached answer.
+  const storedScan = useStoredScanQuery(jdText);
 
   function setPhase(p: Phase) {
     setPhaseRaw(p);
@@ -104,6 +110,9 @@ const LogFlow: FC<{ onClose: () => void; onPhaseChange: (p: Phase) => void }> = 
         jdText: jdText || undefined,
         duplicateOf: duplicate?.id,
         startedAtMs,
+        // A real scan's number or nothing. If the lookup is still out, the
+        // application is saved without one rather than waiting on it.
+        atsScore: storedScan.data?.score ?? null,
       })
     );
     setPhase("payoff");

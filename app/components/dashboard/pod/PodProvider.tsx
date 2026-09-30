@@ -39,7 +39,7 @@ export interface SuggestedGoal {
   unit: string;
 }
 
-interface PodContextValue {
+export interface PodContextValue {
   /** Whether you are in a pod at all. Leaving drops you to solo. */
   inPod: boolean;
   /** Ten. Exposed so every surface quotes the same number. */
@@ -49,15 +49,29 @@ interface PodContextValue {
   seatsLeft: number;
   /** This pod's invite code — what you hand out, and what the link carries. */
   inviteCode: string;
+  /** What the pod calls itself. Sits beside "Your pod" in the header. */
+  podName: string;
+  /** You own it, which is what gates renaming. */
+  isOwner: boolean;
+  /** You are the only one here, so leaving deletes the pod. The confirm dialog
+   *  branches on this, and it has to know before the click. */
+  soleMember: boolean;
+  /** You have muted this pod's notifications. Never silences your own membership. */
+  muted: boolean;
   /** The full link for this pod, built against the current origin. */
   invitePath: (origin: string) => string;
   /** The company's own route back in: matched by role, band and timezone. */
   joinByMatching: () => void;
+  /** Starts a pod of your own, which is what makes you its owner. */
+  createPod: (name: string) => void;
+  /** Owner only. */
+  renamePod: (name: string) => void;
+  toggleMute: () => void;
   /**
    * Joins with a pasted code or invite link. Refuses if you are already in a
    * pod — an invite moves someone with no pod, never poaches one who has one.
    */
-  joinWithCode: (input: string) => JoinResult;
+  joinWithCode: (input: string) => JoinResult | Promise<JoinResult>;
   leavePod: () => void;
 
   moving: PodMovingItem[];
@@ -80,7 +94,10 @@ interface PodContextValue {
   recordJobWin: (win: WinRecord) => void;
 }
 
-const PodCtx = createContext<PodContextValue | null>(null);
+// Exported so LivePodProvider can supply the same context on /dashboard/pod.
+// `useContext` takes the nearest provider, so the dialogs read live data there
+// and the mock everywhere else without knowing either exists.
+export const PodCtx = createContext<PodContextValue | null>(null);
 
 let seq = 0;
 const nextId = () => `pod-shared-${(seq += 1)}`;
@@ -98,6 +115,11 @@ const PodProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Stable for the life of the session: an invite you copied a minute ago must
   // still work. A real pod carries its code in the record.
   const [inviteCode] = useState(generateInviteCode);
+  const [podName, setPodName] = useState("Night Shift");
+  const [muted, setMuted] = useState(false);
+  // The mock's founder owns their pod, so the owner-only affordances are
+  // reachable in the walkthrough rather than only against a real backend.
+  const [isOwner, setIsOwner] = useState(true);
 
   const [moving, setMoving] = useState<PodMovingItem[]>(() =>
     FEED.map((f) => ({ id: f.id, text: f.text, time: f.time, fires: f.n, firedByMe: false, hot: f.hot }))
@@ -121,7 +143,29 @@ const PodProvider: FC<{ children: ReactNode }> = ({ children }) => {
     if (!code) return "invalid";
     if (code === FULL_POD_CODE) return "full";
     setInPod(true);
+    // You joined someone else's pod, so it is not yours.
+    setIsOwner(false);
     return "joined";
+  }
+
+  function createPod(name: string) {
+    setInPod(true);
+    setIsOwner(true);
+    setPodName(name);
+    toast.success(`${name} is open`, { description: "Invite someone — a pod of one is just a to-do list." });
+  }
+
+  function renamePod(name: string) {
+    setPodName(name);
+  }
+
+  function toggleMute() {
+    setMuted((value) => {
+      toast.success(value ? "Pod unmuted" : "Pod muted", {
+        description: value ? "You'll hear about your pod again." : "You'll still hear about your own membership.",
+      });
+      return !value;
+    });
   }
 
   function leavePod() {
@@ -214,8 +258,15 @@ const PodProvider: FC<{ children: ReactNode }> = ({ children }) => {
         memberCount,
         seatsLeft,
         inviteCode,
+        podName,
+        isOwner,
+        soleMember: memberCount <= 1,
+        muted,
         invitePath: (origin: string) => inviteUrl(inviteCode, origin),
         joinByMatching,
+        createPod,
+        renamePod,
+        toggleMute,
         joinWithCode,
         leavePod,
         moving,

@@ -33,6 +33,10 @@ export interface RichTextEditorProps {
   surfaceClassName?: string;
   /** Classes for the editable body — fonts, spacing, marker styles. */
   contentClassName?: string;
+  /** Shown in place of the body while the document is being replaced (a
+   *  rewrite in flight). The body stays mounted underneath, hidden, so what
+   *  the user typed is still there if the replacement never arrives. */
+  busy?: ReactNode;
   ariaLabel?: string;
   className?: string;
 }
@@ -60,6 +64,7 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
   pageHeader,
   surfaceClassName,
   contentClassName,
+  busy,
   ariaLabel = "Document body",
   className,
 }) => {
@@ -124,11 +129,12 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
                   // and the command would apply to nothing.
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => exec(t.cmd)}
+                  disabled={Boolean(busy)}
                   aria-label={t.label}
                   aria-pressed={STATEFUL.includes(t.cmd) ? Boolean(isOn) : undefined}
                   title={t.label}
                   className={cn(
-                    "grid h-7 w-7 place-content-center rounded-md cursor-pointer transition-colors",
+                    "grid h-7 w-7 place-content-center rounded-md cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                     isOn ? "bg-[#222325] text-white" : "text-black/50 hover:bg-black/[0.06] hover:text-primary"
                   )}>
                   <t.icon className="h-3.5 w-3.5" />
@@ -141,8 +147,9 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 
       {/* The page: header (if any) and body share one surface, so a
           letterhead reads as part of the document rather than a note about it. */}
-      <div className={cn("rounded-b-2xl border border-black/10 overflow-hidden", surfaceClassName)}>
+      <div className={cn("rounded-b-2xl border border-black/10 overflow-hidden", surfaceClassName)} aria-busy={busy ? true : undefined}>
         {pageHeader}
+        {busy}
         <div
           ref={ref}
           contentEditable
@@ -157,7 +164,8 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
           className={cn(
             "min-h-[320px] px-8 py-7 outline-none",
             "[&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5",
-            contentClassName
+            contentClassName,
+            busy && "hidden"
           )}
         />
       </div>

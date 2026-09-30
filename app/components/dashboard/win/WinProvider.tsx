@@ -9,14 +9,22 @@
 // straight to the pod: onto What's moving as a hot item, and into the pod's
 // protected "someone lands a job" goal. That's the incentive loop — the
 // dopamine hit of logging is the pod seeing it.
+//
+// The pod post goes to the API directly (useRecordJobWin), not through
+// `usePod()`: this provider sits in the shell, above the pod screen's
+// LivePodProvider, so the context it can reach is the walkthrough's mock —
+// which would post nowhere and toast that the pod knows.
 
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { usePod } from "@/app/components/dashboard/pod/PodProvider";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
+import { useRecordJobWin } from "@/hooks/mutations/usePodMutations";
 import WinLogDialog from "./WinLogDialog";
 import WinCelebrationDialog from "./WinCelebrationDialog";
-import type { WinRecord } from "@/app/lib/dashboard/win";
+import { podPostAuthor, podWinBody, type WinRecord } from "@/app/lib/dashboard/win";
+import { qk } from "@/app/lib/query/keys";
+import type { Settings } from "@/app/lib/settings/types";
 
 interface WinContextValue {
   /** Opens the 90-second win log — or the celebration directly, if already logged. */
@@ -29,8 +37,9 @@ const WinCtx = createContext<WinContextValue | null>(null);
 
 const WinProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { current, retiredStreak, markHired } = useActivity();
-  const { recordJobWin } = usePod();
-  const { profile } = useSettings();
+  const recordJobWin = useRecordJobWin();
+  const { profile, privacy } = useSettings();
+  const queryClient = useQueryClient();
 
   const [win, setWin] = useState<WinRecord | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -47,7 +56,10 @@ const WinProvider: FC<{ children: ReactNode }> = ({ children }) => {
     setLogOpen(false);
     // The streak retires itself — a system event, not a button.
     if (retiredStreak === null) markHired();
-    recordJobWin(record);
+    // Named only while the SAVED privacy lets the pod see who you are — what the
+    // board shows them — not an unsaved toggle on the privacy screen.
+    const saved = queryClient.getQueryData<Settings>(qk.settings.me())?.privacy ?? privacy;
+    recordJobWin.mutate(podWinBody(record, podPostAuthor(profile.fullName, saved.showProfileToPod !== false)));
     setCelebrationOpen(true);
   }
 
@@ -56,7 +68,7 @@ const WinProvider: FC<{ children: ReactNode }> = ({ children }) => {
       {children}
       {logOpen && <WinLogDialog streak={current} onClose={() => setLogOpen(false)} onComplete={handleComplete} />}
       {celebrationOpen && win && (
-        <WinCelebrationDialog win={win} ownerName={profile.fullName} onClose={() => setCelebrationOpen(false)} />
+        <WinCelebrationDialog win={win} ownerName={profile.fullName.trim()} onClose={() => setCelebrationOpen(false)} />
       )}
     </WinCtx.Provider>
   );

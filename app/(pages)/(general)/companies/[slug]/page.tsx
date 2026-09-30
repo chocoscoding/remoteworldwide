@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import React from "react";
 import { Metadata } from "next";
+import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 
 interface PageProps {
   companyDetails: {
@@ -44,11 +45,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     return {
       title: "Company Not Found",
       description: "The requested company could not be found.",
+      // The page answers 200 with a "not found" message, so keep it out of the index.
+      robots: { index: false, follow: true },
     };
   }
 
   const jobCount = companyData._count?.jobs;
-  const title = `${companyData.name} - Remote Jobs`;
+  const title = `${companyData.name} Remote Jobs | Remote Worldwide`;
   const description = companyData.about
     ? `${companyData.about.substring(0, 100)}... Explore ${jobCount ?? "several"} remote ${jobCount === 1 ? "job" : "jobs"} at ${
         companyData.name
@@ -64,6 +67,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title,
     description,
+    alternates: { canonical: absoluteUrl(`/companies/${encodeURIComponent(companyData.slug)}`) },
     openGraph: {
       title,
       description,
@@ -92,8 +96,13 @@ const Page = async ({ params }: { params: Promise<{ slug: string }> }) => {
   const companyData = await fetchCompany(companySlug);
 
   if (!companyData) return <NotFound buttonType="back" title="Company" />;
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Companies", path: "/companies" },
+    { name: companyData.name, path: `/companies/${encodeURIComponent(companyData.slug)}` },
+  ]);
   return (
     <main className="min-h-screen">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbs) }} />
       <section className="w-full m-auto max-w-[1200px] min-h-screen my-5 p-3">
         {/* back buttton */}
         <Link href={`/jobs`}>

@@ -1,17 +1,29 @@
 "use client";
 
-import { FC, FormEvent, useState } from "react";
+import { FC, FormEvent, useRef, useState } from "react";
 import { Check, Plus, Upload } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
+import { useUploadAvatar } from "@/hooks/mutations/useAvatarMutation";
 import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagList } from "@/app/components/dashboard/settings/settings-ui";
+import EducationEditor from "@/app/components/onboarding/EducationEditor";
+import ExperienceEditor from "@/app/components/onboarding/ExperienceEditor";
+import { educationOf, educationProblems, experienceOf, experienceProblems, type EducationRow, type ExperienceRow } from "@/app/lib/onboarding/profile";
 
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
 
 const ProfileClient: FC = () => {
   const { profile, setProfile, save, saving } = useSettings();
   const [skillDraft, setSkillDraft] = useState("");
+  const photoRef = useRef<HTMLInputElement | null>(null);
+  const uploadPhoto = useUploadAvatar();
+
+  // Keyed by position: the saved list has no ids, and rows only move on an add or a remove.
+  const educationRows: EducationRow[] = (profile.education ?? []).map((entry, index) => ({ id: `row-${index}`, ...entry }));
+  const educationBlocked = educationProblems(educationRows).length > 0;
+  // The same, for roles (a role needs a title or a company).
+  const experienceRows: ExperienceRow[] = (profile.experience ?? []).map((entry, index) => ({ id: `role-${index}`, ...entry }));
+  const experienceBlocked = experienceProblems(experienceRows).length > 0;
 
   const initials = profile.fullName
     .split(" ")
@@ -39,19 +51,38 @@ const ProfileClient: FC = () => {
         title="Profile"
         description="What recruiters see when we put your name forward."
         action={
-          <button type="button" onClick={() => save("profile")} disabled={saving} className={BUTTON_SOLID}>
+          <button type="button" onClick={() => save("profile")} disabled={saving || educationBlocked || experienceBlocked} className={BUTTON_SOLID}>
             <Check className="h-3.5 w-3.5" />
             {saving ? "Saving…" : "Save"}
           </button>
         }>
         <div className="mb-5 flex items-center gap-4 border-b border-black/8 pb-5">
-          <span className="grid h-16 w-16 flex-none place-content-center rounded-full bg-[#222325] text-lg font-extrabold text-[#e1f073]">
-            {initials || "?"}
+          <span className="grid h-16 w-16 flex-none place-content-center overflow-hidden rounded-full bg-[#222325] text-lg font-extrabold text-[#e1f073]">
+            {profile.avatarUrl ? (
+              // A plain img, not next/image: the URL is signed and short-lived,
+              // and the initials below are the fallback when it stops resolving.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              initials || "?"
+            )}
           </span>
           <div className="min-w-0">
-            <button type="button" className={BUTTON_OUTLINE} onClick={() => toast("Photo upload isn't wired up yet.")}>
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                // Cleared first so picking the same file twice still fires.
+                e.target.value = "";
+                if (file) uploadPhoto.mutate(file);
+              }}
+            />
+            <button type="button" className={BUTTON_OUTLINE} disabled={uploadPhoto.isPending} onClick={() => photoRef.current?.click()}>
               <Upload className="h-3.5 w-3.5" />
-              Upload a photo
+              {uploadPhoto.isPending ? "Uploading…" : profile.avatarUrl ? "Change photo" : "Upload a photo"}
             </button>
             <p className="mt-1.5 text-xs text-black/45">JPG or PNG, at least 400×400.</p>
           </div>
@@ -88,6 +119,11 @@ const ProfileClient: FC = () => {
               className={cn(INPUT, "w-auto flex-none cursor-pointer")}
               value={profile.timezone}
               onChange={(e) => setProfile({ timezone: e.target.value })}>
+              {/* Without this, an unset timezone displays as the first option
+                  while "" is what's saved — and reviewers need a real one. */}
+              <option value="" disabled>
+                Timezone
+              </option>
               {TIMEZONES.map((tz) => (
                 <option key={tz} value={tz}>
                   {tz}
@@ -129,6 +165,18 @@ const ProfileClient: FC = () => {
           onRemove={(t) => setProfile({ skills: profile.skills.filter((s) => s !== t) })}
           emptyNote="No skills yet — add a few so we can match you properly."
         />
+      </SettingsSection>
+
+      {/* The same editor as onboarding's, and optional there too, so a role entered in one is edited in the other. Saved with the
+          Profile button above; a role with neither a title nor a company holds it (the backend refuses those). */}
+      <SettingsSection title="Work experience" description="Where you've worked, most recent first. Resumes, cover letters and answers draw on it; it's optional.">
+        <ExperienceEditor rows={experienceRows} onChange={(rows) => setProfile({ experience: experienceOf(rows) })} />
+      </SettingsSection>
+
+      {/* The same editor as onboarding's, so a school entered there is edited here. Saved with the
+          Profile button above; a row with no school holds it (the backend refuses those). */}
+      <SettingsSection title="Education" description="Where you studied. The extension answers education questions from it; a school's name is all an entry needs.">
+        <EducationEditor rows={educationRows} onChange={(rows) => setProfile({ education: educationOf(rows) })} />
       </SettingsSection>
     </>
   );

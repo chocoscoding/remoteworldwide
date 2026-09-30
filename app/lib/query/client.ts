@@ -48,6 +48,24 @@ function makeQueryClient() {
 
 let browserQueryClient: QueryClient | undefined;
 
+/** Where QueryProvider persists the allowlisted part of the cache. */
+export const QUERY_CACHE_STORAGE_KEY = "rww.query-cache";
+
+/**
+ * Forget every cached query, in memory and on disk. Called on sign-out: the
+ * persisted cache is keyed by nothing user-specific, so without this the next
+ * person to sign in on the same browser would paint the last user's data first.
+ */
+export function clearQueryCache(): void {
+  if (isServer) return;
+  browserQueryClient?.clear();
+  try {
+    window.localStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable (private mode, policy); nothing was persisted then.
+  }
+}
+
 /**
  * Server: a fresh client per request, so one user's data can never be handed
  * to another. Browser: the singleton, created once.

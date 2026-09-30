@@ -3,8 +3,8 @@
 // Plan, credit balance and checkout state — now backed by React Query.
 //
 // App-wide because the sidebar credit meter and the billing screen must never
-// disagree. Distinct from ActivityProvider.credits, which counts referral
-// credits earned through invites — a different currency.
+// disagree. Distinct from the invite summary (useInviteSummary), which counts
+// referral credits earned through invites — a different currency.
 //
 // Like SettingsProvider, this is an adapter: the context value is unchanged,
 // so every screen reading `useBilling()` was untouched. What changed
@@ -18,13 +18,14 @@
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
 import { useBillingQuery } from "@/hooks/queries/useBillingQuery";
 import { useBuyCredits, useBuyPlan, useCancelPlan } from "@/hooks/mutations/useBillingMutations";
-import type { BillingOverview, Checkout } from "@/app/lib/settings/types";
+import type { BillingInterval, BillingOverview, Checkout } from "@/app/lib/settings/types";
 
 interface BillingContextValue extends BillingOverview {
   busy: boolean;
   /** The checkout this session just opened, so the screen can show what is pending. */
   lastCheckout: Checkout | null;
-  buyPlan: (planKey: string) => void;
+  /** Monthly unless told otherwise. */
+  buyPlan: (planKey: string, interval?: BillingInterval) => void;
   buyCredits: (packKey: string) => void;
   cancelPlan: () => void;
 }
@@ -50,7 +51,7 @@ export const BillingProvider: FC<{ initial: BillingOverview; children: ReactNode
         ...overview,
         busy,
         lastCheckout,
-        buyPlan: (planKey) => buyPlan.mutate(planKey),
+        buyPlan: (planKey, interval = "month") => buyPlan.mutate({ planKey, interval }),
         buyCredits: (packKey) => buyCredits.mutate(packKey),
         cancelPlan: () => cancelPlan.mutate(),
       }}>

@@ -13,6 +13,7 @@ import { Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STREAK_MILESTONES, milestoneProgress, nextMilestone } from "@/app/lib/dashboard/streak";
 import { GIFT_CATALOGUE } from "@/app/lib/dashboard/gifts";
+import { milestoneGiftRef } from "@/app/lib/streak/types";
 import { useStreak } from "./StreakContext";
 
 export interface StreakRewardsProps {
@@ -110,7 +111,7 @@ const StreakRewards: FC<StreakRewardsProps> = ({ dark = false, className }) => {
                       gift actually drawn (the inventory holds the roll).
                       Seeded history has no entry — fall back to the promise. */}
                   {(() => {
-                    const drawn = gifts.find((g) => g.refId === String(m.days));
+                    const drawn = gifts.find((g) => g.refId === milestoneGiftRef(m.days));
                     const what = unlocked && drawn ? `\u{1F381} ${GIFT_CATALOGUE[drawn.kind].label}` : "\u{1F381} Surprise gift";
                     return `${what}${m.perk ? ` · ${m.perk}` : ""}`;
                   })()}

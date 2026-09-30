@@ -106,6 +106,12 @@ export interface TrackerCard {
   lastTouchedDaysAgo?: number;
   /** How far the interview loop actually got — the funnel's late-stage signal. */
   roundsReached?: number;
+  /**
+   * The slug of the Remote Worldwide listing it was applied to (`/jobs/<slug>`),
+   * when the server linked one: the job was on the site at the application's
+   * moment. Independent of `rww`, which says it was applied to through the board.
+   */
+  listingSlug?: string;
 }
 
 /** One entry in the dashboard sidebar navigation. */
@@ -193,6 +199,78 @@ export interface CoverLetterContent {
   paragraphs: string[];
   signOff: string;
   wordCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// The library, reopened: saved letters and resume summaries
+// ---------------------------------------------------------------------------
+//
+// Mirrors of the AI service's `src/types/index.ts` (the `/api/ai/cover/letters`
+// and `/api/ai/resume/documents?view=summary` answers). The service sends
+// `createdAt`/`updatedAt` as ISO strings; `unwrapResponse` revives both keys, so
+// they are Dates by the time anything here reads them.
+
+/**
+ * A saved letter, as the editor last left it. The writer fills the
+ * `CoverLetterContent` half; the editor's autosave adds what is actually on the
+ * page. `html` is stored as sent — every renderer sanitises it (the browser's
+ * `sanitizeLetterHtml`, the print page's `sanitizeLetterHtmlServer`).
+ */
+export interface StoredLetterContent extends CoverLetterContent {
+  /** The letter as edited, plain text. The service caps it at 12,000 characters. */
+  text?: string;
+  /** The editor's HTML. Capped at 60,000 characters. */
+  html?: string;
+}
+
+export type LetterThemeId = "ats" | "bordered" | "warm";
+export type LetterFontId = "manrope" | "serif" | "mono";
+export type LetterSpacingId = "tight" | "normal" | "airy";
+/** Whether the letter prints the person's name (and contacts) above it. The name itself is the profile's, never stored here. */
+export type LetterheadMode = "off" | "name" | "full";
+
+/** The cover editor's four toolbar controls, saved with the letter so it reopens and prints as it was left. */
+export interface LetterDesign {
+  theme: LetterThemeId;
+  font: LetterFontId;
+  spacing: LetterSpacingId;
+  letterhead: LetterheadMode;
+}
+
+/** A letter in a list: no content. */
+export interface LetterSummary {
+  id: string;
+  label: string;
+  tone: "warm" | "formal" | "story" | "short" | null;
+  /** The saved job it was written for. */
+  jobId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LetterView {
+  id: string;
+  label: string;
+  content: StoredLetterContent;
+  /** Null until the editor saves one; the editor's defaults apply until then. */
+  design: LetterDesign | null;
+  tone: "warm" | "formal" | "story" | "short" | null;
+  jobId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A built resume in a list: no content. The whole document is `StoredResumeDocument` (app/lib/resume/api.ts). */
+export interface ResumeDocumentSummary {
+  id: string;
+  label: string;
+  template: string | null;
+  /** The saved job it was built for. */
+  jobId: string | null;
+  /** The vault file it was copied from ("Edit a copy"), so the next click reopens this copy. */
+  sourceDocumentId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +375,14 @@ export interface VaultDoc {
   addedAt: number;
   updatedLabel: string;
   archived?: boolean;
+  /** The master resume — the one reviewers read, and the extension attaches by default. At most one. */
+  master?: boolean;
+  /**
+   * The parsed resume (an `ai_resumes` id in the AI service) this file became,
+   * recorded the first time it was imported. A hint: when the AI service no
+   * longer has it ready, import again (`/api/ats/resume-for-doc` does both).
+   */
+  aiResumeId?: string | null;
   /** A stored match score + which job it was against, where mock data has one. */
   jdScore?: number | null;
   jdLabel?: string;
@@ -364,26 +450,40 @@ export interface JdQaAnswer {
 // Referrals
 // ---------------------------------------------------------------------------
 
-/** Closed union so warmth can be sorted and filtered, not just printed. */
-export type TieKind = "strong" | "second" | "alumni";
+/**
+ * Closed union so warmth can be sorted and filtered, not just printed — and
+ * read off where a person came from, never guessed (app/lib/contacts/people.ts):
+ * `connection` is a LinkedIn connection from the import (1st degree, which says
+ * nothing about how well you know them), `added` is someone you typed in
+ * yourself, `cold` is someone referral search found online — a stranger whose
+ * intro has to say how you found them.
+ */
+export type TieKind = "connection" | "added" | "cold";
 
 export interface ReferralContact {
+  /** What "asked" and selection key on: a saved contact's id, or a found person's. */
   id: string;
+  /** Set when this person is one of your saved contacts. */
+  contactId?: string;
   name: string;
+  /** What to greet them by — LinkedIn's own first-name field when imported. Falls back to the first word of `name`. */
+  firstName?: string;
   tie: TieKind;
+  /** Their title. May be blank: plenty of LinkedIn connections list none. */
   role: string;
   company: string;
-  targetRole: string;
+  /** The line under the name: how you know them. */
   status: string;
-  /** Present for 2nd-degree contacts — the mutual connection's name. */
-  via?: string;
-  bio?: string;
-  /** "GMT+1" — feeds the same-timezone filter. */
-  timezone: string;
-  /** The two reach channels the referral flow is actually built around. */
+  location?: string;
+  /** The two reach channels the referral flow is built around. Either may be "" — most imported connections share no email. */
   email: string;
+  /** `likely` is a guess from the company's email format and must be labelled so. */
+  emailStatus?: "known" | "found" | "likely";
   linkedinUrl: string;
-  lastInteraction?: string;
+  /** The page a web-found person was found on, when it is not LinkedIn. */
+  profileUrl?: string;
+  /** Their company has a live job on Remote Worldwide. */
+  hiring?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -401,24 +501,33 @@ export interface ChecklistItem {
 // ---------------------------------------------------------------------------
 
 /**
- * A company our reviewers watch. Carries real facts (role, salary, timezone,
- * skills) so fit can be computed against your preferences rather than stored
- * as a literal percentage.
+ * A job worth watching: a live Remote Worldwide listing
+ * (app/lib/recommendations/view.ts `toWatchTarget`). Carries facts (role,
+ * regions, salary and skills when a listing has them) so fit is computed
+ * against your preferences rather than stored as a literal percentage.
  */
 export interface RecommendationTarget {
+  /** The listing's id. */
   id: string;
   company: string;
   role: string;
-  /** Display string, e.g. "$140k–$180k + equity". */
+  /** Display string, e.g. "$140k–$180k + equity". Listings don't carry one yet. */
   salaryText?: string;
   /** Midpoint in USD — what the fit engine compares against minSalary. */
   salaryUsd?: number;
-  /** Hours from GMT for the company's hub. */
-  timezoneOffset: number;
+  /** Approximate hours from GMT for each region the listing hires in. Empty = not stated. */
+  timezoneOffsets: number[];
+  /** Open to hires anywhere — the timezone factor is met outright. */
+  anywhere?: boolean;
+  /** The listing's own level, e.g. "Senior" or "Entry & mid-level". Null when it doesn't say. */
+  seniority?: string | null;
+  /** When it was posted, epoch ms — breaks ties toward the fresher listing. */
+  postedAt?: number;
   skills: string[];
-  /** The reviewer's one-liner on why this company is on your list. */
+  /** A one-line summary under the name: seniority, regions, how fresh. */
   note?: string;
-  onHold?: boolean;
+  /** The listing's own page, e.g. `/jobs/{slug}`. */
+  href?: string;
 }
 
 /** One of the one or two things a company asks before they'll book time. */
@@ -429,48 +538,33 @@ export interface IntroQuestion {
 }
 
 /**
- * A company our reviewers put you in front of. There is no messaging thread:
- * they ask a question or two, you answer, and you're connected — which is why
- * this carries `questions` rather than a message list.
+ * A company our reviewers put you in front of — the screen's view of a backend
+ * recommendation (app/lib/recommendations/view.ts `toPipelineEntry`). There is
+ * no messaging thread: they ask a question or two, you answer, and you're
+ * connected — which is why this carries `questions` rather than a message list.
  */
 export interface IntroPipelineEntry {
   id: string;
-  targetId: string;
+  /** The Remote Worldwide listing it is for, when there is one — keeps it out of "worth watching". */
+  platformJobId: string | null;
   company: string;
   role: string;
-  /** Index into INTRO_STAGES. */
+  /** Index into RECOMMENDATION_STAGE_LABELS. */
   stageIndex: number;
   startedAgoDays: number;
   questions?: IntroQuestion[];
-  /** A warm contact at this company, when you have one. */
-  contactId?: string;
   /** Days left to answer, shown while questions are open. Unset = no clock. */
   expiresInDays?: number;
-  /** Set once the rec closed without a hire. Absent = still live. */
-  outcome?: "passed" | "expired";
+  /** Set once the rec closed. Absent = still live. */
+  outcome?: "connected" | "passed" | "expired";
   /** Days since the outcome landed — >7 moves the row into History. */
   outcomeAgoDays?: number;
-}
-
-// ---------------------------------------------------------------------------
-// Home screen
-// ---------------------------------------------------------------------------
-
-export interface HomeStat {
-  id: string;
-  label: string;
-  value: string;
-  delta: string;
-  positive?: boolean;
-}
-
-export interface WeeklyGoal {
-  current: number;
-  target: number;
-  /** Days of the M-S week that are marked done, e.g. ["M", "T", "Th"]. */
-  doneDays: string[];
-  /** All seven day labels in order, M through S. */
-  allDays: string[];
+  /** The reviewer's line on why you were put forward. */
+  note?: string;
+  /** Who put you forward, as they sign it. */
+  reviewerName?: string;
+  /** The posting, when there is a link to one. */
+  jobUrl?: string;
 }
 
 // ---------------------------------------------------------------------------

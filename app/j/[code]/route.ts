@@ -11,6 +11,13 @@ const CODE = /^[a-z0-9-]{3,40}$/;
  * and is read back by the backend at registration, because the gap between
  * clicking someone's link and actually signing up is usually days — long
  * enough that carrying it in the URL would lose it.
+ *
+ * Both signups read it: the register route for email and password, and the
+ * Auth.js adapter for Google and GitHub, which sees it on the provider's
+ * redirect back to /api/auth/callback/* (proxied, and a top-level GET, so Lax
+ * carries it). The backend expires it once the account exists, by name and
+ * path "/" — change either here and the backend's helpers/inviteCookie.ts
+ * has to follow.
  */
 export async function GET(request: Request, props: { params: Promise<{ code: string }> }) {
   const { code } = await props.params;

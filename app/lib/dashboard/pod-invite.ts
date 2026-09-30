@@ -83,11 +83,14 @@ export function inviteUrl(code: string, origin: string): string {
  * own sentence — the dialog says it in a field, the deep link says it in a
  * toast — so this stays a verdict rather than a message.
  */
-export type JoinResult = "joined" | "invalid" | "full" | "already-in-pod";
+export type JoinResult = "joined" | "invalid" | "full" | "already-in-pod" | "pod-closed";
 
 /** What each refusal means, in the one sentence every surface shows. */
 export const JOIN_REFUSAL: Record<Exclude<JoinResult, "joined">, string> = {
   invalid: `That doesn't look like an invite. A code is ${INVITE_CODE_LENGTH} characters — paste the whole thing, or the link you were sent.`,
   full: "That pod is full. Ask whoever invited you, or get matched with one that has room.",
   "already-in-pod": "You're already in a pod. Leave it first, then this will work.",
+  // A pod that went quiet is closed during the weekly rotation and its members moved on, which
+  // leaves the code resolving to somewhere nobody is any more.
+  "pod-closed": "That pod has closed and everyone moved on. Ask for a fresh invite, or get matched with an active one.",
 };

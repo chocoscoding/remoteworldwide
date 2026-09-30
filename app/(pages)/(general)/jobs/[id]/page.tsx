@@ -5,6 +5,8 @@ import { prisma } from "@/prisma";
 import { JobAndCompany } from "@/types/main";
 import { Job } from "@prisma/client";
 import OneJobClient from "./Client";
+import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
+import { jobPostingJsonLd } from "@/app/lib/jobs/jobPostingJsonLd";
 
 export const revalidate = 43200; // 3600 * 12
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
@@ -33,6 +35,7 @@ const fetchJobMetaData = async (slug: string): Promise<any | null> => {
         slug: true,
         title: true,
         region: true,
+        seniority: true,
         company: {
           select: {
             name: true,
@@ -54,6 +57,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return {
       title: "Job Not Found",
       description: "The job you are looking for does not exist.",
+      // The page answers 200 with a "not found" message, so keep it out of the index.
+      robots: { index: false, follow: true },
       openGraph: {
         title: "Job Not Found - Find more remote roles jobs on RemoteWorldWide",
         images: `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`,
@@ -68,17 +73,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   )}&company=${encodeURIComponent(JOB.company.name)}`;
 
   const keywordText = JOB.slug.split("-").slice(0, -1);
+  const title = `${JOB.title} at ${JOB.company.name} (Remote) | Remote Worldwide`;
+  const description = `${JOB.company.name} is hiring a remote ${JOB.title}.${JOB.seniority ? ` Seniority: ${JOB.seniority}.` : ""} Location: ${regionLabel}. Read the full job description and apply on Remote Worldwide.`;
   return {
-    title: `${JOB.title} - Remoteworldwide`,
-    description: `Remoteworldwide - ${JOB.title}`,
+    title,
+    description,
     alternates: {
-      canonical: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${JOB.slug}`,
+      canonical: absoluteUrl(`/jobs/${JOB.slug}`),
     },
     openGraph: {
       images: imageUrl,
-      title: `${JOB.title} - Remoteworldwide`,
+      title,
       description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
-      url: `${process.env.NEXT_PUBLIC_SITE_URL}/jobs/${JOB.slug}`,
+      url: absoluteUrl(`/jobs/${JOB.slug}`),
     },
     keywords: ["Remoteworldwide", ...keywordText],
   };
@@ -95,12 +102,25 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const jobDetails = _jobDetails as unknown as Job;
 
   let hasUserBookmarked = undefined;
-  if (userSession?.user) {
-    const _hasUserBookmarked = await checkBookmarkForUser(userSession.user.id, jobDetails.id);
+  // The same tests requireUserAction makes, so a signed-in visitor never meets its 401, and
+  // an account locked for deletion (refused there with 423) still sees the public page.
+  if (userSession?.user?.id && !userSession.user.deletionDueAt) {
+    const _hasUserBookmarked = await checkBookmarkForUser(jobDetails.id);
     if (_hasUserBookmarked.data?.id) {
       hasUserBookmarked = true;
     }
   }
 
-  return <OneJobClient Job={JOB} hasUserBookmarked={hasUserBookmarked} />;
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Jobs", path: "/jobs" },
+    { name: JOB.title, path: `/jobs/${JOB.slug}` },
+  ]);
+
+  return (
+    <>
+      {JOB.isActive ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(jobPostingJsonLd(JOB)) }} /> : null}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbs) }} />
+      <OneJobClient Job={JOB} hasUserBookmarked={hasUserBookmarked} />
+    </>
+  );
 }

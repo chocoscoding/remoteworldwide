@@ -1,12 +1,31 @@
 "use server";
 
+// Every export here is a server action: a POST endpoint anyone holding its id can
+// call with any arguments, whichever page imports it — the admin route groups'
+// notFound() gates the page, not the action. So each one opens with its own check
+// (app/lib/auth/action-guards.ts), placed before its `try` so a refusal leaves as
+// the ActionAuthError it is instead of being rewrapped by the catch or `surface`.
+//   - The board (jobs, companies, the dashboard counts) is ADMIN's, the same
+//     positive check as the REST routes behind requireAdmin: an AUTHOR may neither
+//     write it nor list the inactive listings.
+//   - Posts are the writers' (ADMIN or AUTHOR) and author profiles are ADMIN's. The
+//     backend's isWriter/isAdmin already enforce that; checking here too makes an
+//     anonymous call fail at the edge rather than on the backend's word alone.
+//   - Bookmarks belong to the session's user. They once took a `userId` argument,
+//     and their ids ship on every public job page, so any visitor could read,
+//     add or delete anyone's.
+//   - The public reads (latest jobs, the active count, filters) stay open and
+//     return only active listings and public fields.
+
 import { prisma } from "@/prisma";
 import { Job } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { backend, BackendError, backendOrNull, type BackendInit } from "@/app/lib/backend";
+import { backend, BackendError, backendOrNull, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
 import type { Author, Blog, BlogStatus } from "@/app/lib/blog/types";
+import { requireAdminAction, requireRoleAction, requireUserAction } from "@/app/lib/auth/action-guards";
 
 export const deleteOneJob = async (id: string) => {
+  await requireAdminAction();
   try {
     await prisma.job.delete({
       where: {
@@ -24,6 +43,7 @@ export const deleteOneJob = async (id: string) => {
 };
 
 export const toggleJobActiveState = async (id: string, state: boolean) => {
+  await requireAdminAction();
   try {
     await prisma.job.update({
       where: {
@@ -43,13 +63,22 @@ export const toggleJobActiveState = async (id: string, state: boolean) => {
   }
 };
 
-export const updateOneJob = async (id: string, jobDetails: Omit<Job, "createdAt" | "updatedAt" | "isActive" | "id" | "jobType">) => {
+// The fields the edit form owns. The type alone never limited the write — it is
+// erased at runtime, and `data: jobDetails` let a direct call pass anything the
+// update input accepts: `isActive` (publishing is toggleJobActiveState's job) or
+// `createdAt` (which orders the board). Naming each field makes the write match
+// the type, as the REST twin (app/api/jobs/[id]/route.ts PUT) does.
+type JobEdit = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "region" | "seniority" | "slug">;
+
+export const updateOneJob = async (id: string, jobDetails: JobEdit) => {
+  await requireAdminAction();
   try {
+    const { title, description, companyId, applicationUrl, category, region, seniority, slug } = jobDetails;
     const data = await prisma.job.update({
       where: {
         id,
       },
-      data: jobDetails,
+      data: { title, description, companyId, applicationUrl, category, region, seniority, slug },
     });
     revalidatePath("/");
     return { data };
@@ -62,6 +91,7 @@ export const updateOneJob = async (id: string, jobDetails: Omit<Job, "createdAt"
 };
 
 export const findJobsAdmin = async (page: number, active: boolean) => {
+  await requireAdminAction();
   try {
     const inactiveJobsListPromise = prisma.job.findMany({
       where: {
@@ -101,7 +131,10 @@ export const findJobsAdmin = async (page: number, active: boolean) => {
   }
 };
 
+// The admin view of a company. The public /companies pages read through
+// app/api/companies and app/api/jobs/company, which filter to active listings.
 export const findCompany = async (slug: string) => {
+  await requireAdminAction();
   try {
     const company = await prisma.company.findUnique({
       where: {
@@ -125,6 +158,7 @@ export const findCompany = async (slug: string) => {
 };
 
 export const findCompanyJobs = async (companyId: string, page: number) => {
+  await requireAdminAction();
   try {
     const jobsListPromise = prisma.job.findMany({
       where: {
@@ -166,7 +200,9 @@ export const findCompanyJobs = async (companyId: string, page: number) => {
   }
 };
 
+// heroshima/page.tsx returns early for an AUTHOR, so only ADMIN renders this.
 export const getAdminDashboardInfo = async () => {
+  await requireAdminAction();
   try {
     const [latestJob, jobsCount, companiesCount, blogsCount] = await Promise.all([
       prisma.job.findMany({
@@ -217,9 +253,13 @@ const surface = (error: unknown): never => {
   throw new Error(error instanceof BackendError ? error.message : "something went wrong");
 };
 
+// The backend's isWriter, checked at the edge: posts are written by ADMIN or AUTHOR.
+const requireWriterAction = () => requireRoleAction("ADMIN", "AUTHOR");
+
 export type AuthorInput = Omit<Author, "id" | "createdAt" | "slug">;
 
 export const createAuthor = async (body: AuthorInput) => {
+  await requireAdminAction();
   try {
     return { data: await admin<Author>("/authors", { method: "POST", body }) };
   } catch (error) {
@@ -227,24 +267,32 @@ export const createAuthor = async (body: AuthorInput) => {
   }
 };
 
+// The ids below go through `idSegment` (app/lib/backend.ts): pasted raw, `../../..`
+// turned "delete this post" into a request to any backend path under the caller's
+// cookie. Inside the `try`, so a malformed id surfaces as the backend's own 400 text.
 export const updateAuthor = async (id: string, body: AuthorInput) => {
+  await requireAdminAction();
   try {
-    return { data: await admin<Author>(`/authors/${id}`, { method: "PUT", body }) };
+    return { data: await admin<Author>(`/authors/${idSegment(id)}`, { method: "PUT", body }) };
   } catch (error) {
     return surface(error);
   }
 };
 
 export const deleteAuthor = async (id: string) => {
+  await requireAdminAction();
   try {
-    await admin(`/authors/${id}`, { method: "DELETE" });
+    await admin(`/authors/${idSegment(id)}`, { method: "DELETE" });
     return { status: "deleted author successfully" };
   } catch (error) {
     return surface(error);
   }
 };
 
-export const findAuthorBySlug = async (slug: string) => ({ data: await backendOrNull<Author>(`/blog/admin/authors/${encodeURIComponent(slug)}`, { session: true }) });
+export const findAuthorBySlug = async (slug: string) => {
+  await requireAdminAction();
+  return { data: await backendOrNull<Author>(`/blog/admin/authors/${encodeURIComponent(slug)}`, { session: true }) };
+};
 
 export const allAuthorsSelect = async () => admin<{ label: string; value: string }[]>("/authors/options");
 
@@ -269,6 +317,7 @@ export interface BlogInput extends BlogConversionFields {
 }
 
 export const createBlog = async (data: BlogInput) => {
+  await requireWriterAction();
   try {
     const blog = await admin<Blog>("/posts", { method: "POST", body: data });
     revalidatePath("/blogs");
@@ -278,11 +327,15 @@ export const createBlog = async (data: BlogInput) => {
   }
 };
 
-export const getBlogBySlug = async (slug: string) => ({ data: await backendOrNull<Blog>(`/blog/admin/posts/${encodeURIComponent(slug)}`, { session: true }) });
+export const getBlogBySlug = async (slug: string) => {
+  await requireWriterAction();
+  return { data: await backendOrNull<Blog>(`/blog/admin/posts/${encodeURIComponent(slug)}`, { session: true }) };
+};
 
 export const editBlog = async (id: string, data: Partial<BlogInput>) => {
+  await requireWriterAction();
   try {
-    const blog = await admin<Blog>(`/posts/${id}`, { method: "PUT", body: data });
+    const blog = await admin<Blog>(`/posts/${idSegment(id)}`, { method: "PUT", body: data });
     revalidatePath("/blogs");
     for (const slug of [blog.slug, ...blog.previousSlugs]) revalidatePath("/blogs/" + slug);
     return { data: blog };
@@ -292,8 +345,9 @@ export const editBlog = async (id: string, data: Partial<BlogInput>) => {
 };
 
 export const deleteBlog = async (id: string) => {
+  await requireWriterAction();
   try {
-    await admin(`/posts/${id}`, { method: "DELETE" });
+    await admin(`/posts/${idSegment(id)}`, { method: "DELETE" });
     revalidatePath("/blogs");
     return { status: "deleted blog successfully" };
   } catch (error) {
@@ -301,7 +355,20 @@ export const deleteBlog = async (id: string) => {
   }
 };
 
-export const getAllBookmarksForUser = async (userId: string, page: number) => {
+// How a query failure reaches a caller who is not an admin. Prisma's message names
+// the database host when the connection drops and echoes malformed ids back, and
+// development forwards a thrown message to the browser (production already hides
+// it). These callers show their own fixed copy, so the detail stays in the server
+// log and the caller gets the same words in every environment.
+const opaque = (action: string, error: unknown): never => {
+  console.error(`[query] ${action}:`, error);
+  throw new Error("something went wrong");
+};
+
+// The bookmarks below are the session user's own: the id comes from
+// requireUserAction(), never from an argument.
+export const getAllBookmarksForUser = async (page: number) => {
+  const { id: userId } = await requireUserAction();
   try {
     const bookmarksPromise = prisma.bookmark.findMany({
       where: { userId },
@@ -333,13 +400,14 @@ export const getAllBookmarksForUser = async (userId: string, page: number) => {
 
     const [bookmarks, count] = await Promise.all([bookmarksPromise, totalCountPromise]);
     return { data: bookmarks, count };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return opaque("getAllBookmarksForUser", error);
   }
 };
 
 //delete a bookmark
-export const deleteBookmarkForUser = async (userId: string, jobId: string) => {
+export const deleteBookmarkForUser = async (jobId: string) => {
+  const { id: userId } = await requireUserAction();
   try {
     await prisma.bookmark.delete({
       where: {
@@ -354,12 +422,20 @@ export const deleteBookmarkForUser = async (userId: string, jobId: string) => {
     if (error.message.includes("Record to delete does not exist")) {
       throw new Error("Record to delete does not exist");
     }
-    throw new Error(error.message ?? "something went wrong");
+    return opaque("deleteBookmarkForUser", error);
   }
 };
 //crate a bookmark
-export const createBookmarkForUser = async (userId: string, jobId: string) => {
+// Only a live listing can be saved. The row's jobId is a bare ObjectId — Mongo has no
+// foreign keys and Prisma checks none on a scalar write — so any invented id used to
+// make a row, as many as the caller liked, and an inactive listing's id read its title
+// and slug back through getAllBookmarksForUser. Listing inactive jobs is ADMIN's.
+const JOB_NOT_LIVE = "Job not found";
+export const createBookmarkForUser = async (jobId: string) => {
+  const { id: userId } = await requireUserAction();
   try {
+    const live = isObjectId(jobId) && (await prisma.job.count({ where: { id: jobId, isActive: true } })) > 0;
+    if (!live) throw new Error(JOB_NOT_LIVE);
     const bookmark = await prisma.bookmark.create({
       data: {
         userId,
@@ -368,14 +444,16 @@ export const createBookmarkForUser = async (userId: string, jobId: string) => {
     });
     return { data: bookmark };
   } catch (error: any) {
+    if (error.message === JOB_NOT_LIVE) throw error;
     if (error.message.includes("Unique constraint failed")) {
       throw new Error("Bookmark already exists");
     }
-    throw new Error(error.message ?? "something went wrong");
+    return opaque("createBookmarkForUser", error);
   }
 };
 //check if a user has job bookmarked
-export const checkBookmarkForUser = async (userId: string, jobId: string) => {
+export const checkBookmarkForUser = async (jobId: string) => {
+  const { id: userId } = await requireUserAction();
   try {
     const bookmark = await prisma.bookmark.findUnique({
       where: {
@@ -386,8 +464,8 @@ export const checkBookmarkForUser = async (userId: string, jobId: string) => {
       },
     });
     return { data: bookmark };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return opaque("checkBookmarkForUser", error);
   }
 };
 
@@ -424,12 +502,16 @@ export const getFilters = async () => {
         .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
     ]);
     return { data: { category, seniority, region } };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    // Public, like fetchLatestJobs: a dropped connection's Prisma text names the host.
+    return opaque("getFilters", error);
   }
 };
 
+// Public, like the home page that calls it with 10. `amount` comes from the caller,
+// so it is capped: uncapped, one direct POST read every active job in one query.
 export const fetchLatestJobs = async (amount: number) => {
+  const take = Math.min(Math.max(1, amount | 0), 50);
   try {
     const jobs = await prisma.job.findMany({
       where: {
@@ -438,7 +520,7 @@ export const fetchLatestJobs = async (amount: number) => {
       orderBy: {
         createdAt: "desc",
       },
-      take: amount,
+      take,
       select: {
         id: true,
         title: true,
@@ -457,7 +539,7 @@ export const fetchLatestJobs = async (amount: number) => {
       },
     });
     return { data: jobs };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return opaque("fetchLatestJobs", error);
   }
 };

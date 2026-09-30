@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { requireAdmin } from "@/app/lib/auth/require-admin";
 import { prisma } from "@/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -6,9 +6,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const filterParam = (await params).filterType;
   const { name } = await request.json();
   try {
-    const session = await auth();
+    const denied = await requireAdmin();
+    if (denied) return denied;
 
-    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     if (!name) {
       return NextResponse.json({ message: "name not provided" }, { status: 404, statusText: "forbidden" });
     }
@@ -49,9 +49,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const filterParam = (await params).filterType;
   const { id } = await request.json();
   try {
-    const session = await auth();
-
-    if (!session?.user || session.user.role === "USER") return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const denied = await requireAdmin();
+    if (denied) return denied;
 
     if (!id) {
       return NextResponse.json({ message: "id not provided" }, { status: 404, statusText: "forbidden" });

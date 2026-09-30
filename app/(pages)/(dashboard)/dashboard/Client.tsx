@@ -2,59 +2,81 @@
 
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Minus, Plus, ArrowRight, X } from "lucide-react";
+import { Minus, Plus, ArrowRight, RotateCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
-import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import type { ProgressBarFillColor } from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import StreakPill from "@/app/components/dashboard/streak/StreakPill";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import AtRiskBanner from "@/app/components/dashboard/streak/AtRiskBanner";
 import ProofOfProgress from "@/app/components/dashboard/ProofOfProgress";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
+import { COLUMN_LABELS, STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
 import { ACTION_KINDS, type ActionKind } from "@/app/lib/dashboard/activity";
 import { dayKey, fromDayKey, addDays, weekdayIndex, dayVisual, tierFor } from "@/app/lib/dashboard/streak";
 import { clampTarget, dailyMath, TARGET_STEP, HIGH_VOLUME_THRESHOLD, TARGET_MAX, TARGET_MIN } from "@/app/lib/dashboard/goals";
-import { TRACKER_COLUMNS, WEEKLY_GOAL } from "@/app/lib/dashboard/mock-data";
 import type { TrackerColumnId } from "@/app/lib/dashboard/types";
+import { comparePlanRows, taskHref } from "@/app/lib/tasks/api";
+import { periodOf, type TaskItem, type TaskSourceKind } from "@/app/lib/tasks/types";
+import { useMarkTasksSeen } from "@/hooks/mutations/useTaskMutations";
+import { useApplicationSummary, useApplications, useGoals } from "@/hooks/queries/useApplicationsQuery";
+import { useTasks } from "@/hooks/queries/useTasksQuery";
 
 // ---------------------------------------------------------------------------
-// Local content that isn't shared with any other screen yet — kept here
-// rather than in mock-data.ts.
+// Next best actions — the top of this month's plan
 // ---------------------------------------------------------------------------
 
-interface NextAction {
-  id: string;
-  title: string;
-  detail: string;
-  href: string;
+/** Open tasks the card shows. The rest of the plan lives with the coach. */
+const NEXT_ACTIONS_LIMIT = 3;
+
+/** Where the whole plan lives: the empty state, the overflow link, and any task without a page of its own. */
+const FULL_PLAN_HREF = "/dashboard/coach";
+
+/**
+ * The second line of a task that carries no detail: where it came from. Every
+ * row keeps two lines, so the numbered list doesn't read ragged.
+ */
+const SOURCE_LINE: Record<TaskSourceKind, string> = {
+  user: "Added by you",
+  coach: "Agreed with your coach",
+  prep: "From interview prep",
+  ats: "From the ATS scorer",
+  "follow-up": "A follow-up that's due",
+  application: "From your tracker",
+  system: "From Remote Worldwide",
+};
+
+/** A task a service added that hasn't been on screen yet. A task the user writes is seen as it's written. */
+const isUnseen = (task: TaskItem) => task.createdBy === "service" && task.seenAt === null;
+
+const NEXT_ACTION_SKELETON_WIDTHS = ["w-2/3", "w-1/2", "w-3/5"] as const;
+
+/** The week's seven labels, Monday first — the order `goals.restDays` numbers them in. */
+const WEEK_DAY_LABELS = ["M", "T", "W", "Th", "F", "S", "S"] as const;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * "Mon 21 — Sun 27 Sep": the Monday-to-Sunday week containing `todayKey`, the
+ * user's own today as the server counts it. The month is named once when the
+ * week stays inside it, on both ends when it straddles two.
+ */
+function weekRangeLabel(todayKey: string): string {
+  const today = fromDayKey(todayKey);
+  const monday = addDays(today, -weekdayIndex(today));
+  const sunday = addDays(monday, 6);
+  const sameMonth = monday.getMonth() === sunday.getMonth();
+  return `Mon ${monday.getDate()}${sameMonth ? "" : ` ${MONTHS[monday.getMonth()]}`} — Sun ${sunday.getDate()} ${MONTHS[sunday.getMonth()]}`;
 }
 
-const NEXT_ACTIONS: NextAction[] = [
-  {
-    id: "action-linear",
-    title: "Tailor resume to Linear",
-    detail: "Closes in 2 days · ATS 71 → 89",
-    href: "/dashboard/resume",
-  },
-  {
-    id: "action-deel",
-    title: "Follow up with Deel",
-    detail: "Applied 8 days ago",
-    href: "/dashboard/tracker",
-  },
-  {
-    id: "action-vercel",
-    title: 'Practise "why remote?" answer',
-    detail: "Vercel screen · Thu 14:00",
-    href: "/dashboard/prep",
-  },
-];
-
-const PIPELINE_MAX = Math.max(...TRACKER_COLUMNS.map((col) => col.count), 1);
+// A link dressed as the outline sticker button. The old markup put a <button>
+// inside the <Link>, which nests one control in another.
+const outlineLink = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "flex-none hover:shadow-[3px_3px_0_0_#e1f073]");
 
 /**
  * One green per pipeline stage, deepening toward the end of the funnel. Same
@@ -88,8 +110,6 @@ const HomeClient: FC = () => {
     addHabit,
     updateHabit,
     removeHabit,
-    dailyTarget,
-    todayIntensity,
   } = useActivity();
   const habitsDone = habitsToday.filter((h) => h.done).length;
 
@@ -113,24 +133,76 @@ const HomeClient: FC = () => {
   const restDays = new Set(goals.restDays);
   const streakTier = tierFor(streak);
 
-  // The Monday-first week that contains today, resolved against real streak
-  // history rather than WEEKLY_GOAL.doneDays — the strip and the calendar now
-  // read from one source, so logging a day lights up both at once.
+  // The Monday-first week that contains today, resolved against the server's
+  // streak history — the strip and the calendar read from one source, so a
+  // logged day lights up both at once.
   const weekDays = useMemo(() => {
     const today = fromDayKey(todayKey);
     const monday = addDays(today, -weekdayIndex(today));
-    return WEEKLY_GOAL.allDays.map((label, i) => {
+    return WEEK_DAY_LABELS.map((label, i) => {
       const date = addDays(monday, i);
       const key = dayKey(date);
       return { label, key, index: i, day: byKey.get(key) ?? null, isToday: key === todayKey };
     });
   }, [byKey, todayKey]);
 
-  // Reads the live count of applications logged this week instead of the frozen
-  // WEEKLY_GOAL.current, which never moved no matter how much you logged.
-  const goalPct = weeklyTarget > 0 ? Math.min(100, Math.round((weeklyLogged / weeklyTarget) * 100)) : 0;
+  // The week's count is ActivityProvider's, from the applications list: sent
+  // applications only (a job added to Saved isn't one) in the user's own
+  // Monday-to-Sunday week, the week the strip below lights up and the weekly
+  // gift is judged on. The summary's count includes saved jobs and runs on the
+  // UTC week, so it isn't the one shown. The target stays the goals row as
+  // ActivityProvider holds it, which moves the instant the stepper below is
+  // pressed; a hero one save behind the stepper under it would read as a
+  // missed press.
+  const summary = useApplicationSummary();
+  // The same cached row ActivityProvider reads, watched here only to know
+  // whether it has arrived: until it has, `goals` holds a stand-in target.
+  const goalsRow = useGoals();
+  const goalsKnown = goalsRow.data !== undefined || goalsRow.isError;
+  // The list behind `weeklyLogged`, watched here to know whether it has
+  // arrived: until it has, that count is a stand-in zero. A list that couldn't
+  // load falls back to the summary's count, so the hero never sits on a
+  // skeleton through an outage. The pipeline below reads the same list.
+  const applications = useApplications();
+  const loggedThisWeek =
+    applications.data !== undefined ? weeklyLogged : applications.isError ? (summary.data?.weeklyGoal.loggedThisWeek ?? null) : null;
+  const goalReady = goalsKnown && loggedThisWeek !== null;
+  const goalPct =
+    loggedThisWeek !== null && goalsKnown && weeklyTarget > 0 ? Math.min(100, Math.round((loggedThisWeek / weeklyTarget) * 100)) : 0;
   const math = dailyMath(weeklyTarget, restDays);
   const highVolume = weeklyTarget > HIGH_VOLUME_THRESHOLD;
+
+  // Next best actions: this month's open tasks, most important first. The month
+  // is fixed when Home opens, so a render just past midnight on the 1st can't
+  // swap the list for next month's.
+  const [planPeriod] = useState(() => periodOf(new Date()));
+  // The unfiltered list: the cache entry the plan panel and every "Add to plan"
+  // button already share, rather than a second request for open tasks alone.
+  const plan = useTasks(planPeriod);
+  const markTasksSeen = useMarkTasksSeen();
+  const { nextActions, moreOnPlan } = useMemo(() => {
+    const open = (plan.data ?? []).filter((task) => task.status === "open").sort(comparePlanRows);
+    return { nextActions: open.slice(0, NEXT_ACTIONS_LIMIT), moreOnPlan: Math.max(0, open.length - NEXT_ACTIONS_LIMIT) };
+  }, [plan.data]);
+  // Only rows on screen are marked, so a new task below the top three keeps its
+  // marker until it is shown. Keyed on the ids, so an unrelated render queues nothing.
+  const unseenKey = nextActions
+    .filter(isUnseen)
+    .map((task) => task.id)
+    .join(",");
+  useEffect(() => {
+    if (unseenKey) markTasksSeen(unseenKey.split(","));
+  }, [unseenKey, markTasksSeen]);
+
+  // Your pipeline: open applications per stage, the rows each tracker column
+  // holds. The summary's funnel counts how far applications ever got, closed
+  // ones included — a different number, so it isn't the one shown here.
+  const pipeline = useMemo(() => {
+    const rows = applications.data;
+    if (!rows) return null;
+    const stages = STATUS_ORDER.map((id) => ({ id, label: COLUMN_LABELS[id], count: rows.filter((row) => row.status === id).length }));
+    return { stages, max: Math.max(...stages.map((stage) => stage.count), 1) };
+  }, [applications.data]);
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
@@ -138,17 +210,18 @@ const HomeClient: FC = () => {
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-[17px] font-bold text-primary whitespace-nowrap">Your week</h1>
-          <span className="text-sm text-black/45 truncate">Mon 3 — Sun 9 Aug</span>
+          <span className="text-sm text-black/45 truncate">{weekRangeLabel(todayKey)}</span>
         </div>
         <div className="flex items-center gap-3 flex-none">
           <StreakPill />
           <StickerButton variant="primary" size="md" onClick={() => openLog()}>
             Log an application
           </StickerButton>
+          <NotificationBell />
         </div>
       </header>
 
-      <main className="px-8 py-7 pb-14 max-w-[1240px] mx-auto">
+      <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto">
         <AtRiskBanner />
 
         {/* Hero row: weekly goal + today */}
@@ -162,12 +235,28 @@ const HomeClient: FC = () => {
                   context for the target, not a caption on the progress. */}
               <div className="flex items-start justify-between gap-4 mb-4">
                 <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-secondary">Weekly goal</p>
-                <p className="text-xs text-white/45 text-right">{math.sentence}</p>
+                {goalsKnown ? (
+                  <p className="text-xs text-white/45 text-right">
+                    {goals.paused ? "Paused. Nothing is expected until you're back." : math.sentence}
+                  </p>
+                ) : (
+                  <span aria-hidden className="h-3 w-40 animate-pulse rounded bg-white/10" />
+                )}
               </div>
 
               <div className="flex items-baseline gap-2.5 mb-5">
-                <span className="text-[56px] font-bold leading-none tabular-nums">{weeklyLogged}</span>
-                <span className="text-base text-white/55">of {weeklyTarget} applications</span>
+                {goalReady ? (
+                  <>
+                    <span className="text-[56px] font-bold leading-none tabular-nums">{loggedThisWeek}</span>
+                    <span className="text-base text-white/55">of {weeklyTarget} applications</span>
+                  </>
+                ) : (
+                  <>
+                    <span aria-hidden className="h-14 w-16 self-end animate-pulse rounded-lg bg-white/10" />
+                    <span aria-hidden className="h-4 w-36 self-end animate-pulse rounded bg-white/10" />
+                    <span className="sr-only">Loading your weekly goal</span>
+                  </>
+                )}
               </div>
 
               <ProgressBar value={goalPct} dark height="h-[9px]" className="mb-6" />
@@ -365,7 +454,7 @@ const HomeClient: FC = () => {
                   <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-1">Working days</p>
                   <p className="text-xs text-black/45 mb-2.5">Filled days are the ones you work. Tap one to make it a rest day.</p>
                   <div className="flex gap-1.5">
-                    {WEEKLY_GOAL.allDays.map((day, i) => {
+                    {WEEK_DAY_LABELS.map((day, i) => {
                       // Filled means active. The picker used to fill the *rest*
                       // days, which read backwards — a solid chip says "on".
                       const working = !restDays.has(i);
@@ -486,43 +575,118 @@ const HomeClient: FC = () => {
 
         {/* Footer row: next best actions + pipeline */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-6">
-          {/* Next best actions */}
+          {/* Next best actions — the top of this month's plan */}
           <DashCard className="p-6">
             <p className="text-[15px] font-bold text-primary mb-1">Next best actions</p>
-            <p className="text-xs text-black/45 mb-4">Ranked by what moves the needle this week.</p>
+            <p className="text-xs text-black/45 mb-4">The top of this month&apos;s plan, most important first.</p>
+            <p role="status" className="sr-only">
+              {plan.isPending ? "Loading your plan" : ""}
+            </p>
             <div className="flex flex-col divide-y divide-black/8">
-              {NEXT_ACTIONS.map((action, i) => (
-                <div key={action.id} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+              {plan.isPending &&
+                NEXT_ACTION_SKELETON_WIDTHS.map((width, i) => (
+                  <div key={width} aria-hidden className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+                    <span className="h-6 w-6 flex-none rounded-full bg-[#f0f0ea] text-xs font-bold text-black/25 flex items-center justify-center">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                      <span className={cn("h-3 animate-pulse rounded bg-[#f0f0ea]", width)} />
+                      <span className="h-2.5 w-1/3 animate-pulse rounded bg-[#f0f0ea]" />
+                    </div>
+                    <span className="h-8 w-14 flex-none animate-pulse rounded-lg bg-[#f0f0ea]" />
+                  </div>
+                ))}
+
+              {plan.isError && !plan.data && (
+                <div role="alert" className="flex items-center justify-between gap-3 rounded-xl bg-[#f0f0ea]/70 px-4 py-3">
+                  <span className="text-sm text-black/60">Couldn&apos;t load your plan.</span>
+                  <button type="button" onClick={() => void plan.refetch()} disabled={plan.isFetching} className={outlineLink}>
+                    <RotateCw aria-hidden className={cn("h-3.5 w-3.5", plan.isFetching && "animate-spin")} />
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {plan.data && nextActions.length === 0 && (
+                <div className="flex flex-col items-start gap-3 rounded-xl bg-[#f0f0ea]/70 px-4 py-4">
+                  <div>
+                    <p className="text-sm font-semibold text-primary">Nothing open on your plan</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-black/50">
+                      Ask your coach what to focus on next. It can suggest steps to add.
+                    </p>
+                  </div>
+                  <Link href={FULL_PLAN_HREF} className={outlineLink}>
+                    Plan with your coach
+                  </Link>
+                </div>
+              )}
+
+              {nextActions.map((task, i) => (
+                <div key={task.id} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
                   <span className="h-6 w-6 flex-none rounded-full bg-[#f0f0ea] text-xs font-bold text-primary flex items-center justify-center">
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-primary truncate">{action.title}</p>
-                    <p className="text-xs text-black/45 truncate">{action.detail}</p>
+                    <p className="flex min-w-0 items-center gap-2">
+                      <span className="text-sm font-semibold text-primary truncate">{task.title}</span>
+                      {isUnseen(task) && (
+                        <>
+                          <span
+                            aria-hidden
+                            title="New"
+                            className="h-2 w-2 flex-none rounded-full bg-[#e1f073] ring-[1.5px] ring-[#222325]"
+                          />
+                          <span className="sr-only">(new)</span>
+                        </>
+                      )}
+                    </p>
+                    <p className="text-xs text-black/45 truncate">{task.detail || SOURCE_LINE[task.source.kind]}</p>
                   </div>
-                  <Link href={action.href} className="flex-none">
-                    <StickerButton variant="outline" size="sm">
-                      Open
-                    </StickerButton>
+                  <Link href={taskHref(task) ?? FULL_PLAN_HREF} aria-label={`Open: ${task.title}`} className={outlineLink}>
+                    Open
                   </Link>
                 </div>
               ))}
             </div>
+            {moreOnPlan > 0 && (
+              <Link
+                href={FULL_PLAN_HREF}
+                className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-black/50 transition-colors hover:text-primary">
+                +{moreOnPlan} more on your plan
+                <ArrowRight aria-hidden className="h-3.5 w-3.5" />
+              </Link>
+            )}
           </DashCard>
 
           {/* Your pipeline */}
           <DashCard className="p-6 flex flex-col">
             <p className="text-[15px] font-bold text-primary mb-4">Your pipeline</p>
-            <div className="flex flex-col gap-3.5 flex-1">
-              {TRACKER_COLUMNS.map((col) => (
-                <div key={col.id}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-semibold text-black/60">{col.label}</span>
-                    <span className="text-xs font-bold text-primary">{col.count}</span>
-                  </div>
-                  <ProgressBar value={(col.count / PIPELINE_MAX) * 100} fillColor={PIPELINE_FILL[col.id]} />
-                </div>
-              ))}
+            <div aria-busy={applications.isPending || undefined} className="flex flex-col gap-3.5 flex-1">
+              {pipeline
+                ? pipeline.stages.map((stage) => (
+                    <div key={stage.id}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-black/60">{stage.label}</span>
+                        <span className="text-xs font-bold text-primary">{stage.count}</span>
+                      </div>
+                      <ProgressBar value={(stage.count / pipeline.max) * 100} fillColor={PIPELINE_FILL[stage.id]} />
+                    </div>
+                  ))
+                : // Loading, or a first read that failed (the board says so in a
+                  // toast): each stage keeps its place, with no number to show.
+                  STATUS_ORDER.map((id) => (
+                    <div key={id}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-black/60">{COLUMN_LABELS[id]}</span>
+                        {applications.isPending ? (
+                          <span aria-hidden className="h-3 w-5 animate-pulse rounded bg-[#f0f0ea]" />
+                        ) : (
+                          <span className="text-xs font-bold text-black/30">—</span>
+                        )}
+                      </div>
+                      <div aria-hidden className={cn("h-2 w-full rounded-full bg-[#f0f0ea]", applications.isPending && "animate-pulse")} />
+                    </div>
+                  ))}
             </div>
             <Link href="/dashboard/tracker" className="mt-5 block">
               <StickerButton variant="outline" size="md" className="w-full">

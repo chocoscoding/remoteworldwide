@@ -20,7 +20,7 @@ const stickerButtonVariants = cva(
       },
       size: {
         sm: "h-8 px-3 text-xs hover:-translate-x-px hover:-translate-y-px",
-        md: "h-10 md:h-9 px-4 text-sm hover:-translate-x-px hover:-translate-y-px",
+        md: "h-9 px-4 text-sm hover:-translate-x-px hover:-translate-y-px",
         lg: "h-12 px-6 text-base hover:-translate-x-[2px] hover:-translate-y-[2px]",
       },
     },

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "@/app/lib/seo";
 
 const COMPANY = "Remote Worldwide";
-const CONTACT_EMAIL = "hello@remoteworldwide.net";
+const CONTACT_EMAIL = "contact@remoteworldwide.net";
 const JURISDICTION = "the Federal Republic of Nigeria";
 const COURTS = "the courts of Lagos State, Nigeria";
 const LAST_UPDATED = "8 September 2026";

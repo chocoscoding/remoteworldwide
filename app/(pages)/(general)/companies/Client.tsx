@@ -85,10 +85,10 @@ const CompaniesList: FC<{ initialData: CompanyList[]; totalCompanies: number; fo
       <section className="w-full md:px-1 flex gap-12 relative">
         <section className="w-full m-auto px-2 lg:px-0">
           <div className="flex justify-between flex-wrap-reverse items-center">
-            <p className="md:text-2xl mb-2 flex-shrink-0">
+            <h1 className="md:text-2xl mb-2 flex-shrink-0">
               <span className="font-bold text-primary">Companies</span>{" "}
               <span className="font-extralight text-gray-400 italic text-sm md:text-lg">{`(A-Z)`}</span>
-            </p>
+            </h1>
 
             <div className="flex border border-black rounded-md items-center w-full sm:w-[300px] bg-white overflow-hidden gap-2 flex-shrink-0 mb-3">
               <input

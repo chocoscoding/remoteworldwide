@@ -8,8 +8,7 @@ import { toast } from "react-toastify";
 const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jobId, hasUserBookmarked }) => {
   const [isBookmarked, setIsBookmarked] = useState(hasUserBookmarked ?? false);
   const [pendingAction, setPendingAction] = useState<boolean | null>(null); // To track the intended action
-  const { status, data: sessionData } = useSession();
-  const userId = sessionData?.user?.id;
+  const { status } = useSession();
 
   useEffect(() => {
     if (pendingAction === null) return;
@@ -17,10 +16,11 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jo
     // Set a debounce timer
     const timer = setTimeout(async () => {
       try {
+        // The actions take the user from the session, not from here.
         if (pendingAction) {
-          await createBookmarkForUser(userId!, jobId);
+          await createBookmarkForUser(jobId);
         } else {
-          await deleteBookmarkForUser(userId!, jobId);
+          await deleteBookmarkForUser(jobId);
         }
       } catch {
         toast.error("An error occurred. Please try again.");
@@ -32,7 +32,7 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jo
 
     // Clear the timer if the component unmounts or the action changes
     return () => clearTimeout(timer);
-  }, [pendingAction, userId, jobId]);
+  }, [pendingAction, jobId]);
 
   const toggleBookmark = () => {
     toast.dismiss("bookmarkErr");

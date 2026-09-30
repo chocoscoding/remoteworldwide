@@ -27,6 +27,10 @@ import LogApplicationDialog from "./log/LogApplicationDialog";
 import GiftStore from "./gifts/GiftStore";
 import { TrackerProvider } from "./tracker/TrackerProvider";
 import RepairStreakPanel from "./streak/RepairStreakPanel";
+import { JobPickerProvider } from "./jobs/JobPickerProvider";
+import BoardImporter from "./applications/BoardImporter";
+import OnboardingBanner from "./onboarding/OnboardingBanner";
+import { PlanGateProvider } from "./billing/UpgradeModal";
 
 const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; children: ReactNode }> = ({ settings, billing, children }) => (
   <SidebarCollapseProvider>
@@ -37,12 +41,20 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
           ActivityProvider because asking for a referral is a logged action. */}
       <SettingsProvider initial={settings}>
       <BillingProvider initial={billing}>
+      {/* Right inside billing, which it reads: the one upgrade popup, opened by any call refused
+          for the plan (402 / 403 plan_required) or by a locked control. */}
+      <PlanGateProvider>
       <NetworkProvider>
       <AnswersProvider>
       <DocumentsProvider>
       {/* PodProvider before WinProvider: logging a win pushes onto the pod
           feed and its goals, so the win flow reads pod context. */}
       <PodProvider>
+      {/* JobPickerProvider wraps WinProvider and TrackerProvider because both
+          open the picker from inside themselves: the win log asks which job
+          won, the tracker's add flow asks which job to add. Any lower and
+          their pickJob would have no provider to reach. */}
+      <JobPickerProvider>
       <WinProvider>
       {/* TrackerProvider is innermost: every board move is a logged action
           (ActivityProvider) and landing in Offer offers the win log
@@ -52,19 +64,30 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
       <TrackerProvider>
       <div className="w-full flex">
         <DashboardSidebar />
-        <div className="flex-1 min-w-0">{children}</div>
+        <div className="flex-1 min-w-0">
+          {/* Above every screen, never instead of one: setup is guidance, not
+              a lock — the banner counts what's done and points at
+              /dashboard/onboarding, the one screen it stays off. */}
+          <OnboardingBanner />
+          {children}
+        </div>
       </div>
       <LogApplicationDialog />
       <GiftStore />
       <RepairStreakPanel />
       <StreakMilestoneModal />
+      {/* Moves a tracker board kept in this browser into the applications
+          table, once. Inside the providers for the query client and toasts. */}
+      <BoardImporter />
       <Toaster />
       </TrackerProvider>
       </WinProvider>
+      </JobPickerProvider>
       </PodProvider>
       </DocumentsProvider>
       </AnswersProvider>
       </NetworkProvider>
+      </PlanGateProvider>
       </BillingProvider>
       </SettingsProvider>
     </ActivityProvider>

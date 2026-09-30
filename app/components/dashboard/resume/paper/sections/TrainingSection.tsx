@@ -19,7 +19,7 @@ export interface TrainingSectionProps {
  */
 const TrainingSection: FC<TrainingSectionProps> = ({ content, design }) => {
   if (content.certifications.length === 0) {
-    return <p className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No certifications added yet.</p>;
+    return <p data-resume-placeholder className="text-[length:var(--r-fs-small)] italic text-[color:var(--r-text-muted)]">No certifications added yet.</p>;
   }
   return (
     <div className="flex flex-col gap-[var(--r-gap)]">

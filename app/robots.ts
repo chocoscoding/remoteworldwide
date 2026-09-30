@@ -9,6 +9,10 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
         disallow: [
           "/go/",
+          // A resume or letter's print page (token-only, 404 without one) and
+          // its signed-in deep links: nothing here is for a crawler.
+          "/print/",
+          "/open/",
           "/heroshima/",
           "/dashboard/",
           "/api/",

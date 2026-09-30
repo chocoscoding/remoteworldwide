@@ -9,10 +9,29 @@
 
 import { headers } from "next/headers";
 import { BackendError, unwrapResponse } from "@/app/lib/api/core";
+import { clientIpHeaders } from "@/app/lib/api/clientIp";
 
 export { BackendError };
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
+
+/** A backend (Mongo) id: 24 hex characters, the only shape any `:id` route takes (isMongoId). */
+export const isObjectId = (value: unknown): value is string => typeof value === "string" && /^[a-f\d]{24}$/i.test(value);
+
+/**
+ * An id as one path segment of a backend call.
+ *
+ * A server action's arguments are whatever its caller sends, and an id pasted
+ * raw into `/lead-magnets/${id}` is a path: fetch's URL parser collapses `..`
+ * and `%2e%2e`, so `../../../account/sign-in/google` turned "delete this lead
+ * magnet" into DELETE /api/account/sign-in/google under the caller's cookie.
+ * encodeURIComponent alone is not enough — it leaves a bare `..` intact — so
+ * the shape check is what closes it. Refused as a 400, like the backend would.
+ */
+export function idSegment(id: unknown): string {
+  if (!isObjectId(id)) throw new BackendError(400, "That id is not valid");
+  return encodeURIComponent(id);
+}
 
 export interface BackendInit {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -22,10 +41,23 @@ export interface BackendInit {
 
 export async function backend<T>(path: string, init: BackendInit = {}): Promise<T> {
   const h: Record<string, string> = { accept: "application/json" };
-  if (init.body !== undefined) h["content-type"] = "application/json";
+  // A FormData body (an upload made on the user's behalf, e.g. onboarding's
+  // "save a built resume to My documents") goes as multipart, untouched: no
+  // content-type by hand, because only fetch knows the boundary it writes —
+  // the same rule as the browser's `app/lib/api/client.ts`.
+  const multipart = init.body instanceof FormData;
+  if (init.body !== undefined && !multipart) h["content-type"] = "application/json";
   const incoming = await headers();
+  // The visitor's address, for the backend's per-IP limiters and logs (`trust proxy` 1
+  // makes req.ip its last entry). Only as honest as the edge in front of this server:
+  // Next keeps a header the client sent, and the /api rewrites in next.config.mjs pass
+  // it on verbatim, so dropping it here would close nothing. The edge has to set or
+  // append X-Forwarded-For itself. Identity never rides on it; that is the cookie alone.
   const forwarded = incoming.get("x-forwarded-for");
   if (forwarded) h["x-forwarded-for"] = forwarded;
+  // What the backend's limiters actually count by: X-Forwarded-For above never gets past the
+  // backend's own proxy intact, so the visitor is named in a header only this server can vouch for.
+  Object.assign(h, clientIpHeaders(incoming));
   if (init.session) {
     const cookie = incoming.get("cookie");
     if (cookie) h.cookie = cookie;
@@ -33,7 +65,7 @@ export async function backend<T>(path: string, init: BackendInit = {}): Promise<
   const res = await fetch(`${BACKEND_URL}/api${path}`, {
     method: init.method ?? "GET",
     headers: h,
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body: init.body === undefined ? undefined : multipart ? (init.body as FormData) : JSON.stringify(init.body),
     cache: "no-store",
   });
   return unwrapResponse<T>(res);

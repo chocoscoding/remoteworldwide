@@ -1,19 +1,25 @@
 "use client";
 
-// AI Tools tab's left-sidebar action list. No longer theater: every Run is
-// wired to a real transform in `lib/dashboard/resume/ai-tools` and the paper
-// preview changes the moment one lands. Two tools open inline pickers —
-// Rewrite offers three takes to choose from, Quantify lists per-bullet
-// upgrades to apply one by one.
+// AI Tools tab's left-sidebar action list. Every Run is wired to the AI
+// service through `lib/resume/ai`, and the paper preview changes the moment one
+// lands. Two tools open inline pickers — Rewrite offers three takes to choose
+// from, Quantify lists per-bullet upgrades to apply one by one.
+//
+// Each tool that spends a credit says so on its own card rather than once in a
+// footnote — a button that quietly charges for a click is the thing worth
+// avoiding here. All six do now; `costsCredit` decides, so a free tool would
+// lose its pill without a change to this file.
 
 import type { FC } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Check, Hash, PenLine, Scissors, SpellCheck2, Tag, Target } from "lucide-react";
+import { Check, Hash, Loader2, PenLine, Scissors, SpellCheck2, Tag, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Pill from "@/app/components/dashboard/ui/Pill";
+import { SUGGESTION_CREDITS, costsCredit, type SuggestionTool } from "@/app/lib/resume/ai";
 import type { QuantifySuggestion, RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
 
 interface AiToolAction {
-  id: string;
+  id: SuggestionTool;
   icon: LucideIcon;
   label: string;
   description: string;
@@ -34,6 +40,9 @@ export interface AiToolsListProps {
   /** Live per-tool result captions — what actually happened, not canned copy. */
   captions: Record<string, string | undefined>;
   onRun: (id: string) => void;
+  /** A job Tailor already has from a link. Run tailors to it; the picker is still one click away. */
+  tailorFor?: { status: "loading" | "ready" | "failed"; label: string } | null;
+  onPickTailorJob?: () => void;
   /** Rewrite's three takes, once generated; choosing applies to the Summary. */
   rewriteVariants: RewriteVariant[] | null;
   onUseRewrite: (index: number) => void;
@@ -49,6 +58,8 @@ const AiToolsList: FC<AiToolsListProps> = ({
   aiDone,
   captions,
   onRun,
+  tailorFor = null,
+  onPickTailorJob,
   rewriteVariants,
   onUseRewrite,
   quantify,
@@ -61,21 +72,60 @@ const AiToolsList: FC<AiToolsListProps> = ({
       const running = aiRunning === action.id;
       const done = aiDone.has(action.id);
       const caption = captions[action.id];
+      const preset = action.id === "tailor" ? tailorFor : null;
       return (
-        <div key={action.id} data-tool={action.id} className="rounded-xl border border-black/8 p-3">
+        <div
+          key={action.id}
+          data-tool={action.id}
+          className={cn("rounded-xl border border-black/8 p-3", preset && "border-[#222325] shadow-[3px_3px_0_0_#e1f073]")}>
           <div className="flex items-start gap-2.5">
             <div className="h-8 w-8 flex-none rounded-lg bg-[#f0f0ea] flex items-center justify-center">
               <action.icon className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-primary leading-tight">{action.label}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[13px] font-bold text-primary leading-tight">{action.label}</p>
+                {costsCredit(action.id) && (
+                  <Pill variant="outline-dashed" className="flex-none">
+                    {SUGGESTION_CREDITS} credit
+                  </Pill>
+                )}
+              </div>
               <p className="text-[11px] text-black/45 leading-snug mt-0.5">{action.description}</p>
             </div>
           </div>
+          {preset && (
+            <div className="mt-2.5 rounded-lg bg-[#f6f6f6] px-2.5 py-2 text-[11px] leading-snug text-black/60">
+              {preset.status === "loading" ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading {preset.label}…
+                </span>
+              ) : preset.status === "failed" ? (
+                <>We couldn&apos;t load {preset.label}. Run to pick the job instead.</>
+              ) : (
+                <>
+                  For <span className="font-bold text-primary">{preset.label}</span>
+                  {onPickTailorJob && (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        onClick={onPickTailorJob}
+                        disabled={running}
+                        className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e] disabled:cursor-default disabled:opacity-40">
+                        Tailor to a different job
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => onRun(action.id)}
-            disabled={running}
+            disabled={running || preset?.status === "loading"}
             className={cn(
               "mt-2.5 w-full rounded-lg py-1.5 text-xs font-semibold cursor-pointer transition-colors disabled:cursor-default",
               done ? "bg-[#f0f0ea] text-black/45" : "bg-primary text-white hover:bg-black"
