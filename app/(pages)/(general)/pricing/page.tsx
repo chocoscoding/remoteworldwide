@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Coins, Gift, Infinity as InfinityIcon, Plus, RefreshCcw, Sparkle } from "lucide-react";
+import { ArrowRight, Check, Crown, Gift, Infinity as InfinityIcon, Plus, RefreshCcw, Rocket, Sparkle, Sprout, Zap, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { absoluteUrl } from "@/app/lib/seo";
 import PlanCta from "@/app/components/pricing/PlanCta";
 import CreditEstimator from "@/app/components/pricing/CreditEstimator";
 import PlanComparison from "@/app/components/pricing/PlanComparison";
 import FaqList from "@/app/components/pricing/FaqList";
-import { BillingIntervalProvider, BillingToggle, PerCredit, PlanCardPrice } from "@/app/components/pricing/BillingInterval";
+import CheckChip from "@/app/components/marketing/CheckChip";
+import Eyebrow from "@/app/components/marketing/Eyebrow";
+import { BillingIntervalProvider, BillingToggle, PlanCardPrice } from "@/app/components/pricing/BillingInterval";
 import {
   CREDITS_PER_INVITE,
   RECOMMENDED_PLAN,
@@ -35,14 +37,21 @@ export const metadata: Metadata = {
 
 const TAGLINES: Record<string, string> = {
   free: "To get started",
+  basic: "For a steady search",
   pro: "For a focused search",
   ultra: "For an all-out search",
 };
 
+/** The small brand square beside each plan's name. A plan the page doesn't know gets the sparkle. */
+const PLAN_ICONS: Record<string, LucideIcon> = { free: Sprout, basic: Zap, pro: Rocket, ultra: Crown };
+
+/** Three plans or four, from the catalogue: four columns on desktop, two by two on a tablet, one on a phone. */
+const PLAN_GRID: Record<number, string> = { 1: "md:grid-cols-1", 2: "md:grid-cols-2", 3: "md:grid-cols-3", 4: "sm:grid-cols-2 lg:grid-cols-4" };
+
 const FAQ: { q: string; a: React.ReactNode }[] = [
   {
     q: "What do I get on Free?",
-    a: "50 credits every month, topped back up to 50 at the start of each month, for ATS scans, cover letters, questions about a job and autofill. You also get the resume builder for one resume, application tracking and drafts. AI help inside the resume builder comes with Pro, and interview prep with Ultra.",
+    a: "50 credits every month, topped back up to 50 at the start of each month, for ATS scans, your cover letter, questions about a job and autofill. You also get the resume builder for one resume, one cover letter, application tracking and drafts, and streaks. AI help inside the resume builder, the career coach, the daily plan, pods and recommendations to companies come with Basic, and interview prep with Pro.",
   },
   {
     q: "Do unused credits roll over?",
@@ -58,11 +67,11 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "What happens if I run out of credits?",
-    a: "Top up with a credit pack, or wait for your allowance to refill. The free parts keep working either way: the job board, importing jobs, typed practice interviews and your first 15 coach replies each day.",
+    a: "Top up with a credit pack, or wait for your allowance to refill. The free parts keep working either way: the job board, importing jobs, saved answers and autofill, and on a paid plan your first 15 coach replies each day.",
   },
   {
     q: "How are voice mock interviews billed?",
-    a: "Interview prep is on Ultra. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
+    a: "Interview prep is on Pro and Ultra. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
   },
   {
     q: "Can I earn credits instead of buying them?",
@@ -92,55 +101,45 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
 /** Plan copy lives in Mongo; referral search is off the public pages for now, so its line is hidden here. */
 const HIDDEN_FEATURE = /referral/i;
 
+/**
+ * One plan, after the owner's reference (2026-10-01): flat and simple. The recommended plan is
+ * filled lime with ink text and no border; the rest sit on a hairline. The check chips are the
+ * only brutalist detail.
+ */
 function PlanCard({ plan }: { plan: PricingPlan }) {
   const featured = plan.key === RECOMMENDED_PLAN;
   const features = plan.features.filter((feature) => !HIDDEN_FEATURE.test(feature));
+  const Icon = PLAN_ICONS[plan.key] ?? Sparkle;
   return (
     <div
       className={cn(
-        "relative flex flex-col rounded-[20px] border-[1.5px] border-primary p-6",
-        featured
-          ? "bg-primary text-white shadow-[5px_5px_0_0_#e1f073] lg:-translate-y-3"
-          : "bg-white text-primary transition-shadow duration-150 hover:shadow-[4px_4px_0_0_#222325]",
+        "flex flex-col rounded-[20px] p-6 text-primary",
+        featured ? "bg-secondary" : "border border-primary/10 bg-white",
       )}>
-      {featured ? (
-        <span className="absolute -top-3.5 right-5 rotate-3 rounded-full border-[1.5px] border-primary bg-secondary px-3 py-0.5 text-[11px] font-bold uppercase tracking-[0.08em] text-primary shadow-[2px_2px_0_0_#222325]">
-          Recommended
-        </span>
-      ) : null}
-
-      <p className="text-lg font-bold">{plan.name}</p>
-      <p className={cn("mt-0.5 text-sm", featured ? "text-white/60" : "text-primary/55")}>{TAGLINES[plan.key] ?? " "}</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-2.5 text-lg font-bold">
+          <span className={cn("grid h-9 w-9 flex-none place-content-center rounded-[10px]", featured ? "bg-primary text-secondary" : "border border-primary/10 bg-primary2 text-primary")}>
+            <Icon className="h-[18px] w-[18px]" aria-hidden />
+          </span>
+          {plan.name}
+        </p>
+        {featured ? (
+          <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-secondary">Recommended</span>
+        ) : null}
+      </div>
 
       <PlanCardPrice plan={plan} featured={featured} />
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-sm font-semibold tabular-nums",
-            featured ? "border-secondary bg-secondary text-primary" : "border-primary/60 bg-[#f9f8f1]",
-          )}>
-          <Coins className="h-3.5 w-3.5" aria-hidden />
-          {plan.monthlyCredits} credits / {plan.interval}
-        </span>
-        <span className={cn("text-xs font-medium tabular-nums", featured ? "text-white/55" : "text-primary/50")}>
-          <PerCredit plan={plan} free="Topped up monthly" suffix=" per credit" />
-        </span>
-      </div>
+      <p className={cn("mt-3 text-sm", featured ? "text-primary/80" : "text-primary/70")}>{TAGLINES[plan.key] ?? " "}</p>
 
       <hr className={cn("my-5 border-t", featured ? "border-primary/15" : "border-primary/10")} />
 
-      <ul className="mb-7 flex flex-1 flex-col gap-2.5">
+      <p className="text-sm font-semibold">What&apos;s included:</p>
+      <ul className="mb-7 mt-3.5 flex flex-1 flex-col gap-3">
         {features.map((feature) => (
-          <li key={feature} className="flex items-start gap-2.5 text-sm leading-snug">
-            <span
-              className={cn(
-                "mt-px grid h-5 w-5 flex-none place-content-center rounded-full border",
-                featured ? "border-secondary bg-secondary text-primary" : "border-primary bg-secondary text-primary",
-              )}>
-              <Check className="h-3 w-3" strokeWidth={3.5} aria-hidden />
-            </span>
-            <span className={featured ? "text-white/90" : "text-primary/85"}>{feature}</span>
+          <li key={feature} className="flex items-start gap-3 text-sm leading-snug">
+            <CheckChip tone={featured ? "white" : "lime"} className="mt-px" />
+            <span className={featured ? "text-primary" : "text-primary/85"}>{feature}</span>
           </li>
         ))}
       </ul>
@@ -158,66 +157,70 @@ export default async function PricingPage() {
   return (
     <BillingIntervalProvider>
       <div className="bg-[#f9f8f1] text-primary">
-        {/* Hero */}
-        <section className="relative overflow-hidden border-b-[1.5px] border-primary">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(34,35,37,0.13)_1px,transparent_1px)] bg-[length:22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden />
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-secondary/60 blur-3xl" aria-hidden />
-          <div className="relative mx-auto max-w-[1100px] px-4 pb-24 pt-14 text-center md:pb-28 md:pt-20">
-            <span className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-primary bg-white px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.12em] shadow-[3px_3px_0_0_#222325]">
-              <Sparkle className="h-3.5 w-3.5 fill-secondary text-primary" aria-hidden />
-              Pricing
+        {/* Hero: flat, centred, the way the owner's reference opens (2026-10-01). */}
+        <section className="mx-auto max-w-[1140px] px-4 pb-12 pt-14 text-center md:pb-16 md:pt-20">
+          <Eyebrow>Pricing &amp; plans</Eyebrow>
+          {/* The lime marker stays (owner, 2026-10-01): behind the words in an isolated heading, so the ink text keeps its contrast. */}
+          <h1 className="isolate mx-auto mt-5 max-w-[760px] text-balance text-[2.5rem] font-bold leading-[1.04] tracking-tight sm:text-6xl">
+            Pick a plan.{" "}
+            <span className="relative inline-block whitespace-nowrap">
+              <span className="absolute inset-x-[-0.12em] bottom-[0.06em] top-[0.5em] -z-10 -rotate-1 rounded-md bg-secondary" aria-hidden />
+              Land the job.
             </span>
-            <h1 className="isolate mx-auto mt-6 max-w-[820px] text-[2.6rem] font-bold leading-[1.02] tracking-tight sm:text-6xl md:text-7xl">
-              Pick a plan.{" "}
-              <span className="relative inline-block whitespace-nowrap">
-                <span className="absolute inset-x-[-0.12em] bottom-[0.06em] top-[0.5em] -z-10 -rotate-1 rounded-md bg-secondary" aria-hidden />
-                Land the job.
-              </span>
-            </h1>
-            <p className="mx-auto mt-6 max-w-[560px] text-balance text-base text-primary/70 md:text-lg">
-              Start free with 50 credits a month. Upgrade when your search picks up.
-            </p>
-            <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold text-primary/75">
-              <li className="flex items-center gap-2">
-                <RefreshCcw className="h-4 w-4" aria-hidden /> Cancel anytime
-              </li>
-              <li className="flex items-center gap-2">
-                <InfinityIcon className="h-4 w-4" aria-hidden /> Top-ups never expire
-              </li>
-              <li className="flex items-center gap-2">
-                <Check className="h-4 w-4" aria-hidden /> Job board always free
-              </li>
-            </ul>
-            <BillingToggle saving={yearlySavingLabel(plans)} className="mt-8" />
-          </div>
+          </h1>
+          <p className="mx-auto mt-5 max-w-[520px] text-balance text-base text-primary/70 md:text-lg">
+            Start free with 50 credits a month. Upgrade when your search picks up.
+          </p>
+          <BillingToggle saving={yearlySavingLabel(plans)} className="mt-8" />
+          <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-primary/70">
+            <li className="flex items-center gap-2">
+              <RefreshCcw className="h-4 w-4" aria-hidden /> Cancel anytime
+            </li>
+            <li className="flex items-center gap-2">
+              <InfinityIcon className="h-4 w-4" aria-hidden /> Top-ups never expire
+            </li>
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4" aria-hidden /> Job board always free
+            </li>
+          </ul>
         </section>
 
         {/* Plans */}
-        <section className="relative mx-auto -mt-12 max-w-[1140px] px-4" aria-label="Plans">
-          <div className="grid gap-8 md:grid-cols-3 md:gap-5 lg:gap-6 lg:pt-3">
+        <section className="mx-auto max-w-[1180px] px-4" aria-label="Plans">
+          <div className={cn("grid gap-5", PLAN_GRID[plans.length] ?? "md:grid-cols-3")}>
             {plans.map((plan) => (
               <PlanCard key={plan.key} plan={plan} />
             ))}
           </div>
 
-          <PlanComparison plans={plans} />
-
-          <div className="mt-10 flex flex-col items-start justify-between gap-4 rounded-[20px] border-[1.5px] border-dashed border-primary/40 bg-white/60 px-6 py-5 sm:flex-row sm:items-center">
+          <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-[20px] border border-primary/10 bg-white px-6 py-4 sm:flex-row sm:items-center">
             <p className="text-sm text-primary/75">
               <span className="font-bold text-primary">Just browsing?</span> The job board is free, always — search and apply to vetted remote roles without a plan.
             </p>
-            <Link href="/jobs" className="group inline-flex flex-none items-center gap-1.5 text-sm font-bold underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary">
+            <Link href="/jobs" className="group inline-flex min-h-[44px] flex-none items-center gap-1.5 text-sm font-bold underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary">
               Browse remote jobs
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
           </div>
         </section>
 
+        {/* Comparison */}
+        <section className="mx-auto max-w-[1180px] px-4 pt-24 md:pt-28" aria-labelledby="compare-heading">
+          <div className="mx-auto mb-10 max-w-[620px] text-center">
+            <Eyebrow>Comparison</Eyebrow>
+            <h2 id="compare-heading" className="mt-4 text-3xl font-bold tracking-tight md:text-[2.75rem] md:leading-[1.1]">
+              Compare our plans
+            </h2>
+            <p className="mt-3 text-balance text-base text-primary/70">Every tool, plan by plan. Prices follow the Monthly / Yearly switch above.</p>
+          </div>
+          <PlanComparison plans={plans} />
+        </section>
+
         {/* Estimator */}
-        <section className="mx-auto max-w-[1140px] px-4 pt-24" aria-labelledby="estimate-heading">
+        <section className="mx-auto max-w-[1180px] px-4 pt-24 md:pt-28" aria-labelledby="estimate-heading">
           <div className="mb-8 max-w-[640px]">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary/55">Not sure which?</p>
-            <h2 id="estimate-heading" className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">
+            <Eyebrow>Not sure which?</Eyebrow>
+            <h2 id="estimate-heading" className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">
               Size your plan to your search.
             </h2>
           </div>
@@ -281,30 +284,30 @@ export default async function PricingPage() {
         */}
 
         {/* Top-ups */}
-        <section className="mx-auto max-w-[1140px] px-4 pt-24" aria-labelledby="topups-heading">
+        <section className="mx-auto max-w-[1180px] px-4 pt-24 md:pt-28" aria-labelledby="topups-heading">
           <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.6fr]">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary/55">Top-ups</p>
-              <h2 id="topups-heading" className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">
+              <Eyebrow>Top-ups</Eyebrow>
+              <h2 id="topups-heading" className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">
                 Big week? Add credits.
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-primary/70">
                 Packs never expire and are only used after your monthly allowance runs out. A plan is always the cheaper way to buy credits.
               </p>
-              <p className="mt-4 inline-flex items-center gap-2 rounded-full border-[1.5px] border-primary bg-white px-3 py-1.5 text-xs font-bold">
+              <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white px-3 py-1.5 text-xs font-semibold">
                 <Gift className="h-3.5 w-3.5" aria-hidden />
                 Or earn {CREDITS_PER_INVITE} credits for every friend who subscribes
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               {creditPacks.map((pack) => (
-                <div key={pack.key} className="rounded-[20px] border-[1.5px] border-primary bg-white p-5 shadow-[4px_4px_0_0_#222325] transition-transform hover:-translate-y-1">
-                  <p className="flex items-center gap-1.5 text-sm font-bold text-primary/70">
+                <div key={pack.key} className="rounded-[20px] border border-primary/10 bg-white p-5 transition-colors duration-150 hover:border-primary/30">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-primary/75">
                     <Plus className="h-4 w-4" aria-hidden />
                     <span className="tabular-nums">{pack.credits}</span> credits
                   </p>
                   <p className="mt-3 text-3xl font-bold tabular-nums">{money(pack.priceCents)}</p>
-                  <p className="mt-1 text-xs font-semibold text-primary/50 tabular-nums">{perCredit(pack.priceCents, pack.credits)} per credit</p>
+                  <p className="mt-1 text-xs font-medium text-primary/65 tabular-nums">{perCredit(pack.priceCents, pack.credits)} per credit</p>
                 </div>
               ))}
             </div>
@@ -312,25 +315,28 @@ export default async function PricingPage() {
         </section>
 
         {/* FAQ */}
-        <section className="mx-auto max-w-[860px] px-4 pt-24" aria-labelledby="faq-heading">
-          <h2 id="faq-heading" className="text-center text-3xl font-bold tracking-tight md:text-4xl">
-            Questions, answered.
-          </h2>
+        <section className="mx-auto max-w-[820px] px-4 pt-24 md:pt-28" aria-labelledby="faq-heading">
+          <div className="text-center">
+            <Eyebrow>FAQ</Eyebrow>
+            <h2 id="faq-heading" className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">
+              Questions, answered.
+            </h2>
+          </div>
           <FaqList items={FAQ} />
         </section>
 
         {/* Closing CTA */}
-        <section className="mx-auto max-w-[1140px] px-4 py-24">
-          <div className="relative overflow-hidden rounded-[28px] border-[1.5px] border-primary bg-primary px-6 py-12 text-center text-white shadow-[5px_5px_0_0_#e1f073] md:px-12 md:py-16">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.14)_1px,transparent_1px)] bg-[length:20px_20px]" aria-hidden />
+        <section className="mx-auto max-w-[1180px] px-4 py-24 md:py-28">
+          <div className="relative overflow-hidden rounded-[28px] bg-primary px-6 py-14 text-center text-white md:px-12 md:py-20">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.1)_1px,transparent_1px)] bg-[length:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" aria-hidden />
             <div className="relative">
-              <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
+              <h2 className="text-balance text-3xl font-bold tracking-tight md:text-5xl">
                 Not ready to pick? <span className="text-secondary">Save your spot.</span>
               </h2>
-              <p className="mx-auto mt-4 max-w-[520px] text-white/70">Joining the waitlist is free. We&apos;ll email you when your spot opens — then choose a plan, or don&apos;t.</p>
+              <p className="mx-auto mt-4 max-w-[520px] text-white/75">Joining the waitlist is free. We&apos;ll email you when your spot opens — then choose a plan, or don&apos;t.</p>
               <Link
                 href="/waitlist"
-                className="group mt-8 inline-flex h-12 items-center gap-2 rounded-xl border-[1.5px] border-secondary bg-secondary px-7 text-sm font-bold text-primary shadow-[4px_4px_0_0_#ffffff] transition-[transform,box-shadow] duration-100 hover:shadow-[2px_2px_0_0_#ffffff] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
+                className="group mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-secondary px-7 text-sm font-bold text-primary transition-colors duration-150 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
                 Join the waitlist
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
               </Link>

@@ -103,7 +103,7 @@ export interface PrepSetupProps {
 const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQuestions, onStart }) => {
   const [formats, setFormats] = useState<SessionFormat[]>(initialFormats?.length ? initialFormats : ["behavioural"]);
   const { allows, openUpgrade } = usePlanGate();
-  const prepLocked = !allows("ultra");
+  const prepLocked = !allows("pro");
 
   // Never let the last one be unticked — a session with no format has no
   // questions to ask, so the control refuses rather than erroring later.
@@ -252,10 +252,10 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
 
   async function startSession() {
     if (blocked || configLoading || resumeBlocked || resumeBusy) return;
-    // Interview prep is on Ultra: below it, the upgrade popup rather than a session the AI
+    // Interview prep is on Pro: below it, the upgrade popup rather than a session the AI
     // service would refuse once the microphone is already asked for.
     if (prepLocked) {
-      openUpgrade({ kind: "plan", requiredPlan: "ultra", message: "Interview prep is on Ultra." });
+      openUpgrade({ kind: "plan", requiredPlan: "pro", message: "Interview prep is on Pro." });
       return;
     }
     // A master document default is parsed and stored on the track here, once,
@@ -514,7 +514,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
               : offerMinutes !== null
                 ? `Start ${offerMinutes}-minute session`
                 : "Start session"}
-            {prepLocked ? <PlanChip plan="ultra" className="bg-white" /> : null}
+            {prepLocked ? <PlanChip plan="pro" className="bg-white" /> : null}
           </button>
         )}
       </div>

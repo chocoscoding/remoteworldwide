@@ -14,15 +14,17 @@ const FaqList: FC<{ items: { q: string; a: ReactNode }[] }> = ({ items }) => {
   const baseId = useId();
 
   return (
-    <div className="mt-10 flex flex-col gap-3">
+    <div className="mt-10 flex flex-col gap-2.5">
       {items.map((item, i) => {
         const expanded = open === i;
         const buttonId = `${baseId}-q${i}`;
         const panelId = `${baseId}-a${i}`;
+        // Flat rows on a hairline, as the lighter pricing page has them (owner, 2026-10-01); the open
+        // one only darkens its outline and fills its toggle lime.
         return (
           <div
             key={item.q}
-            className={cn("rounded-[18px] border-[1.5px] border-primary bg-white transition-shadow", expanded && "shadow-[4px_4px_0_0_#e1f073]")}>
+            className={cn("rounded-2xl border bg-white transition-colors duration-150", expanded ? "border-primary/30" : "border-primary/10")}>
             <h3>
               <button
                 id={buttonId}
@@ -30,12 +32,12 @@ const FaqList: FC<{ items: { q: string; a: ReactNode }[] }> = ({ items }) => {
                 aria-expanded={expanded}
                 aria-controls={panelId}
                 onClick={() => setOpen((prev) => (prev === i ? null : i))}
-                className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-[16px] px-5 py-4 text-left text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+                className="flex min-h-[56px] w-full cursor-pointer items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 {item.q}
                 <span
                   className={cn(
-                    "grid h-7 w-7 flex-none place-content-center rounded-full border-[1.5px] border-primary transition-transform duration-200 motion-reduce:transition-none",
-                    expanded && "rotate-45 bg-secondary",
+                    "grid h-7 w-7 flex-none place-content-center rounded-full border transition-[transform,background-color,border-color] duration-200 motion-reduce:transition-none",
+                    expanded ? "rotate-45 border-primary bg-secondary" : "border-primary/20",
                   )}>
                   <Plus className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
                 </span>
@@ -50,7 +52,7 @@ const FaqList: FC<{ items: { q: string; a: ReactNode }[] }> = ({ items }) => {
                 expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
               )}>
               <div className="overflow-hidden" inert={!expanded}>
-                <p className="px-5 pb-5 text-sm leading-relaxed text-primary/75">{item.a}</p>
+                <p className="max-w-[640px] px-5 pb-5 text-sm leading-relaxed text-primary/75">{item.a}</p>
               </div>
             </div>
           </div>

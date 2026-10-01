@@ -54,9 +54,9 @@ export const BillingSwitch: FC<{
           aria-pressed={active}
           onClick={() => onChange(option.value)}
           className={cn(
-            "inline-flex items-center gap-2 rounded-full font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-            size === "md" ? "h-9 px-4 text-sm" : "h-7 px-3 text-xs",
-            active ? "bg-primary text-white" : "text-primary/60 hover:text-primary",
+            "inline-flex items-center gap-2 rounded-full font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+            size === "md" ? "h-11 px-5 text-sm" : "h-7 px-3 text-xs",
+            active ? "bg-primary text-white" : "text-primary/70 hover:text-primary",
           )}>
           {option.label}
           {option.value === "year" && saving ? (
@@ -74,19 +74,23 @@ export const BillingToggle: FC<{ saving?: string | null; className?: string }> =
   return <BillingSwitch value={billing} onChange={setBilling} saving={saving} className={className} />;
 };
 
-/** A plan card's big price, per month on either billing, and how it's billed underneath. */
+/**
+ * A plan card's big price, per month on either billing, and how it's billed underneath. Both card
+ * styles carry ink text now (the featured one is lime), so `featured` only nudges the grey up a
+ * step to keep AA contrast on lime.
+ */
 export const PlanCardPrice: FC<{ plan: PricingPlan; featured: boolean }> = ({ plan, featured }) => {
   const { billing } = useBillingInterval();
-  const muted = featured ? "text-white/60" : "text-primary/55";
+  const muted = featured ? "text-primary/75" : "text-primary/65";
   const paid = plan.priceCents > 0;
   return (
     <>
-      <p className="mt-5 flex items-baseline gap-1.5">
-        <span className="text-4xl font-bold tracking-tight tabular-nums">{money(perMonthCents(plan, billing), plan.currency)}</span>
-        <span className={cn("text-sm font-medium", muted)}>/{plan.interval}</span>
+      <p className="mt-6 flex items-baseline gap-1.5">
+        <span className="text-[2.75rem] font-bold leading-none tracking-tight tabular-nums">{money(perMonthCents(plan, billing), plan.currency)}</span>
+        <span className={cn("text-sm font-medium", muted)}>/per {plan.interval}</span>
       </p>
       {/* Always one line tall, so the cards stay level whichever billing is picked. */}
-      <p className={cn("mt-1 min-h-[1rem] text-xs font-medium tabular-nums", muted)}>
+      <p className={cn("mt-2 min-h-[1rem] text-xs font-medium tabular-nums", muted)}>
         {!paid ? null : billing === "year" ? `${money(yearlyCents(plan), plan.currency)} billed yearly` : "Billed monthly"}
       </p>
     </>

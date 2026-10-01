@@ -171,15 +171,15 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
 
   // "Build with AI". The builder saved the document already, so it is opened,
   // not created again; the build spent credits, so the balance is refreshed.
-  // Building with AI is on Pro and up, so Free sees it locked and gets the
+  // Building with AI is on Basic and up, so Free sees it locked and gets the
   // upgrade popup instead of a dialog it can't finish.
   const queryClient = useQueryClient();
   const { allows, openUpgrade } = usePlanGate();
-  const buildLocked = !allows("pro");
+  const buildLocked = !allows("basic");
   const [buildOpen, setBuildOpen] = useState(false);
   const startBuild = () =>
     buildLocked
-      ? openUpgrade({ kind: "plan", requiredPlan: "pro", message: "Building a resume with AI is on Pro and up." })
+      ? openUpgrade({ kind: "plan", requiredPlan: "basic", message: "Building a resume with AI is on Basic and up." })
       : setBuildOpen(true);
   const openBuilt = (stored: StoredResumeDocument) => {
     open(fromStored(stored));

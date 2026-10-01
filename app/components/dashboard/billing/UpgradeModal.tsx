@@ -8,7 +8,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
 import { PLAN_LIMIT_EVENT, type PlanLimitDetail } from "@/app/lib/api/core";
 import { money, perCredit } from "@/app/lib/pricing/catalogue";
-import { PLAN_TIERS, type Plan, type PlanTier } from "@/app/lib/settings/types";
+import { PLAN_TIER_NAMES, isPlanTier, tierAllows, upgradeTierFor, type Plan, type PlanTier } from "@/app/lib/settings/types";
 
 /**
  * The one upgrade popup. It opens two ways:
@@ -21,9 +21,6 @@ import { PLAN_TIERS, type Plan, type PlanTier } from "@/app/lib/settings/types";
  * tier: the plan that unlocks it. Choosing either reserves it through the same `buyPlan` /
  * `buyCredits` the billing screen uses, since card payments aren't connected yet.
  */
-
-const RANK: Record<PlanTier, number> = { free: 0, pro: 1, ultra: 2 };
-const isTier = (value: unknown): value is PlanTier => typeof value === "string" && (PLAN_TIERS as readonly string[]).includes(value);
 
 interface PlanGate {
   tier: PlanTier;
@@ -72,8 +69,8 @@ export const PlanGateProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { subscription, plans, creditPacks, busy, buyPlan, buyCredits } = useBilling();
   const [detail, setDetail] = useState<PlanLimitDetail | null>(null);
 
-  const tier: PlanTier = isTier(subscription.tier) ? subscription.tier : "free";
-  const allows = useCallback((min: PlanTier) => RANK[tier] >= RANK[min], [tier]);
+  const tier: PlanTier = isPlanTier(subscription.tier) ? subscription.tier : "free";
+  const allows = useCallback((min: PlanTier) => tierAllows(tier, min), [tier]);
   const openUpgrade = useCallback((next: PlanLimitDetail) => setDetail(next), []);
 
   useEffect(() => {
@@ -85,8 +82,8 @@ export const PlanGateProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // The plan to offer: the one a refusal names, or else the next tier up.
   const offer = useMemo(() => {
     if (!detail) return null;
-    const wanted = detail.kind === "plan" && isTier(detail.requiredPlan) ? detail.requiredPlan : PLAN_TIERS[RANK[tier] + 1];
-    return wanted && RANK[wanted] > RANK[tier] ? plans.find((plan) => plan.key === wanted) ?? null : null;
+    const wanted = upgradeTierFor(tier, detail.kind === "plan" ? detail.requiredPlan : null);
+    return wanted ? plans.find((plan) => plan.key === wanted) ?? null : null;
   }, [detail, plans, tier]);
 
   const value = useMemo(() => ({ tier, allows, openUpgrade }), [tier, allows, openUpgrade]);
@@ -184,6 +181,6 @@ export const PlanChip: FC<{ plan: PlanTier; className?: string }> = ({ plan, cla
       (className ?? "")
     }>
     <Lock className="h-2.5 w-2.5" strokeWidth={3} aria-hidden />
-    {plan === "pro" ? "Pro" : plan === "ultra" ? "Ultra" : "Free"}
+    {PLAN_TIER_NAMES[plan]}
   </span>
 );

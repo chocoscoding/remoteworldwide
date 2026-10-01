@@ -25,14 +25,16 @@ const PlanCta: FC<{ planKey: string; planName: string; featured?: boolean }> = (
   const href = !signedIn ? `/waitlist?${query}` : free ? "/dashboard" : `/dashboard/settings/billing?${query}`;
   const label = !signedIn ? "Join the waitlist" : free ? "Open dashboard" : `Choose ${planName}`;
 
+  // Flat, as the owner's reference has it (2026-10-01): an ink button on the lime featured card,
+  // a plain outlined one everywhere else. The check icons carry the brutalism.
   return (
     <Link
       href={href}
       className={cn(
-        "group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border-[1.5px] px-5 text-sm font-bold transition-[transform,box-shadow] duration-100 active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+        "group inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border px-5 text-sm font-bold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         featured
-          ? "border-secondary bg-secondary text-primary shadow-[4px_4px_0_0_#ffffff] hover:shadow-[2px_2px_0_0_#ffffff]"
-          : "border-primary bg-primary text-white shadow-[4px_4px_0_0_#e1f073] hover:shadow-[2px_2px_0_0_#e1f073]",
+          ? "border-primary bg-primary text-white hover:bg-primary/90 focus-visible:ring-offset-secondary"
+          : "border-primary/20 bg-white text-primary hover:border-primary",
       )}>
       {label}
       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />

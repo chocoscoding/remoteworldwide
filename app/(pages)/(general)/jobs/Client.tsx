@@ -6,7 +6,7 @@ import JobsContainerForSearch from "@/app/components/main/JobsContainerForSearch
 import ScrollToTop from "@/app/components/main/ScrollToTop";
 import { cn } from "@/lib/utils";
 
-// `showAds` comes from the server (app/lib/ads.ts): true for Free and signed-out visitors, false for Pro and Ultra.
+// `showAds` comes from the server (app/lib/ads.ts): true for Free and signed-out visitors, false for Basic and up.
 const Client = ({ showAds }: { showAds: boolean }) => {
   return (
     <div className="w-full">

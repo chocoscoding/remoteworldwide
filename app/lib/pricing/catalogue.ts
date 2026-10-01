@@ -38,7 +38,7 @@ export interface PricingCatalogue {
 }
 
 /** The plan the page puts forward. A recommendation, not a sales figure. */
-export const RECOMMENDED_PLAN = "ultra";
+export const RECOMMENDED_PLAN = "pro";
 
 /**
  * Yearly billing for a plan that carries no `yearlyPriceCents`: twelve months at the monthly price,
@@ -57,18 +57,21 @@ export const perMonthCents = (plan: PricingPlan, billing: BillingInterval) =>
   billing === "year" ? Math.round(yearlyCents(plan) / 12) : plan.priceCents;
 
 /**
- * What paying yearly saves, as the Monthly / Yearly switch says it: "Save 10%", or "Save up to 10%"
- * when the plans save different amounts. Rounded down, so it never claims more than a plan gives.
+ * What paying yearly saves, as the Monthly / Yearly switch says it, worked out from the plans: "Save
+ * 10%" when every paid plan saves the same (rounded down, so it never claims more than a plan gives),
+ * or "Save ~10%" when they differ, the plans' average saving to the nearest point (owner,
+ * 2026-10-01: Basic, Pro and Ultra save about 12%, 10% and 9%).
  */
 export const yearlySavingLabel = (plans: PricingPlan[]): string | null => {
   const savings = plans
     .filter((plan) => plan.priceCents > 0)
-    // The nudge keeps an exact 10% (1 - 0.9 is 0.0999… in floating point) from reading as 9%.
-    .map((plan) => Math.floor((1 - yearlyCents(plan) / (plan.priceCents * 12)) * 100 + 1e-6))
+    .map((plan) => (1 - yearlyCents(plan) / (plan.priceCents * 12)) * 100)
     .filter((percent) => percent > 0);
   if (savings.length === 0) return null;
-  const best = Math.max(...savings);
-  return savings.every((percent) => percent === best) ? `Save ${best}%` : `Save up to ${best}%`;
+  // The nudge keeps an exact 10% (1 - 0.9 is 0.0999… in floating point) from reading as 9%.
+  const whole = savings.map((percent) => Math.floor(percent + 1e-6));
+  if (whole.every((percent) => percent === whole[0])) return `Save ${whole[0]}%`;
+  return `Save ~${Math.round(savings.reduce((sum, percent) => sum + percent, 0) / savings.length)}%`;
 };
 
 export const FALLBACK_CATALOGUE: PricingCatalogue = {
@@ -81,29 +84,40 @@ export const FALLBACK_CATALOGUE: PricingCatalogue = {
       interval: "month",
       monthlyCredits: 50,
       prioritySupport: false,
-      features: ["50 AI credits a month", "Resume builder (one resume)", "ATS scans and cover letters", "Application tracking and drafts"],
+      features: ["50 AI credits a month", "Resume builder (one resume)", "One cover letter and ATS scans", "Application tracking and drafts"],
+    },
+    {
+      key: "basic",
+      name: "Basic",
+      priceCents: 1700,
+      yearlyPriceCents: 18000,
+      currency: "USD",
+      interval: "month",
+      monthlyCredits: 100,
+      prioritySupport: false,
+      features: ["100 AI credits a month", "No ads and unlimited resumes", "AI help in the resume builder", "AI career coach and daily plan", "Job-search pod and recommendations"],
     },
     {
       key: "pro",
       name: "Pro",
-      priceCents: 2500,
-      yearlyPriceCents: 26988,
+      priceCents: 3100,
+      yearlyPriceCents: 33600,
       currency: "USD",
       interval: "month",
-      monthlyCredits: 150,
+      monthlyCredits: 200,
       prioritySupport: false,
-      features: ["150 AI credits a month", "Unlimited resumes", "AI help in the resume builder", "Email support"],
+      features: ["200 AI credits a month", "Everything in Basic", "Interview prep and voice mock interviews", "Likely interview questions for each role"],
     },
     {
       key: "ultra",
       name: "Ultra",
       priceCents: 5500,
-      yearlyPriceCents: 59988,
+      yearlyPriceCents: 60000,
       currency: "USD",
       interval: "month",
       monthlyCredits: 400,
       prioritySupport: true,
-      features: ["400 AI credits a month", "Everything in Pro", "Interview prep and voice mock interviews", "Priority support and early access"],
+      features: ["400 AI credits a month", "Everything in Pro", "Priority support", "Early access to new tools"],
     },
   ],
   creditPacks: [
@@ -124,8 +138,8 @@ export interface CreditCost {
 
 export const CREDIT_COSTS: CreditCost[] = [
   { action: "Import a job", detail: "Paste a link or posting and it's ready to tailor against.", credits: 0 },
-  { action: "Typed practice interview", detail: "Graded like a voice session, up to 10 a day.", credits: 0 },
-  { action: "AI coach reply", detail: "The first 15 replies every day are free.", credits: 0, label: "15 free / day" },
+  // No typed practice interview: the website only starts voice sessions (PrepLive), so it isn't sold here.
+  { action: "AI coach reply", detail: "On Basic and up, the first 15 replies every day are free.", credits: 0, label: "15 free / day" },
   { action: "ATS scan", detail: "Score your resume against a posting, keyword by keyword.", credits: 1 },
   { action: "Resume suggestion", detail: "Add missing keywords, quantify bullets, or shorten to a page.", credits: 1 },
   { action: "Ask about a job", detail: "An answer grounded in the posting and your profile.", credits: 1 },
@@ -139,13 +153,18 @@ export const CREDIT_COSTS: CreditCost[] = [
 ];
 
 /**
- * Plans the interview-prep tools are on. The comparison table and the estimator share it, and the
- * AI service enforces it (remoteworldwideai services/planService.ts: prep is on Ultra).
+ * Plans the interview-prep tools are on, voice interviews included. The comparison table and the
+ * estimator share it, and the AI service enforces it (remoteworldwideai services/planService.ts:
+ * prep is on Pro).
  */
-const INTERVIEW_PLANS = ["ultra"];
+const INTERVIEW_PLANS = ["pro", "ultra"];
 
-/** Every paid plan: AI help in the resume builder, and more than one resume, start at Pro. */
-const PAID_PLANS = ["pro", "ultra"];
+/**
+ * Every paid plan: no ads (app/lib/ads.ts), AI help in the resume builder and more than one resume
+ * start at Basic, and so do the coach, voice talk, the daily plan, pods and recommendations
+ * (owner, 2026-10-01). Streaks stay on Free.
+ */
+const PAID_PLANS = ["basic", "pro", "ultra"];
 
 export interface EstimatorItem {
   key: string;
@@ -156,12 +175,14 @@ export interface EstimatorItem {
   initial: number;
   /** Plans that include this tool; omitted means every plan. */
   plans?: string[];
+  /** The most a plan allows, by plan key, e.g. Free's one cover letter; omitted means no cap. */
+  limits?: Record<string, number>;
 }
 
 /** What the estimator on /pricing multiplies by. Kept next to CREDIT_COSTS so the two can't disagree. */
 export const ESTIMATOR_ITEMS: EstimatorItem[] = [
   { key: "scans", label: "ATS scans", unit: "scan", credits: 1, max: 80, initial: 20 },
-  { key: "letters", label: "Cover letters", unit: "letter", credits: 2, max: 40, initial: 10 },
+  { key: "letters", label: "Cover letters", unit: "letter", credits: 2, max: 40, initial: 10, limits: { free: 1 } },
   { key: "interviews", label: "Voice mock interviews", unit: "interview", credits: 5, max: 30, initial: 6, plans: INTERVIEW_PLANS },
 ];
 
@@ -186,14 +207,16 @@ export const CREDIT_ROWS: FeatureRow[] = [
 
 /**
  * The comparison table under the plan cards. Free's limits (one resume, no AI in the builder) and
- * interview prep on Ultra are enforced by the AI service; priority support and early access are
- * the Ultra plan's promise. Referral search is left out for now.
+ * interview prep on Pro are enforced by the AI service, the coaching tools and recommendations on
+ * Basic by the AI service and backend, and ads by app/lib/ads.ts; priority support and early access
+ * are the Ultra plan's promise. Referral search is left out for now.
  */
 export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
     title: "Find and track jobs",
     rows: [
       { label: "Remote job board", note: "Search, save and apply to vetted remote roles", plans: "all" },
+      { label: "No ads", note: "Browse the job board without them", plans: PAID_PLANS },
       { label: "Import jobs", note: "From a link or a pasted posting · free", plans: "all" },
       { label: "Saved jobs", note: "A shortlist to come back to", plans: "all" },
       { label: "Unlimited application tracking", note: "Every application, stage by stage", plans: "all" },
@@ -202,12 +225,12 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
     title: "Resumes & cover letters",
     rows: [
-      { label: "Resume builder", plans: "all", values: { free: "1 resume", pro: "Unlimited", ultra: "Unlimited" } },
+      { label: "Resume builder", plans: "all", values: { free: "1 resume", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" } },
       { label: "Import your resume", note: "Upload a PDF, Word or text file · free", plans: "all" },
       { label: "Build a resume with AI", note: "A full resume around a target role · 3 credits", plans: PAID_PLANS },
       { label: "AI help in the resume builder", note: "Tailor, add keywords, quantify, shorten · 1 credit", plans: PAID_PLANS },
       { label: "ATS scans", note: "Keyword-by-keyword score against a posting · 1 credit", plans: "all" },
-      { label: "Cover letters", note: "2 credits a draft, 1 per revision", plans: "all" },
+      { label: "Cover letters", note: "2 credits a draft, 1 per revision", plans: "all", values: { free: "1 letter", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" } },
       { label: "Document vault", note: "Your files in one place, with a master resume", plans: "all" },
     ],
   },
@@ -220,7 +243,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
       { label: "Autofill from your profile", note: "Your details and saved answers · free", plans: "all" },
       { label: "AI answers in the extension", note: "New questions answered from your resume · 1 credit", plans: "all" },
       { label: "Application drafts", note: "Pick an application back up later", plans: "all" },
-      { label: "Recommendations to companies", note: "Reviewers put strong profiles in front of hiring teams", plans: "all" },
+      { label: "Recommendations to companies", note: "Reviewers put strong profiles in front of hiring teams", plans: PAID_PLANS },
     ],
   },
   {
@@ -229,7 +252,6 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
       { label: "Prep tracks for each role", note: "Built on the real posting, synced with your tracker", plans: INTERVIEW_PLANS },
       { label: "Likely interview questions", note: "A tailored set for the role · 1 credit", plans: INTERVIEW_PLANS },
       { label: "Voice mock interviews", note: "5 credits for up to 10 minutes, then 1 a minute", plans: INTERVIEW_PLANS },
-      { label: "Typed practice interviews", note: "Free, up to 10 a day", plans: INTERVIEW_PLANS },
       { label: "Interview reports", note: "Scores, transcript and recording playback", plans: INTERVIEW_PLANS },
       { label: "Delivery analysis", note: "Long pauses, filler words and pitch", plans: INTERVIEW_PLANS },
       { label: "Positioning, diction and grammar", note: "Every point backed by a quote from your answers", plans: INTERVIEW_PLANS },
@@ -238,10 +260,11 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
     title: "Coaching & momentum",
     rows: [
-      { label: "AI career coach", note: "15 free replies a day, then 1 credit each", plans: "all" },
-      { label: "Talk it through by voice", note: "With the coach and Ask about a job", plans: "all" },
-      { label: "Daily plan and streaks", note: "Today's tasks, and a streak to keep", plans: "all" },
-      { label: "Job-search pod", note: "Weekly goals and wins with a small group", plans: "all" },
+      { label: "AI career coach", note: "15 free replies a day, then 1 credit each", plans: PAID_PLANS },
+      { label: "Talk it through by voice", note: "With the coach and Ask about a job", plans: PAID_PLANS },
+      { label: "Daily plan", note: "Today's tasks, picked for your search", plans: PAID_PLANS },
+      { label: "Job-search pod", note: "Weekly goals and wins with a small group", plans: PAID_PLANS },
+      { label: "Streaks", note: "A streak to keep, from the work you do", plans: "all" },
     ],
   },
   {

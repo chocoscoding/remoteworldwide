@@ -99,7 +99,7 @@ const BillingClient: FC<{ initialBilling?: BillingInterval }> = ({ initialBillin
         title="Plans"
         description="Pay monthly, or yearly for less. Credits refill every month either way. Change or cancel whenever."
         action={<BillingSwitch value={billing} onChange={setBilling} saving={yearlySavingLabel(plans)} size="sm" />}>
-        <div className="grid gap-3 py-1 sm:grid-cols-3">
+        <div className="grid gap-3 py-1 sm:grid-cols-2 xl:grid-cols-4">
           {plans.map((p) => {
             const samePlan = p.key === currentKey;
             // Free is current however it's shown; a paid plan only on the billing it's paid on.

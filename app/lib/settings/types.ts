@@ -180,9 +180,33 @@ export interface CreditPack {
   priceCents: number;
 }
 
-/** The four plan tiers, cheapest first. Free is everyone without an active paid plan. */
-export const PLAN_TIERS = ["free", "pro", "ultra"] as const;
+/**
+ * The four plan tiers, cheapest first (backend config/billing.ts PLAN_KEYS). Free is everyone
+ * without an active paid plan. Basic adds no ads and the resume AI, Pro interview prep, Ultra the
+ * most credits.
+ */
+export const PLAN_TIERS = ["free", "basic", "pro", "ultra"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
+
+/** Each tier as the site names it. */
+export const PLAN_TIER_NAMES: Record<PlanTier, string> = { free: "Free", basic: "Basic", pro: "Pro", ultra: "Ultra" };
+
+export const isPlanTier = (value: unknown): value is PlanTier => typeof value === "string" && (PLAN_TIERS as readonly string[]).includes(value);
+
+/** True when `tier` is `min` or above. A tier this build doesn't know counts as below every tier. */
+export const tierAllows = (tier: unknown, min: PlanTier): boolean => isPlanTier(tier) && PLAN_TIERS.indexOf(tier) >= PLAN_TIERS.indexOf(min);
+
+/** The lowest tier that never sees ads (app/lib/ads.ts); Free and signed-out visitors do. */
+export const AD_FREE_FROM: PlanTier = "basic";
+
+/**
+ * The plan the upgrade popup puts forward: the one a refusal names, or else the next tier up. Null
+ * when that is not above the account's own tier, so Ultra out of credits is offered packs only.
+ */
+export const upgradeTierFor = (tier: PlanTier, requiredPlan?: string | null): PlanTier | null => {
+  const wanted = isPlanTier(requiredPlan) ? requiredPlan : PLAN_TIERS[PLAN_TIERS.indexOf(tier) + 1];
+  return wanted && PLAN_TIERS.indexOf(wanted) > PLAN_TIERS.indexOf(tier) ? wanted : null;
+};
 
 export interface Subscription {
   planKey: string | null;
