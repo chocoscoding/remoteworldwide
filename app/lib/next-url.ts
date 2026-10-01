@@ -29,5 +29,20 @@ export function requiresSession(path: string): boolean {
 }
 
 export function loginWithNext(next: string): string {
-  return `/login?next=${encodeURIComponent(next)}`;
+  return next === DEFAULT_NEXT ? "/login" : `/login?next=${encodeURIComponent(next)}`;
+}
+
+export function signupWithNext(next: string): string {
+  return next === DEFAULT_NEXT ? "/signup" : `/signup?next=${encodeURIComponent(next)}`;
+}
+
+const AUTH_PAGES = ["/login", "/signup"];
+
+/**
+ * Where signing in from this page should come back to: the page itself, query included. On the
+ * login or signup page, the `next` it already carries, so switching between the two keeps it.
+ */
+export function returnTo(pathname: string, search: string): string {
+  if (AUTH_PAGES.includes(pathname)) return safeNext(new URLSearchParams(search).get("next"));
+  return safeNext(pathname + search);
 }

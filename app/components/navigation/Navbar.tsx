@@ -10,7 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
 import { cn } from "@/app/lib/utils";
-import { loginWithNext } from "@/app/lib/next-url";
+import { loginWithNext, returnTo, signupWithNext } from "@/app/lib/next-url";
 
 const JOBS = "/jobs";
 const DASHBOARD = "/dashboard";
@@ -59,6 +59,10 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
       document.removeEventListener("keydown", onKey);
     };
   }, [open, close]);
+
+  // Signing in comes back to this page, query and all. The menu only renders after a click, so
+  // `window` is always there when this is read (and no useSearchParams Suspense boundary is needed).
+  const here = open && !signedIn ? returnTo(window.location.pathname, window.location.search) : "/";
 
   return (
     <div ref={wrapper} className="relative">
@@ -112,10 +116,10 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
             </>
           ) : (
             <>
-              <Link href={loginWithNext(DASHBOARD)} onClick={close} className={cn(MENU_ITEM, "font-bold")}>
+              <Link href={loginWithNext(here)} onClick={close} className={cn(MENU_ITEM, "font-bold")}>
                 Log in
               </Link>
-              <Link href="/signup" onClick={close} className={MENU_ITEM}>
+              <Link href={signupWithNext(here)} onClick={close} className={MENU_ITEM}>
                 Sign up
               </Link>
             </>

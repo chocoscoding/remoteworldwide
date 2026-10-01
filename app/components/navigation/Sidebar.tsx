@@ -86,7 +86,8 @@ const menuItemsForAuthor: MenuItem[] = [
 const withBlogSubItems = (items: MenuItem[], role: "ADMIN" | "AUTHOR", hasProfile: boolean): MenuItem[] =>
   items.map((item) => (item.section === "blog" ? { ...item, subItems: blogSubItems(role, hasProfile) } : item));
 
-const Sidebar = ({ hasAuthorProfile }: { hasAuthorProfile: boolean }) => {
+/** `sttLab`: the STT lab exists here (development or localhost only, see app/lib/stt-lab). */
+const Sidebar = ({ hasAuthorProfile, sttLab }: { hasAuthorProfile: boolean; sttLab: boolean }) => {
   const { data: userData, status } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string>("home");
@@ -124,10 +125,13 @@ const Sidebar = ({ hasAuthorProfile }: { hasAuthorProfile: boolean }) => {
 
   const menuItems = useMemo(() => {
     const role = userData?.user?.role;
-    if (role === "ADMIN") return withBlogSubItems(menuItemsForAdmin, role, hasAuthorProfile);
+    if (role === "ADMIN") {
+      const items = sttLab ? menuItemsForAdmin : menuItemsForAdmin.filter((item) => item.section !== "stt-lab");
+      return withBlogSubItems(items, role, hasAuthorProfile);
+    }
     if (role === "AUTHOR") return withBlogSubItems(menuItemsForAuthor, role, hasAuthorProfile);
     return [];
-  }, [userData, hasAuthorProfile]);
+  }, [userData, hasAuthorProfile, sttLab]);
 
   return (
     <div className={`flex flex-col h-screen bg-primary text-white ${isOpen ? "w-64" : "w-16"} transition-width duration-300 sticky top-0`}>

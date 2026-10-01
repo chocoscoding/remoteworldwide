@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { evaluatePassword, MIN_PASSWORD_LENGTH } from "@/app/lib/auth/password-strength";
-import { ONBOARDING_PATH } from "@/app/lib/next-url";
+import { DEFAULT_NEXT, loginWithNext } from "@/app/lib/next-url";
 import { AuthLogo, GitHubIcon, GoogleIcon } from "./AuthIcons";
 import PasswordStrength from "./PasswordStrength";
 import {
@@ -45,9 +45,9 @@ interface SignupFormProps {
 export default function SignupForm({
   onSuccess,
   onSwitchToLogin,
-  // Where a new account goes when nobody said: setup (a resume and a profile), which the extension
-  // requires before it fills anything. The auth dialog passes the page it opened on instead.
-  oauthCallbackUrl = ONBOARDING_PATH,
+  // Where a new account goes when nobody said: home (owner, 2026-10-01: for now, not setup at
+  // ONBOARDING_PATH). The signup page passes its `next`, the auth dialog the page it opened on.
+  oauthCallbackUrl = DEFAULT_NEXT,
   idPrefix = "signup",
   embedded = false,
 }: SignupFormProps) {
@@ -118,7 +118,7 @@ export default function SignupForm({
         if (onSwitchToLogin) {
           onSwitchToLogin();
         } else {
-          router.push("/login");
+          router.push(loginWithNext(oauthCallbackUrl));
         }
         return;
       }
@@ -320,7 +320,7 @@ export default function SignupForm({
               Sign in
             </button>
           ) : (
-            <Link className={brutalistLink} href="/login">
+            <Link className={brutalistLink} href={loginWithNext(oauthCallbackUrl)}>
               Sign in
             </Link>
           )}

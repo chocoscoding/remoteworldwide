@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { myAuthor } from "@/libs/blog-admin";
 import Sidebar from "@/app/components/navigation/Sidebar";
 import { notFound, redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { sttLabAvailable } from "@/app/lib/stt-lab";
 
 export default async function RootLayout({
   children,
@@ -21,7 +23,7 @@ export default async function RootLayout({
 
   return (
     <div className="w-full flex">
-      <Sidebar hasAuthorProfile={me !== null} />
+      <Sidebar hasAuthorProfile={me !== null} sttLab={sttLabAvailable((await headers()).get("host"))} />
       <div className="h-screen w-full max-w-[1680px] overflow-x-clip overflow-y-auto m-auto">{children}</div>
     </div>
   );

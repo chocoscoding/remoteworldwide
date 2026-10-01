@@ -7,6 +7,7 @@ import { type FormEvent, useState } from "react";
 import { toast } from "react-toastify";
 import { signIn } from "@/app/lib/authClient";
 import { signInErrorMessage } from "@/app/lib/auth/sign-in-error";
+import { signupWithNext } from "@/app/lib/next-url";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -168,7 +169,7 @@ export default function LoginForm({
               Sign up
             </button>
           ) : (
-            <Link className={brutalistLink} href="/signup">
+            <Link className={brutalistLink} href={signupWithNext(oauthCallbackUrl)}>
               Sign up
             </Link>
           )}
