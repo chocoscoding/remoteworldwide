@@ -15,6 +15,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // and see one screen until the address is confirmed. `/verify-email` sits outside this layout
   // deliberately, or the redirect would land back here and loop.
   if (session.user.verified === false) redirect("/verify-email");
+  // TEMPORARY: until launch only staff may open the dashboard; everyone else is sent to the
+  // waitlist. Remove this line to open it to every signed-in user.
+  if (session.user.role !== "ADMIN" && session.user.role !== "AUTHOR") redirect("/waitlist");
 
   const [settings, billing] = await Promise.all([getSettings(), getBillingOverview()]);
 
