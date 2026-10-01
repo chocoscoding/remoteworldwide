@@ -14,6 +14,7 @@ import StepVisual from "@/app/components/waitlist/StepVisuals";
 import JoinLink from "@/app/components/waitlist/JoinLink";
 import SmoothScroll from "@/app/components/waitlist/SmoothScroll";
 import PinnedRail from "@/app/components/waitlist/PinnedRail";
+import UnlessJoined from "@/app/components/waitlist/UnlessJoined";
 import { WAITLIST_GRANT_CREDITS, WAITLIST_GRANT_PLAN } from "@/app/lib/waitlist/types";
 import type { BoardJob } from "@/app/components/waitlist/JourneyVisuals";
 import CheckChip from "@/app/components/marketing/CheckChip";
@@ -372,7 +373,7 @@ export default async function WaitlistPage() {
         </section>
 
         {/* The ask, with the form right here */}
-        <section className="mx-auto max-w-[1200px] px-4 py-24 md:py-32" aria-labelledby="final-heading">
+        <section className="mx-auto max-w-[1200px] px-4 py-24 md:py-32" aria-label="Join the waitlist">
           <div className="relative overflow-hidden rounded-[28px] bg-primary px-5 py-14 text-center text-white sm:px-6 md:px-12 md:py-20">
             <div
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.12)_1px,transparent_1px)] bg-[length:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
@@ -381,15 +382,18 @@ export default async function WaitlistPage() {
             <Sparkle className="absolute left-8 top-8 hidden h-10 w-10 fill-secondary text-secondary md:block" aria-hidden />
             <Sparkle className="absolute bottom-10 right-10 hidden h-6 w-6 fill-secondary text-secondary md:block" aria-hidden />
             <div className="relative">
-              <h2 id="final-heading" className="text-balance text-3xl font-extrabold tracking-tight md:text-5xl">
-                Your spot is <span className="text-secondary">waiting.</span>
-              </h2>
-              <p className="mx-auto mt-4 max-w-[480px] text-white/75">
-                Leave your email and you&apos;re in line. We&apos;ll write the moment your spot opens.
-              </p>
+              {/* The ask goes once this browser has joined (owner, 2026-10-01); "You're on the list" stays. */}
+              <UnlessJoined>
+                <h2 id="final-heading" className="text-balance text-3xl font-extrabold tracking-tight md:text-5xl">
+                  Your spot is <span className="text-secondary">waiting.</span>
+                </h2>
+                <p className="mx-auto mt-4 max-w-[480px] text-white/75">
+                  Leave your email and you&apos;re in line. We&apos;ll write the moment your spot opens.
+                </p>
+              </UnlessJoined>
               <Suspense
-                fallback={<WaitlistForm initialPlan={null} tone="dark" inputId="waitlist-email-final" className="mx-auto max-w-[560px]" />}>
-                <WaitlistFormFromParams tone="dark" inputId="waitlist-email-final" className="mx-auto max-w-[560px]" />
+                fallback={<WaitlistForm initialPlan={null} tone="dark" inputId="waitlist-email-final" className="mx-auto max-w-[560px] first:mt-0" />}>
+                <WaitlistFormFromParams tone="dark" inputId="waitlist-email-final" className="mx-auto max-w-[560px] first:mt-0" />
               </Suspense>
               <Link
                 href="/pricing"

@@ -99,7 +99,10 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, plan, billing: plan ? (initialYearly ? "year" : "month") : null, website }),
       });
-      const body = (await res.json().catch(() => ({}))) as { data?: { ok?: boolean; position?: number | null; returning?: boolean } | null; message?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        data?: { ok?: boolean; position?: number | null; returning?: boolean } | null;
+        message?: string;
+      };
       if (!res.ok || !body.data?.ok) {
         setStatus("error");
         setMessage(body.message ?? "Couldn't save that. Try again.");
@@ -135,7 +138,9 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
           {shown.position !== null ? (
             <div className="flex h-24 w-full flex-none flex-col items-center justify-center rounded-2xl bg-secondary br-shadow sm:w-28">
               <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-primary/75">Your spot</span>
-              <span className="text-4xl font-extrabold tracking-tight text-primary tabular-nums">#{(shown.position + SPOT_OFFSET).toLocaleString("en-US")}</span>
+              <span className="text-3xl font-extrabold tracking-tight text-primary tabular-nums">
+                #{(shown.position + SPOT_OFFSET).toLocaleString("en-US")}
+              </span>
             </div>
           ) : (
             <div className="grid h-14 w-14 flex-none place-content-center rounded-2xl bg-secondary br-shadow">
@@ -147,8 +152,8 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
             <p className="mt-1 text-sm text-primary/75">
               {joined && !joined.returning ? (
                 <>
-                  A confirmation is on its way to <span className="break-all font-bold text-primary">{shown.email}</span>. We&apos;ll write again when
-                  your spot opens.
+                  A confirmation is on its way to <span className="break-all font-bold text-primary">{shown.email}</span>. We&apos;ll write
+                  again when your spot opens.
                 </>
               ) : (
                 <>
@@ -157,11 +162,15 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
               )}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-x-5 text-sm font-bold">
-              <Link href="/jobs" className="group inline-flex min-h-[44px] items-center gap-1.5 underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary">
+              <Link
+                href="/jobs"
+                className="group inline-flex min-h-[44px] items-center gap-1.5 underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary !text-black">
                 Browse remote jobs while you wait
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
               </Link>
-              <Link href="/pricing" className="inline-flex min-h-[44px] items-center text-primary/70 underline decoration-2 underline-offset-4 hover:text-primary">
+              <Link
+                href="/pricing"
+                className="inline-flex min-h-[44px] items-center text-primary/70 underline decoration-2 underline-offset-4 hover:text-primary">
                 See pricing
               </Link>
             </div>
@@ -175,7 +184,7 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
               "mt-1 inline-flex min-h-[44px] items-center text-xs font-semibold underline underline-offset-2",
               dark ? "text-white/70 hover:text-white" : "text-primary/70 hover:text-primary",
             )}>
-            Not you, or eyeing a different plan? Join again
+            Not you? Join again
           </button>
         ) : null}
       </div>
@@ -214,11 +223,21 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
           aria-describedby={message ? errorId : hintId}
           className={cn(
             "h-14 w-full min-w-0 rounded-xl border bg-white px-4 text-base text-primary outline-none transition-colors placeholder:text-primary/45 focus:ring-4 sm:flex-1",
-            dark ? "border-white/20 focus:border-secondary focus:ring-secondary/40" : "border-primary/25 focus:border-primary focus:ring-secondary",
+            dark
+              ? "border-white/20 focus:border-secondary focus:ring-secondary/40"
+              : "border-primary/25 focus:border-primary focus:ring-secondary",
             status === "error" && "border-[#b23c26]",
           )}
         />
-        <input type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" className="absolute -left-[9999px] h-0 w-0 opacity-0" aria-hidden />
+        <input
+          type="text"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          defaultValue=""
+          className="absolute -left-[9999px] h-0 w-0 opacity-0"
+          aria-hidden
+        />
         <button
           type="submit"
           disabled={status === "submitting"}
