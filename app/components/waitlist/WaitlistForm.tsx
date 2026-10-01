@@ -22,6 +22,11 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const CONFETTI_COLORS = ["#e1f073", "#cddd54", "#f0c86a", "#222325"];
+/**
+ * Added to the place in line where it is shown here (owner, 2026-10-01). Display only: the backend's
+ * position, what this browser remembers and the admin waitlist all keep the real number.
+ */
+const SPOT_OFFSET = 729;
 const noopSubscribe = () => () => {};
 
 const prefersReducedMotion = () => {
@@ -130,7 +135,7 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
           {shown.position !== null ? (
             <div className="flex h-24 w-full flex-none flex-col items-center justify-center rounded-2xl bg-secondary br-shadow sm:w-28">
               <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-primary/75">Your spot</span>
-              <span className="text-4xl font-extrabold tracking-tight text-primary tabular-nums">#{shown.position.toLocaleString("en-US")}</span>
+              <span className="text-4xl font-extrabold tracking-tight text-primary tabular-nums">#{(shown.position + SPOT_OFFSET).toLocaleString("en-US")}</span>
             </div>
           ) : (
             <div className="grid h-14 w-14 flex-none place-content-center rounded-2xl bg-secondary br-shadow">
