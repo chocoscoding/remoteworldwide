@@ -57,6 +57,34 @@ export interface StreakAuditItem {
   reason: string;
 }
 
+/**
+ * One Monday-to-Sunday week on the user's own calendar — the shareable week
+ * card. `applied` leaves re-logs of one role out; `interviews` / `offers` count
+ * applications that moved into that stage that week, once each.
+ */
+export interface StreakWeekReport {
+  /** The Monday. */
+  weekStart: string;
+  /** The Sunday, or today while the week is still running. */
+  weekEnd: string;
+  /** True for the week in progress. */
+  partial: boolean;
+  applied: number;
+  interviews: number;
+  offers: number;
+  /** Days with at least one qualifying action. */
+  activeDays: number;
+  /** The run as the week ended; today's for the week in progress. */
+  streak: number;
+}
+
+export interface StreakWeeks {
+  current: StreakWeekReport;
+  previous: StreakWeekReport;
+  /** False until last week's card has been shown. */
+  previousSeen: boolean;
+}
+
 /** `GET /api/streak`. */
 export interface StreakItem {
   timezone: string;
@@ -76,6 +104,8 @@ export interface StreakItem {
   giftsWaiting: number;
   retiredStreak: number | null;
   audit: StreakAuditItem[];
+  /** This week so far and last week. */
+  weeks: StreakWeeks;
 }
 
 export interface GiftItem {

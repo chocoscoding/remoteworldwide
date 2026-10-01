@@ -88,20 +88,22 @@ export function useDismissRepair() {
 }
 
 /**
- * Marks celebrations shown and freeze notices told. Optimistic, and silent on
- * failure: the worst case is seeing one of them again.
+ * Marks celebrations shown, freeze notices told and last week's card shown.
+ * Optimistic, and silent on failure: the worst case is seeing one of them again.
  */
 export function useMarkStreakSeen() {
   const queryClient = useQueryClient();
-  return useMutation<unknown, unknown, { milestones?: number[]; freezes?: string[] }>({
+  return useMutation<unknown, unknown, { milestones?: number[]; freezes?: string[]; week?: string }>({
     mutationFn: markStreakSeen,
-    onMutate: ({ milestones = [], freezes = [] }) => {
+    onMutate: ({ milestones = [], freezes = [], week }) => {
       queryClient.setQueryData<StreakItem>(qk.activity.streak(), (streak) =>
         streak
           ? {
               ...streak,
               milestones: streak.milestones.map((m) => (milestones.includes(m.days) ? { ...m, seen: true } : m)),
               notices: streak.notices.filter((notice) => !freezes.includes(notice.day)),
+              weeks:
+                week && streak.weeks && week >= streak.weeks.previous.weekStart ? { ...streak.weeks, previousSeen: true } : streak.weeks,
             }
           : streak,
       );

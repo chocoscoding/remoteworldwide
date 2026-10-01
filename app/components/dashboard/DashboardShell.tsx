@@ -23,6 +23,7 @@ import WinProvider from "./win/WinProvider";
 import { SettingsProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import { BillingProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
 import StreakMilestoneModal from "./streak/StreakMilestoneModal";
+import WeekCardModal from "./streak/WeekCardModal";
 import LogApplicationDialog from "./log/LogApplicationDialog";
 import GiftStore from "./gifts/GiftStore";
 import { TrackerProvider } from "./tracker/TrackerProvider";
@@ -76,6 +77,7 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
       <GiftStore />
       <RepairStreakPanel />
       <StreakMilestoneModal />
+      <WeekCardModal />
       {/* Moves a tracker board kept in this browser into the applications
           table, once. Inside the providers for the query client and toasts. */}
       <BoardImporter />

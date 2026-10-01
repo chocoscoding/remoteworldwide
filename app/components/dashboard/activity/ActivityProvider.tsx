@@ -47,7 +47,8 @@ import { FOLLOW_UP_AFTER_APPLY_DAYS } from "@/app/lib/dashboard/follow-up";
 import type { StreakDay, StreakMilestone, StreakState, TrackerColumnId } from "@/app/lib/dashboard/types";
 import { applicationInput, isObjectId, newClientId, toActivityApplication, wasApplied } from "@/app/lib/applications/api";
 import type { GoalsItem, UpdateGoalsInput } from "@/app/lib/applications/types";
-import type { GiftItem, StreakDayItem, StreakItem } from "@/app/lib/streak/types";
+import type { GiftItem, StreakDayItem, StreakItem, StreakWeekReport, StreakWeeks } from "@/app/lib/streak/types";
+import { hasWeekToShare } from "@/app/lib/dashboard/week-card";
 import { useCreateApplication, useUpdateGoals } from "@/hooks/mutations/useApplicationMutations";
 import {
   refreshStreak,
@@ -264,6 +265,19 @@ interface ActivityContextValue extends StreakState {
   /** Prompts shown today, capped per §8 so this never becomes nagging. */
   promptsToday: number;
 
+  // --- the week card ---
+  /** This week so far and last week, as the server counted them. Null until the streak loads. */
+  weeks: StreakWeeks | null;
+  /**
+   * The week card on screen: one the user opened, else last week's — shown
+   * once, at the start of a new week, when that week had anything in it.
+   * `auto` is the second kind, which waits a beat before it appears.
+   */
+  weekCard: { report: StreakWeekReport; auto: boolean } | null;
+  openWeekCard: (which: "current" | "previous") => void;
+  /** Closes it; closing last week's marks it seen, so it never pops up again. */
+  closeWeekCard: () => void;
+
   // --- log dialog ---
   /**
    * Owned here rather than per-screen so the dialog is mounted once, and so the
@@ -355,6 +369,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [logPulse, setLogPulse] = useState(0);
   const [logOpen, setLogOpen] = useState(false);
   const [giftsOpen, setGiftsOpen] = useState(false);
+  const [weekCardOpen, setWeekCardOpen] = useState<"current" | "previous" | null>(null);
   const [atRiskDismissed, setAtRiskDismissed] = useState(false);
   // The break whose repair panel was closed this session. Closing is not a
   // decision — an overlay click must not throw a streak away — so only the
@@ -383,6 +398,22 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     .sort((a, b) => a.days - b.days)
     .map((m) => milestoneOf(m.days, m.gift))
     .filter((m): m is StreakMilestone => m !== null);
+
+  // The week card. Last week's comes up by itself once a new week has started —
+  // only for a week with something in it, never over a rung's celebration or the
+  // log dialog, and not while the search is paused (every prompt goes quiet).
+  // `weeks` can be missing from a streak cached before it existed.
+  const weeks = streak?.weeks ?? null;
+  const weekCardDue =
+    weeks !== null &&
+    !weeks.previousSeen &&
+    hasWeekToShare(weeks.previous) &&
+    goalsQuery.data !== undefined &&
+    !goals.paused &&
+    !logOpen &&
+    queue.length === 0;
+  const weekCardWhich = weekCardOpen ?? (weekCardDue ? "previous" : null);
+  const weekCard = weeks && weekCardWhich ? { report: weeks[weekCardWhich], auto: weekCardOpen === null } : null;
 
   // Habits live on the goals row; the defaults stand in until it loads.
   const habits: HabitDef[] = goalsQuery.data?.habits ?? DEFAULT_HABITS;
@@ -694,6 +725,14 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       writeGoals((row) => ({ habits: [...(row?.habits ?? DEFAULT_HABITS), { id: newClientId("habit"), label: "New habit", kind: "application" }] })),
     updateHabit: (id, patch) => writeGoals((row) => ({ habits: (row?.habits ?? DEFAULT_HABITS).map((h) => (h.id === id ? { ...h, ...patch } : h)) })),
     removeHabit: (id) => writeGoals((row) => ({ habits: (row?.habits ?? DEFAULT_HABITS).filter((h) => h.id !== id) })),
+
+    weeks,
+    weekCard,
+    openWeekCard: setWeekCardOpen,
+    closeWeekCard: () => {
+      if (weeks && weekCardWhich === "previous" && !weeks.previousSeen) markSeen.mutate({ week: weeks.previous.weekStart });
+      setWeekCardOpen(null);
+    },
 
     logOpen,
     openLog: () => setLogOpen(true),

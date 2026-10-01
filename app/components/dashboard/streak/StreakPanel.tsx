@@ -10,11 +10,12 @@
 import { type FC } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { Gift, Flame, Snowflake, Trophy } from "lucide-react";
+import { Gift, Flame, Share2, Snowflake, Trophy } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import { milestoneProgress, nextMilestone, nextTier, tierFor } from "@/app/lib/dashboard/streak";
+import { hasWeekToShare } from "@/app/lib/dashboard/week-card";
 import { useStreak } from "./StreakContext";
 import StreakFlame from "./StreakFlame";
 import StreakCalendar from "./StreakCalendar";
@@ -26,8 +27,10 @@ export interface StreakPanelProps {
 }
 
 const StreakPanel: FC<StreakPanelProps> = ({ open, onOpenChange }) => {
-  const { current, longest, freezes, freeFreezes, giftsWaiting, loggedToday, openLog, logPulse, openGifts } = useStreak();
+  const { current, longest, freezes, freeFreezes, giftsWaiting, loggedToday, openLog, logPulse, openGifts, weeks, openWeekCard } = useStreak();
   const reduceMotion = useReducedMotion();
+  // This week once it has something in it; until then, last week's.
+  const shareWeek = hasWeekToShare(weeks?.current) ? "current" : hasWeekToShare(weeks?.previous) ? "previous" : null;
 
   const tier = tierFor(current);
   const upNext = nextTier(current);
@@ -112,6 +115,20 @@ const StreakPanel: FC<StreakPanelProps> = ({ open, onOpenChange }) => {
               <StickerButton variant="outline" size="md" shadowColor="#ffffff" onClick={openGifts}>
                 Your gifts
               </StickerButton>
+              {shareWeek && (
+                <StickerButton
+                  variant="outline"
+                  size="md"
+                  shadowColor="#ffffff"
+                  onClick={() => {
+                    // One dialog at a time: the panel steps aside for the card.
+                    onOpenChange(false);
+                    openWeekCard(shareWeek);
+                  }}>
+                  <Share2 className="h-4 w-4" />
+                  Share your week
+                </StickerButton>
+              )}
             </div>
           </div>
         </div>

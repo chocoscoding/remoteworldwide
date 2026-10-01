@@ -48,8 +48,8 @@ export function dismissRepair() {
   return apiPost<StreakItem>(`${STREAK_PATH}/repair/dismiss`);
 }
 
-/** Celebrations shown and freeze notices told, so neither comes back. */
-export function markStreakSeen(input: { milestones?: number[]; freezes?: string[] }) {
+/** Celebrations shown, freeze notices told and a week's card shown (its Monday), so none comes back. */
+export function markStreakSeen(input: { milestones?: number[]; freezes?: string[]; week?: string }) {
   return apiPost<{ seen: true }>(`${STREAK_PATH}/seen`, input);
 }
 
