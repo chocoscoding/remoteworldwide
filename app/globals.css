@@ -1079,3 +1079,17 @@ body {
     animation: none;
   }
 }
+
+/* The /waitlist live-board strip: a slower rail, the second row running the other way, and both
+   holding still under the pointer so a posting can be read. */
+.marquee-track.marquee-slow {
+  animation-duration: 60s;
+}
+
+.marquee-track.marquee-reverse {
+  animation-direction: reverse;
+}
+
+.marquee-hold:hover .marquee-track {
+  animation-play-state: paused;
+}
