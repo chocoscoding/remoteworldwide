@@ -7,7 +7,9 @@ import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PipelineCard from "@/app/components/dashboard/recommend/PipelineCard";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
+import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { BackendError } from "@/app/lib/api/core";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { toPipelineEntry } from "@/app/lib/recommendations/view";
 import { useRecommendation, useWarmPaths } from "@/hooks/queries/useRecommendationsQuery";
 
@@ -18,7 +20,8 @@ import { useRecommendation, useWarmPaths } from "@/hooks/queries/useRecommendati
  * Read from GET /api/recommendations/:id — opening on the list's cached copy
  * when there is one, so a click from the list paints at once. Someone else's
  * id reads exactly like a deleted one (404), and says so without a retry;
- * anything else that fails offers one.
+ * anything else that fails offers one. Recommendations are on Basic and up:
+ * below it nothing is read, and the page says so.
  */
 export interface RecDetailClientProps {
   entryId: string;
@@ -43,7 +46,8 @@ const DetailSkeleton: FC = () => (
 );
 
 const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
-  const query = useRecommendation(entryId);
+  const lock = usePlanLock(BASIC_GATES.recommendations);
+  const query = useRecommendation(entryId, { enabled: !lock.locked });
   // Mapped once per fetch: the day counts are read off the clock here, not on every render.
   const entry = useMemo(() => (query.data ? toPipelineEntry(query.data) : undefined), [query.data]);
   const warmPathAt = useWarmPaths(entry ? [entry.company] : []);
@@ -69,7 +73,13 @@ const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
       </header>
 
       <main className="mx-auto max-w-[760px] px-8 py-7 pb-14">
-        {entry ? (
+        {lock.locked ? (
+          <PlanLockNote
+            gate={BASIC_GATES.recommendations}
+            title="Recommendations come with Basic"
+            body="Your recommendations are kept. Upgrade to read them and answer the company's questions."
+          />
+        ) : entry ? (
           <PipelineCard entry={entry} warmPath={warmPathAt(entry.company)} />
         ) : query.isPending ? (
           <DetailSkeleton />

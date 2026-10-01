@@ -17,6 +17,11 @@
 // extension's Edit link arrives here through `/open/letter/<id>`): its words,
 // its look, and the job it was written for.
 //
+// Free keeps one cover letter (owner, 2026-10-01). Every write is a new letter
+// (a job, a tone, a redo) and so is a blank draft, so on Free with one already
+// held those open the upgrade popup instead; editing, revising and printing the
+// one held stay open, and deleting it frees the slot.
+//
 // ── Two things here are deliberate and easy to get wrong ───────────────────
 //
 // 1. TONE COSTS A CREDIT, AND THE SCREEN SAYS SO. Tone is not a filter over one
@@ -44,6 +49,9 @@ import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Pill, { pillVariants } from "@/app/components/dashboard/ui/Pill";
+import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
 import { coverToDocx, coverToMarkdown, letterheadHtml, sanitizeLetterHtml, textToLetterHtml, type Letterhead } from "@/app/lib/export/cover";
@@ -575,6 +583,9 @@ const CoverScreen: FC = () => {
     // Someone's letters, held only while this screen is open.
     gcTime: 0,
   });
+  // Free keeps one letter: once it holds one (on screen, or among the recent ones), another write or a blank draft opens the upgrade popup.
+  const coverLock = usePlanLock(BASIC_GATES.coverLetters);
+  const letterLimited = coverLock.locked && (letterId !== null || (recent.data?.length ?? 0) > 0);
   const spacingCfg = SPACING_CLASS[spacing];
   const downloadFileName = profile?.fullName?.trim() ? `${profile.fullName.trim().replace(/\s+/g, "-")}-Cover-Letter` : "Cover-Letter";
 
@@ -670,6 +681,10 @@ const CoverScreen: FC = () => {
   };
 
   const handlePickJob = async () => {
+    if (letterLimited) {
+      coverLock.upgrade();
+      return;
+    }
     const result = await pickJob(COVER_JOB_SPEC);
     if (result.status !== "picked") return;
     // A new job's letters are not the old job's letters, so the kept drafts go.
@@ -696,6 +711,12 @@ const CoverScreen: FC = () => {
       setDraftSeq((seq) => seq + 1);
       return;
     }
+    // Another tone is another letter.
+    if (letterLimited) {
+      setTone(previous);
+      coverLock.upgrade();
+      return;
+    }
 
     if (await write(linkedJob, next)) return;
     // Nothing was written and the previous letter is still on the page, so the
@@ -707,6 +728,10 @@ const CoverScreen: FC = () => {
   /** Rewrites the current tone from scratch — a genuinely different letter, and another credit. */
   const handleRewrite = async () => {
     if (!linkedJob) return;
+    if (letterLimited) {
+      coverLock.upgrade();
+      return;
+    }
     await write(linkedJob, tone);
   };
 
@@ -745,6 +770,10 @@ const CoverScreen: FC = () => {
   };
 
   const startBlank = () => {
+    if (letterLimited) {
+      coverLock.upgrade();
+      return;
+    }
     reset();
     setDraftSeq((seq) => seq + 1);
     setIsBlankDraft(true);
@@ -890,6 +919,17 @@ const CoverScreen: FC = () => {
 
             {!resume && !resumesPending && <NoResumeNote className="mt-5 max-w-[560px]" />}
 
+            {letterLimited && (
+              <p className="mt-5 max-w-[560px] text-xs leading-relaxed text-black/55">
+                <PlanChip plan="basic" className="mr-1.5 bg-white align-middle" />
+                Free keeps one cover letter. Open yours below to edit or revise it, or{" "}
+                <button type="button" onClick={coverLock.upgrade} className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                  upgrade to Basic
+                </button>{" "}
+                to write more.
+              </p>
+            )}
+
             {recent.data && recent.data.length > 0 && <RecentLetters letters={recent.data} />}
           </div>
         ) : (
@@ -968,6 +1008,14 @@ const CoverScreen: FC = () => {
                         className="text-xs font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
                         Import a resume
                       </Link>
+                    )}
+                    {failure.kind === "plan" && (
+                      <button
+                        type="button"
+                        onClick={coverLock.upgrade}
+                        className="cursor-pointer text-xs font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
+                        Upgrade to Basic
+                      </button>
                     )}
                     {failure.retryable && failure.kind !== "credits" && (
                       <button

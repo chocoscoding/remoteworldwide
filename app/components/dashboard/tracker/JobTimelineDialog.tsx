@@ -11,6 +11,8 @@ import LogoMini from "@/app/components/svg/LogoMini";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import { useSharePost } from "@/hooks/mutations/usePodMutations";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { firstNameOf } from "@/app/lib/dashboard/win";
 import { useWin } from "@/app/components/dashboard/win/WinProvider";
 import type { TrackerCard, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
@@ -160,9 +162,13 @@ const NEXT_STEP_HINT: Record<TrackerColumnId, string> = {
  * "On your pod" shows only once the server stored it; the toast, and the
  * refusal when there is no pod, come from useSharePost. The feed prints no
  * author for the others, so the post carries the profile's first name.
+ *
+ * The pod is on Basic and up: below it the row stays, and pressing it opens
+ * the upgrade popup rather than a post the backend would refuse.
  */
 const SharePodRow: FC<{ card: TrackerCard; columnId: TrackerColumnId }> = ({ card, columnId }) => {
   const sharePost = useSharePost();
+  const podLock = usePlanLock(BASIC_GATES.pod);
   const { profile } = useSettings();
   const [shared, setShared] = useState(false);
 
@@ -178,7 +184,7 @@ const SharePodRow: FC<{ card: TrackerCard; columnId: TrackerColumnId }> = ({ car
       <button
         type="button"
         disabled={shared || sharePost.isPending}
-        onClick={() => sharePost.mutate({ text: milestone }, { onSuccess: () => setShared(true) })}
+        onClick={() => (podLock.locked ? podLock.upgrade() : sharePost.mutate({ text: milestone }, { onSuccess: () => setShared(true) }))}
         className={cn(
           "inline-flex flex-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
           shared

@@ -257,4 +257,9 @@ export interface BillingOverview {
   creditPacks: CreditPack[];
   invoices: Checkout[];
   ledger: LedgerEntry[];
+  /**
+   * Whether the backend locks features below their tier (PLAN_GATES_ENABLED). False unlocks every
+   * control the site locks by plan; absent (an older backend) reads as on.
+   */
+  planGates?: boolean;
 }

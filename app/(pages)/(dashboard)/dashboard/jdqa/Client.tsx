@@ -30,6 +30,7 @@ import {
   CreditCard,
   ExternalLink,
   Loader2,
+  Lock,
   MapPin,
   Mic,
   Repeat2,
@@ -49,6 +50,8 @@ import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSessio
 import InlineTalkBar from "@/app/components/dashboard/voice/InlineTalkBar";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { useVoiceConversation } from "@/app/components/dashboard/voice/useVoiceConversation";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import {
   atsScoreHref,
   coachHref,
@@ -641,6 +644,8 @@ const JdqaScreen: FC = () => {
   };
 
   // Talk mode. A call's answers are stored on the thread, which is read back by id after each turn.
+  // Talking it through is on Basic and up; typing stays free. Below Basic, Talk opens the upgrade popup.
+  const voiceLock = usePlanLock(BASIC_GATES.voice);
   const voiceConfig = useVoiceConfig();
   const talkOn = !!voiceConfig.data?.spokenEnabled && !!voiceConfig.data?.features["job-ask"].enabled;
   const talkThreadRef = useRef<{ savedJobId: string; threadId: string } | null>(null);
@@ -681,13 +686,15 @@ const JdqaScreen: FC = () => {
   const minutesBack = outOfMinutes ? minutesBackAt(voiceConfig.dataUpdatedAt) : null;
   const talkReason = talkActive
     ? null
-    : minutesBack !== null
-      ? problemCopy({ kind: "minutes", retryAt: minutesBack })
-      : !ready
-        ? "Available once the conversation is open"
-        : busy
-          ? "Wait for the answer to finish"
-          : null;
+    : voiceLock.locked
+      ? "On Basic and up"
+      : minutesBack !== null
+        ? problemCopy({ kind: "minutes", retryAt: minutesBack })
+        : !ready
+          ? "Available once the conversation is open"
+          : busy
+            ? "Wait for the answer to finish"
+            : null;
   const talkLabel = talkActive ? "End voice call" : talkReason ? `Talk about this job. ${talkReason}` : "Talk about this job";
   const talkCaption =
     talk.state !== "live" ? "" : talk.agentCaption ? `Answer: ${talk.agentCaption}` : talk.userCaption ? `You: ${talk.userCaption}` : "";
@@ -706,6 +713,10 @@ const JdqaScreen: FC = () => {
     if (talkActive) {
       typeFocusRef.current = true;
       endTalk();
+      return;
+    }
+    if (voiceLock.locked) {
+      voiceLock.upgrade();
       return;
     }
     if (!job || !threadItem) return;
@@ -1090,6 +1101,9 @@ const JdqaScreen: FC = () => {
                       className={talkActive ? undefined : "border-[#222325] br-plain-press"}>
                       {talkActive ? (
                         <Square className="h-3 w-3 fill-current" aria-hidden />
+                      ) : voiceLock.locked ? (
+                        // Kept on screen below Basic: pressing it opens the upgrade popup.
+                        <Lock className="h-3 w-3" aria-hidden />
                       ) : (
                         <AudioLines className="h-3.5 w-3.5" aria-hidden />
                       )}

@@ -12,7 +12,7 @@ import type { VoiceConversationConflict, VoiceFeature } from "./conversation";
 export const TALK_PHASES = ["idle", "checking-mic", "minting", "connecting", "live", "ending", "ended"] as const;
 export type TalkPhase = (typeof TALK_PHASES)[number];
 
-export const TALK_PROBLEM_KINDS = ["mic", "conflict", "session", "minutes", "rate", "unavailable", "dropped"] as const;
+export const TALK_PROBLEM_KINDS = ["mic", "conflict", "session", "minutes", "rate", "plan", "unavailable", "dropped"] as const;
 export type TalkProblemKind = (typeof TALK_PROBLEM_KINDS)[number];
 
 export interface TalkProblem {
@@ -165,6 +165,8 @@ export function problemCopy(problem: TalkProblem, formatTime: (iso: string) => s
     }
     case "rate":
       return "Too many calls started — try again in a few minutes";
+    case "plan":
+      return "Talking it through is on Basic and up — type instead";
     case "unavailable":
       return problem.browser ? "Voice calls don't work in this browser yet — type instead" : "Voice isn't available right now";
     case "dropped":
@@ -175,8 +177,9 @@ export function problemCopy(problem: TalkProblem, formatTime: (iso: string) => s
 /**
  * What a problem offers besides typing. `end-other` hangs up the call named in
  * the conflict and tries once more; `retry` just tries again. Minutes, the
- * start limit, a session that can't take a call and a browser that can't run
- * one offer nothing: a retry now would only fail again.
+ * start limit, a session that can't take a call, a plan below Basic (the
+ * upgrade popup has already opened) and a browser that can't run one offer
+ * nothing: a retry now would only fail again.
  */
 export function problemAction(problem: TalkProblem): "retry" | "end-other" | null {
   switch (problem.kind) {
@@ -190,6 +193,7 @@ export function problemAction(problem: TalkProblem): "retry" | "end-other" | nul
     case "session":
     case "minutes":
     case "rate":
+    case "plan":
       return null;
   }
 }

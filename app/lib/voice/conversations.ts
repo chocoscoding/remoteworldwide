@@ -10,7 +10,7 @@
 // logs it, stores it or puts it in an error.
 
 import { apiGet } from "@/app/lib/api/client";
-import { BackendError } from "@/app/lib/api/core";
+import { BackendError, signalPlanLimit } from "@/app/lib/api/core";
 import {
   VOICE_FEATURES,
   type MintVoiceConversationInput,
@@ -26,6 +26,8 @@ export const VOICE_PATH = "/api/ai/voice";
 const CONVERSATIONS_PATH = `${VOICE_PATH}/conversations`;
 export const RELEASE_PATH = `${CONVERSATIONS_PATH}/release`;
 
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
 /** A non-2xx answer whose `data` says more than the status: see the readers below. */
 export class VoiceRequestError extends BackendError {
   constructor(
@@ -33,12 +35,12 @@ export class VoiceRequestError extends BackendError {
     message: string,
     public readonly data: unknown,
   ) {
-    super(status, message);
+    // A 403's `data` is the plan refusal ("plan_required" and the plan it names), as on every call.
+    const reason = isRecord(data) ? data : {};
+    super(status, message, typeof reason.code === "string" ? reason.code : null, typeof reason.requiredPlan === "string" ? reason.requiredPlan : null);
     this.name = "VoiceRequestError";
   }
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
 const FEATURES: ReadonlySet<string> = new Set(VOICE_FEATURES);
 
@@ -54,7 +56,10 @@ async function postKeepingData<T>(path: string, body: unknown, keepalive = false
   const json = (await res.json().catch(() => null)) as { data?: unknown; message?: unknown } | null;
   if (!res.ok) {
     const message = typeof json?.message === "string" ? json.message : res.statusText;
-    throw new VoiceRequestError(res.status, message, json?.data ?? null);
+    const error = new VoiceRequestError(res.status, message, json?.data ?? null);
+    // Talking it through is on Basic and up: a page that thought otherwise opens the upgrade popup.
+    if (error.code === "plan_required") signalPlanLimit({ kind: "plan", message, requiredPlan: error.requiredPlan });
+    throw error;
   }
   return json?.data as T;
 }
@@ -71,6 +76,7 @@ export function getVoiceConfig(signal?: AbortSignal) {
 /**
  * Mints one conversation. Reserves nothing: the call is metered once it
  * connects. Refusals reject with a VoiceRequestError:
+ *  - 403: the account's plan is below the feature's (`code` "plan_required");
  *  - 409: a call is already live (`conversationConflictOf`);
  *  - 429: today's minutes are used, or too many calls were started (`voiceLimitedOf`);
  *  - 503: spoken conversations are switched off (`isVoiceUnavailable`).
@@ -144,9 +150,11 @@ export function isVoiceUnavailable(error: unknown): boolean {
 export type MintRefusal =
   | { kind: "conflict"; conflict: VoiceConversationConflict }
   | { kind: "minutes" | "rate"; retryAt?: string }
+  | { kind: "plan" }
   | { kind: "unavailable" };
 
 export function mintRefusalOf(error: unknown, now: number = Date.now()): MintRefusal {
+  if (error instanceof BackendError && error.code === "plan_required") return { kind: "plan" };
   const conflict = conversationConflictOf(error);
   if (conflict) return { kind: "conflict", conflict };
   const limited = voiceLimitedOf(error);

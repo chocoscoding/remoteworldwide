@@ -10,6 +10,8 @@ import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { COLUMN_LABELS, COLUMN_META, STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
@@ -100,6 +102,7 @@ type RoadDates = Record<string, Date | undefined>;
 const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) => {
   // Read once, lazily — today anchors the road's date math and stays stable.
   const [today] = useState(() => new Date());
+  const { locked: podLocked } = usePlanLock(BASIC_GATES.pod);
 
   const [step, setStep] = useState(0);
 
@@ -500,8 +503,9 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
           {step === 3 && (
             <p className="flex flex-none items-center gap-1.5 border-t border-black/8 bg-[#fbfbf7] px-6 py-2.5 text-[11px] text-black/50">
               <Trophy className="h-3 w-3 flex-none" />
-              Logging your win retires your {streak}-day streak at its final count and puts the news on your pod&apos;s board — no buttons,
-              it just happens.
+              {/* The pod is on Basic and up; below it the win is not posted there (WinProvider). */}
+              Logging your win retires your {streak}-day streak at its final count{podLocked ? "" : " and puts the news on your pod's board"} — no
+              buttons, it just happens.
             </p>
           )}
         </DialogPrimitive.Content>

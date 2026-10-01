@@ -24,7 +24,7 @@ import { PLAN_TIER_NAMES, isPlanTier, tierAllows, upgradeTierFor, type Plan, typ
 
 interface PlanGate {
   tier: PlanTier;
-  /** True when the account's tier is `min` or above. */
+  /** True when the account's tier is `min` or above, or the backend has the plan gates switched off. */
   allows: (min: PlanTier) => boolean;
   openUpgrade: (detail: PlanLimitDetail) => void;
 }
@@ -66,11 +66,13 @@ const PlanOffer: FC<{ plan: Plan; reserved: boolean; busy: boolean; onChoose: ()
 );
 
 export const PlanGateProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { subscription, plans, creditPacks, busy, buyPlan, buyCredits } = useBilling();
+  const { subscription, plans, creditPacks, busy, buyPlan, buyCredits, planGates } = useBilling();
   const [detail, setDetail] = useState<PlanLimitDetail | null>(null);
 
   const tier: PlanTier = isPlanTier(subscription.tier) ? subscription.tier : "free";
-  const allows = useCallback((min: PlanTier) => tierAllows(tier, min), [tier]);
+  // PLAN_GATES_ENABLED=false on the backend unlocks every locked control too, not just the routes.
+  const gated = planGates !== false;
+  const allows = useCallback((min: PlanTier) => !gated || tierAllows(tier, min), [gated, tier]);
   const openUpgrade = useCallback((next: PlanLimitDetail) => setDetail(next), []);
 
   useEffect(() => {

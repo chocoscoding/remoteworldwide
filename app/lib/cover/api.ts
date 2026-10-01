@@ -207,6 +207,8 @@ export const updateLetter = (id: string, patch: LetterPatch, options: { keepaliv
 export type CoverFailureKind =
   /** Too few credits. Nothing was written or charged. */
   | "credits"
+  /** Free keeps one cover letter, and this would be another. Nothing was written or charged. */
+  | "plan"
   /** No resume the writer can read — none imported, or the one named never parsed. */
   | "resume"
   | "failed";
@@ -225,6 +227,8 @@ export function describeCoverFailure(error: unknown): CoverFailure {
   if (error instanceof BackendError) {
     // Retryable: people top up in another tab and come back to the same job.
     if (error.status === 402) return { kind: "credits", message: error.message, retryable: true };
+    // Not retryable: the same letter would be refused the same way until the plan changes.
+    if (error.code === "plan_required") return { kind: "plan", message: error.message, retryable: false };
     // 404 is a resume that is not this user's; 422 is one with nothing to write
     // from. Both are answered by choosing or importing a different resume, so
     // they read as the same kind of problem to the person looking at the screen.

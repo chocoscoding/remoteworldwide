@@ -30,11 +30,11 @@ export const RECOMMENDATION_DEFAULT_EXPIRY_DAYS = 7;
 
 /**
  * Reviewers only pick from complete profiles with a master resume, from people
- * who have left "Let recruiters find me" on (`discoverable`). The server owns
- * the rule (and the labels); the ids are here so the screen can link each one
- * to where it is fixed.
+ * who have left "Let recruiters find me" on (`discoverable`) and are on Basic
+ * or higher (`plan`, owner 2026-10-01). The server owns the rule (and the
+ * labels); the ids are here so the screen can link each one to where it is fixed.
  */
-export const ELIGIBILITY_REQUIREMENTS = ["fullName", "headline", "summary", "location", "timezone", "skills", "targetRoles", "masterResume", "discoverable"] as const;
+export const ELIGIBILITY_REQUIREMENTS = ["fullName", "headline", "summary", "location", "timezone", "skills", "targetRoles", "masterResume", "discoverable", "plan"] as const;
 export type EligibilityRequirement = (typeof ELIGIBILITY_REQUIREMENTS)[number];
 
 export interface EligibilityItem {

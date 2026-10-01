@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
+import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import { useApplications } from "@/hooks/queries/useApplicationsQuery";
 import { usePodOverview } from "@/hooks/queries/usePodQuery";
@@ -17,6 +19,7 @@ import { useInviteLink, useInviteSummary } from "@/hooks/queries/useInviteSummar
 import { useSharePost } from "@/hooks/mutations/usePodMutations";
 import { podPostAuthor, trackedLink } from "@/app/lib/dashboard/win";
 import { qk } from "@/app/lib/query/keys";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import type { ApplicationItem } from "@/app/lib/applications/types";
 import type { Settings } from "@/app/lib/settings/types";
 
@@ -125,8 +128,10 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
   const queryClient = useQueryClient();
   const name = profile.fullName.trim();
   const applications = useApplications({ enabled: open });
-  // Only asked for while open: whether there is a pod to post to, and who is in it.
-  const podQuery = usePodOverview({ enabled: open });
+  // Only asked for while open: whether there is a pod to post to, and who is in it. The pod is on
+  // Basic and up, so below it nothing is asked and the row says so.
+  const podLock = usePlanLock(BASIC_GATES.pod);
+  const podQuery = usePodOverview({ enabled: open && !podLock.locked });
   const inviteLink = useInviteLink();
   const invites = useInviteSummary();
   const sharePost = useSharePost();
@@ -366,7 +371,21 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
 
               {/* The pod — the people who actually cheer. Real members, real post. */}
               <div className="mt-4 w-full rounded-xl border border-black/10 px-4 py-3 text-left">
-                {podQuery.isPending ? (
+                {podLock.locked ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="flex min-w-0 items-center gap-2 text-xs text-black/60">
+                      <PlanChip plan="basic" className="flex-none" />
+                      Pods, where a win gets cheered, come with Basic.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={podLock.upgrade}
+                      className="inline-flex flex-none cursor-pointer items-center gap-1 text-xs font-semibold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                      Upgrade
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : podQuery.isPending ? (
                   <p className="text-xs text-black/50">Checking your pod…</p>
                 ) : pod ? (
                   <div className="flex items-center gap-3">

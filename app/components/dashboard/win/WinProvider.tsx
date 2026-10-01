@@ -14,16 +14,23 @@
 // `usePod()`: this provider sits in the shell, above the pod screen's
 // LivePodProvider, so the context it can reach is the walkthrough's mock —
 // which would post nowhere and toast that the pod knows.
+//
+// The pod is on Basic and up (owner, 2026-10-01). Below it the win is still
+// logged and celebrated, and the streak still retires; only the pod post is
+// left out, rather than sent for a refusal that would open the upgrade popup
+// on top of the celebration.
 
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { useRecordJobWin } from "@/hooks/mutations/usePodMutations";
 import WinLogDialog from "./WinLogDialog";
 import WinCelebrationDialog from "./WinCelebrationDialog";
 import { podPostAuthor, podWinBody, type WinRecord } from "@/app/lib/dashboard/win";
 import { qk } from "@/app/lib/query/keys";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import type { Settings } from "@/app/lib/settings/types";
 
 interface WinContextValue {
@@ -38,6 +45,7 @@ const WinCtx = createContext<WinContextValue | null>(null);
 const WinProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { current, retiredStreak, markHired } = useActivity();
   const recordJobWin = useRecordJobWin();
+  const podLock = usePlanLock(BASIC_GATES.pod);
   const { profile, privacy } = useSettings();
   const queryClient = useQueryClient();
 
@@ -59,7 +67,7 @@ const WinProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // Named only while the SAVED privacy lets the pod see who you are — what the
     // board shows them — not an unsaved toggle on the privacy screen.
     const saved = queryClient.getQueryData<Settings>(qk.settings.me())?.privacy ?? privacy;
-    recordJobWin.mutate(podWinBody(record, podPostAuthor(profile.fullName, saved.showProfileToPod !== false)));
+    if (!podLock.locked) recordJobWin.mutate(podWinBody(record, podPostAuthor(profile.fullName, saved.showProfileToPod !== false)));
     setCelebrationOpen(true);
   }
 

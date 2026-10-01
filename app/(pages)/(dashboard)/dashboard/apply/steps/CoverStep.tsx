@@ -21,7 +21,9 @@ import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { APPLICATION_LIMITS } from "@/app/lib/applications/types";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { COVER_BILLING_HREF, COVER_CREDITS, COVER_TONES, TONE_PARAGRAPHS, type CoverLetterContent, type CoverTone } from "@/app/lib/cover/api";
 import { useCoverLetter } from "@/hooks/mutations/useCoverLetter";
 import type { StartedJob } from "../job";
@@ -56,6 +58,7 @@ type Shown = CoverTone | "own";
 
 const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, letter, onLetterChange, skipped, onSkippedChange, onPickResume }) => {
   const cover = useCoverLetter();
+  const coverLock = usePlanLock(BASIC_GATES.coverLetters);
   const [tone, setTone] = useState<CoverTone>("warm");
   const [shown, setShown] = useState<Shown | null>(null);
   // Each tone's latest text, edits included, so going back to one is free.
@@ -216,6 +219,12 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, letter, onLe
             {cover.failure.kind === "resume" && (
               <StickerButton variant="outline" size="sm" onClick={onPickResume}>
                 Pick another resume
+              </StickerButton>
+            )}
+            {/* Free keeps one cover letter: the service refused another, and the popup has opened. */}
+            {cover.failure.kind === "plan" && (
+              <StickerButton variant="outline" size="sm" onClick={coverLock.upgrade}>
+                Upgrade to Basic
               </StickerButton>
             )}
           </div>

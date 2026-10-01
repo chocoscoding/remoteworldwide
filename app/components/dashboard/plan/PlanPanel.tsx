@@ -12,6 +12,10 @@
 // The data is `useTasks(period)`, the unfiltered list, so the header can count
 // done against everything on the plan; every write goes through
 // hooks/mutations/useTaskMutations.ts.
+//
+// The plan is on Basic and up (owner, 2026-10-01). Below it the panel reads
+// nothing and says so, in its own look, with the way to upgrade; the tasks a
+// Free account already has are kept and come back with the plan.
 
 import { FC, KeyboardEvent, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
@@ -19,9 +23,11 @@ import { ArrowUpRight, Loader2, Plus, RotateCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
+import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import { apiMessage } from "@/app/lib/api/core";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { comparePlanRows, isOnPlan, planProgress, taskHref } from "@/app/lib/tasks/api";
 import { TASK_LIMITS, type TaskItem } from "@/app/lib/tasks/types";
 import { useTasks } from "@/hooks/queries/useTasksQuery";
@@ -457,7 +463,7 @@ const CardPlan: FC<ViewProps> = ({ plan, title, headingId, allowAdd, className }
 
 // ---------------------------------------------------------------------------
 
-const PlanPanel: FC<PlanPanelProps> = ({ period, variant, title = "This month's plan", limit, allowAdd = true, className }) => {
+const LivePlanPanel: FC<PlanPanelProps> = ({ period, variant, title = "This month's plan", limit, allowAdd = true, className }) => {
   const plan = usePlanPanel(period, limit);
   const headingId = useId();
   return variant === "dark-rail" ? (
@@ -465,6 +471,34 @@ const PlanPanel: FC<PlanPanelProps> = ({ period, variant, title = "This month's 
   ) : (
     <CardPlan plan={plan} title={title} headingId={headingId} allowAdd={allowAdd} className={className} />
   );
+};
+
+const LOCKED_TITLE = "Your daily plan comes with Basic";
+const LOCKED_BODY = "Tasks picked for your search, added by you or by your coach.";
+
+/** Below Basic: the same frame, nothing fetched, and the way to the plan. */
+const LockedPlanPanel: FC<PlanPanelProps> = ({ variant, title = "This month's plan", className }) => {
+  const headingId = useId();
+  return variant === "dark-rail" ? (
+    <section aria-labelledby={headingId} className={cn("flex min-h-0 flex-[1_1_37%] flex-col px-3 pb-3.5 pt-3", className)}>
+      <p id={headingId} className="mb-1.5 flex-none px-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-white/45">
+        {title}
+      </p>
+      <PlanLockNote gate={BASIC_GATES.dailyPlan} tone="dark" title={LOCKED_TITLE} body={LOCKED_BODY} />
+    </section>
+  ) : (
+    <DashCard role="region" aria-labelledby={headingId} className={cn("p-6", className)}>
+      <p id={headingId} className="mb-4 text-[15px] font-bold text-primary">
+        {title}
+      </p>
+      <PlanLockNote gate={BASIC_GATES.dailyPlan} title={LOCKED_TITLE} body={LOCKED_BODY} />
+    </DashCard>
+  );
+};
+
+const PlanPanel: FC<PlanPanelProps> = (props) => {
+  const { locked } = usePlanLock(BASIC_GATES.dailyPlan);
+  return locked ? <LockedPlanPanel {...props} /> : <LivePlanPanel {...props} />;
 };
 
 export default PlanPanel;

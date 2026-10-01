@@ -20,7 +20,9 @@ import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { apiMessage } from "@/app/lib/api/core";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import type { AcceptProposalResult, CoachProposalItem } from "@/app/lib/coach/types";
 import { useAcceptCoachProposal, useDismissCoachProposal, useProposalState } from "@/hooks/mutations/useCoachProposal";
 
@@ -49,6 +51,7 @@ const ProposalCard: FC<ProposalCardProps> = ({ proposal: given }) => {
   const proposal = useProposalState(given);
   const headingId = useId();
   const accept = useAcceptCoachProposal();
+  const planLock = usePlanLock(BASIC_GATES.dailyPlan);
   const dismiss = useDismissCoachProposal();
   const [chosen, setChosen] = useState<ReadonlySet<number>>(() => new Set(given.tasks.map((_, index) => index)));
   // Which button was pressed last, so a failed Not now is not reported under a later Add to plan.
@@ -140,6 +143,11 @@ const ProposalCard: FC<ProposalCardProps> = ({ proposal: given }) => {
 
   const onAdd = () => {
     if (busy || chosen.size === 0) return;
+    // The plan is on Basic and up: below it, adding opens the upgrade popup, and the card stays open.
+    if (planLock.locked) {
+      planLock.upgrade();
+      return;
+    }
     setLastAction("accept");
     focusOutcome.current = true;
     accept.mutate(

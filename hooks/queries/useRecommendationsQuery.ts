@@ -21,12 +21,16 @@ import type { RecommendationItem } from "@/app/lib/recommendations/types";
 import { useContacts } from "./useContactsQuery";
 import { platformJobSearchQuery } from "./useJobQueries";
 
-/** Every recommendation, live and closed, newest first. */
-export function useRecommendations() {
+/**
+ * Every recommendation, live and closed, newest first. Recommendations are on Basic and up, so a
+ * screen below it passes `enabled: false` rather than a request the backend would refuse.
+ */
+export function useRecommendations({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: qk.recommendations.list(),
     queryFn: ({ signal }) => listRecommendations(signal),
     staleTime: STALE_TIME.recommendations,
+    enabled,
   });
 }
 
@@ -49,12 +53,13 @@ export function useRecommendationEligibility() {
  * against the server. A 404 is final — someone else's id, or one deleted — so
  * it is not retried.
  */
-export function useRecommendation(id: string) {
+export function useRecommendation(id: string, { enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
   return useQuery<RecommendationItem>({
     queryKey: qk.recommendations.detail(id),
     queryFn: ({ signal }) => getRecommendation(id, signal),
     staleTime: STALE_TIME.recommendations,
+    enabled,
     retry: shouldRetry,
     placeholderData: () => queryClient.getQueryData<RecommendationItem[]>(qk.recommendations.list())?.find((r) => r.id === id),
   });

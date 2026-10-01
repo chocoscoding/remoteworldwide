@@ -9,11 +9,13 @@ import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import SlidingTabs, { slidingTabId, slidingTabPanelId } from "@/app/components/dashboard/ui/SlidingTabs";
 import AddToPlanButton from "@/app/components/dashboard/plan/AddToPlanButton";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { apiMessage } from "@/app/lib/api/core";
 import { formatsLabel } from "@/app/lib/dashboard/prep-data";
 import type { ActionItem, DimensionScore, LanguageStat, PrepSession, PrepTrack, TranscriptTurn } from "@/app/lib/dashboard/prep-data";
 import { trackHref } from "@/app/lib/prep/tracks";
 import { qk } from "@/app/lib/query/keys";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { TASK_LIMITS, periodOf, type TaskInput, type TaskItem } from "@/app/lib/tasks/types";
 import { withoutAudioTags } from "@/app/lib/voice/audioTags";
 import { FLAG_KIND_META, SEVERITY_LABELS, formatMeasure, numberAnswers } from "@/app/lib/voice/format";
@@ -281,7 +283,10 @@ const PrepReport: FC<PrepReportProps> = ({
   // rests on a session too short to charge, and without a score there are too
   // few judged dimensions to rank, so neither adds anything by itself. Their
   // actions can still be added one at a time below.
-  const autoPlanDue = display.kind === "scored";
+  // The plan is on Basic and up: an account below it (one that has moved down
+  // since the session) gets nothing added, rather than a refusal on opening.
+  const planLock = usePlanLock(BASIC_GATES.dailyPlan);
+  const autoPlanDue = display.kind === "scored" && !planLock.locked;
   const planRef = session.serverId ?? session.id;
   useEffect(() => {
     if (!autoPlanDue || autoPlannedSessions.has(planRef)) return;

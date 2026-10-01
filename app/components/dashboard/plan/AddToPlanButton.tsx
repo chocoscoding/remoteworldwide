@@ -23,12 +23,17 @@
 // A dedupeKey names a suggestion across months, so a click can land on the task
 // an earlier month's plan already holds. That still reads "Added", with the
 // month named beside it, because no view of this month's plan will show it.
+//
+// The plan is on Basic and up. Below it the button stays, reads nothing, and
+// opens the upgrade popup when pressed.
 
 import { FC, useState } from "react";
 import { Check, Loader2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { apiMessage } from "@/app/lib/api/core";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { isOnPlan } from "@/app/lib/tasks/api";
 import { periodOf, type TaskInput, type TaskItem, type UserRouteSourceKind } from "@/app/lib/tasks/types";
 import { useTasks } from "@/hooks/queries/useTasksQuery";
@@ -77,7 +82,8 @@ const AddToPlanButton: FC<AddToPlanButtonProps> = ({ task, source, size = "sm", 
   const [mountPeriod] = useState(() => periodOf(new Date()));
   const period = task.period ?? mountPeriod;
 
-  const plan = useTasks(period);
+  const lock = usePlanLock(BASIC_GATES.dailyPlan);
+  const plan = useTasks(period, undefined, { enabled: !lock.locked });
   const create = useCreateTasks({ toastErrors: false });
   const reopen = useUpdateTask({ toastErrors: false });
   const [stored, setOutcome] = useState<Outcome | null>(null);
@@ -96,6 +102,10 @@ const AddToPlanButton: FC<AddToPlanButtonProps> = ({ task, source, size = "sm", 
   const label = pending ? "Adding…" : added ? "Added" : "Add to plan";
 
   const add = () => {
+    if (lock.locked) {
+      lock.upgrade();
+      return;
+    }
     if (inert) return;
     // Fixed at the click, so an answer that arrives after the suggestion changed is filed under the one it was for.
     const target = suggestion;

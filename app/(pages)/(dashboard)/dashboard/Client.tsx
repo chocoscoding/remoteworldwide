@@ -16,11 +16,13 @@ import AtRiskBanner from "@/app/components/dashboard/streak/AtRiskBanner";
 import ProofOfProgress from "@/app/components/dashboard/ProofOfProgress";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
+import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { COLUMN_LABELS, STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
 import { ACTION_KINDS, type ActionKind } from "@/app/lib/dashboard/activity";
 import { dayKey, fromDayKey, addDays, weekdayIndex, dayVisual, tierFor } from "@/app/lib/dashboard/streak";
 import { clampTarget, dailyMath, TARGET_STEP, HIGH_VOLUME_THRESHOLD, TARGET_MAX, TARGET_MIN } from "@/app/lib/dashboard/goals";
 import type { TrackerColumnId } from "@/app/lib/dashboard/types";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { comparePlanRows, taskHref } from "@/app/lib/tasks/api";
 import { periodOf, type TaskItem, type TaskSourceKind } from "@/app/lib/tasks/types";
 import { useMarkTasksSeen } from "@/hooks/mutations/useTaskMutations";
@@ -178,7 +180,9 @@ const HomeClient: FC = () => {
   const [planPeriod] = useState(() => periodOf(new Date()));
   // The unfiltered list: the cache entry the plan panel and every "Add to plan"
   // button already share, rather than a second request for open tasks alone.
-  const plan = useTasks(planPeriod);
+  // The plan is on Basic and up: below it nothing is read, and the card says so.
+  const planLock = usePlanLock(BASIC_GATES.dailyPlan);
+  const plan = useTasks(planPeriod, undefined, { enabled: !planLock.locked });
   const markTasksSeen = useMarkTasksSeen();
   const { nextActions, moreOnPlan } = useMemo(() => {
     const open = (plan.data ?? []).filter((task) => task.status === "open").sort(comparePlanRows);
@@ -579,6 +583,14 @@ const HomeClient: FC = () => {
           <DashCard className="p-6">
             <p className="text-[15px] font-bold text-primary mb-1">Next best actions</p>
             <p className="text-xs text-black/45 mb-4">The top of this month&apos;s plan, most important first.</p>
+            {planLock.locked ? (
+              <PlanLockNote
+                gate={BASIC_GATES.dailyPlan}
+                title="Your daily plan comes with Basic"
+                body="Tasks picked for your search, added by you or by your coach."
+              />
+            ) : (
+            <>
             <p role="status" className="sr-only">
               {plan.isPending ? "Loading your plan" : ""}
             </p>
@@ -655,6 +667,8 @@ const HomeClient: FC = () => {
                 +{moreOnPlan} more on your plan
                 <ArrowRight aria-hidden className="h-3.5 w-3.5" />
               </Link>
+            )}
+            </>
             )}
           </DashCard>
 

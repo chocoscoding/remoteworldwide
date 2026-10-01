@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import PodClient from "./Client";
 import { LivePodProvider } from "@/app/components/dashboard/pod/LivePodProvider";
+import PodLocked from "@/app/components/dashboard/pod/PodLocked";
+import { BackendError } from "@/app/lib/api/core";
 import { getPodOverview } from "@/libs/pod";
 
 // Auth is already gated in app/(pages)/(dashboard)/dashboard/layout.tsx.
@@ -19,7 +21,13 @@ import { getPodOverview } from "@/libs/pod";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPodPage() {
-  const overview = await getPodOverview();
+  // The pod is on Basic and up. Below it the backend refuses the overview (403
+  // plan_required), an expected answer rather than an error: the screen says so.
+  const overview = await getPodOverview().catch((error: unknown) => {
+    if (error instanceof BackendError && error.code === "plan_required") return null;
+    throw error;
+  });
+  if (!overview) return <PodLocked />;
 
   return (
     <LivePodProvider initial={overview}>

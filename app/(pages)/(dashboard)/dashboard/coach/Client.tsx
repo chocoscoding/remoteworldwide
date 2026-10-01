@@ -13,12 +13,16 @@
 //
 // A new chat costs nothing until its first message: "+" only clears the screen,
 // and the first send creates the session and then streams into it.
+//
+// The coach, talking to it and the plan are on Basic and up (owner, 2026-10-01).
+// On Free the screen stays as it is, past sessions included: Send and Talk open
+// the upgrade popup instead of a request, and the plan in the rail says what it is.
 
 import { FC, FormEvent, Suspense, UIEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ArrowRight, AudioLines, Clock, CreditCard, Loader2, Mic, Plus, RotateCcw, RotateCw, Send, Square, User } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, AudioLines, Clock, CreditCard, Loader2, Lock, Mic, Plus, RotateCcw, RotateCw, Send, Square, User } from "lucide-react";
 import { Lottie } from "lottie-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -27,6 +31,8 @@ import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard
 import LogoMini from "@/app/components/svg/LogoMini";
 import PlanPanel from "@/app/components/dashboard/plan/PlanPanel";
 import ProposalCard from "@/app/components/dashboard/coach/ProposalCard";
+import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
 import InlineTalkBar from "@/app/components/dashboard/voice/InlineTalkBar";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
@@ -46,6 +52,7 @@ import {
 } from "@/app/lib/coach/types";
 import { qk } from "@/app/lib/query/keys";
 import type { Settings } from "@/app/lib/settings/types";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { periodOf } from "@/app/lib/tasks/types";
 import { isTalkActive, problemCopy } from "@/app/lib/voice/talkState";
 import { useCoachSession, useCoachSessions } from "@/hooks/queries/useCoachQueries";
@@ -181,6 +188,7 @@ const TypingBubble: FC = () => (
 
 /** Where the reply would have been: why it isn't, and a Retry that sends the same message under the same id. */
 const FailureRow: FC<{ failure: CoachFailure; onRetry: () => void; retryDisabled: boolean }> = ({ failure, onRetry, retryDisabled }) => {
+  const { upgrade } = usePlanLock(BASIC_GATES.coach);
   const retry = failure.retryable ? (
     <StickerButton variant="outline" size="sm" onClick={onRetry} disabled={retryDisabled}>
       <RotateCcw className="h-3.5 w-3.5" aria-hidden />
@@ -205,6 +213,26 @@ const FailureRow: FC<{ failure: CoachFailure; onRetry: () => void; retryDisabled
                 </Link>
                 {retry}
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // The plan, not a fault: said calmly, with the way on. Nothing was sent or charged.
+  if (failure.kind === "plan") {
+    return (
+      <div className="flex gap-2.5 items-start" role="alert">
+        <CoachBadge />
+        <div className="max-w-[78%] rounded-xl border border-black/12 bg-white px-4 py-3.5">
+          <div className="flex items-start gap-2.5">
+            <Lock className="h-4 w-4 flex-none text-primary mt-0.5" aria-hidden />
+            <div>
+              <p className="text-sm text-black/70 leading-relaxed">{failure.message}</p>
+              <StickerButton variant="outline" size="sm" className="mt-3" onClick={upgrade}>
+                Upgrade to Basic
+              </StickerButton>
             </div>
           </div>
         </div>
@@ -265,6 +293,9 @@ const TurnRows: FC<TurnRowsProps> = ({ turn, userStored, onRetry, retryDisabled 
 const CoachScreen: FC = () => {
   const sessionsQuery = useCoachSessions();
   const { turns, send, retry } = useSendCoachMessage();
+  // Below Basic, Send and Talk open the upgrade popup instead of a request the service would refuse.
+  const coachLock = usePlanLock(BASIC_GATES.coach);
+  const voiceLock = usePlanLock(BASIC_GATES.voice);
   // null = a new chat: the default when you land, and what "+" returns to.
   // Otherwise a session id, or a draft key while a new chat's session is being created.
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -390,11 +421,13 @@ const CoachScreen: FC = () => {
   const minutesBack = outOfMinutes ? minutesBackAt(voiceConfig.dataUpdatedAt) : null;
   const talkReason = talkActive
     ? null
-    : minutesBack !== null
-      ? problemCopy({ kind: "minutes", retryAt: minutesBack })
-      : busy
-        ? "Wait for the coach to finish replying"
-        : null;
+    : voiceLock.locked
+      ? "On Basic and up"
+      : minutesBack !== null
+        ? problemCopy({ kind: "minutes", retryAt: minutesBack })
+        : busy
+          ? "Wait for the coach to finish replying"
+          : null;
   const talkLabel = talkActive ? "End voice call" : talkReason ? `Talk to your coach. ${talkReason}` : "Talk to your coach";
   const talkCaption = talk.state !== "live" ? "" : talk.agentCaption ? `Coach: ${talk.agentCaption}` : talk.userCaption ? `You: ${talk.userCaption}` : "";
   const pendingTalkRef = useRef<string | null>(null);
@@ -413,6 +446,10 @@ const CoachScreen: FC = () => {
     if (talkActive) {
       typeFocusRef.current = true;
       endTalk();
+      return;
+    }
+    if (voiceLock.locked) {
+      voiceLock.upgrade();
       return;
     }
     if (activeSessionId !== null) {
@@ -513,6 +550,11 @@ const CoachScreen: FC = () => {
     e.preventDefault();
     const text = draft.trim();
     if (!text || busy || talking) return;
+    // Kept in the composer: nothing typed is lost on the way to upgrading.
+    if (coachLock.locked) {
+      coachLock.upgrade();
+      return;
+    }
     const turn = send(activeSessionId, text);
     if (!turn) return;
     resetTalk();
@@ -527,7 +569,10 @@ const CoachScreen: FC = () => {
       {/* Header */}
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="min-w-0">
-          <h1 className="text-[17px] font-bold text-primary leading-tight truncate">Career coach</h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="text-[17px] font-bold text-primary leading-tight truncate">Career coach</h1>
+            {coachLock.locked && <PlanChip plan="basic" className="flex-none" />}
+          </div>
           <p className="text-xs text-black/45 truncate">
             {coachingOff ? (
               <>
@@ -670,12 +715,27 @@ const CoachScreen: FC = () => {
                       style={{ width: 220, height: 220 }}
                     />
                   </span>
-                  <p className="text-[15px] font-bold text-primary">Ask your coach anything</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-black/50">
-                    {coachingOff
-                      ? "Type below or tap the mic to start. Your coach knows your profile, but your applications and results are hidden from it in privacy settings."
-                      : "Type below or tap the mic to start. Your coach already knows your profile, applications and results."}
-                  </p>
+                  {coachLock.locked ? (
+                    <>
+                      <p className="text-[15px] font-bold text-primary">Your career coach comes with Basic</p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-black/50">
+                        A coach that knows your profile, applications and results, by text or by voice, plus a daily plan to work from. On Basic, the first 15
+                        replies every day are free.
+                      </p>
+                      <StickerButton variant="outline" size="sm" className="mt-4" onClick={coachLock.upgrade}>
+                        Upgrade to Basic
+                      </StickerButton>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[15px] font-bold text-primary">Ask your coach anything</p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-black/50">
+                        {coachingOff
+                          ? "Type below or tap the mic to start. Your coach knows your profile, but your applications and results are hidden from it in privacy settings."
+                          : "Type below or tap the mic to start. Your coach already knows your profile, applications and results."}
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -817,6 +877,9 @@ const CoachScreen: FC = () => {
                           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                         ) : talkActive ? (
                           <Square className="h-3 w-3 fill-current" aria-hidden />
+                        ) : voiceLock.locked ? (
+                          // Kept on screen below Basic: pressing it opens the upgrade popup.
+                          <Lock className="h-3 w-3" aria-hidden />
                         ) : (
                           <AudioLines className="h-3.5 w-3.5" aria-hidden />
                         )}

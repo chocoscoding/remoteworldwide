@@ -16,7 +16,7 @@
 
 import { apiGet, apiPost } from "@/app/lib/api/client";
 import { createSseParser, type SseFrame } from "@/app/lib/api/sse";
-import { BackendError, apiMessage, revive } from "@/app/lib/api/core";
+import { BackendError, apiMessage, revive, signalPlanLimit } from "@/app/lib/api/core";
 import type {
   AcceptProposalInput,
   AcceptProposalResult,
@@ -105,8 +105,11 @@ export class CoachRequestError extends BackendError {
     status: number,
     message: string,
     public readonly retryAfterMs: number | null,
+    /** "plan_required" and the plan it names, when the account's plan is below the coach's (403). */
+    code: string | null = null,
+    requiredPlan: string | null = null,
   ) {
-    super(status, message);
+    super(status, message, code, requiredPlan);
     this.name = "CoachRequestError";
   }
 }
@@ -228,8 +231,14 @@ async function refusalFrom(res: Response): Promise<CoachRequestError> {
   const json = (await res.json().catch(() => null)) as { message?: unknown; data?: unknown } | null;
   // An empty message falls through to apiMessage's wording for the status.
   const message = typeof json?.message === "string" ? json.message : res.statusText;
+  const data = isRecord(json?.data) ? json.data : null;
+  const code = typeof data?.code === "string" ? data.code : null;
+  const requiredPlan = typeof data?.requiredPlan === "string" ? data.requiredPlan : null;
+  // The coach is on Basic and up: a page that thought otherwise opens the upgrade popup, as
+  // `unwrapEnvelope` does for every other call this stream does not go through.
+  if (code === "plan_required") signalPlanLimit({ kind: "plan", message, requiredPlan });
   // Only the body can say when to retry: the proxy passes no response headers on.
-  return new CoachRequestError(res.status, message, retryAfterFrom(json?.data));
+  return new CoachRequestError(res.status, message, retryAfterFrom(json?.data), code, requiredPlan);
 }
 
 export interface StreamCoachMessageOptions {
@@ -314,6 +323,8 @@ export async function streamCoachMessage(
 export type CoachFailureKind =
   /** Past today's free replies with too few credits. Nothing was generated or stored. */
   | "credits"
+  /** The account's plan is below the coach's (Basic). Nothing was sent; upgrading is the way on. */
+  | "plan"
   /** Too many replies this hour. `retryAt` says when, if the service did. */
   | "limited"
   | "failed";
@@ -350,6 +361,8 @@ export function describeCoachFailure(error: unknown, now: number): CoachFailure 
 
   if (error instanceof BackendError) {
     const message = apiMessage(error);
+    // Not retryable: the same message would be refused the same way until the plan changes.
+    if (error.code === "plan_required") return { kind: "plan", message, retryable: false, retryAt: null };
     const wait = error instanceof CoachRequestError ? error.retryAfterMs : null;
     // Retryable: people top up in another tab and come back to the same message.
     if (error.status === 402) return { kind: "credits", message, retryable: true, retryAt: null };

@@ -14,6 +14,10 @@
 // from your target roles and the roles you've been applying to
 // (lib/dashboard/fit.ts) — computed, never stored, so change a preference or
 // log an application and every card on this screen re-ranks.
+//
+// Being recommended is on Basic and up (owner, 2026-10-01). Below it the list
+// is not read, its section says what the plan adds, and the eligibility
+// checklist carries the plan as one more thing to do. Worth watching stays.
 
 import { FC, useMemo, useState } from "react";
 import Link from "next/link";
@@ -25,6 +29,9 @@ import Pill from "@/app/components/dashboard/ui/Pill";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
+import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
+import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings } from "../settings/SettingsProvider";
 import ClosedRecRow from "@/app/components/dashboard/recommend/ClosedRecRow";
@@ -96,7 +103,8 @@ const RetryCard: FC<{ title: string; onRetry: () => void }> = ({ title, onRetry 
 const RecommendClient: FC = () => {
   const { goals, pausedDaysLeft, resumeSearch } = useActivity();
   const { preferences, profile } = useSettings();
-  const recommendations = useRecommendations();
+  const lock = usePlanLock(BASIC_GATES.recommendations);
+  const recommendations = useRecommendations({ enabled: !lock.locked });
   // The application trend: what you've logged in the tracker lately.
   const applications = useApplications();
   const history: FitHistory = useMemo(() => ({ applied: recentApplications(applications.data ?? []) }), [applications.data]);
@@ -174,6 +182,7 @@ const RecommendClient: FC = () => {
           <Pill variant="neutral" className="hidden sm:inline-flex">
             Picked by our reviewers
           </Pill>
+          {lock.locked && <PlanChip plan="basic" className="flex-none" />}
         </div>
         <div className="flex flex-none items-center gap-4">
           <button
@@ -292,7 +301,13 @@ const RecommendClient: FC = () => {
             )}
           </div>
 
-          {recommendations.isPending ? (
+          {lock.locked ? (
+            <PlanLockNote
+              gate={BASIC_GATES.recommendations}
+              title="Recommendations come with Basic"
+              body="On Basic and up, reviewers can put a strong profile like yours in front of a hiring team. Anything already made for you is kept."
+            />
+          ) : recommendations.isPending ? (
             <PipelineSkeleton />
           ) : recommendations.isError && pipeline.length === 0 ? (
             <RetryCard title="We couldn't load your recommendations." onRetry={() => void recommendations.refetch()} />
