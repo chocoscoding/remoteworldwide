@@ -137,7 +137,7 @@ const KindGroup: FC<{ kind: DictionKind; items: readonly DictionFinding[]; index
               <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.07em] text-black/45">{typed ? "You wrote" : "You said"}</p>
               <p className="text-sm italic leading-relaxed text-black/60">“{finding.quote}”</p>
             </div>
-            <div className="rounded-lg border-2 border-[#222325] p-3 shadow-[3px_3px_0_0_#e1f073]">
+            <div className="rounded-lg border-2 p-3 br-shadow br-lime">
               <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.07em] text-primary">Try instead</p>
               <p className="text-sm leading-relaxed text-primary">{finding.suggestion}</p>
             </div>

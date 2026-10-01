@@ -186,7 +186,7 @@ const StartApplication: FC<StartApplicationProps> = ({ onStart }) => {
               className={cn(
                 "inline-flex items-center gap-2 rounded-md border-[1.5px] px-3.5 py-2 text-sm font-semibold transition-[transform,box-shadow,background-color] duration-100 ease-out cursor-pointer",
                 active
-                  ? "border-[#222325] bg-[#222325] text-white shadow-[2px_2px_0_0_#e1f073]"
+                  ? "bg-[#222325] text-white br-shadow br-lime"
                   : "border-black/15 bg-white text-black/60 hover:border-[#222325] hover:text-primary",
                 "active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
               )}>

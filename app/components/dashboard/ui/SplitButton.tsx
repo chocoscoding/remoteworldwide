@@ -25,8 +25,8 @@ export interface SplitButtonItem {
 export type SplitShadowColor = "#e1f073" | "#ffffff";
 
 const SPLIT_SHADOW: Record<SplitShadowColor, string> = {
-  "#e1f073": "shadow-[2px_2px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073]",
-  "#ffffff": "shadow-[2px_2px_0_0_#ffffff] hover:shadow-[2.5px_2.5px_0_0_#ffffff]",
+  "#e1f073": "br-shadow-press br-lime",
+  "#ffffff": "br-shadow-press br-white",
 };
 
 export interface SplitButtonProps {
@@ -64,7 +64,7 @@ const SplitButton: FC<SplitButtonProps> = ({ label, icon, onClick, items, shadow
     <div ref={wrapRef} className={cn("relative inline-flex", className)}>
       <div
         className={cn(
-          "inline-flex items-stretch rounded-lg border-[1.5px] border-[#222325] bg-[#222325] text-white transition-[transform,box-shadow] duration-100 ease-out active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+          "inline-flex items-stretch rounded-lg bg-[#222325] text-white",
           SPLIT_SHADOW[shadowColor]
         )}>
         <button type="button" onClick={onClick} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold cursor-pointer">
@@ -86,7 +86,7 @@ const SplitButton: FC<SplitButtonProps> = ({ label, icon, onClick, items, shadow
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[190px] overflow-hidden rounded-xl border-[1.5px] border-[#222325] bg-white shadow-[4px_4px_0_0_#222325]">
+          className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[190px] overflow-hidden rounded-xl bg-white br-bold">
           {items.map((item) => (
             <button
               key={item.id}

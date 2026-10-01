@@ -446,7 +446,7 @@ const PodClient: FC = () => {
                   <p className="text-[15px] font-bold text-primary">This week</p>
                   <span
                     title={`Your current streak: ${myStreak} days`}
-                    className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-[#222325] bg-secondary px-2 py-1 text-[11px] font-bold text-primary shadow-[2px_2px_0_0_#222325]">
+                    className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 text-[11px] font-bold text-primary br-shadow">
                     <StreakFlame tier={myTier} size={12} pulse={logPulse} dimmed={myStreak === 0} />
                     {myStreak}d
                   </span>

@@ -177,7 +177,7 @@ const ExperienceEditor: FC<{ rows: ExperienceRow[]; onChange: (rows: ExperienceR
                   }}
                   className={cn(
                     "flex min-w-0 flex-col gap-2 rounded-xl border p-2 transition-all duration-200",
-                    isActive ? "border-[#222325] bg-[#e9e9e4] shadow-[3px_3px_0_0_#e1f073]" : "border-black/15 bg-white hover:border-black/45 hover:bg-[#f8f8f6]",
+                    isActive ? "bg-[#e9e9e4] br-shadow br-lime" : "border-black/15 bg-white hover:border-black/45 hover:bg-[#f8f8f6]",
                   )}>
                   <legend className="sr-only">
                     Role {index + 1} of {rows.length}

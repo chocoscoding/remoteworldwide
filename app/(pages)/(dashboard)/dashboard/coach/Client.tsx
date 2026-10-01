@@ -55,8 +55,8 @@ import { isDraftKey, isTurnInFlight, useSendCoachMessage, type CoachTurn } from 
 
 // Links styled as sticker buttons rather than a <button> nested inside an <a>,
 // which is invalid HTML and gives keyboard users two tab stops for one action.
-const OUTLINE_LINK = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "hover:shadow-[3px_3px_0_0_#e1f073]");
-const PRIMARY_LINK = cn(stickerButtonVariants({ variant: "primary", size: "sm" }), "hover:shadow-[3px_3px_0_0_#e1f073]");
+const OUTLINE_LINK = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "br-lime");
+const PRIMARY_LINK = cn(stickerButtonVariants({ variant: "primary", size: "sm" }), "br-lime");
 
 const PRIVACY_HREF = "/dashboard/settings/privacy";
 
@@ -192,7 +192,7 @@ const FailureRow: FC<{ failure: CoachFailure; onRetry: () => void; retryDisabled
     return (
       <div className="flex gap-2.5 items-start" role="alert">
         <CoachBadge />
-        <div className="max-w-[78%] rounded-xl border-[1.5px] border-[#222325] bg-white px-4 py-3.5 shadow-[3px_3px_0_0_#e1f073]">
+        <div className="max-w-[78%] rounded-xl bg-white px-4 py-3.5 br-shadow br-lime">
           <div className="flex items-start gap-2.5">
             <CreditCard className="h-4 w-4 flex-none text-primary mt-0.5" aria-hidden />
             <div>
@@ -622,7 +622,7 @@ const CoachScreen: FC = () => {
                         // The hard shadow is the SELECTED state only. Putting it
                         // on hover too made every row feel like a heavy button.
                         active
-                          ? "bg-white font-bold text-[#222325] shadow-[2px_2px_0_0_#e1f073]"
+                          ? "bg-white font-bold text-[#222325] br-shadow br-lime"
                           : "bg-transparent font-medium text-white/65 hover:bg-white/10 hover:text-white",
                       )}>
                       {/* An unnamed session pulses lime until its first message names it. */}
@@ -812,7 +812,7 @@ const CoachScreen: FC = () => {
                         onClick={() => void handleTalk()}
                         disabled={talkOpening || talk.state === "ending" || (!talkActive && (busy || outOfMinutes))}
                         aria-label={talkLabel}
-                        className={talkActive ? undefined : "border-[1.5px] border-[#222325] hover:shadow-[2px_2px_0_0_#222325]"}>
+                        className={talkActive ? undefined : "border-[#222325] br-plain-press"}>
                         {talkOpening ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                         ) : talkActive ? (
@@ -831,7 +831,7 @@ const CoachScreen: FC = () => {
                   disabled={!draft.trim() || busy || talking || showTalk}
                   aria-label="Send"
                   title="Send"
-                  className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-[#222325] text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-30 disabled:pointer-events-none">
+                  className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-[#222325] text-white cursor-pointer br-shadow-press br-lime disabled:opacity-30 disabled:pointer-events-none">
                   <Send className="h-4 w-4" />
                 </button>
               </form>

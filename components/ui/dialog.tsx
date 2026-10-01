@@ -48,7 +48,7 @@ const DialogContent = React.forwardRef<
           dialog's text colour and went invisible whenever the top of a modal
           was a dark surface. Painting its own background makes it legible on
           any header, and matches the neobrutalist press used elsewhere. */}
-      <DialogPrimitive.Close className="absolute right-4 top-4 z-20 inline-flex h-7 w-7 items-center justify-center rounded-md border-[1.5px] border-[#222325] bg-white text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-1 disabled:pointer-events-none">
+      <DialogPrimitive.Close className="absolute right-4 top-4 z-20 inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-1 disabled:pointer-events-none">
         <X className="h-3.5 w-3.5" strokeWidth={3} />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

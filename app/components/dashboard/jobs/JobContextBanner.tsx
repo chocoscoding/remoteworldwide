@@ -34,7 +34,7 @@ const JobContextBanner: FC<JobContextBannerProps> = ({ action, role, company, ba
         )}
       </p>
       {backHref && (
-        <Link href={backHref} className={cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "hover:shadow-[3px_3px_0_0_#e1f073]")}>
+        <Link href={backHref} className={cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "br-lime")}>
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
           Back to the job
         </Link>

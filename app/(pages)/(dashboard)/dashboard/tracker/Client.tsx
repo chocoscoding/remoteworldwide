@@ -213,7 +213,7 @@ const TrackerClient: FC = () => {
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded font-semibold whitespace-nowrap transition-all cursor-pointer px-3.5 py-1.5 text-xs",
                   view === v.id
-                    ? "bg-[#222325] text-white shadow-[2px_2px_0_0_#e1f073]"
+                    ? "bg-[#222325] text-white br-shadow br-lime"
                     : "text-black/55 hover:bg-black/[0.04] hover:text-primary",
                 )}>
                 <v.icon className="h-3.5 w-3.5" />
@@ -236,7 +236,7 @@ const TrackerClient: FC = () => {
             onClick={() => setInsightsOpen(true)}
             aria-label="Insights"
             title="Insights"
-            className="inline-flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-primary transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[3px_3px_0_0_#e1f073] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none">
+            className="inline-flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-lg border-[#222325] bg-white text-primary br-plain-press br-lime">
             <ChartNoAxesColumn className="h-4 w-4" />
           </button>
 

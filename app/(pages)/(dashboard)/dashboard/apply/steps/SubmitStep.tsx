@@ -331,7 +331,7 @@ const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, 
                   href={link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={cn(stickerButtonVariants({ variant: "secondary", size: "md" }), "hover:shadow-[4px_4px_0_0_#ffffff]")}>
+                  className={cn(stickerButtonVariants({ variant: "secondary", size: "md" }), "br-white")}>
                   Open the application
                   <ArrowUpRight className="h-4 w-4" />
                 </a>

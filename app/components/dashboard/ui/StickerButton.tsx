@@ -3,25 +3,23 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Primary CTA button for the Job Seeker Dashboard. Hover state renders a
- * flat "sticker" shadow (offset box-shadow + slight translate) instead of a
- * blur/elevation shadow — mirrors the `brutalist-accent` treatment already
- * used in `components/ui/button.tsx`, but as its own cva component per the
- * dashboard's design spec.
+ * Primary CTA button for the Job Seeker Dashboard: flat at rest, a hard
+ * "sticker" shadow on hover, pressed into it on click — the site's
+ * `br-plain-press` (app/globals.css).
  */
 const stickerButtonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap cursor-pointer transition-all disabled:pointer-events-none disabled:opacity-50",
+  "br-plain-press inline-flex items-center justify-center gap-2 rounded-lg font-semibold whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         primary: "bg-[#222325] text-white",
         secondary: "bg-[#e1f073] text-[#222325]",
-        outline: "border-[1.5px] border-[rgba(34,35,37,.18)] bg-white text-[#222325] hover:border-[#222325]",
+        outline: "border-[rgba(34,35,37,.18)] bg-white text-[#222325]",
       },
       size: {
-        sm: "h-8 px-3 text-xs hover:-translate-x-px hover:-translate-y-px",
-        md: "h-9 px-4 text-sm hover:-translate-x-px hover:-translate-y-px",
-        lg: "h-12 px-6 text-base hover:-translate-x-[2px] hover:-translate-y-[2px]",
+        sm: "h-8 px-3 text-xs",
+        md: "h-9 px-4 text-sm",
+        lg: "h-12 px-6 text-base",
       },
     },
     defaultVariants: {
@@ -43,22 +41,11 @@ const stickerButtonVariants = cva(
  */
 export type StickerShadowColor = "#e1f073" | "#ffffff" | "rgba(255,255,255,.3)";
 
-const STICKER_SHADOW_HOVER: Record<StickerShadowColor, Record<"sm" | "md" | "lg", string>> = {
-  "#e1f073": {
-    sm: "hover:shadow-[3px_3px_0_0_#e1f073]",
-    md: "hover:shadow-[4px_4px_0_0_#e1f073]",
-    lg: "hover:shadow-[5px_5px_0_0_#e1f073]",
-  },
-  "#ffffff": {
-    sm: "hover:shadow-[3px_3px_0_0_#ffffff]",
-    md: "hover:shadow-[4px_4px_0_0_#ffffff]",
-    lg: "hover:shadow-[5px_5px_0_0_#ffffff]",
-  },
-  "rgba(255,255,255,.3)": {
-    sm: "hover:shadow-[3px_3px_0_0_rgba(255,255,255,.3)]",
-    md: "hover:shadow-[4px_4px_0_0_rgba(255,255,255,.3)]",
-    lg: "hover:shadow-[5px_5px_0_0_rgba(255,255,255,.3)]",
-  },
+/** The br-* shadow colour for each choice; the faint white has no named class of its own. */
+const STICKER_SHADOW_COLOR: Record<StickerShadowColor, string> = {
+  "#e1f073": "br-lime",
+  "#ffffff": "br-white",
+  "rgba(255,255,255,.3)": "[--br-c:rgba(255,255,255,0.3)]",
 };
 
 export interface StickerButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof stickerButtonVariants> {
@@ -67,12 +54,11 @@ export interface StickerButtonProps extends ButtonHTMLAttributes<HTMLButtonEleme
 
 const StickerButton = forwardRef<HTMLButtonElement, StickerButtonProps>(
   ({ className, variant, size, shadowColor = "#e1f073", type = "button", ...props }, ref) => {
-    const resolvedSize = size ?? "md";
     return (
       <button
         ref={ref}
         type={type}
-        className={cn(stickerButtonVariants({ variant, size }), STICKER_SHADOW_HOVER[shadowColor][resolvedSize], className)}
+        className={cn(stickerButtonVariants({ variant, size }), STICKER_SHADOW_COLOR[shadowColor], className)}
         {...props}
       />
     );

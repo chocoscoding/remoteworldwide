@@ -16,7 +16,7 @@ import { Toaster as Sonner } from "sonner";
 type ToasterProps = ComponentProps<typeof Sonner>;
 
 const TOAST_BASE =
-  "flex items-start gap-3 w-full rounded-xl border-2 border-[#222325] bg-white p-4 text-[#222325] shadow-[4px_4px_0_0_#e1f073]";
+  "flex items-start gap-3 w-full rounded-xl border-2 bg-white p-4 text-[#222325] br-bold br-lime";
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (

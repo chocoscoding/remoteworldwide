@@ -81,7 +81,7 @@ export default function ThumbnailPicker<T extends string = string>({
               onClick={() => onChange(option.id)}
               className={cn(
                 "group relative flex flex-col items-stretch gap-1.5 rounded-lg border bg-white p-2 text-left transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
-                selected ? "border-[#222325] border-2 shadow-[3px_3px_0_0_#e1f073]" : "border-black/10 hover:border-black/25"
+                selected ? "border-2 br-shadow br-lime" : "border-black/10 hover:border-black/25"
               )}>
               {selected && (
                 <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-content-center rounded-full bg-[#222325] text-[#e1f073]">

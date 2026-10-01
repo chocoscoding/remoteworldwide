@@ -29,7 +29,7 @@ const FilterPill: FC<{
       <button
         type="button"
         className={cn(
-          "group inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary pl-3.5 pr-2.5 text-sm font-semibold text-primary shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow,background-color] duration-100 ease-out hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none data-[state=open]:translate-x-[2px] data-[state=open]:translate-y-[2px] data-[state=open]:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+          "group inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full pl-3.5 pr-2.5 text-sm font-semibold text-primary br-shadow-press transition-[transform,box-shadow,background-color] duration-100 ease-out data-[state=open]:translate-x-[2px] data-[state=open]:translate-y-[2px] data-[state=open]:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
           active ? "bg-secondary" : "bg-white",
         )}>
         {icon}

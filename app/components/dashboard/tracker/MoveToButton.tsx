@@ -49,7 +49,7 @@ const MoveToButton: FC<MoveToButtonProps> = ({ current, suggested, onMove }) => 
       {/* One control, two targets: the label commits the suggestion, the arrow
           opens the rest. Split with a divider rather than two buttons so it
           still reads as a single action. */}
-      <div className="inline-flex items-stretch overflow-hidden rounded-lg bg-[#222325] text-white transition-all hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_#e1f073]">
+      <div className="inline-flex items-stretch overflow-hidden rounded-lg bg-[#222325] text-white transition-all br-plain-press br-lime">
         <button
           type="button"
           onClick={() => onMove(suggested)}
@@ -71,7 +71,7 @@ const MoveToButton: FC<MoveToButtonProps> = ({ current, suggested, onMove }) => 
       {open && (
         <div
           role="menu"
-          className="absolute bottom-[calc(100%+6px)] right-0 z-40 min-w-[190px] overflow-hidden rounded-xl border-[1.5px] border-[#222325] bg-white shadow-[4px_4px_0_0_#222325]">
+          className="absolute bottom-[calc(100%+6px)] right-0 z-40 min-w-[190px] overflow-hidden rounded-xl bg-white br-bold">
           {destinations.map((id, i) => {
             const meta = statusMeta(id);
             const firstClosed = isClosedStatus(id) && destinations[i - 1] !== undefined && !isClosedStatus(destinations[i - 1]);

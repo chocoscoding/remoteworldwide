@@ -38,10 +38,9 @@ const SettingsNav: FC = () => {
             aria-current={active ? "page" : undefined}
             className={cn(
               "group flex items-start gap-2.5 rounded-lg border-[1px] px-3 py-2.5 transition-[transform,box-shadow,border-color,background-color] duration-100 ease-out",
-              "active:translate-x-0 active:translate-y-0 active:shadow-none",
               active
-                ? "-translate-x-[2px] -translate-y-[2px] border-[#222325] bg-[#222325] text-white shadow-[4px_4px_0_0_#e1f073]"
-                : "border-[rgba(34,35,37,.16)] bg-white text-black/70 hover:-translate-x-px hover:-translate-y-px hover:border-[#222325] hover:shadow-[3px_3px_0_0_#222325]",
+                ? "-translate-x-[2px] -translate-y-[2px] bg-[#222325] text-white br-bold br-lime"
+                : "border-[rgba(34,35,37,.16)] bg-white text-black/70 br-plain-press",
             )}>
             <item.icon
               className={cn(

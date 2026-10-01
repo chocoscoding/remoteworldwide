@@ -27,7 +27,7 @@ const DANGER_OUTLINE =
   "inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#c0392b]/35 bg-white px-3.5 py-2 text-xs font-bold text-[#b23c26] cursor-pointer transition-colors hover:border-[#b23c26] hover:bg-[#fdeae6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-50";
 
 const DANGER_SOLID =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg border-[1.5px] border-[#8f3120] bg-[#b23c26] px-4 py-2.5 text-sm font-bold text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-60 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0";
+  "inline-flex items-center justify-center gap-1.5 rounded-lg border-[#8f3120] bg-[#b23c26] px-4 py-2.5 text-sm font-bold text-white cursor-pointer br-shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-60 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0";
 
 const isThenable = (value: unknown): value is Promise<unknown> => typeof (value as Promise<unknown> | undefined)?.then === "function";
 

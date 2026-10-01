@@ -27,7 +27,7 @@ const ScrollToTop: FC<{ threshold?: number }> = ({ threshold = 300 }) => {
       onClick={toTop}
       aria-label="Scroll to top"
       className={cn(
-        "fixed bottom-6 right-4 md:right-6 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-white shadow-[2px_2px_0_0_#e1f073] transition-[opacity,transform,visibility,box-shadow] duration-200 ease-out hover:shadow-[3px_3px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2",
+        "fixed bottom-6 right-4 md:right-6 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-white br-shadow-press br-lime transition-[opacity,transform,visibility,box-shadow] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2",
         visible ? "visible opacity-100" : "invisible opacity-0 translate-y-3",
       )}>
       <ArrowUp className="h-5 w-5" aria-hidden />

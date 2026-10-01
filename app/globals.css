@@ -12,6 +12,124 @@ body {
   overscroll-behavior: none;
 }
 
+/*
+ * The site's brutalism, as named classes (owner, 2026-10-02), so it reads in markup instead of
+ * hiding in arbitrary shadow values. Half the site is flat, half brutal; these are the brutal half
+ * and its flat counterpart:
+ *
+ *   br-shadow        ink outline + 2px hard shadow, at rest (chips, tags, small cards)
+ *   br-shadow-press  the same, pressable: the shadow shrinks on hover and the element sinks into
+ *                    it on click (buttons, icon buttons, pills)
+ *   br-bold          1.5px outline + 4px shadow, at rest (the featured card, illustrations)
+ *   br-bold-press    the same, pressable (the big submit buttons)
+ *   br-plain         flat: a hairline, no shadow (the default card or row)
+ *   br-plain-press   flat at rest; outlined with a hard shadow on hover, pressed on click
+ *                    (clickable cards and rows)
+ *
+ * Shadow colour: ink by default; add br-lime or br-white (on dark surfaces). It's a custom
+ * property, so setting it on a container recolours every br-* shadow inside it.
+ * Hover and press also follow a `group` parent, so a pill inside a link reacts to the link.
+ * The shadows go through Tailwind's --tw-shadow, so focus rings stack on top of them and
+ * shadow-none still turns them off. These sit in the components layer: any utility on the same
+ * element (rounded-*, border-secondary, bg-*) wins over them.
+ */
+@layer components {
+  .br-shadow,
+  .br-shadow-press,
+  .br-bold,
+  .br-bold-press,
+  .br-plain,
+  .br-plain-press {
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+  }
+
+  .br-shadow,
+  .br-shadow-press {
+    border: 1px solid #222325;
+    --tw-shadow: 2px 2px 0 0 var(--br-c, #222325);
+  }
+
+  .br-bold,
+  .br-bold-press {
+    border: 1.5px solid #222325;
+    --tw-shadow: 4px 4px 0 0 var(--br-c, #222325);
+  }
+
+  .br-plain,
+  .br-plain-press {
+    border: 1px solid rgb(34 35 37 / 0.12);
+    --tw-shadow: 0 0 #0000;
+  }
+
+  .br-shadow-press,
+  .br-bold-press,
+  .br-plain-press {
+    cursor: pointer;
+    transition:
+      transform 100ms ease-out,
+      box-shadow 100ms ease-out,
+      border-color 150ms ease-out;
+  }
+
+  .br-shadow-press:hover,
+  .group:hover .br-shadow-press {
+    --tw-shadow: 1px 1px 0 0 var(--br-c, #222325);
+  }
+
+  .br-bold-press:hover,
+  .group:hover .br-bold-press {
+    --tw-shadow: 2px 2px 0 0 var(--br-c, #222325);
+  }
+
+  .br-plain-press:hover,
+  .group:hover .br-plain-press {
+    border-color: #222325;
+    --tw-shadow: 2px 2px 0 0 var(--br-c, #222325);
+  }
+
+  .br-shadow-press:active,
+  .group:active .br-shadow-press,
+  .br-plain-press:active,
+  .group:active .br-plain-press {
+    transform: translate(2px, 2px);
+    --tw-shadow: 0 0 #0000;
+  }
+
+  .br-bold-press:active,
+  .group:active .br-bold-press {
+    transform: translate(4px, 4px);
+    --tw-shadow: 0 0 #0000;
+  }
+
+  /* A disabled control doesn't react: it keeps its resting look and never sinks. */
+  .br-shadow-press:is(:disabled, [aria-disabled="true"]) {
+    cursor: default;
+    transform: none;
+    --tw-shadow: 2px 2px 0 0 var(--br-c, #222325);
+  }
+
+  .br-bold-press:is(:disabled, [aria-disabled="true"]) {
+    cursor: default;
+    transform: none;
+    --tw-shadow: 4px 4px 0 0 var(--br-c, #222325);
+  }
+
+  .br-plain-press:is(:disabled, [aria-disabled="true"]) {
+    cursor: default;
+    transform: none;
+    border-color: rgb(34 35 37 / 0.12);
+    --tw-shadow: 0 0 #0000;
+  }
+
+  .br-lime {
+    --br-c: #e1f073;
+  }
+
+  .br-white {
+    --br-c: #ffffff;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

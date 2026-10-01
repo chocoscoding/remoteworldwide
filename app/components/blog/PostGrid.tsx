@@ -14,7 +14,7 @@ const PostGrid: FC<{ posts: PostCardData[] }> = ({ posts }) => (
 
 const PRESS = "transition-[transform,box-shadow] duration-75 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none";
 const PAGE_LINK = cn("inline-flex h-9 min-w-9 items-center justify-center rounded-md px-2 text-sm font-semibold text-primary active:bg-primary/10", PRESS);
-const PAGE_ACTIVE = "inline-flex h-9 min-w-9 items-center justify-center rounded-md border-2 border-primary bg-white px-2 text-sm font-bold text-primary shadow-[3px_3px_0_0_#222325]";
+const PAGE_ACTIVE = "inline-flex h-9 min-w-9 items-center justify-center rounded-md border-2 bg-white px-2 text-sm font-bold text-primary br-shadow";
 const EDGE_LINK = cn("inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-sm font-semibold text-primary active:bg-primary/10", PRESS);
 const EDGE_DISABLED = "inline-flex h-9 items-center gap-1 rounded-md px-2.5 text-sm font-semibold text-primary/35";
 

@@ -132,7 +132,7 @@ const WaitlistForm: FC<{ initialPlan: string | null; initialYearly?: boolean }> 
             className="pointer-events-none !fixed inset-0 z-[60]"
           />
         ) : null}
-        <div className="flex flex-col gap-5 rounded-[22px] border-2 border-primary bg-white p-5 shadow-[6px_6px_0_0_#e1f073] sm:flex-row sm:items-center sm:p-6">
+        <div className="flex flex-col gap-5 rounded-[22px] border border-primary/15 bg-white p-5 sm:flex-row sm:items-center sm:p-6">
           {shown.position !== null ? (
             <div className="flex h-24 w-full flex-none flex-col items-center justify-center rounded-2xl border-2 border-primary bg-secondary sm:w-28">
               <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-primary/60">Your spot</span>

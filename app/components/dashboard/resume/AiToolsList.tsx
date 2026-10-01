@@ -77,7 +77,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
         <div
           key={action.id}
           data-tool={action.id}
-          className={cn("rounded-xl border border-black/8 p-3", preset && "border-[#222325] shadow-[3px_3px_0_0_#e1f073]")}>
+          className={cn("rounded-xl border border-black/8 p-3", preset && "br-shadow br-lime")}>
           <div className="flex items-start gap-2.5">
             <div className="h-8 w-8 flex-none rounded-lg bg-[#f0f0ea] flex items-center justify-center">
               <action.icon className="h-4 w-4 text-primary" />

@@ -29,7 +29,7 @@ export interface CreateCompanyModalProps {
 }
 
 const CLOSE_BUTTON_CLASS =
-  "inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md border-[1.5px] border-[#222325] bg-white text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none";
+  "inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press";
 
 const CreateCompanyModal: FC<CreateCompanyModalProps> = ({
   open,
@@ -71,7 +71,7 @@ const CreateCompanyModal: FC<CreateCompanyModalProps> = ({
             event.preventDefault();
             contentRef.current?.querySelector("input")?.focus();
           }}
-          className="fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100%-2rem)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border-[1.5px] border-[#222325] bg-white shadow-[6px_6px_0_0_#222325] duration-200 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          className="fixed left-1/2 top-1/2 z-50 flex max-h-[88vh] w-[calc(100%-2rem)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl bg-white br-bold duration-200 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="flex flex-none items-start justify-between gap-4 border-b-[1.5px] border-[#222325] px-6 py-5">
             <div>
               <DialogPrimitive.Title className="text-lg font-bold text-primary">Create New Company</DialogPrimitive.Title>
@@ -96,14 +96,14 @@ const CreateCompanyModal: FC<CreateCompanyModalProps> = ({
               <div className="flex flex-none flex-wrap items-center justify-between gap-3 border-t-[1.5px] border-[#222325] bg-[#f9f8f1] px-6 py-4">
                 <Link
                   href={creationPageHref}
-                  className="inline-flex items-center gap-2 rounded-lg border-[1.5px] border-[rgba(34,35,37,.25)] bg-white px-3 py-2 text-xs font-bold text-[#222325] transition-all hover:-translate-x-px hover:-translate-y-px hover:border-[#222325] hover:shadow-[3px_3px_0_0_#222325]">
+                  className="inline-flex items-center gap-2 rounded-lg border-[rgba(34,35,37,.25)] bg-white px-3 py-2 text-xs font-bold text-[#222325] transition-all br-plain-press">
                   <ExternalLink className="h-4 w-4" />
                   Go to company creation page
                 </Link>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="inline-flex items-center gap-2 rounded-lg border-[1.5px] border-[#222325] bg-secondary px-4 py-2 text-sm font-bold text-primary transition-all hover:-translate-x-px hover:-translate-y-px hover:shadow-[4px_4px_0_0_#222325] active:translate-x-0 active:translate-y-0 active:shadow-none disabled:pointer-events-none disabled:opacity-50">
+                  className="inline-flex items-center gap-2 rounded-lg border-[#222325] bg-secondary px-4 py-2 text-sm font-bold text-primary transition-all br-plain-press disabled:pointer-events-none disabled:opacity-50">
                   <Plus className="h-4 w-4" strokeWidth={3} />
                   {isLoading ? "Creating..." : "Create Company"}
                 </button>

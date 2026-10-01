@@ -865,7 +865,7 @@ const CoverScreen: FC = () => {
                 type="button"
                 onClick={handlePickJob}
                 disabled={!resume}
-                className="group rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-5 text-left text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#e1f073] hover:shadow-[4px_4px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:active:translate-x-0 disabled:active:translate-y-0">
+                className="group rounded-2xl bg-[#222325] p-5 text-left text-white cursor-pointer br-shadow-press br-lime disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none">
                 <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
                   <Link2 className="h-4 w-4 text-[#e1f073]" />
                 </span>
@@ -877,7 +877,7 @@ const CoverScreen: FC = () => {
               <button
                 type="button"
                 onClick={startBlank}
-                className="group rounded-2xl border-[1.5px] border-black/15 bg-white p-5 text-left cursor-pointer transition-[transform,box-shadow,border-color] duration-100 ease-out hover:border-[#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none">
+                className="group rounded-2xl bg-white p-5 text-left cursor-pointer br-plain-press">
                 <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
                   <FileSignature className="h-4 w-4 text-primary" />
                 </span>
@@ -909,7 +909,7 @@ const CoverScreen: FC = () => {
                           title={`Open ${linkedJob.company} · ${linkedJob.role}`}
                           className={cn(
                             pillVariants({ variant: "positive" }),
-                            "max-w-full gap-1 transition-shadow duration-100 hover:shadow-[2px_2px_0_0_#222325] hover:underline",
+                            "max-w-full gap-1 br-plain-press hover:underline",
                           )}>
                           <span className="min-w-0 truncate">
                             {linkedJob.company} · {linkedJob.role}

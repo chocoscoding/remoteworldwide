@@ -14,10 +14,9 @@ import { cn } from "@/lib/utils";
  * button on the outside and passes `interactive` so the press states still
  * apply.
  *
- * Motion is on the shadow rather than colour, in two stages: hovering the row
- * grows the shadow by 0.5px so the box lifts without moving, and pressing
- * translates it onto the shadow while the shadow collapses, so it lands flush
- * against the surface.
+ * Motion is on the shadow rather than colour (br-shadow-press, which also
+ * follows a `group` row): hovering shrinks the shadow, and pressing translates
+ * the box onto it while it collapses, so it lands flush against the surface.
  */
 export type NeoCheckboxSize = "sm" | "md";
 
@@ -47,21 +46,15 @@ const NeoCheckbox: FC<NeoCheckboxProps> = ({ checked, size = "md", interactive =
     className={cn(
       "flex-none inline-flex items-center justify-center rounded-[3px] border-2 transition-all",
       SIZE_CLASS[size],
+      // Checked and unchecked share the motion; the fill carries the state.
+      interactive ? "br-shadow-press" : "br-shadow",
       dark
         ? checked
-          ? "bg-secondary border-white text-primary shadow-[2px_2px_0_0_#ffffff]"
-          : "bg-transparent border-white/60 shadow-[2px_2px_0_0_rgba(255,255,255,0.35)]"
+          ? "bg-secondary border-white text-primary br-white"
+          : "bg-transparent border-white/60 [--br-c:rgba(255,255,255,0.35)]"
         : checked
-          ? "bg-secondary border-[#222325] text-[#222325] shadow-[2px_2px_0_0_#222325]"
-          : "bg-white border-[#222325] shadow-[2px_2px_0_0_#222325]",
-      // Hovering the row grows the shadow by 0.5px — the box lifts without
-      // moving. Pressing translates it by the resting shadow's full 2px while
-      // that shadow collapses, so it lands flush and reads as pushed in.
-      // Checked and unchecked share the behaviour; the fill carries the state.
-      interactive && "group-active:translate-x-[2px] group-active:translate-y-[2px] group-active:shadow-none",
-      interactive && !dark && "group-hover:shadow-[2.5px_2.5px_0_0_#222325]",
-      interactive && dark && checked && "group-hover:shadow-[2.5px_2.5px_0_0_#ffffff]",
-      interactive && dark && !checked && "group-hover:shadow-[2.5px_2.5px_0_0_rgba(255,255,255,0.5)]",
+          ? "bg-secondary text-[#222325]"
+          : "bg-white",
       className,
     )}>
     {checked && <Check className={cn(ICON_CLASS[size], "stroke-[3.5]")} />}

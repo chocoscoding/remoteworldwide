@@ -70,11 +70,11 @@ const Page = async ({ params }: Params) => {
             <span className="text-primary">Author</span>
           </nav>
           <div className="mt-6 flex flex-col items-start gap-6 md:flex-row md:items-center md:gap-10">
-            <span className="relative h-32 w-32 flex-none overflow-hidden rounded-full border-[3px] border-primary bg-white shadow-[6px_6px_0_0_#e1f073] md:h-40 md:w-40">
+            <span className="relative h-32 w-32 flex-none overflow-hidden rounded-full border-[3px] bg-white br-bold br-lime md:h-40 md:w-40">
               <Image src={author.profileImage} alt={author.name} fill priority sizes="160px" className="object-cover" />
             </span>
             <div className="min-w-0">
-              <span className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-secondary px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary shadow-[3px_3px_0_0_#222325]">
+              <span className="inline-flex items-center gap-2 rounded-full border-2 bg-secondary px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary br-shadow">
                 {count} {count === 1 ? "post" : "posts"}
               </span>
               <h1 className="mt-4 text-[2.25rem] font-extrabold leading-[1.05] tracking-[-0.025em] text-primary md:text-[3.25rem]">{author.name}</h1>

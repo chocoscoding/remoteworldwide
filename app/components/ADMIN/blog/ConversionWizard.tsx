@@ -39,7 +39,7 @@ const ConversionWizard: FC<{ initial?: ConversionType | null }> = ({ initial = n
               key={c.type}
               type="button"
               onClick={() => setType(c.type)}
-              className="group rounded-2xl border-2 border-[#222325] bg-white p-6 text-left shadow-[4px_4px_0_0_#222325] transition-[transform,box-shadow] duration-100 hover:shadow-[6px_6px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer">
+              className="group rounded-2xl border-2 bg-white p-6 text-left br-bold-press">
               <span className="grid h-10 w-10 place-content-center rounded-lg bg-[#e1f073]">
                 <c.icon className="h-5 w-5 text-[#222325]" />
               </span>

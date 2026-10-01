@@ -124,7 +124,7 @@ const WebReferrals: FC<WebReferralsProps> = ({ savedJobId, company, role, askedI
 
 const StartCard: FC<{ company: string; role: string; onStart: () => void }> = ({ company, role, onStart }) => (
   // The payoff surface: the page's one accent moment until results replace it.
-  <DashCard className="border-[1.5px] border-[#222325] p-6 shadow-[4px_4px_0_0_#e1f073]">
+  <DashCard className="p-6 br-bold br-lime">
     <div className="flex flex-wrap items-center justify-between gap-5">
       <div className="min-w-0 flex-1 basis-[320px]">
         <p className="text-[15px] font-bold text-primary">Find the people who can get you into {company}</p>
@@ -150,7 +150,7 @@ const FailureCard: FC<{ failure: ReferralFailure; onRetry: () => void }> = ({ fa
     </div>
     <div className="flex flex-none items-center gap-2">
       {failure.kind === "credits" && (
-        <Link href={BILLING_HREF} target="_blank" className={cn(stickerButtonVariants({ variant: "primary", size: "sm" }), "hover:shadow-[3px_3px_0_0_#e1f073]")}>
+        <Link href={BILLING_HREF} target="_blank" className={cn(stickerButtonVariants({ variant: "primary", size: "sm" }), "br-lime")}>
           Get credits
         </Link>
       )}
@@ -285,7 +285,7 @@ const PeopleSection: FC<PeopleSectionProps> = ({ title, hint, people, accent, as
         </h3>
         <span className="text-xs text-black/55">{hint}</span>
       </div>
-      <DashCard className={cn("overflow-hidden p-0", accent && "border-[1.5px] border-[#222325] shadow-[4px_4px_0_0_#e1f073]")}>
+      <DashCard className={cn("overflow-hidden p-0", accent && "br-bold br-lime")}>
         <div className="flex flex-col divide-y divide-black/8">
           {shown.map((person) => (
             <PersonRow

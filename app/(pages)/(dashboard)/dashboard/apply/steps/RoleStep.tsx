@@ -135,7 +135,7 @@ const RoleStep: FC<RoleStepProps> = ({ job, duplicate, alreadyTracked = false })
 const DuplicateNote: FC<{ duplicate: ApplicationItem; alreadyTracked: boolean }> = ({ duplicate, alreadyTracked }) => {
   const saved = duplicate.status === "saved";
   return (
-    <div className="flex items-start gap-3 rounded-2xl border-[1.5px] border-[#222325] bg-white p-5 shadow-[4px_4px_0_0_#e1f073]">
+    <div className="flex items-start gap-3 rounded-2xl bg-white p-5 br-bold br-lime">
       <CopyCheck className="mt-0.5 h-4 w-4 flex-none text-primary" aria-hidden />
       <div className="min-w-0">
         <p className="text-sm font-bold text-primary">

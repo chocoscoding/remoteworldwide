@@ -33,7 +33,7 @@ const ExtensionStrip: FC = () => (
         href={EXTENSION_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex flex-none cursor-pointer items-center rounded-md border-[1.5px] border-[#222325] bg-white px-2.5 py-1 text-xs font-bold text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+        className="inline-flex flex-none cursor-pointer items-center rounded-md bg-white px-2.5 py-1 text-xs font-bold text-[#222325] br-shadow-press">
         Get it
         <span className="sr-only"> — the browser extension, in a new tab</span>
       </a>

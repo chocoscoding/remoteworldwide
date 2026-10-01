@@ -217,7 +217,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
     <DialogPrimitive.Root open onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[#222325]/45 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-[500px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border-[1.5px] border-[#222325] bg-white shadow-[6px_6px_0_0_#222325] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-[500px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl bg-white br-bold duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="flex flex-none items-start justify-between gap-4 px-6 pb-4 pt-6">
             <div>
               <div className="mb-2 flex items-center gap-1.5">
@@ -236,7 +236,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                 {step === 3 && "One honest line for the person six weeks behind you."}
               </DialogPrimitive.Description>
             </div>
-            <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md border-[1.5px] border-[#222325] bg-white text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+            <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press">
               <X className="h-3.5 w-3.5" strokeWidth={3} />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
@@ -370,7 +370,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                             // this sibling portal inherits — without the reset
                             // the calendar paints but can't be clicked. The z
                             // keeps it above the dialog's own z-50.
-                            className="pointer-events-auto z-[60] w-auto rounded-xl border-[1.5px] border-[#222325] p-0 shadow-[4px_4px_0_0_#222325]">
+                            className="pointer-events-auto z-[60] w-auto rounded-xl p-0 br-bold">
                             <Calendar
                               mode="single"
                               selected={value}

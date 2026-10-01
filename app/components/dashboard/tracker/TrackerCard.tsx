@@ -57,7 +57,7 @@ export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOp
   if (card.highlighted) {
     const [roundLabel, timeLabel] = (card.statusChip ?? "").split(" · ");
     return (
-      <div className="rounded-sm border-[1.5px] border-primary bg-white p-3.5 shadow-[4px_4px_0_0_#e1f073]">
+      <div className="rounded-sm bg-white p-3.5 br-bold br-lime">
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
             {card.rww && <LogoMini className="h-3.5 w-3.5 flex-none" />}

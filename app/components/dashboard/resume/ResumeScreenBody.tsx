@@ -113,7 +113,7 @@ const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
 // it comes forward: ink border, a hair of hard shadow, and a real press that
 // travels onto that shadow and drops it.
 const ZOOM_BUTTON_CLASS =
-  "grid h-6 w-6 place-content-center rounded-full border border-black/15 bg-white text-sm font-semibold leading-none text-black/70 transition-[transform,box-shadow,background-color,border-color,color] duration-100 ease-out hover:border-[#222325] hover:bg-[#f7f7f7] hover:text-primary hover:shadow-[0.5px_0.5px_0_0_#222325] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none cursor-pointer";
+  "grid h-6 w-6 place-content-center rounded-full bg-white text-sm font-semibold leading-none text-black/70 transition-[transform,box-shadow,background-color,border-color,color] duration-100 ease-out hover:bg-[#f7f7f7] hover:text-primary br-plain-press cursor-pointer";
 
 // What Tailor and the ATS card's "Against a job" read from a picked job. Skills
 // and requirements are asked for but never required: a pasted posting may name
@@ -838,7 +838,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
               </p>
 
               {/* Zoom — a quiet pill that only comes forward on hover. */}
-              <div className="group/zoom flex items-center gap-2 rounded-full border border-black/15 bg-white px-2 py-1 shadow-sm transition-[border-color,box-shadow] duration-100 ease-out hover:border-[#222325] hover:shadow-[1px_1px_0_0_#222325]">
+              <div className="group/zoom flex items-center gap-2 rounded-full bg-white px-2 py-1 shadow-sm transition-[border-color,box-shadow] duration-100 ease-out br-plain-press">
                 <button
                   type="button"
                   aria-label="Zoom out"

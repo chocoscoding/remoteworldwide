@@ -321,7 +321,7 @@ const ReferralsScreen: FC = () => {
                     </h3>
                     <span className="text-xs text-black/55">From your contacts — the warmest way in</span>
                   </div>
-                  <DashCard className="overflow-hidden border-[1.5px] border-[#222325] p-0 shadow-[4px_4px_0_0_#e1f073]">
+                  <DashCard className="overflow-hidden p-0 br-bold br-lime">
                     <div className="flex flex-col divide-y divide-black/8">
                       {shownKnown.map((c) => (
                         <ContactRow

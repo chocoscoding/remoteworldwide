@@ -108,7 +108,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
         }}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#f9f8f1_35%,_rgba(249,248,241,0.6)_70%,_rgba(249,248,241,0.2)_100%)]" />
         <div className="relative mx-auto flex max-w-[1440px] flex-col items-center px-4 pb-14 pt-14 text-center md:pb-20 md:pt-20">
-          <span className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-secondary px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary shadow-[3px_3px_0_0_#222325]">
+          <span className="inline-flex items-center gap-2 rounded-full border-2 bg-secondary px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary br-shadow">
             <span aria-hidden className="font-black">{"///"}</span>
             Free career playbooks
           </span>
@@ -184,7 +184,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
 
           {landing && (
             <section
-              className="mt-16 rounded-[24px] border-2 border-primary bg-primary p-8 text-white shadow-[6px_6px_0_0_#e1f073] md:p-12"
+              className="mt-16 rounded-[24px] border-2 bg-primary p-8 text-white br-bold br-lime md:p-12"
               aria-label="Explore by topic">
               <h2 className="text-2xl font-extrabold tracking-tight md:text-3xl">Pick a topic, get the playbook.</h2>
               <p className="mt-2 max-w-[56ch] text-white/70">Every category has its own free download at the top of the page.</p>

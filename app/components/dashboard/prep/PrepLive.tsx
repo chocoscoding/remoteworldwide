@@ -1772,7 +1772,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
             type="button"
             onClick={endNow}
             disabled={phase === "saving" || phase === "done" || restarting}
-            className="inline-flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#222325] bg-white px-3 py-1.5 text-xs font-bold text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:pointer-events-none">
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-[#222325] cursor-pointer br-shadow-press br-lime disabled:opacity-40 disabled:pointer-events-none">
             <PhoneOff className="h-3.5 w-3.5" />
             {engine ? "End interview" : "End session"}
           </button>
@@ -1853,7 +1853,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
                 <button
                   type="button"
                   onClick={() => onSaved(refusal.openSessionId as string)}
-                  className="rounded-xl border-[1.5px] border-[#222325] bg-[#e1f073] px-5 py-2.5 text-sm font-bold text-[#222325] cursor-pointer shadow-[2px_2px_0_0_#ffffff] transition-[transform,box-shadow] duration-100 hover:shadow-[2.5px_2.5px_0_0_#ffffff] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+                  className="rounded-xl bg-[#e1f073] px-5 py-2.5 text-sm font-bold text-[#222325] cursor-pointer br-shadow-press br-white">
                   Open that session
                 </button>
               )}
@@ -1861,7 +1861,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
                 <button
                   type="button"
                   onClick={retryStart}
-                  className="inline-flex items-center gap-2 rounded-xl border-[1.5px] border-[#222325] bg-[#e1f073] px-5 py-2.5 text-sm font-bold text-[#222325] cursor-pointer shadow-[2px_2px_0_0_#ffffff] transition-[transform,box-shadow] duration-100 hover:shadow-[2.5px_2.5px_0_0_#ffffff] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-35 disabled:pointer-events-none">
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#e1f073] px-5 py-2.5 text-sm font-bold text-[#222325] cursor-pointer br-shadow-press br-white disabled:opacity-35 disabled:pointer-events-none">
                   <Mic className="h-4 w-4" />
                   Try again
                 </button>
@@ -1956,7 +1956,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
                       type="button"
                       onClick={() => void finishSession("ended-early", withPendingAnswer())}
                       disabled={restarting}
-                      className="inline-flex items-center gap-2 rounded-xl border-[1.5px] border-[#222325] bg-[#e1f073] px-5 py-2.5 text-sm font-bold text-[#222325] cursor-pointer shadow-[2px_2px_0_0_#ffffff] transition-[transform,box-shadow] duration-100 hover:shadow-[2.5px_2.5px_0_0_#ffffff] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-35 disabled:pointer-events-none">
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#e1f073] px-5 py-2.5 text-sm font-bold text-[#222325] cursor-pointer br-shadow-press br-white disabled:opacity-35 disabled:pointer-events-none">
                       <FileText className="h-4 w-4" />
                       Finish and get my report
                     </button>
@@ -2039,7 +2039,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
                     onClick={() => void finishSession("completed", withPendingAnswer())}
                     className={cn(
                       "flex-none inline-flex items-center gap-2.5 h-[52px] rounded-xl border-[1.5px] border-[#222325] bg-[#e1f073] px-5 text-sm font-bold text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out",
-                      "shadow-[2px_2px_0_0_#ffffff] hover:shadow-[2.5px_2.5px_0_0_#ffffff] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                      "br-shadow-press br-white"
                     )}>
                     <FileText className="h-4 w-4" />
                     Finish and get my report

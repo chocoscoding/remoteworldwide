@@ -40,7 +40,7 @@ import { TASK_LIMITS } from "@/app/lib/tasks/types";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
 
 /** The billing link wears the primary button's clothes, as the coach's does. */
-const TOP_UP_LINK = cn(stickerButtonVariants({ variant: "primary", size: "md" }), "hover:shadow-[4px_4px_0_0_#e1f073]");
+const TOP_UP_LINK = cn(stickerButtonVariants({ variant: "primary", size: "md" }), "br-lime");
 
 /** Where an ATS fix on the plan leads: the resume it asks you to change. */
 const ATS_TASK_HREF = "/dashboard/resume";
@@ -202,7 +202,7 @@ const AtsResults: FC<AtsResultsProps> = ({
               onClick={onExit}
               aria-label="Back to resume choice"
               title="Score a different resume"
-              className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+              className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white text-[#222325] cursor-pointer br-shadow-press">
               <X className="h-3.5 w-3.5" strokeWidth={2.5} />
             </button>
           </div>

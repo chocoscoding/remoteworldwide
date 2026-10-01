@@ -52,7 +52,7 @@ const LockedReport: FC<LockedReportProps> = ({ credits, balance = null, onUnlock
 
       <div className="relative bg-gradient-to-b from-white/70 via-white to-white px-6 pb-6 pt-7 sm:pt-24">
         <div className="flex items-start gap-3.5">
-          <span aria-hidden className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-xl border-[1.5px] border-[#222325] bg-[#e1f073] shadow-[2px_2px_0_0_#222325]">
+          <span aria-hidden className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-[#e1f073] br-shadow">
             <Lock className="h-4 w-4 text-[#222325]" strokeWidth={2.5} />
           </span>
           <div className="min-w-0">

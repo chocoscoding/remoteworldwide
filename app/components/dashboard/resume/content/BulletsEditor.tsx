@@ -127,7 +127,7 @@ const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = f
             type="button"
             onClick={() => replace(i, [])}
             aria-label={`Remove bullet ${i + 1}`}
-            className="mt-0.5 grid h-6 w-6 flex-none place-content-center rounded-md border border-black/30 bg-white text-black/50 transition-all hover:border-[#222325] hover:bg-[#222325] hover:text-white hover:shadow-[2px_2px_0_0_#e1f073] cursor-pointer">
+            className="mt-0.5 grid h-6 w-6 flex-none place-content-center rounded-md border-black/30 bg-white text-black/50 transition-all hover:bg-[#222325] hover:text-white br-plain-press br-lime cursor-pointer">
             <X className="h-3 w-3" />
           </button>
         </div>

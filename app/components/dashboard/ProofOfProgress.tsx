@@ -116,7 +116,7 @@ const ProofOfProgress: FC = () => {
         </Link>
         <Link
           href="/dashboard/coach"
-          className="inline-flex items-center gap-2 rounded-md border-[1.5px] border-[#222325] bg-white px-3.5 py-2 text-sm font-semibold text-primary shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+          className="inline-flex items-center gap-2 rounded-md bg-white px-3.5 py-2 text-sm font-semibold text-primary br-shadow-press">
           Ask your coach what this means
           <ArrowRight className="h-3.5 w-3.5 flex-none" />
         </Link>

@@ -35,7 +35,7 @@ const featureRow = (row: FeatureRow): Row => ({ label: row.label, note: row.note
 const LABEL = "sticky left-0 z-10 bg-white pl-6 pr-4 text-left align-middle";
 const CELL = "px-3 py-4 text-center align-middle";
 /** A hairline above every cell in the row. The table is border-separate so each cell carries its own. */
-const RULED = "[&>*]:border-t [&>*]:border-primary/[0.07]";
+const RULED = "[&>*]:border-t [&>*]:border-primary/[0.08]";
 /**
  * The recommended plan's column: a faint tint and a 1px rule down each side, drawn by every cell in
  * it (header, group titles and all) so the rules run unbroken from the top of the table to the

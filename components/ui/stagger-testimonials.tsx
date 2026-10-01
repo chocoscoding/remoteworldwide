@@ -190,7 +190,7 @@ export const StaggerTestimonials: React.FC = () => {
           className={cn(
             "flex h-11 w-11 rounded-sm items-center justify-center text-2xl transition-colors",
             "bg-background border-2 border-border hover:bg-primary hover:text-primary-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 shadow-[3px_3px_0px_0px_#000] hover:shadow-[1px_1px_0px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 br-shadow-press hover:translate-x-[1px] hover:translate-y-[1px]",
           )}
           aria-label="Previous testimonial">
           <ChevronLeft />
@@ -200,7 +200,7 @@ export const StaggerTestimonials: React.FC = () => {
           className={cn(
             "flex h-11 w-11  rounded-sm items-center justify-center text-2xl transition-colors",
             "bg-background border-2 border-border hover:bg-primary hover:text-primary-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 shadow-[3px_3px_0px_0px_#000] hover:shadow-[1px_1px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[1px]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 br-shadow-press hover:translate-x-[-1px] hover:translate-y-[1px]",
           )}
           aria-label="Next testimonial">
           <ChevronRight />

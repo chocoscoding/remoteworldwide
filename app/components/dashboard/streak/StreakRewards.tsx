@@ -51,11 +51,11 @@ const StreakRewards: FC<StreakRewardsProps> = ({ dark = false, className }) => {
               unlocked
                 ? dark
                   ? "border-secondary bg-secondary/15"
-                  : "border-[#222325] bg-[#e1f073] shadow-[3px_3px_0_0_#222325]"
+                  : "bg-[#e1f073] br-shadow"
                 : isNext
                   ? dark
                     ? "border-white/40 bg-white/[0.07]"
-                    : "border-[#222325] bg-white shadow-[3px_3px_0_0_#e1f073]"
+                    : "bg-white br-shadow br-lime"
                   : dark
                     ? "border-white/12 bg-white/[0.03]"
                     : "border-black/12 bg-[#fbfbf7]"

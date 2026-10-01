@@ -128,7 +128,7 @@ const StreakMilestoneModal: FC = () => {
             initial={reduceMotion ? undefined : { opacity: 0, scale: 0.9 }}
             animate={reduceMotion ? undefined : { opacity: 1, scale: 1 }}
             transition={{ delay: 0.36, type: "spring", stiffness: 360, damping: 22 }}
-            className="mb-3 w-full rounded-xl border-2 border-[#222325] bg-[#e1f073] px-5 py-3.5 shadow-[4px_4px_0_0_#222325]">
+            className="mb-3 w-full rounded-xl border-2 bg-[#e1f073] px-5 py-3.5 br-bold">
             <div className="flex items-center justify-center gap-2">
               <Flame className="h-4 w-4 text-primary" />
               <span className="text-lg" aria-hidden>🎁</span>

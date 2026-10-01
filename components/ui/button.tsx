@@ -16,9 +16,9 @@ const buttonVariants = cva(
         ghost: "rounded-md border border-0 hover:border-1 hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         brutalist:
-          "rounded-md border-2 border-black  text-primary shadow-[3px_3px_0px_0px_#000] active:shadow-[1px_1px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] transition-all",
+          "rounded-md border-2 text-primary br-shadow-press transition-all",
         "brutalist-accent":
-          "rounded-none border-2 border-black bg-primary text-primary-foreground shadow-[3px_3px_0px_0px_#e1f073] active:shadow-[1px_1px_0px_0px_#e1f073] active:translate-x-[2px] active:translate-y-[2px] transition-all",
+          "rounded-none border-2 bg-primary text-primary-foreground br-shadow-press br-lime transition-all",
       },
       size: {
         default: "h-9 px-4 py-2",

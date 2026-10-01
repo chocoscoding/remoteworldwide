@@ -128,7 +128,7 @@ function PlanCard({ plan }: { plan: PricingPlan }) {
         </span>
       </div>
 
-      <hr className={cn("my-5 border-t border-dashed", featured ? "border-white/20" : "border-primary/15")} />
+      <hr className={cn("my-5 border-t", featured ? "border-primary/15" : "border-primary/10")} />
 
       <ul className="mb-7 flex flex-1 flex-col gap-2.5">
         {features.map((feature) => (
@@ -239,7 +239,7 @@ export default async function PricingPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
-            <div className="rounded-[20px] border-[1.5px] border-primary bg-secondary p-6 shadow-[5px_5px_0_0_#222325]">
+            <div className="rounded-[20px] bg-secondary p-6 br-bold">
               <p className="text-lg font-bold">Always free</p>
               <ul className="mt-4 flex flex-col gap-4">
                 {costs.free.map((cost) => (
@@ -256,7 +256,7 @@ export default async function PricingPage() {
               </ul>
             </div>
 
-            <ul className="grid overflow-hidden rounded-[20px] border-[1.5px] border-primary bg-white shadow-[5px_5px_0_0_#222325] sm:grid-cols-2">
+            <ul className="grid overflow-hidden rounded-[20px] bg-white br-bold sm:grid-cols-2">
               {costs.paid.map((cost, i) => (
                 <li
                   key={cost.action}

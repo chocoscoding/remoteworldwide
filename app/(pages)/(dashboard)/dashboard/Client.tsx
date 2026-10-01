@@ -76,7 +76,7 @@ function weekRangeLabel(todayKey: string): string {
 
 // A link dressed as the outline sticker button. The old markup put a <button>
 // inside the <Link>, which nests one control in another.
-const outlineLink = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "flex-none hover:shadow-[3px_3px_0_0_#e1f073]");
+const outlineLink = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "flex-none br-lime");
 
 /**
  * One green per pipeline stage, deepening toward the end of the funnel. Same
@@ -387,7 +387,7 @@ const HomeClient: FC = () => {
             "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
             goalsOpen ? "max-h-[1000px] opacity-100 mt-5" : "max-h-0 opacity-0",
           )}>
-          <div className="rounded-2xl border border-black bg-white shadow-[4px_4px_0_0_#e1f073] p-6">
+          <div className="rounded-2xl bg-white br-bold br-lime p-6">
             <div className="flex items-center justify-between mb-6">
               <p className="text-[15px] font-bold text-primary">Set your goals</p>
               <button
@@ -416,7 +416,7 @@ const HomeClient: FC = () => {
                       onClick={(e) => e.detail === 0 && nudgeWeeklyTarget(-TARGET_STEP)}
                       disabled={weeklyTarget <= TARGET_MIN}
                       className={
-                        "h-9 w-9 flex-none rounded-full border-[1.5px] border-[#222325] bg-white flex items-center justify-center shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"
+                        "h-9 w-9 flex-none rounded-full bg-white flex items-center justify-center br-shadow-press cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"
                       }>
                       <Minus className="h-4 w-4" />
                     </button>
@@ -440,7 +440,7 @@ const HomeClient: FC = () => {
                       onClick={(e) => e.detail === 0 && nudgeWeeklyTarget(TARGET_STEP)}
                       disabled={weeklyTarget >= TARGET_MAX}
                       className={
-                        "h-9 w-9 flex-none rounded-full border-[1.5px] border-[#222325] bg-white flex items-center justify-center shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"
+                        "h-9 w-9 flex-none rounded-full bg-white flex items-center justify-center br-shadow-press cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:shadow-none"
                       }>
                       <Plus className="h-4 w-4" />
                     </button>

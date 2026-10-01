@@ -57,7 +57,7 @@ const NeedsANudge: FC = () => {
 
       <Link
         href="/dashboard/tracker"
-        className="inline-flex h-7 flex-none items-center gap-1.5 rounded-md border-[1.5px] border-[#222325] bg-white px-2.5 text-[11px] font-bold text-primary transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none">
+        className="inline-flex h-7 flex-none items-center gap-1.5 rounded-md border-[#222325] bg-white px-2.5 text-[11px] font-bold text-primary br-plain-press br-lime">
         Nudge them
         <ArrowRight className="h-3 w-3 flex-none" />
       </Link>

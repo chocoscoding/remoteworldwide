@@ -35,7 +35,7 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
   const usedPct = plan ? Math.min(100, Math.round((total / plan.monthlyCredits) * 100)) : 0;
 
   return (
-    <div className="grid overflow-hidden rounded-[20px] border-[1.5px] border-primary bg-white shadow-[4px_4px_0_0_#222325] lg:grid-cols-[1.25fr_1fr]">
+    <div className="grid overflow-hidden rounded-[20px] border border-primary/10 bg-white lg:grid-cols-[1.25fr_1fr]">
       <div className="p-6 md:p-8">
         <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary/55">
           <Calculator className="h-4 w-4" aria-hidden />

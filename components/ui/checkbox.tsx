@@ -19,9 +19,9 @@ const Checkbox = React.forwardRef<
     ref={ref}
     className={cn(
       "grid place-content-center peer h-5 w-5 shrink-0 rounded-[3px] border-2 border-[#222325] bg-white transition-all",
-      "shadow-[2px_2px_0_0_#222325] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_#222325]",
+      "br-shadow-press",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-1",
-      "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[2px_2px_0_0_#222325]",
+      "disabled:cursor-not-allowed disabled:opacity-50",
       "data-[state=checked]:bg-secondary data-[state=checked]:text-[#222325]",
       "data-[state=checked]:translate-x-px data-[state=checked]:translate-y-px data-[state=checked]:shadow-[1px_1px_0_0_#222325]",
       "data-[state=checked]:hover:translate-x-px data-[state=checked]:hover:translate-y-px data-[state=checked]:hover:shadow-[1px_1px_0_0_#222325]",

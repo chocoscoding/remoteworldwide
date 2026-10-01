@@ -3,7 +3,7 @@ import Link from "next/link";
 import { UserPlus } from "lucide-react";
 
 const NeedAuthorProfile: FC<{ action?: "write" | "edit" }> = ({ action = "write" }) => (
-  <div data-need-profile className="mx-auto mt-16 max-w-[560px] rounded-md border-2 border-[#222325] bg-white p-8 text-center shadow-[6px_6px_0_0_#e1f073]">
+  <div data-need-profile className="mx-auto mt-16 max-w-[560px] rounded-md border-2 bg-white p-8 text-center br-bold br-lime">
     <h1 className="text-2xl font-extrabold text-primary">Create your author profile first</h1>
     <p className="mt-3 text-sm leading-relaxed text-primary/70">
       Posts are published under an author profile linked to your account. Set yours up and you can {action === "edit" ? "edit this post" : "start writing"} right away.

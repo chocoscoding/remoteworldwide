@@ -487,7 +487,7 @@ const Page = () => (
       style={{ backgroundImage: "radial-gradient(#222325 0.9px, transparent 0.9px)", backgroundSize: "22px 22px" }}>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#f9f8f1_40%,_rgba(249,248,241,0.55)_75%,_rgba(249,248,241,0.2)_100%)]" />
       <div className="relative mx-auto max-w-[1120px] px-4 pb-10 pt-10 md:pb-14 md:pt-14">
-        <span className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-secondary px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary shadow-[3px_3px_0_0_#222325]">
+        <span className="inline-flex items-center gap-2 rounded-full border-2 bg-secondary px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary br-shadow">
           Legal
         </span>
         <h1 className="mt-5 text-[2.25rem] font-extrabold leading-[1.05] tracking-[-0.025em] text-primary md:text-[3.25rem]">

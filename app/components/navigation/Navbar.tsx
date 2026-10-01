@@ -78,7 +78,7 @@ const Navbar = () => {
       case "/blogs":
         return "bg-white border-white";
       default:
-        return "bg-white border-gray-200";
+        return "bg-white border-primary/10";
     }
   })();
   return (

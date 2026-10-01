@@ -62,7 +62,7 @@ export function EntryListEditor<T extends { id: string }>({
                 // Active reads as a tone of gray, with the fields a deeper
                 // gray inside it (see FormField) — never a black block.
                 isActive
-                  ? "border-[#222325] bg-[#e9e9e4] shadow-[3px_3px_0_0_#e1f073]"
+                  ? "bg-[#e9e9e4] br-shadow br-lime"
                   : "border-black/15 bg-white hover:border-black/45 hover:bg-[#f8f8f6]",
               )}>
               <button
@@ -73,7 +73,7 @@ export function EntryListEditor<T extends { id: string }>({
                   "absolute right-2 top-2 grid h-6 w-6 place-content-center rounded-md border transition-all duration-200 cursor-pointer",
                   isActive
                     ? "border-[#1f1f1f] bg-[#1f1f1f] text-white hover:border-[#2a2a2a] hover:bg-[#2a2a2a]"
-                    : "border-black/30 bg-white text-black/50 opacity-0 group-hover:opacity-100 hover:border-[#222325] hover:bg-[#222325] hover:text-white hover:shadow-[2px_2px_0_0_#e1f073]",
+                    : "border-black/30 bg-white text-black/50 opacity-0 group-hover:opacity-100 hover:bg-[#222325] hover:text-white br-plain-press br-lime",
                 )}>
                 <X className="h-3.5 w-3.5" />
               </button>

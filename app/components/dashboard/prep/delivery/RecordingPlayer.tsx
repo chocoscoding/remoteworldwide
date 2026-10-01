@@ -224,7 +224,7 @@ const RecordingPlayer: FC<RecordingPlayerProps> = ({ getUrl, title = "Your recor
     <section
       aria-label="Recording player"
       className={cn(
-        "sticky top-3 z-30 rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] px-3.5 py-3 text-white shadow-[4px_4px_0_0_#e1f073] sm:px-5",
+        "sticky top-3 z-30 rounded-2xl bg-[#222325] px-3.5 py-3 text-white br-bold br-lime sm:px-5",
         className
       )}>
       {/* No `controls`: this bar is the interface. No `crossOrigin`: playback
@@ -238,7 +238,7 @@ const RecordingPlayer: FC<RecordingPlayerProps> = ({ getUrl, title = "Your recor
           onClick={controls.toggle}
           disabled={disabled}
           aria-label={state.playing ? "Pause recording" : "Play recording"}
-          className="inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-full border-[1.5px] border-[#222325] bg-[#e1f073] text-[#222325] shadow-[2px_2px_0_0_#ffffff] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#ffffff] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#222325] disabled:cursor-default disabled:opacity-40 disabled:shadow-none">
+          className="inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-full bg-[#e1f073] text-[#222325] br-shadow-press br-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#222325] disabled:cursor-default disabled:opacity-40 disabled:shadow-none">
           {status === "loading" ? (
             <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
           ) : state.playing ? (

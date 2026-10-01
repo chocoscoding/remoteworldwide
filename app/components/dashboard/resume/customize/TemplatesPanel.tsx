@@ -49,7 +49,7 @@ const TemplatesPanel: FC = () => {
               className={cn(
                 "relative flex items-center gap-3 rounded-xl border bg-white p-3 text-left transition-all cursor-pointer",
                 selected
-                  ? "border-2 border-[#222325] shadow-[3px_3px_0_0_#e1f073]"
+                  ? "border-2 br-shadow br-lime"
                   : "border-black/10 hover:border-black/25"
               )}>
               {selected && (

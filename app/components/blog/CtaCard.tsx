@@ -47,38 +47,38 @@ const TONE: Record<
 > = {
   INK: {
     card: "bg-primary",
-    shadow: "shadow-[5px_5px_0_0_#e1f073]",
-    shadowSm: "shadow-[2px_2px_0_0_#e1f073]",
+    shadow: "br-bold br-lime",
+    shadowSm: "br-shadow br-lime",
     eyebrow: "text-secondary",
     text: "text-white",
     sub: "text-white/70",
     button: "bg-secondary text-primary",
-    buttonShadow: "shadow-[4px_4px_0_0_#ffffff] hover:shadow-[2px_2px_0_0_#ffffff]",
-    buttonShadowSm: "shadow-[2px_2px_0_0_#ffffff] hover:shadow-[1px_1px_0_0_#ffffff]",
+    buttonShadow: "br-bold-press br-white",
+    buttonShadowSm: "br-shadow-press br-white",
     frame: "border-secondary",
   },
   LIME: {
     card: "bg-secondary",
-    shadow: "shadow-[5px_5px_0_0_#222325]",
-    shadowSm: "shadow-[2px_2px_0_0_#222325]",
+    shadow: "br-bold",
+    shadowSm: "br-shadow",
     eyebrow: "text-primary/70",
     text: "text-primary",
     sub: "text-primary/75",
     button: "bg-primary text-white",
-    buttonShadow: "shadow-[4px_4px_0_0_#ffffff] hover:shadow-[2px_2px_0_0_#ffffff]",
-    buttonShadowSm: "shadow-[2px_2px_0_0_#ffffff] hover:shadow-[1px_1px_0_0_#ffffff]",
+    buttonShadow: "br-bold-press br-white",
+    buttonShadowSm: "br-shadow-press br-white",
     frame: "border-primary",
   },
   PAPER: {
     card: "bg-primary2",
-    shadow: "shadow-[5px_5px_0_0_#222325]",
-    shadowSm: "shadow-[2px_2px_0_0_#222325]",
+    shadow: "br-bold",
+    shadowSm: "br-shadow",
     eyebrow: "text-primary/60",
     text: "text-primary",
     sub: "text-primary/70",
     button: "bg-primary text-white",
-    buttonShadow: "shadow-[4px_4px_0_0_#e1f073] hover:shadow-[2px_2px_0_0_#e1f073]",
-    buttonShadowSm: "shadow-[2px_2px_0_0_#e1f073] hover:shadow-[1px_1px_0_0_#e1f073]",
+    buttonShadow: "br-bold-press br-lime",
+    buttonShadowSm: "br-shadow-press br-lime",
     frame: "border-primary",
   },
 };
@@ -107,7 +107,7 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
       <a
         href={ctaHref(cta.key, placement, blogSlug)}
         className={cn(
-          "mt-5 inline-flex flex-none items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+          "mt-5 inline-flex flex-none items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold",
           variant === "side" && "mt-4 px-4 py-2.5",
           t.button,
           inArticle ? t.buttonShadowSm : t.buttonShadow,
@@ -129,7 +129,7 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
         variant === "inline" && "my-8 p-5 md:p-6",
         variant === "end" && "mt-8 p-6 md:p-8",
         band && "p-7 md:p-10",
-        variant === "side" && "rounded-2xl p-5 shadow-[3px_3px_0_0_#222325]",
+        variant === "side" && "rounded-2xl p-5 br-shadow",
         className,
       )}>
       {hasImage ? (
@@ -164,7 +164,7 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
           <a
             href={ctaHref(cta.key, placement, blogSlug)}
             className={cn(
-              "mt-5 inline-flex flex-none items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none md:mt-0",
+              "mt-5 inline-flex flex-none items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold md:mt-0",
               t.button,
               t.buttonShadow,
             )}>

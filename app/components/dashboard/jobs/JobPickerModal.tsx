@@ -93,7 +93,7 @@ const LABEL = "mb-1 block text-[10.5px] font-bold uppercase tracking-[0.08em] te
 
 /** The small sticker buttons a recovery offers. */
 const RECOVERY =
-  "inline-flex cursor-pointer items-center rounded-md border-[1.5px] border-[#222325] bg-white px-2.5 py-1 text-xs font-bold text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none";
+  "inline-flex cursor-pointer items-center rounded-md bg-white px-2.5 py-1 text-xs font-bold text-[#222325] br-shadow-press";
 
 const TAB_OPTIONS: { id: PickerTab; label: string }[] = [
   { id: "platform", label: "From Remote Worldwide" },
@@ -189,7 +189,7 @@ const ExtensionPromo: FC = () => {
   if (!EXTENSION_URL || status !== "absent") return null;
 
   return (
-    <div className="mt-3 flex flex-none items-center gap-4 rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-4 shadow-[4px_4px_0_0_#e1f073]">
+    <div className="mt-3 flex flex-none items-center gap-4 rounded-2xl bg-[#222325] p-4 br-bold br-lime">
       <span className="grid h-11 w-11 flex-none place-content-center rounded-xl bg-[#e1f073]">
         <Chrome className="h-5 w-5 text-[#222325]" />
       </span>
@@ -911,7 +911,7 @@ const PickerBody: FC<PickerBodyProps> = ({
 
   return (
     <>
-      <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-[1.5px] border-[#222325] bg-white shadow-[6px_6px_0_0_#222325]">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-white br-bold">
         <div className="flex-none px-6 pt-5 pb-3.5">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -920,7 +920,7 @@ const PickerBody: FC<PickerBodyProps> = ({
                 Pick one from Remote Worldwide, or put a new one in.
               </DialogPrimitive.Description>
             </div>
-            <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md border-[1.5px] border-[#222325] bg-white text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none cursor-pointer">
+            <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press cursor-pointer">
               <X className="h-3.5 w-3.5" strokeWidth={3} />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
@@ -1092,7 +1092,7 @@ const PickerBody: FC<PickerBodyProps> = ({
                 type="button"
                 onClick={handleFill}
                 disabled={!state.raw.trim() || busy || offer !== null}
-                className="inline-flex flex-none cursor-pointer items-center gap-1.5 rounded-lg border-[1.5px] border-[#222325] bg-white px-3 py-2 text-xs font-bold text-[#222325] transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:pointer-events-none disabled:opacity-40">
+                className="inline-flex flex-none cursor-pointer items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#222325] br-shadow-press disabled:pointer-events-none disabled:opacity-40">
                 {importing || matching?.next === "import" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 {importing ? "Reading" : matching?.next === "import" ? "Checking" : "Fill fields"}
               </button>
@@ -1157,7 +1157,7 @@ const PickerBody: FC<PickerBodyProps> = ({
               <button
                 type="submit"
                 disabled={missingForSave.length > 0 || busy || offer !== null}
-                className="inline-flex flex-none items-center gap-1.5 rounded-lg border-[1.5px] border-[#222325] bg-[#222325] px-3.5 py-2 text-xs font-bold text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#e1f073] hover:shadow-[2.5px_2.5px_0_0_#e1f073] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:pointer-events-none">
+                className="inline-flex flex-none items-center gap-1.5 rounded-lg bg-[#222325] px-3.5 py-2 text-xs font-bold text-white cursor-pointer br-shadow-press br-lime disabled:opacity-40 disabled:pointer-events-none">
                 {saving || matching?.next === "save" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardPaste className="h-3.5 w-3.5" />}
                 {saving ? "Saving" : matching?.next === "save" ? "Checking" : "Save & use this job"}
               </button>

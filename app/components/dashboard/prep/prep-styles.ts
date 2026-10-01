@@ -11,19 +11,17 @@
 export const PANEL = "rounded-2xl border border-black/10 bg-white";
 
 /** The single emphasis surface per screen — dark fill, hard border, offset shadow. */
-export const RAISED_DARK = "rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] text-white shadow-[4px_4px_0_0_#e1f073]";
+export const RAISED_DARK = "rounded-2xl bg-[#222325] text-white br-bold br-lime";
 
 /**
- * Press feedback for real controls. Hover lifts onto a shadow, active drops
- * it back flush — the app's established StickerButton motion, not a heavy
- * always-on shadow.
+ * Press feedback for real controls: flat at rest, a hard shadow on hover,
+ * pressed flush on click — the StickerButton motion (br-plain-press), not a
+ * heavy always-on shadow.
  */
-export const PRESS =
-  "transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[3px_3px_0_0_#e1f073] hover:-translate-x-px hover:-translate-y-px active:translate-x-0 active:translate-y-0 active:shadow-none";
+export const PRESS = "br-plain-press br-lime";
 
 /** Press variant for controls on a dark surface, where lime would disappear. */
-export const PRESS_ON_DARK =
-  "transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[3px_3px_0_0_rgba(255,255,255,.3)] hover:-translate-x-px hover:-translate-y-px active:translate-x-0 active:translate-y-0 active:shadow-none";
+export const PRESS_ON_DARK = "br-plain-press [--br-c:rgba(255,255,255,0.3)]";
 
 /** Square icon-only control for secondary nav (pagination). Quiet until hovered. */
 export const ICON_BUTTON =
@@ -36,7 +34,7 @@ export const ICON_BUTTON =
  * button lands flush. Same motion as NeoCheckbox.
  */
 export const ICON_BUTTON_PRESS =
-  "inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none";
+  "inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white text-[#222325] cursor-pointer br-shadow-press";
 
 /** Secondary text button — bordered, no fill. */
 export const BUTTON_OUTLINE =
@@ -52,7 +50,7 @@ export const BUTTON_SOLID = `inline-flex items-center gap-1.5 rounded-lg bg-[#22
  * hover grows it 0.5px, active lands it flush.
  */
 export const BUTTON_ACCENT =
-  "inline-flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#222325] bg-[#e1f073] px-3.5 py-2 text-xs font-bold text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#ffffff] hover:shadow-[2.5px_2.5px_0_0_#ffffff] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none";
+  "inline-flex items-center gap-1.5 rounded-lg bg-[#e1f073] px-3.5 py-2 text-xs font-bold text-[#222325] cursor-pointer br-shadow-press br-white";
 
 /** Segmented control shell + its selected/unselected item states. */
 export const SEGMENT_SHELL = "inline-flex items-center gap-0.5 rounded-lg bg-[#f0f0ea] p-1";

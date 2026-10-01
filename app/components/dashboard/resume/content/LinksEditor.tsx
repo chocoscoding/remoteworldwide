@@ -53,7 +53,7 @@ const LinksEditor: FC<LinksEditorProps> = ({ links, onChange }) => {
               type="button"
               onClick={() => remove(i)}
               aria-label="Remove link"
-              className="grid h-8 w-8 flex-none place-content-center rounded-none border border-black/30 bg-white text-black/50 transition-all hover:border-[#222325] hover:bg-[#222325] hover:text-white hover:shadow-[2px_2px_0_0_#e1f073] cursor-pointer">
+              className="grid h-8 w-8 flex-none place-content-center rounded-none border-black/30 bg-white text-black/50 transition-all hover:bg-[#222325] hover:text-white br-plain-press br-lime cursor-pointer">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>

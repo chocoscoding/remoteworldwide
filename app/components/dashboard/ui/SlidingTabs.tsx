@@ -68,7 +68,7 @@ export default function SlidingTabs<T extends string>({ value, options, onChange
     <div
       role={tablist ? "tablist" : undefined}
       aria-label={tablist?.label}
-      className={cn("relative grid w-fit max-w-full overflow-x-auto rounded-xl border-[1.5px] border-[#222325] bg-[#f0f0ea] p-1 shadow-[3px_3px_0_0_#222325]", className)}
+      className={cn("relative grid w-fit max-w-full overflow-x-auto rounded-xl bg-[#f0f0ea] p-1 br-shadow", className)}
       // `max-content` floor, not 0: equal-width columns are what makes the
       // indicator's position pure arithmetic, but they must never shrink
       // below their own label or the bar collapses on a narrow viewport.

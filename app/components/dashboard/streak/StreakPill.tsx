@@ -39,11 +39,9 @@ const StreakPill: FC<StreakPillProps> = ({ className }) => {
         onClick={() => setOpen(true)}
         aria-label={`${current}-day streak — open streak details`}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-3 py-1.5 text-xs font-bold whitespace-nowrap cursor-pointer",
-          "transition-[transform,box-shadow] duration-100 ease-out",
+          "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold whitespace-nowrap cursor-pointer",
           tier.chip,
-          tier.shadow,
-          !reduceMotion && tier.press,
+          reduceMotion ? tier.shadow : tier.press,
           className,
         )}>
         <StreakFlame tier={tier} size={15} pulse={logPulse} dimmed={current === 0} />

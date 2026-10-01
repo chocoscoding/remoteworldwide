@@ -156,9 +156,9 @@ const EMPLOYMENT_LABEL: Record<EmploymentType, string> = {
 
 // Links styled as sticker buttons rather than a <button> nested inside an <a>,
 // which is invalid HTML and gives keyboard users two tab stops for one action.
-const OUTLINE_LINK = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "hover:shadow-[3px_3px_0_0_#e1f073]");
-const PRIMARY_LINK_SM = cn(stickerButtonVariants({ variant: "primary", size: "sm" }), "hover:shadow-[3px_3px_0_0_#e1f073]");
-const PRIMARY_LINK_MD = cn(stickerButtonVariants({ variant: "primary", size: "md" }), "hover:shadow-[4px_4px_0_0_#e1f073]");
+const OUTLINE_LINK = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "br-lime");
+const PRIMARY_LINK_SM = cn(stickerButtonVariants({ variant: "primary", size: "sm" }), "br-lime");
+const PRIMARY_LINK_MD = cn(stickerButtonVariants({ variant: "primary", size: "md" }), "br-lime");
 
 /**
  * A URL from a posting, or null. The backend already refuses other schemes,
@@ -370,7 +370,7 @@ const FailureBubble: FC<{ failure: AskFailure; onRetry: () => void; retryDisable
     return (
       <div className="flex items-start gap-2.5" role="alert">
         <CoachAvatar />
-        <div className="max-w-[85%] rounded-xl border-[1.5px] border-[#222325] bg-white px-4 py-3.5 shadow-[3px_3px_0_0_#e1f073]">
+        <div className="max-w-[85%] rounded-xl bg-white px-4 py-3.5 br-shadow br-lime">
           <div className="flex items-start gap-2.5">
             <CreditCard className="h-4 w-4 flex-none text-primary mt-0.5" aria-hidden />
             <div>
@@ -915,7 +915,7 @@ const JdqaScreen: FC = () => {
                 onClick={clearJob}
                 aria-label="Clear this job"
                 title="Clear this job"
-                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-white text-[#222325] cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white text-[#222325] cursor-pointer br-shadow-press">
                 <X className="h-4 w-4" strokeWidth={2.5} />
               </button>
             </>
@@ -1087,7 +1087,7 @@ const JdqaScreen: FC = () => {
                       onClick={handleTalk}
                       disabled={talk.state === "ending" || (!talkActive && (!ready || busy || outOfMinutes))}
                       aria-label={talkLabel}
-                      className={talkActive ? undefined : "border-[1.5px] border-[#222325] hover:shadow-[2px_2px_0_0_#222325]"}>
+                      className={talkActive ? undefined : "border-[#222325] br-plain-press"}>
                       {talkActive ? (
                         <Square className="h-3 w-3 fill-current" aria-hidden />
                       ) : (

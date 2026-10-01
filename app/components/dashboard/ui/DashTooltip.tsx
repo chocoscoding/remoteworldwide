@@ -42,7 +42,7 @@ const DashTooltip: FC<DashTooltipProps> = ({ label, children, align = "left", cl
         role="tooltip"
         id={id}
         className={cn(
-          "pointer-events-none absolute bottom-full z-50 mb-2 w-[268px] translate-y-1 rounded-xl border-[1.5px] border-[#222325] bg-white p-3.5 text-left opacity-0 shadow-[3px_3px_0_0_#222325] transition-[opacity,transform] duration-150 ease-out group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:translate-y-0 group-hover:opacity-100",
+          "pointer-events-none absolute bottom-full z-50 mb-2 w-[268px] translate-y-1 rounded-xl bg-white p-3.5 text-left opacity-0 br-shadow transition-[opacity,transform] duration-150 ease-out group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:translate-y-0 group-hover:opacity-100",
           align === "left" ? "left-0" : "right-0"
         )}>
         {children}

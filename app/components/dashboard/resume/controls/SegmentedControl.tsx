@@ -67,7 +67,7 @@ export default function SegmentedControl<T extends string = string>({
               className={cn(
                 "min-w-0 flex-1 truncate rounded font-semibold transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
                 SEGMENT_SIZE_CLASS[size],
-                selected ? "bg-[#222325] text-white shadow-[2px_2px_0_0_#e1f073]" : "text-black/55 hover:bg-black/[0.04] hover:text-primary"
+                selected ? "bg-[#222325] text-white br-shadow br-lime" : "text-black/55 hover:bg-black/[0.04] hover:text-primary"
               )}>
               {option.label}
             </button>

@@ -74,7 +74,7 @@ const DraftPanel: FC<DraftPanelProps> = ({ contact, job }) => {
   return (
     // The tool surface — hard border + offset shadow, same tier as dialogs.
     // It carries the page's one true primary ("Mark as asked").
-    <DashCard className="border-[1.5px] border-[#222325] p-6 shadow-[6px_6px_0_0_#222325]">
+    <DashCard className="p-6 br-bold">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Avatar name={contact.name} tone="dark" size="lg" />

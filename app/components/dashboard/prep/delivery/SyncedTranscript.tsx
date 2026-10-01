@@ -291,7 +291,7 @@ const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, c
             <button
               type="button"
               onClick={backToPlaying}
-              className="pointer-events-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] border-[#222325] bg-[#e1f073] px-3.5 py-1.5 text-xs font-bold text-[#222325] shadow-[2px_2px_0_0_#222325] transition-[transform,box-shadow] duration-100 hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_#222325] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2">
+              className="pointer-events-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[#e1f073] px-3.5 py-1.5 text-xs font-bold text-[#222325] br-shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2">
               {offscreen === "above" ? <ArrowUp aria-hidden className="h-3.5 w-3.5" /> : <ArrowDown aria-hidden className="h-3.5 w-3.5" />}
               Back to what&apos;s playing
             </button>

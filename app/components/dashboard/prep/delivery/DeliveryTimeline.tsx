@@ -1010,7 +1010,7 @@ const CursorLayer: FC<{ reading: Reading; width: number; durationMs: number }> =
       <div aria-hidden className="pointer-events-none absolute bottom-[22px] left-0 top-0 z-10 w-px bg-black/40 dark:bg-white/50" style={{ transform: `translateX(${x}px)` }} />
       <div
         aria-hidden
-        className="pointer-events-none absolute left-0 top-2 z-30 w-[236px] rounded-xl border-[1.5px] border-[#222325] bg-white p-3 shadow-[3px_3px_0_0_#222325] dark:border-white/30 dark:bg-[#2c2d30] dark:shadow-none"
+        className="pointer-events-none absolute left-0 top-2 z-30 w-[236px] rounded-xl bg-white p-3 br-shadow dark:border-white/30 dark:bg-[#2c2d30] dark:shadow-none"
         style={{ transform: `translateX(${left}px)` }}>
         <p className="flex items-baseline justify-between gap-2">
           <span className="text-sm font-bold tabular-nums text-primary dark:text-white">{formatClock(reading.ms)}</span>

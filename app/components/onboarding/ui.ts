@@ -6,15 +6,15 @@
 // and weight saved for the things you press. Headings stop at bold.
 
 /** A step's frame: the heaviest thing on the page, and the only 4px shadow. */
-export const STEP_CARD = "rounded-[20px] border-[1.5px] border-primary bg-white shadow-[4px_4px_0_0_#222325]";
+export const STEP_CARD = "rounded-[20px] bg-white br-bold";
 
 /** A choice inside a step (a document, a built resume): hairline until hovered or picked. */
 export const OPTION = "flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-[border-color,background-color,box-shadow] duration-100 cursor-pointer";
 export const OPTION_IDLE = "border-primary/20 bg-white hover:border-primary/60";
-export const OPTION_PICKED = "border-primary bg-primary2 shadow-[2px_2px_0_0_#222325]";
+export const OPTION_PICKED = "bg-primary2 br-shadow";
 
 export const BUTTON_PRIMARY =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_#e1f073] active:translate-x-0 active:translate-y-0 active:shadow-none disabled:opacity-40 disabled:pointer-events-none";
+  "inline-flex items-center justify-center gap-2 rounded-lg border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-white cursor-pointer br-plain-press br-lime disabled:opacity-40 disabled:pointer-events-none";
 
 export const BUTTON_SECONDARY =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-white px-4 py-2.5 text-sm font-semibold text-primary cursor-pointer transition-colors hover:border-primary disabled:opacity-40 disabled:pointer-events-none";

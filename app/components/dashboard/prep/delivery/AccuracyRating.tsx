@@ -114,8 +114,8 @@ const AccuracyRating: FC<AccuracyRatingProps> = ({ value, onRate, disabled = fal
                 className={cn(
                   "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[6px] border-2 border-[#222325] text-sm font-bold tabular-nums text-[#222325] transition-[transform,box-shadow,background-color] duration-100 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-40",
                   on
-                    ? "bg-[#e1f073] shadow-[2px_2px_0_0_#222325]"
-                    : "bg-white shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                    ? "bg-[#e1f073] br-shadow"
+                    : "bg-white br-shadow-press"
                 )}>
                 {score}
               </button>

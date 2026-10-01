@@ -67,10 +67,10 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
             onClick={() => setMonthOffset((n) => n - 1)}
             aria-label="Previous month"
             className={cn(
-              "h-7 w-7 rounded-md border-[1.5px] flex items-center justify-center transition-all cursor-pointer active:translate-x-px active:translate-y-px",
+              "h-7 w-7 rounded-md border-[1.5px] flex items-center justify-center transition-all cursor-pointer",
               dark
-                ? "border-white/20 text-white/60 hover:border-white hover:text-white"
-                : "border-black/15 text-black/50 hover:border-[#222325] hover:text-primary hover:shadow-[2px_2px_0_0_#222325]"
+                ? "border-white/20 text-white/60 hover:border-white hover:text-white active:translate-x-px active:translate-y-px"
+                : "text-black/50 hover:text-primary br-plain-press"
             )}>
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
@@ -80,10 +80,10 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
             disabled={monthOffset >= 0}
             aria-label="Next month"
             className={cn(
-              "h-7 w-7 rounded-md border-[1.5px] flex items-center justify-center transition-all cursor-pointer active:translate-x-px active:translate-y-px disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:shadow-none",
+              "h-7 w-7 rounded-md border-[1.5px] flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:shadow-none",
               dark
-                ? "border-white/20 text-white/60 hover:border-white hover:text-white"
-                : "border-black/15 text-black/50 hover:border-[#222325] hover:text-primary hover:shadow-[2px_2px_0_0_#222325]"
+                ? "border-white/20 text-white/60 hover:border-white hover:text-white active:translate-x-px active:translate-y-px"
+                : "text-black/50 hover:text-primary br-plain-press"
             )}>
             <ChevronRight className="h-3.5 w-3.5" />
           </button>

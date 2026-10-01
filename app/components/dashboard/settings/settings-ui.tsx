@@ -19,7 +19,7 @@ export const INPUT =
   "w-full rounded-lg border border-black/15 bg-[#fbfbf7] px-3 py-2 text-sm text-primary outline-none transition-colors placeholder:text-black/35 focus:border-[#222325] disabled:opacity-50";
 
 export const BUTTON_SOLID =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#222325] px-3.5 py-2 text-xs font-bold text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out hover:shadow-[3px_3px_0_0_#e1f073] hover:-translate-x-px hover:-translate-y-px active:translate-x-0 active:translate-y-0 active:shadow-none disabled:opacity-40 disabled:pointer-events-none";
+  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#222325] px-3.5 py-2 text-xs font-bold text-white cursor-pointer br-plain-press br-lime disabled:opacity-40 disabled:pointer-events-none";
 
 export const BUTTON_OUTLINE =
   "inline-flex items-center justify-center gap-1.5 rounded-lg border border-black/15 bg-white px-3.5 py-2 text-xs font-bold text-[#222325] cursor-pointer transition-colors hover:border-[#222325] disabled:opacity-40 disabled:pointer-events-none";
@@ -93,7 +93,7 @@ export interface ToggleProps {
 }
 
 const toggleVariants = cva(
-  "relative inline-flex flex-none items-center rounded-full border-[1.5px] border-[#222325] cursor-pointer transition-[background-color,box-shadow,transform] duration-100 ease-out shadow-[2px_2px_0_0_#222325] hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:pointer-events-none",
+  "relative inline-flex flex-none items-center rounded-full cursor-pointer transition-[background-color,box-shadow,transform] duration-100 ease-out br-shadow-press disabled:opacity-40 disabled:pointer-events-none",
   {
     variants: {
       size: {

@@ -110,7 +110,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             onClick={() => setNaming((v) => !v)}
             aria-expanded={naming}
             disabled={!onCreateBlank}
-            className="group rounded-2xl border-[1.5px] border-[#222325] bg-[#222325] p-5 text-left text-white cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#e1f073] hover:shadow-[4px_4px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-50">
+            className="group rounded-2xl bg-[#222325] p-5 text-left text-white cursor-pointer br-shadow-press br-lime disabled:pointer-events-none disabled:opacity-50">
             <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
               <FilePlus2 className="h-4 w-4 text-[#e1f073]" />
             </span>
@@ -126,7 +126,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                 ? "pointer-events-none opacity-50"
                 : importing
                   ? "cursor-wait opacity-70"
-                  : "cursor-pointer hover:border-[#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+                  : "cursor-pointer br-plain-press",
             )}>
             <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
               {importing ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Upload className="h-4 w-4 text-primary" />}
@@ -151,7 +151,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             <button
               type="button"
               onClick={onBuild}
-              className="group flex items-center gap-4 rounded-2xl border-[1.5px] border-[#222325] bg-[#e1f073] p-5 text-left text-primary cursor-pointer transition-[transform,box-shadow] duration-100 ease-out shadow-[3px_3px_0_0_#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-50 sm:col-span-2">
+              className="group flex items-center gap-4 rounded-2xl bg-[#e1f073] p-5 text-left text-primary cursor-pointer br-shadow-press disabled:pointer-events-none disabled:opacity-50 sm:col-span-2">
               <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
                 <Sparkles className="h-4 w-4 text-[#e1f073]" />
               </span>
@@ -172,7 +172,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
 
         {/* Step 2 of "start from scratch" — reveal, don't modal */}
         {naming && (
-          <div className="mt-3 flex w-full items-center gap-2.5 rounded-2xl border-[1.5px] border-[#222325] bg-white p-3 shadow-[3px_3px_0_0_#222325]">
+          <div className="mt-3 flex w-full items-center gap-2.5 rounded-2xl bg-white p-3 br-shadow">
             <input
               type="text"
               autoFocus

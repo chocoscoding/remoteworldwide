@@ -46,7 +46,7 @@ const PostCard: FC<{ post: PostCardData; variant?: "default" | "compact" | "feat
 
   if (variant === "feature") {
     return (
-      <article className={cn("group overflow-hidden rounded-[24px] border-2 border-primary bg-white shadow-[6px_6px_0_0_#222325] md:grid md:grid-cols-2", className)}>
+      <article className={cn("group overflow-hidden rounded-[24px] border-2 bg-white br-bold md:grid md:grid-cols-2", className)}>
         <Link href={href} className="relative block aspect-[3/2] md:aspect-auto md:min-h-[320px]">
           <Image src={post.coverImage} alt={post.title} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" priority />
         </Link>

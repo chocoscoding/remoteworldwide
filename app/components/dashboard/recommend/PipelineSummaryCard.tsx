@@ -35,7 +35,7 @@ const PipelineSummaryCard: FC<PipelineSummaryCardProps> = ({ entry }) => {
           "p-5 transition-[border-color,box-shadow]",
           // The one accent on this screen: something is waiting on you.
           awaitingYou
-            ? "border-[1.5px] border-[#222325] shadow-[4px_4px_0_0_#e1f073] group-hover:shadow-[5px_5px_0_0_#e1f073]"
+            ? "br-bold-press br-lime"
             : "group-hover:border-black/30"
         )}>
         <div className="flex items-center gap-3">

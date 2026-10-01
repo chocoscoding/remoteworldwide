@@ -56,7 +56,7 @@ const OnboardingBanner: FC = () => {
       </p>
       <Link
         href={href}
-        className="inline-flex flex-none items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-[transform,box-shadow] duration-100 hover:-translate-x-px hover:-translate-y-px hover:shadow-[2px_2px_0_0_#ffffff]">
+        className="inline-flex flex-none items-center gap-1.5 rounded-lg border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white br-plain-press br-white">
         Finish
         <ArrowRight className="h-3.5 w-3.5" aria-hidden />
       </Link>

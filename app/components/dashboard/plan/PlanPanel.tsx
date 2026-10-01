@@ -339,7 +339,7 @@ const RailPlan: FC<ViewProps> = ({ plan, title, headingId, allowAdd, className }
 
 const CARD_SKELETON_WIDTHS = ["w-2/3", "w-1/2", "w-3/5"] as const;
 
-const outlineLink = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "flex-none hover:shadow-[3px_3px_0_0_#e1f073]");
+const outlineLink = cn(stickerButtonVariants({ variant: "outline", size: "sm" }), "flex-none br-lime");
 
 const CardPlan: FC<ViewProps> = ({ plan, title, headingId, allowAdd, className }) => {
   const { query, rows, hidden, progress } = plan;

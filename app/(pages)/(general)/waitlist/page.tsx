@@ -77,9 +77,9 @@ export default function WaitlistPage() {
               We&apos;re building an AI toolkit around the Remote Worldwide job board: tailor your resume to every posting, rehearse interviews out loud, and keep every application in one place.
             </p>
 
-            <Suspense fallback={<WaitlistForm initialPlan={null} />}>
-              <WaitlistFormFromParams />
-            </Suspense>
+          <Suspense fallback={<WaitlistForm initialPlan={null} />}>
+            <WaitlistFormFromParams />
+          </Suspense>
 
             <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-primary/70">
               {["Free to join", "No card needed"].map((item) => (

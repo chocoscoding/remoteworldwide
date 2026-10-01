@@ -9,7 +9,7 @@ const JobTile: FC<JobTileType> = (props) => {
   const { title, slug, company, region, createdAt, seniority } = props;
   const regionLabel = region.length > 0 ? region.join(", ") : "Anywhere in the world";
   return (
-    <div className="flex p-4 mb-5 rounded-md gap-2 md:gap-3 shadow-sm bg-white border border-gray-200 transition-[box-shadow] duration-150 ease-out hover:shadow-[3.9px_3.9px_0px_0px_rgba(0,0,0,1)]">
+    <div className="flex p-4 mb-5 rounded-md gap-2 md:gap-3 bg-white br-plain-press">
       {/* logo
     main info */}
       <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-3">

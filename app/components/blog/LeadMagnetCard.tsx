@@ -91,19 +91,19 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
   const inputId = `lm-${variant}-${placement}-${magnet.slug}`;
   // The hero sits on a page of bigger shadows; in articles everything stays at 2px.
   const buttonShadow = isHero
-    ? "shadow-[4px_4px_0_0_#e1f073] hover:shadow-[2px_2px_0_0_#e1f073]"
-    : "shadow-[2px_2px_0_0_#e1f073] hover:shadow-[1px_1px_0_0_#e1f073]";
+    ? "br-bold-press br-lime"
+    : "br-shadow-press br-lime";
 
   return (
     <aside
       aria-label={`Free download: ${magnet.title}`}
       className={cn(
         "relative rounded-[20px] border-2 border-primary",
-        isHero && "bg-white p-6 md:p-8 shadow-[6px_6px_0_0_#e1f073]",
-        isSidebar && "bg-secondary p-5 shadow-[2px_2px_0_0_#222325]",
+        isHero && "bg-white p-6 md:p-8 br-bold br-lime",
+        isSidebar && "bg-secondary p-5 br-shadow",
         horizontal && "not-prose bg-secondary p-5 md:p-6",
-        variant === "inline" && "my-8 shadow-[2px_2px_0_0_#222325]",
-        variant === "category" && "my-10 shadow-[5px_5px_0_0_#222325]",
+        variant === "inline" && "my-8 br-shadow",
+        variant === "category" && "my-10 br-bold",
         className,
       )}>
       <div className={cn(horizontal && "md:flex md:items-start md:gap-6")}>
@@ -142,7 +142,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                   target="_blank"
                   rel="noopener"
                   className={cn(
-                    "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+                    "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-white",
                     buttonShadow,
                   )}>
                   <Download className="h-4 w-4" />
@@ -180,7 +180,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                   type="submit"
                   disabled={status === "submitting"}
                   className={cn(
-                    "h-11 w-full flex-none rounded-lg bg-primary px-5 text-sm font-bold text-white sm:w-auto transition-[transform,box-shadow] duration-100 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-default disabled:opacity-70 cursor-pointer",
+                    "h-11 w-full flex-none rounded-lg bg-primary px-5 text-sm font-bold text-white sm:w-auto disabled:cursor-default disabled:opacity-70 cursor-pointer",
                     buttonShadow,
                   )}>
                   {status === "submitting" ? "Unlocking…" : magnet.buttonLabel}

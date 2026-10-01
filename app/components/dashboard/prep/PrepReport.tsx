@@ -440,7 +440,7 @@ const PrepReport: FC<PrepReportProps> = ({
                       <span className="font-bold text-primary">What it needed: </span>
                       {r.why}
                     </p>
-                    <div className="rounded-xl border-2 border-[#222325] p-3.5 shadow-[3px_3px_0_0_#e1f073]">
+                    <div className="rounded-xl border-2 p-3.5 br-shadow br-lime">
                       <div className="flex items-center justify-between mb-1.5">
                         <p className="text-[10.5px] font-bold uppercase tracking-[0.07em] text-primary">A stronger version</p>
                         <button
@@ -703,7 +703,7 @@ const PrepReport: FC<PrepReportProps> = ({
           <button
             type="button"
             onClick={onRunAnother}
-            className="text-xs font-bold bg-[#222325] text-white rounded-lg px-3.5 py-2.5 cursor-pointer transition-[transform,box-shadow] duration-100 hover:shadow-[3px_3px_0_0_#e1f073] hover:-translate-x-px hover:-translate-y-px inline-flex items-center gap-1.5">
+            className="text-xs font-bold bg-[#222325] text-white rounded-lg px-3.5 py-2.5 cursor-pointer br-plain-press br-lime inline-flex items-center gap-1.5">
             <Mic className="h-3.5 w-3.5" />
             Run another session
           </button>

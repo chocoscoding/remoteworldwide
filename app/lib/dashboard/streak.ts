@@ -87,18 +87,12 @@ export interface StreakTier {
   level: number;
   /** Chip background + text, for the header pill and tier badges. */
   chip: string;
-  /** Flat offset shadow for the chip, matching the neobrutalist language. */
+  /** The chip's outline and hard shadow at rest: a br-* class (app/globals.css). */
   shadow: string;
   /**
-   * Interaction classes for the chip, in two stages:
-   *
-   * - **hover** grows the shadow by 0.5px. The chip itself does not move, so
-   *   it reads as lifting off the surface rather than sliding across it.
-   * - **active** presses it down: it translates by exactly the resting
-   *   shadow's offset while that shadow collapses to nothing, landing flush
-   *   against the surface. Translating without collapsing the shadow would
-   *   just slide the chip — the shadow has to go for the eye to read it as
-   *   being pushed *into* something.
+   * The same chip, pressable: the matching br-*-press class, used in place of
+   * `shadow` when motion is allowed. Its shadow shrinks on hover and the chip
+   * sinks into it on click.
    */
   press: string;
   /**
@@ -133,8 +127,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🌑",
     level: 1,
     chip: "bg-[#f0f0ea] text-black/50 border-black/15",
-    shadow: "shadow-none",
-    press: "hover:shadow-[1px_1px_0_0_#222325] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none",
+    shadow: "br-plain",
+    press: "br-plain-press",
     cell: "bg-[#f0f0ea] text-black/30",
     flickerSeconds: 0,
   },
@@ -145,8 +139,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🔥",
     level: 1,
     chip: "bg-[#f6f7e8] text-[#222325] border-[#222325]",
-    shadow: "shadow-[2px_2px_0_0_#222325]",
-    press: "hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+    shadow: "br-shadow",
+    press: "br-shadow-press",
     cell: "bg-[#eef5da] text-[#222325]",
     flickerSeconds: 3.4,
   },
@@ -157,8 +151,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🔥",
     level: 1,
     chip: "bg-[#eaf2b8] text-[#222325] border-[#222325]",
-    shadow: "shadow-[2px_2px_0_0_#222325]",
-    press: "hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+    shadow: "br-shadow",
+    press: "br-shadow-press",
     cell: "bg-[#e5f0c6] text-[#222325]",
     flickerSeconds: 3.0,
   },
@@ -169,8 +163,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🔥",
     level: 1,
     chip: "bg-[#e1f073] text-[#222325] border-[#222325]",
-    shadow: "shadow-[2px_2px_0_0_#222325]",
-    press: "hover:shadow-[2.5px_2.5px_0_0_#222325] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+    shadow: "br-shadow",
+    press: "br-shadow-press",
     cell: "bg-[#dbebb0] text-[#222325]",
     flickerSeconds: 2.6,
   },
@@ -181,8 +175,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🔥",
     level: 1,
     chip: "bg-[#cddd54] text-[#222325] border-[#222325]",
-    shadow: "shadow-[3px_3px_0_0_#222325]",
-    press: "hover:shadow-[3.5px_3.5px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+    shadow: "br-shadow",
+    press: "br-shadow-press",
     cell: "bg-[#d0e69b] text-[#222325]",
     flickerSeconds: 2.2,
   },
@@ -193,8 +187,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🔥",
     level: 1,
     chip: "bg-[#222325] text-[#e1f073] border-[#222325]",
-    shadow: "shadow-[3px_3px_0_0_#e1f073]",
-    press: "hover:shadow-[3.5px_3.5px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+    shadow: "br-shadow br-lime",
+    press: "br-shadow-press br-lime",
     cell: "bg-[#c6e087] text-[#222325]",
     flickerSeconds: 1.8,
   },
@@ -205,8 +199,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🔥",
     level: 1,
     chip: "bg-[#222325] text-[#e1f073] border-[#e1f073]",
-    shadow: "shadow-[3px_3px_0_0_#e1f073]",
-    press: "hover:shadow-[3.5px_3.5px_0_0_#e1f073] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+    shadow: "br-shadow br-lime",
+    press: "br-shadow-press br-lime",
     cell: "bg-[#bcda75] text-[#222325]",
     flickerSeconds: 1.4,
   },
@@ -217,8 +211,8 @@ export const STREAK_TIERS: StreakTier[] = [
     emoji: "🔥",
     level: 1,
     chip: "bg-[#222325] text-[#e1f073] border-[#e1f073]",
-    shadow: "shadow-[4px_4px_0_0_#e1f073]",
-    press: "hover:shadow-[4.5px_4.5px_0_0_#e1f073] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
+    shadow: "br-bold br-lime",
+    press: "br-bold-press br-lime",
     cell: "bg-[#b2d463] text-[#222325]",
     flickerSeconds: 1.1,
   },

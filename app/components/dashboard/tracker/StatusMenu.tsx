@@ -70,7 +70,7 @@ const StatusMenu: FC<StatusMenuProps> = ({ value, onChange, readOnly, className 
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-[calc(100%+5px)] z-40 min-w-[168px] overflow-hidden rounded-xl border-[1.5px] border-[#222325] bg-white shadow-[4px_4px_0_0_#222325]">
+          className="absolute left-0 top-[calc(100%+5px)] z-40 min-w-[168px] overflow-hidden rounded-xl bg-white br-bold">
           {BOARD_ORDER.map((id, i) => {
             const meta = statusMeta(id);
             const opensClosed = isClosedStatus(id) && !isClosedStatus(BOARD_ORDER[i - 1]);

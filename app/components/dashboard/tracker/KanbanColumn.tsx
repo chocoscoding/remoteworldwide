@@ -198,7 +198,7 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
             onClick={scrollToEnd}
             tabIndex={hasMore ? 0 : -1}
             className={cn(
-              "absolute bottom-1 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border-[1.5px] border-[#222325] bg-white px-2.5 py-1 text-[10px] font-bold text-primary shadow-[2px_2px_0_0_#222325] transition-shadow duration-100 ease-out hover:shadow-[3px_3px_0_0_#222325]",
+              "absolute bottom-1 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-primary br-shadow-press",
               hasMore ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
             )}>
             +{below} more

@@ -167,7 +167,7 @@ const TypeAnswerPanel: FC<TypeAnswerPanelProps> = ({
             "grid h-11 w-11 flex-none place-content-center rounded-full border-[1.5px] transition-[transform,box-shadow] duration-100 ease-out",
             dark
               ? "border-white/20 text-white hover:border-white/45"
-              : "border-[#222325] bg-white text-primary shadow-[3px_3px_0_0_#222325] hover:shadow-[4px_4px_0_0_#222325] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+              : "bg-white text-primary br-shadow-press",
             "disabled:pointer-events-none disabled:opacity-40 cursor-pointer"
           )}>
           <Keyboard className="h-4 w-4" />
@@ -216,7 +216,7 @@ const TypeAnswerPanel: FC<TypeAnswerPanelProps> = ({
         onSubmit={submit}
         className={cn(
           "flex items-end gap-2 rounded-xl border p-2",
-          dark ? "border-white/15 bg-white/5" : "border-[1.5px] border-[#222325] bg-white shadow-[3px_3px_0_0_#222325]"
+          dark ? "border-white/15 bg-white/5" : "bg-white br-shadow"
         )}>
         <textarea
           ref={inputRef}

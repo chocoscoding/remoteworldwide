@@ -227,7 +227,7 @@ const TranscriptScroller: FC<ScrollerProps> = ({ entries, interim, pending, fill
             setFollowing(true);
             scrollToEnd("smooth");
           }}
-          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] border-[#222325] bg-[#e1f073] px-3 py-1.5 text-[11px] font-bold text-[#222325] shadow-[2px_2px_0_0_#222325]">
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full bg-[#e1f073] px-3 py-1.5 text-[11px] font-bold text-[#222325] br-shadow">
           <ArrowDown className="h-3 w-3" />
           Jump to latest
         </button>
@@ -280,7 +280,7 @@ const InterviewTranscript: FC<InterviewTranscriptProps> = ({
       className={cn(
         "overflow-hidden",
         fill ? "flex min-h-0 flex-col" : "rounded-2xl",
-        dark ? "" : "border-[1.5px] border-[#222325] bg-white shadow-[3px_3px_0_0_#222325]",
+        dark ? "" : "bg-white br-shadow",
         className
       )}
       aria-label="Live transcript">
