@@ -1,77 +1,155 @@
-"use client"; // Since we are using React state
+"use client";
+import { useEffect, useRef } from "react";
 import { useNavbar } from "@/provider/NavbarContext";
-import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
-import Link from "next/link"; // Use Next.js' Link for navigation
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { signOut } from "@/app/lib/authClient";
 import Image from "next/image";
-import { LoaderCircle, Menu, X } from "lucide-react";
+import { LoaderCircle, UserRound } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
 import { cn } from "@/app/lib/utils";
-import StickerButton from "../dashboard/ui/StickerButton";
+import { loginWithNext } from "@/app/lib/next-url";
+
+const JOBS = "/jobs";
+const DASHBOARD = "/dashboard";
+const WAITLIST = "/waitlist";
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+// 36px rows: compact, as a menu's should be (owner, 2026-10-02: same text size, less height).
+const MENU_ITEM =
+  "flex min-h-9 w-full items-center px-4 text-left text-sm font-medium text-primary hover:bg-primary2 focus-visible:bg-primary2 focus-visible:outline-none";
+const BAR_LINK =
+  "inline-flex h-11 items-center rounded-full px-2 text-sm font-semibold text-primary/80 transition-colors hover:bg-primary2 hover:text-primary sm:px-3";
+
+/** What the bar used to link and no longer does, in the menu whether or not you're signed in. */
+const SITE_LINKS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/jobs", label: "Jobs" },
+  { href: "/companies", label: "Companies" },
+  { href: "/blogs", label: "Blog" },
+  { href: "/pricing", label: "Pricing" },
+];
+
+/**
+ * The user icon and its menu, below it. Signed out: Log in and Sign up, then the site's other pages.
+ * Signed in, behind the avatar: Bookmarks, Writer or Admin by role, the same pages, and Logout.
+ */
+const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: string | null; role?: string | null }) => {
+  const { isOpen2: open, toggleNavbar2: toggle, closeNavbar2: close } = useNavbar();
+  const { replace } = useRouter();
+  const wrapper = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+
+  // Closes on a click anywhere else, or on Escape (which hands focus back to the avatar).
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!wrapper.current?.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      close();
+      button.current?.focus();
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, close]);
+
+  return (
+    <div ref={wrapper} className="relative">
+      <button
+        ref={button}
+        type="button"
+        onClick={toggle}
+        aria-label={signedIn ? "Account menu" : "Sign in and more"}
+        aria-expanded={open}
+        aria-controls="account-menu"
+        className={cn("group grid h-11 w-11 cursor-pointer place-content-center rounded-full text-primary", FOCUS)}>
+        {signedIn ? (
+          <Image
+            width={28}
+            height={28}
+            src={image ?? "/images/noimage.png"}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="h-7 w-7 rounded-full border border-primary/15 object-cover"
+          />
+        ) : (
+          <span
+            className={cn(
+              "grid h-[31px] w-[31px] place-content-center rounded-full border transition-colors group-hover:border-primary group-hover:bg-primary2",
+              open ? "border-primary bg-primary2" : "border-primary/20",
+            )}>
+            <UserRound className="h-3.5 w-3.5" aria-hidden />
+          </span>
+        )}
+      </button>
+
+      {open ? (
+        <div
+          id="account-menu"
+          className="absolute right-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-xl border border-primary/10 bg-white py-1 shadow-[0_8px_24px_-12px_rgba(34,35,37,0.25)] !br-shadow">
+          {signedIn ? (
+            <>
+              <Link href="/bookmarks" onClick={close} className={MENU_ITEM}>
+                Bookmarks
+              </Link>
+              {role === "AUTHOR" ? (
+                <Link href="/heroshima/blogs" onClick={close} className={MENU_ITEM}>
+                  Writer
+                </Link>
+              ) : null}
+              {role === "ADMIN" ? (
+                <Link href="/heroshima" onClick={close} className={MENU_ITEM}>
+                  Admin
+                </Link>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Link href={loginWithNext(DASHBOARD)} onClick={close} className={cn(MENU_ITEM, "font-bold")}>
+                Log in
+              </Link>
+              <Link href="/signup" onClick={close} className={MENU_ITEM}>
+                Sign up
+              </Link>
+            </>
+          )}
+          <div className="my-1 border-t border-primary/10" />
+          {SITE_LINKS.map((item) => (
+            <Link key={item.href} href={item.href} onClick={close} className={MENU_ITEM}>
+              {item.label}
+            </Link>
+          ))}
+          {signedIn ? (
+            <button
+              type="button"
+              onClick={async () => {
+                close();
+                await signOut();
+                replace("/");
+              }}
+              className={cn(MENU_ITEM, "mt-1 border-t border-primary/10")}>
+              Logout
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const Navbar = () => {
   const pathname = usePathname();
   const { status, data } = useSession();
-  const { isOpen, toggleNavbar, closeNavbar, isOpen2, toggleNavbar2, closeNavbar2 } = useNavbar();
-  const { openAuthModal } = useAuthModal();
-  const { replace } = useRouter();
-  const User = () => (
-    <>
-      {status === "unauthenticated" ? (
-        <StickerButton className="" onClick={() => openAuthModal("login")}>
-          Sign In
-        </StickerButton>
-      ) : null}
-      {status === "loading" ? <LoaderCircle className="gap-2  text-primary" /> : null}
+  const signedIn = status === "authenticated";
+  const dashboardHref = signedIn ? DASHBOARD : loginWithNext(DASHBOARD);
 
-      {status === "authenticated" ? (
-        <div className="relative">
-          <Image
-            width={50}
-            height={50}
-            src={data.user?.image ?? "/images/noimage.png"}
-            alt="User"
-            referrerPolicy="no-referrer"
-            className="w-10 h-10 border-2 rounded-full cursor-pointer"
-            onClick={toggleNavbar2} // Assuming toggleNavbar will handle the modal visibility
-          />
-
-          {isOpen2 && (
-            <div className="fixed right-2 mt-2 top-16 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-              <Link href="/bookmarks" onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
-                Bookmarks
-              </Link>
-              {data.user?.role === "AUTHOR" ? (
-                <Link href="/heroshima/blogs">
-                  <p onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
-                    WRITER
-                  </p>
-                </Link>
-              ) : null}
-              {data.user?.role === "ADMIN" ? (
-                <Link href="/heroshima">
-                  <p onClick={closeNavbar2} className="block px-4 py-3 text-gray-700 hover:bg-gray-100">
-                    ADMIN
-                  </p>
-                </Link>
-              ) : null}
-              <button
-                onClick={async () => {
-                  closeNavbar2();
-                  await signOut();
-                  replace("/");
-                }}
-                className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-100">
-                Logout
-              </button>
-            </div>
-          )}
-        </div>
-      ) : null}
-    </>
-  );
   const colorToShow = (() => {
     const currentPathname = pathname;
     switch (currentPathname) {
@@ -82,84 +160,48 @@ const Navbar = () => {
     }
   })();
   return (
-    <nav className={cn("border-b sticky z-20 top-0", colorToShow)}>
+    <nav aria-label="Main" className={cn("border-b sticky z-20 top-0", colorToShow)}>
       <div className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/" className="">
-              <LogoFull width={230} height={190} className="w-full !h-auto sm:block hidden" />
+            <Link href="/" aria-label="Remote Worldwide home" className={cn("block rounded-md py-2.5", FOCUS)}>
+              {/* Sized by height so the box is the drawing's (a 230 x 190 box hung far below the bar). */}
+              <LogoFull className="hidden h-[17.5px] w-auto sm:block" />
               <LogoMini width={35} height={35} className="w-full !h-auto block sm:hidden" />
             </Link>
           </div>
 
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-4">
-            <Link href="/jobs">
-              <p className="text-gray-700 hover:text-gray-900">Jobs</p>
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <Link href={JOBS} aria-current={pathname?.startsWith(JOBS) ? "page" : undefined} className={cn(BAR_LINK, FOCUS)}>
+              Jobs
             </Link>
-            <Link href="/companies">
-              <p className="text-gray-700 hover:text-gray-900">Companies</p>
-            </Link>
-            <Link href="/blogs">
-              <p className="text-gray-700 hover:text-gray-900">Blog</p>
-            </Link>
-            {/* <Link href="/pricing">
-              <p className="text-gray-700 hover:text-gray-900">Pricing</p>
+
+            {/* <Link href={dashboardHref} aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined} className={cn(BAR_LINK, FOCUS)}>
+              Dashboard
             </Link> */}
 
-            <User />
-          </div>
+            {/* The 44px link is the touch target; the pill inside is what you see. */}
+            <Link
+              href={WAITLIST}
+              aria-current={pathname === WAITLIST ? "page" : undefined}
+              className={cn("group inline-flex h-11 items-center rounded-full", FOCUS)}>
+              <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press">
+                Waitlist
+              </span>
+            </Link>
 
-          <div className="md:hidden flex items-center gap-2">
-            {/* Mobile Menu Toggle (Hamburger Icon) */}
-            <div className="md:hidden flex items-center">
-              <button onClick={toggleNavbar} className="text-gray-700 hover:text-gray-900 focus:outline-none">
-                {isOpen ? (
-                  <p className="h-6 w-6" aria-hidden="true">
-                    <X />
-                  </p> // Close icon when menu is open
-                ) : (
-                  <p className="h-6 w-6" aria-hidden="true">
-                    <Menu />
-                  </p> // Hamburger icon when menu is closed
-                )}
-              </button>
-            </div>
-            <div className="">
-              <User />
-            </div>
+            {/* The user icon sits where the hamburger was, on every screen size. */}
+            {status === "loading" ? (
+              <span role="status" aria-label="Loading your account" className="grid h-11 w-11 place-content-center">
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin text-primary/60" aria-hidden />
+              </span>
+            ) : (
+              <AccountMenu signedIn={signedIn} image={data?.user?.image} role={data?.user?.role} />
+            )}
           </div>
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {isOpen && (
-        <div className="md:hidden">
-          <div className="px-2 pt-2 pb-3 space-y-1">
-            <Link href="/jobs">
-              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
-                Jobs
-              </p>
-            </Link>
-            <Link href="/companies">
-              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
-                Companies
-              </p>
-            </Link>
-            <Link href="/blogs">
-              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
-                Blog
-              </p>
-            </Link>
-            {/* <Link href="/pricing">
-              <p onClick={closeNavbar} className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-gray-50">
-                Pricing
-              </p>
-            </Link> */}
-          </div>
-        </div>
-      )}
     </nav>
   );
 };

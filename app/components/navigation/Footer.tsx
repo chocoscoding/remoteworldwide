@@ -7,7 +7,8 @@ import { FaTelegram } from "react-icons/fa6";
 import { LinkedInIcon } from "@/components/ui/linkedin-icon";
 import { TwitterIcon } from "@/components/ui/twitter-icon";
 
-// Same words as the navbar: Google leans on consistent link text when it names sitelinks.
+// The site's crawlable links now that the navbar carries only "Dashboard" (2026-10-01). Keep the
+// words stable: Google leans on consistent link text when it names sitelinks.
 const links = [
   {
     title: "Jobs",
@@ -47,14 +48,14 @@ const FooterSection = () => {
           <LogoMini width={35} height={35} className="w-full !h-auto block sm:hidden" />
         </Link>
 
-        <div className="my-6 flex flex-wrap justify-center gap-6 text-sm">
+        <div className="my-4 flex flex-wrap justify-center gap-x-6 text-sm">
           {links.map((link, index) => (
-            <Link key={index} href={link.href} className="text-muted-foreground hover:text-white duration-150">
+            <Link key={index} href={link.href} className="inline-flex min-h-[44px] items-center text-white/65 hover:text-white duration-150">
               <span>{link.title}</span>
             </Link>
           ))}
         </div>
-        <div className="my-6 flex flex-wrap justify-center gap-6 text-sm">
+        <div className="my-4 flex flex-wrap justify-center gap-1 text-sm [&>a]:grid [&>a]:min-h-[44px] [&>a]:min-w-[44px] [&>a]:place-content-center">
           <Link
             href="https://x.com/W0rldwideremote"
             target="_blank"
@@ -95,7 +96,7 @@ const FooterSection = () => {
             </svg>
           </Link>
         </div>
-        <span className="text-muted-foreground block text-center text-sm">2024 - {new Date().getFullYear()} Worldwideremote</span>
+        <span className="text-white/65 block text-center text-sm">2024 - {new Date().getFullYear()} Worldwideremote</span>
       </div>
     </footer>
   );
@@ -104,24 +105,25 @@ const FooterSection = () => {
 const Footer = () => {
   return (
     <footer className="bg-primary relative overflow-hidden p-5 z-10">
-      <div className="absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] top-5 left-5 flex opacity-70 md:opacity-100 z-[3]">
-        <Image src={`/images/Vector.png`} alt="kdkd" width={150} height={150} />
-        <Image src={`/images/star.png`} alt="kdkd" width={40} height={40} className="h-max" />
+      {/* Decorative corners, quieter than they were (owner, 2026-10-01: less brutalism). */}
+      <div className="pointer-events-none absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] top-5 left-5 flex opacity-50 md:opacity-70 z-[3]" aria-hidden>
+        <Image src={`/images/Vector.png`} alt="" width={150} height={150} />
+        <Image src={`/images/star.png`} alt="" width={40} height={40} className="h-max" />
       </div>
-      <div className="absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] bottom-10 right-5 flex opacity-70 md:opacity-100 z-[3] items-end gap-2">
-        <Image src={`/images/Vector.png`} alt="kdkd" width={150} height={150} />
+      <div className="pointer-events-none absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] bottom-10 right-5 flex opacity-50 md:opacity-70 z-[3] items-end gap-2" aria-hidden>
+        <Image src={`/images/Vector.png`} alt="" width={150} height={150} />
       </div>
 
       <div className="w-full flex items-center text-white flex-col z-10 relative item justify-between h-full mt-2">
         <div className="w-full h-full flex flex-col items-center gap-1">
           <h3 className="w-fit text-clamp2">Get that unfair advantage! ✨</h3>
-          <p className="text-lg w-[90%] max-w-[500px] text-center font-thin">
+          <p className="text-lg w-[90%] max-w-[500px] text-center font-light text-white/80">
             Join our Telegram group to skip website distractions and receive daily job updates straight to your feed!
           </p>
           <Link
             href={"https://t.me/worldwideremote"}
             target="_blank"
-            className="bg-white text-primary px-5 py-4 mt-6 rounded-md drop-shadow-primary2-hover transition-all font-bold">
+            className="bg-white text-primary px-6 h-12 inline-flex items-center mt-6 rounded-xl transition-colors hover:bg-secondary font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
             JOIN NOW!
           </Link>
         </div>

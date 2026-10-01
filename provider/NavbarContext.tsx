@@ -1,10 +1,8 @@
 "use client";
 import { createContext, useState, ReactNode, useContext } from "react";
 
+// The navbar's account menu. The mobile drop-down menu's half went with the hamburger (2026-10-01).
 interface NavbarContextType {
-  isOpen: boolean;
-  toggleNavbar: () => void;
-  closeNavbar: () => void;
   isOpen2: boolean;
   toggleNavbar2: () => void;
   closeNavbar2: () => void;
@@ -13,16 +11,8 @@ interface NavbarContextType {
 const NavbarContext = createContext<NavbarContextType | undefined>(undefined);
 
 export const NavbarProvider = ({ children }: { children: ReactNode }) => {
-  const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isOpen2, setIsOpen2] = useState<boolean>(false);
 
-  const toggleNavbar = () => {
-    setIsOpen((prev) => !prev);
-  };
-
-  const closeNavbar = () => {
-    setIsOpen(false);
-  };
   const toggleNavbar2 = () => {
     setIsOpen2((prev) => !prev);
   };
@@ -32,7 +22,7 @@ export const NavbarProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <NavbarContext.Provider value={{ isOpen, toggleNavbar, closeNavbar, isOpen2, toggleNavbar2, closeNavbar2 }}>
+    <NavbarContext.Provider value={{ isOpen2, toggleNavbar2, closeNavbar2 }}>
       {children}
     </NavbarContext.Provider>
   );
