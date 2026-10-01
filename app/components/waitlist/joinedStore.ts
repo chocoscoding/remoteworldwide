@@ -61,6 +61,12 @@ export const parseJoined = (raw: string | null): Joined | null => {
   }
 };
 
+/** What goToJoin needs of a Lenis instance (lenis/react's useLenis()). */
+export type SmoothScroller = { scrollTo: (target: HTMLElement, options: { offset?: number; onComplete?: () => void }) => void };
+
+/** The hero's scroll-mt-28: room for the sticky navbar above the form. */
+const JOIN_OFFSET = 112;
+
 /** The hero form's email field, which every "Join the waitlist" button on the page leads to. */
 export const HERO_INPUT_ID = "waitlist-email";
 
@@ -68,11 +74,17 @@ export const HERO_INPUT_ID = "waitlist-email";
  * Takes the reader to the hero form and puts the cursor in its email field. Links keep `#join` as
  * their href, so without JavaScript they still land on the form.
  */
-export const goToJoin = () => {
+export const goToJoin = (lenis?: SmoothScroller) => {
   const target = document.getElementById("join");
   if (!target) return false;
+  const focus = () => document.getElementById(HERO_INPUT_ID)?.focus({ preventScroll: true });
+  // Under the page's smooth scrolling, Lenis does the glide (a native smooth scroll would fight it).
+  if (lenis) {
+    lenis.scrollTo(target, { offset: -JOIN_OFFSET, onComplete: focus });
+    return true;
+  }
   const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
-  window.setTimeout(() => document.getElementById(HERO_INPUT_ID)?.focus({ preventScroll: true }), smooth ? 450 : 0);
+  window.setTimeout(focus, smooth ? 450 : 0);
   return true;
 };

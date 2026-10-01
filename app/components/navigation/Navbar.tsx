@@ -24,7 +24,7 @@ const BAR_LINK =
 
 /** What the bar used to link and no longer does, in the menu whether or not you're signed in. */
 const SITE_LINKS = [
-  { href: "/dashboard", label: "Dashboard" },
+  // { href: "/dashboard", label: "Dashboard" },
   { href: "/jobs", label: "Jobs" },
   { href: "/companies", label: "Companies" },
   { href: "/blogs", label: "Blog" },
@@ -161,13 +161,12 @@ const Navbar = () => {
   })();
   return (
     <nav aria-label="Main" className={cn("border-b sticky z-20 top-0", colorToShow)}>
-      <div className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" aria-label="Remote Worldwide home" className={cn("block rounded-md py-2.5", FOCUS)}>
-              {/* Sized by height so the box is the drawing's (a 230 x 190 box hung far below the bar). */}
-              <LogoFull className="hidden h-[17.5px] w-auto sm:block" />
+              <LogoFull className="hidden h-[21px] w-auto sm:block" />
               <LogoMini width={35} height={35} className="w-full !h-auto block sm:hidden" />
             </Link>
           </div>

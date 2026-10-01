@@ -2,6 +2,7 @@
 
 import type { FC, ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
+import { useLenis } from "lenis/react";
 import { cn } from "@/lib/utils";
 import { goToJoin } from "./joinedStore";
 
@@ -18,20 +19,24 @@ const LOOKS = {
  * Every "Join the waitlist" on /waitlist. A plain `#join` link underneath, so it still reaches the
  * form without JavaScript; with it, the page glides there and the cursor lands in the email field.
  */
-const JoinLink: FC<{ look?: keyof typeof LOOKS; className?: string; children?: ReactNode }> = ({ look = "ink", className, children = "Join the waitlist" }) => (
-  <a
-    href="#join"
-    onClick={(e) => {
-      if (goToJoin()) e.preventDefault();
-    }}
-    className={cn(
-      "group inline-flex items-center justify-center gap-2 transition-[transform,box-shadow,text-decoration-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-      LOOKS[look],
-      className,
-    )}>
-    {children}
-    <ArrowUp className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" aria-hidden />
-  </a>
-);
+const JoinLink: FC<{ look?: keyof typeof LOOKS; className?: string; children?: ReactNode }> = ({ look = "ink", className, children = "Join the waitlist" }) => {
+  // The page's smooth scrolling, when it is on (app/components/waitlist/SmoothScroll.tsx).
+  const lenis = useLenis();
+  return (
+    <a
+      href="#join"
+      onClick={(e) => {
+        if (goToJoin(lenis)) e.preventDefault();
+      }}
+      className={cn(
+        "group inline-flex items-center justify-center gap-2 transition-[transform,box-shadow,text-decoration-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+        LOOKS[look],
+        className,
+      )}>
+      {children}
+      <ArrowUp className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" aria-hidden />
+    </a>
+  );
+};
 
 export default JoinLink;

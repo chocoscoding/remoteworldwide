@@ -12,7 +12,7 @@ export default async function RootLayout({
       <NavbarProvider>
         <AuthModalProvider>
           <Navbar />
-          <div className="w-full max-w-[1580px] overflow-clip m-auto">{children}</div>
+          <div className="w-full max-w-[1680px] overflow-clip m-auto">{children}</div>
           <Footer />
         </AuthModalProvider>
       </NavbarProvider>

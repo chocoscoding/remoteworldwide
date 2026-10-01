@@ -50,7 +50,10 @@ const FooterSection = () => {
 
         <div className="my-4 flex flex-wrap justify-center gap-x-6 text-sm">
           {links.map((link, index) => (
-            <Link key={index} href={link.href} className="inline-flex min-h-[44px] items-center text-white/65 hover:text-white duration-150">
+            <Link
+              key={index}
+              href={link.href}
+              className="inline-flex min-h-[44px] items-center text-white/65 hover:text-white duration-150">
               <span>{link.title}</span>
             </Link>
           ))}
@@ -96,7 +99,7 @@ const FooterSection = () => {
             </svg>
           </Link>
         </div>
-        <span className="text-white/65 block text-center text-sm">2024 - {new Date().getFullYear()} Worldwideremote</span>
+        <span className="text-white/65 block text-center text-sm">2024 - {new Date().getFullYear()} Remoteworldwide</span>
       </div>
     </footer>
   );
@@ -106,11 +109,15 @@ const Footer = () => {
   return (
     <footer className="bg-primary relative overflow-hidden p-5 z-10">
       {/* Decorative corners, quieter than they were (owner, 2026-10-01: less brutalism). */}
-      <div className="pointer-events-none absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] top-5 left-5 flex opacity-50 md:opacity-70 z-[3]" aria-hidden>
+      <div
+        className="pointer-events-none absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] top-5 left-5 flex opacity-50 md:opacity-70 z-[3]"
+        aria-hidden>
         <Image src={`/images/Vector.png`} alt="" width={150} height={150} />
         <Image src={`/images/star.png`} alt="" width={40} height={40} className="h-max" />
       </div>
-      <div className="pointer-events-none absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] bottom-10 right-5 flex opacity-50 md:opacity-70 z-[3] items-end gap-2" aria-hidden>
+      <div
+        className="pointer-events-none absolute h-[120px] md:h-[200px] w-[120px] md:w-[200px] bottom-10 right-5 flex opacity-50 md:opacity-70 z-[3] items-end gap-2"
+        aria-hidden>
         <Image src={`/images/Vector.png`} alt="" width={150} height={150} />
       </div>
 

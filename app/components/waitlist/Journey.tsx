@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FC, type ReactNode } from "react";
 import { motion, useScroll, useSpring } from "motion/react";
+import { useLenis } from "lenis/react";
 import { cn } from "@/lib/utils";
 import Eyebrow from "@/app/components/marketing/Eyebrow";
 import JoinLink from "./JoinLink";
@@ -92,9 +93,15 @@ const Journey: FC<{ jobs: BoardJob[]; role: string }> = ({ jobs, role }) => {
   const { scrollYProgress } = useScroll({ target: track, offset: ["start 0.5", "end 0.5"] });
   const progress = useSpring(scrollYProgress, { stiffness: 200, damping: 30, restDelta: 0.001 });
 
+  // The page's smooth scrolling, when it is on: it does the glide, since a native one would fight it.
+  const lenis = useLenis();
   const goTo = (index: number) => {
     const el = items.current[index];
     if (!el) return;
+    if (lenis) {
+      lenis.scrollTo(el, { offset: -Math.max(0, (window.innerHeight - el.offsetHeight) / 2) });
+      return;
+    }
     const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
   };

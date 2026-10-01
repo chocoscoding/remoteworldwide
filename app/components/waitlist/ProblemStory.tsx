@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type FC } from "react";
+import { useLayoutEffect, useRef, type FC, type ReactNode } from "react";
 import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } from "motion/react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,20 @@ import { cn } from "@/lib/utils";
 export type StoryLine = { text: string; mark?: boolean };
 
 const FAINT = 0.16;
+
+/**
+ * How much scrolling the reading takes, as a multiple of the first cut's (the block's height plus
+ * 30% of the window, when it simply scrolled past): twice that (owner, 2026-10-01), so people can
+ * read it as they scroll. The block pins while the reading plays out.
+ */
+const READ_LENGTH = 2;
+/** It starts filling in when its top is this far down the window... */
+const START = 0.85;
+/** ...and pins this far from the top, below the navbar, until the last word has filled in. */
+const PIN_TOP = "max(15vh, 89px)";
+const pinTopPx = (vh: number): number => Math.max(0.15 * vh, 89);
+
+const readDistance = (height: number, vh: number): number => READ_LENGTH * (height + 0.3 * vh);
 /** The paragraph's own weight, and a stress word's once it has been read (owner, 2026-10-01). */
 const BASE_WEIGHT = 500;
 const STRESS_WEIGHT = 700;
@@ -49,11 +63,45 @@ const Word: FC<Token & { progress: MotionValue<number>; from: number; to: number
  * motion it is simply printed, stress words already bold. Needs a variable font on `className` for
  * the weight to move smoothly (the page passes Manrope's variable cut).
  */
-const ProblemStory: FC<{ lines: StoryLine[]; className?: string }> = ({ lines, className }) => {
-  const ref = useRef<HTMLParagraphElement>(null);
+const ProblemStory: FC<{ lines: StoryLine[]; className?: string; before?: ReactNode; after?: ReactNode }> = ({ lines, className, before, after }) => {
+  const block = useRef<HTMLDivElement>(null);
+  const runway = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
-  // From when the paragraph's top is low in the window to when its end reaches the middle.
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 0.85", "end 0.55"] });
+
+  // The block (`before` and the paragraph) pins at PIN_TOP for as long as the reading still has to
+  // run, over an empty runway below it. The runway ends where `after` begins, so `after` rises to
+  // meet the pinned block and docks under it the moment the last word fills in; from there they
+  // scroll on together. Set on the DOM rather than in state, so a resize or the font arriving
+  // re-measures without a render.
+  useLayoutEffect(() => {
+    if (reduce) return;
+    const measure = () => {
+      if (!block.current || !runway.current) return;
+      const vh = window.innerHeight;
+      const rise = START * vh - pinTopPx(vh);
+      runway.current.style.height = `${Math.max(0, Math.round(readDistance(block.current.offsetHeight, vh) - rise))}px`;
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (block.current) observer.observe(block.current);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [reduce]);
+
+  // How far into the reading: from the block's top at START of the window, over readDistance() of
+  // scrolling. Worked out from where it sits now rather than from a scroll offset, so it's exact.
+  const { scrollY } = useScroll();
+  const scrollYProgress = useTransform(scrollY, () => {
+    if (!block.current || !runway.current) return 0;
+    const vh = window.innerHeight;
+    // While pinned the block stands still, so measure the scroll from the runway instead.
+    const blockTop = runway.current.getBoundingClientRect().top - block.current.offsetHeight;
+    const travelled = START * vh - blockTop;
+    return Math.min(1, Math.max(0, travelled / readDistance(block.current.offsetHeight, vh)));
+  });
 
   const words: Token[] = lines.flatMap((line) => {
     const split = line.text.split(" ");
@@ -69,20 +117,30 @@ const ProblemStory: FC<{ lines: StoryLine[]; className?: string }> = ({ lines, c
   const step = 1 / words.length;
 
   return (
-    <p ref={ref} className={cn("isolate text-balance", className)} style={{ fontWeight: BASE_WEIGHT }}>
-      {words
-        .map((token, i) =>
-          reduce ? (
-            <span key={i} className="relative inline-block" style={token.stress ? { fontWeight: STRESS_WEIGHT } : undefined}>
-              {token.mark ? <span aria-hidden className={cn(MARKER, markerEnd(token.mark))} /> : null}
-              {token.word}
-            </span>
-          ) : (
-            <Word key={i} {...token} progress={scrollYProgress} from={i * step} to={Math.min(1, (i + 1.5) * step)} />
-          ),
-        )
-        .flatMap((node, i) => (i < words.length - 1 ? [node, " "] : [node]))}
-    </p>
+    <>
+      <div>
+        <div ref={block} className={reduce ? undefined : "sticky"} style={reduce ? undefined : { top: PIN_TOP }}>
+          {before}
+          <p className={cn("isolate text-balance", className)} style={{ fontWeight: BASE_WEIGHT }}>
+            {words
+              .map((token, i) =>
+                reduce ? (
+                  <span key={i} className="relative inline-block" style={token.stress ? { fontWeight: STRESS_WEIGHT } : undefined}>
+                    {token.mark ? <span aria-hidden className={cn(MARKER, markerEnd(token.mark))} /> : null}
+                    {token.word}
+                  </span>
+                ) : (
+                  <Word key={i} {...token} progress={scrollYProgress} from={i * step} to={Math.min(1, (i + 1.5) * step)} />
+                ),
+              )
+              .flatMap((node, i) => (i < words.length - 1 ? [node, " "] : [node]))}
+          </p>
+        </div>
+        {/* The scroll the reading plays out over while the block is pinned; empty. */}
+        <div ref={runway} aria-hidden />
+      </div>
+      {after}
+    </>
   );
 };
 

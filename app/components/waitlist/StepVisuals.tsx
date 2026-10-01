@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { FALLBACK_CATALOGUE, RECOMMENDED_PLAN, money } from "@/app/lib/pricing/catalogue";
+import { FALLBACK_CATALOGUE, money } from "@/app/lib/pricing/catalogue";
+import { WAITLIST_GRANT_CREDITS, WAITLIST_GRANT_PLAN } from "@/app/lib/waitlist/types";
 import CheckChip from "@/app/components/marketing/CheckChip";
 
 // The pictures over the three "How early access works" steps on /waitlist, after the image cards
@@ -36,7 +37,7 @@ function InviteVisual() {
         </div>
       </div>
       <p className="mt-3 text-sm font-extrabold leading-snug text-primary">Your spot is open</p>
-      <p className="mt-0.5 text-[11px] leading-snug text-primary/65">Start on Free, or pick a plan.</p>
+      <p className="mt-0.5 text-[11px] leading-snug text-primary/65">Your first month of {WAITLIST_GRANT_PLAN} is on us.</p>
       <span className="mt-3 inline-flex items-center gap-1 rounded-lg bg-secondary px-3 py-1.5 text-[11px] font-bold text-primary">
         Claim your spot
         <ArrowRight className="h-3 w-3" />
@@ -45,39 +46,42 @@ function InviteVisual() {
   );
 }
 
-function PlansVisual() {
-  // From the seeded plans, so the picture can't quote a price the pricing page doesn't.
+/**
+ * Step three (owner, 2026-10-01): your spot opens on Pro, a month of it with its credits, and you
+ * upgrade later if you want. The price is the seeded plan's, struck through, so the picture can't
+ * quote one the pricing page doesn't.
+ */
+function ProVisual() {
+  const pro = FALLBACK_CATALOGUE.plans.find((plan) => plan.key === "pro");
   return (
-    <ul className="flex w-full max-w-[250px] flex-col gap-1.5">
-      {FALLBACK_CATALOGUE.plans.map((plan) => {
-        const featured = plan.key === RECOMMENDED_PLAN;
-        return (
-          <li
-            key={plan.key}
-            className={cn(
-              "flex items-center justify-between rounded-xl px-3.5 py-2 text-xs font-bold text-primary",
-              featured ? "-rotate-1 bg-secondary br-shadow" : "border border-primary/10 bg-white",
-            )}>
-            <span className="flex items-center gap-2">
-              {plan.name}
-              {/* Too tight in the tablet's three narrow columns; the lime row says it there. */}
-              {featured ? <span className="rounded-full bg-primary px-1.5 py-0.5 text-[8px] uppercase tracking-[0.08em] text-secondary md:max-lg:hidden">Recommended</span> : null}
-            </span>
-            <span className="tabular-nums">
-              {money(plan.priceCents, plan.currency)}
-              <span className="font-semibold text-primary/50">/mo</span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="w-full max-w-[250px]">
+      <div className="-rotate-1 rounded-2xl bg-secondary p-3.5 text-primary br-shadow">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-extrabold">{WAITLIST_GRANT_PLAN}</span>
+          <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-secondary">1 month on us</span>
+        </div>
+        <p className="mt-1.5 flex items-baseline gap-2 tabular-nums">
+          {pro ? <span className="text-sm font-bold text-primary/45 line-through">{money(pro.priceCents, pro.currency)}</span> : null}
+          <span className="text-2xl font-extrabold">{money(0)}</span>
+          <span className="text-[11px] font-semibold text-primary/65">your first month</span>
+        </p>
+        <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold">
+          <CheckChip size="sm" className="!h-3.5 !w-3.5 !rounded-[4px] !shadow-none" />
+          {WAITLIST_GRANT_CREDITS} AI credits
+        </span>
+      </div>
+      <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-primary/10 bg-white px-3.5 py-2 text-[11px] font-bold text-primary/65">
+        Then upgrade, or stay on Free
+        <ArrowRight className="h-3 w-3 flex-none" />
+      </div>
+    </div>
   );
 }
 
 const VISUALS: { canvas: string; picture: ReactNode }[] = [
   { canvas: "bg-secondary/40", picture: <JoinVisual /> },
   { canvas: "border border-primary/10 bg-white", picture: <InviteVisual /> },
-  { canvas: "bg-secondary/40", picture: <PlansVisual /> },
+  { canvas: "bg-secondary/40", picture: <ProVisual /> },
 ];
 
 /** Step `index`'s picture on its canvas, with the step number in the corner. */
