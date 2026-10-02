@@ -1884,7 +1884,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
         </div>
       ) : phase === "connecting" ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
-          <PrepOrb state="connecting" size={150} />
+          <PrepOrb state="connecting" />
           <p className="text-[15px] font-bold">{start.kind === "starting" ? "Starting your recording…" : "Connecting to your interviewer…"}</p>
           <p className="text-sm text-white/50">This is a practice session — keep this tab open.</p>
           {openingNote && start.kind !== "local" && <p className="text-xs font-bold text-[#e1f073]">{openingNote}</p>}

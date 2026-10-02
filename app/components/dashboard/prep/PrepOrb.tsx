@@ -2,10 +2,11 @@
 
 // The interview screen's orb, driven by the session this screen already owns.
 //
-// orb-ui runs in controlled mode here rather than through a provider adapter:
-// PrepLive holds the mic, the recording and the interviewer's voice itself, so
-// it already knows the state. On the ElevenLabs Speech Engine it still does;
-// the engine only adds its real levels, read here every frame.
+// Drawn by AgentAudioVisualizerRadial, a LiveKit Agents UI visualizer ported to
+// work without LiveKit. PrepLive owns the mic, the recording and the
+// interviewer's voice, so it already knows the state. On the ElevenLabs Speech
+// Engine it still does: the engine only adds its real levels, which are read
+// here every frame and passed in as the bars' volume.
 //
 // It owns the level subscription instead of PrepLive doing it, and that is the
 // whole point of the component: `onLevel` fires at animation rate, and lifting
@@ -13,8 +14,11 @@
 // times a second. Here only the orb re-renders.
 
 import { useEffect, useState, type FC } from "react";
+import { Loader2 } from "lucide-react";
 import type { OrbState } from "orb-ui";
-import InterviewOrb from "@/app/components/dashboard/voice/InterviewOrb";
+import { AgentAudioVisualizerRadial } from "@/components/agents-ui/agent-audio-visualizer-radial";
+import { ORB_COLOR, ORB_STATE_LABEL } from "@/app/components/dashboard/voice/orbTheme";
+import { cn } from "@/lib/utils";
 
 export interface PrepOrbProps {
   state: OrbState;
@@ -27,9 +31,9 @@ export interface PrepOrbProps {
   getOutputVolume?: () => number;
   label?: string;
   caption?: string;
-  /** See InterviewOrb — for captions about to cause something. */
+  /** Draws the caption forward, for captions that are about to cause something ("Sending in 3…"). */
   captionEmphasis?: boolean;
-  size?: number;
+  size?: "md" | "lg" | "xl";
   className?: string;
 }
 
@@ -45,7 +49,7 @@ export interface PrepOrbProps {
  */
 const ASSUMED_OUTPUT_LEVEL = 0.55;
 
-const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, getInputVolume, getOutputVolume, label, caption, captionEmphasis, size = 190, className }) => {
+const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, getInputVolume, getOutputVolume, label, caption, captionEmphasis, size = "lg", className }) => {
   const [input, setInput] = useState(0);
   const [output, setOutput] = useState(0);
   const measured = Boolean(getInputVolume && getOutputVolume);
@@ -71,20 +75,35 @@ const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, getInputVolume, 
   // because every path that stops the mic also leaves `listening`.
   const inputVolume = micActive && state === "listening" ? input : 0;
 
+  const outputVolume = state === "speaking" ? (measured ? output : ASSUMED_OUTPUT_LEVEL) : 0;
+  const level = state === "speaking" ? outputVolume : inputVolume;
+
   return (
-    <InterviewOrb
-      signal={{
-        state,
-        inputVolume,
-        outputVolume: state === "speaking" ? (measured ? output : ASSUMED_OUTPUT_LEVEL) : 0,
-      }}
-      label={label}
-      caption={caption}
-      captionEmphasis={captionEmphasis}
-      size={size}
-      tone="dark"
-      className={className}
-    />
+    <div className={cn("flex flex-col items-center gap-4", className)}>
+      <AgentAudioVisualizerRadial
+        // The orb is one colour in every state (see orbTheme.ts). Idle and
+        // error have no animation of their own, so both show dim bars.
+        state={state}
+        size={size}
+        color={ORB_COLOR}
+        volumeBands={[level]}
+        aria-hidden
+      />
+
+      <div className="flex flex-col items-center text-center">
+        {/* Reserved height, so the caption does not jump when the spinner comes and goes. */}
+        <span className="flex h-4 items-center justify-center" aria-hidden>
+          {state === "connecting" && <Loader2 className="h-4 w-4 animate-spin text-[#e1f073]" />}
+        </span>
+        {label && <p className="mt-1 text-sm font-bold text-white">{label}</p>}
+        <p
+          role="status"
+          aria-live="polite"
+          className={cn("mt-0.5 text-xs", state === "error" ? "font-bold text-[#ff9b86]" : captionEmphasis ? "font-bold text-white" : "text-white/45")}>
+          {caption ?? ORB_STATE_LABEL[state]}
+        </p>
+      </div>
+    </div>
   );
 };
 
