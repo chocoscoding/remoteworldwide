@@ -108,7 +108,9 @@ const FAQ: { q: string; a: ReactNode }[] = [
       <>
         Free comes with 50 credits a month, one resume, one cover letter, ATS scans, application tracking and streaks. Resume AI, the career
         coach, the daily plan and pods start at Basic, and interview prep at Pro. Everything is on the{" "}
-        <Link href="/pricing" className={LINK}>
+        <Link
+          href="/pricing"
+          className={LINK}>
           pricing page
         </Link>
         .
@@ -120,7 +122,9 @@ const FAQ: { q: string; a: ReactNode }[] = [
     a: (
       <>
         A confirmation now, then one email when your spot opens — no spam, ever. More in our{" "}
-        <Link href="/privacy-policy" className={LINK}>
+        <Link
+          href="/privacy-policy"
+          className={LINK}>
           privacy policy
         </Link>
         .
@@ -132,7 +136,9 @@ const FAQ: { q: string; a: ReactNode }[] = [
     a: (
       <>
         Yes — the{" "}
-        <Link href="/jobs" className={LINK}>
+        <Link
+          href="/jobs"
+          className={LINK}>
           job board
         </Link>{" "}
         is open to everyone. Search and apply to vetted remote roles, free, right now.
@@ -142,7 +148,9 @@ const FAQ: { q: string; a: ReactNode }[] = [
 ];
 
 const LIVE_DOT = (
-  <span className="relative flex h-2 w-2 flex-none" aria-hidden>
+  <span
+    className="relative flex h-2 w-2 flex-none"
+    aria-hidden>
     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-secondary2 opacity-90 motion-reduce:animate-none" />
     <span className="relative inline-flex h-2 w-2 rounded-full bg-secondary2 ring-1 ring-primary/40" />
   </span>
@@ -190,7 +198,9 @@ export default async function WaitlistPage() {
       <div className="bg-[#f9f8f1] text-primary">
         {/* Hero: the promise */}
         <section className="mx-auto grid max-w-[1200px] items-center gap-10 px-4 pb-16 pt-10 md:pb-24 md:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12">
-          <div id="join" className="scroll-mt-28">
+          <div
+            id="join"
+            className="scroll-mt-28">
             <Eyebrow dot={LIVE_DOT}>Early access · opening in batches</Eyebrow>
 
             <h1 className="isolate mt-6 text-[2.375rem] font-extrabold leading-[1.04] tracking-tight xs:text-5xl sm:text-6xl xl:text-[4.25rem]">
@@ -214,8 +224,10 @@ export default async function WaitlistPage() {
             </Suspense>
 
             <ul className="mt-5 flex flex-wrap items-center gap-x-6 text-sm font-medium text-primary/75">
-              {["Free to join", "No card needed"].map((item) => (
-                <li key={item} className="flex min-h-[44px] items-center gap-2.5">
+              {["No card needed", "First month of PRO plan for free"].map((item) => (
+                <li
+                  key={item}
+                  className="flex min-h-[44px] items-center gap-2.5">
                   <CheckChip size="sm" />
                   {item}
                 </li>
@@ -228,10 +240,14 @@ export default async function WaitlistPage() {
         </section>
 
         {/* Marquee */}
-        <div className="overflow-hidden bg-secondary py-3" aria-hidden>
+        <div
+          className="overflow-hidden bg-secondary py-3"
+          aria-hidden>
           <div className="marquee-track flex w-max">
             {[0, 1].map((copy) => (
-              <div key={copy} className="flex flex-none items-center">
+              <div
+                key={copy}
+                className="flex flex-none items-center">
                 {MARQUEE.map((item) => (
                   <span
                     key={item}
@@ -248,7 +264,9 @@ export default async function WaitlistPage() {
         {/* Act one: the problem */}
         {/* 10% wider and its text 15% larger than the cut before (owner, 2026-10-01): 1000 → 1100px;
           1.5 / 1.75 / 2.4rem → 1.725 / 2.0125 / 2.76rem. */}
-        <section className="mx-auto max-w-[1100px] px-4 pt-24 md:pt-36" aria-label="The problem">
+        <section
+          className="mx-auto max-w-[1100px] px-4 pt-24 md:pt-36"
+          aria-label="The problem">
           {/* Pinned while it's read; the way-out line rises to meet it as the last word fills in. */}
           <ProblemStory
             lines={STORY}
@@ -264,13 +282,21 @@ export default async function WaitlistPage() {
         </section>
 
         {/* Act two: one application, followed from first click to offer */}
-        <Journey jobs={boardJobs} role={role} />
+        <Journey
+          jobs={boardJobs}
+          role={role}
+        />
 
         {/* Act three: proof */}
-        <LiveBoard count={count} jobs={jobs} />
+        <LiveBoard
+          count={count}
+          jobs={jobs}
+        />
 
         {/* Act four: the old way against ours */}
-        <section className="mx-auto max-w-[1200px] px-4 pt-24 md:pt-32" aria-labelledby="why-heading">
+        <section
+          className="mx-auto max-w-[1200px] px-4 pt-24 md:pt-32"
+          aria-labelledby="why-heading">
           <div className="mx-auto mb-12 max-w-[680px] text-center">
             <Eyebrow>Why Remote Worldwide</Eyebrow>
             <h2
@@ -298,14 +324,20 @@ export default async function WaitlistPage() {
                     <span
                       className="grid h-[18px] w-[18px] flex-none place-content-center rounded-[5px] bg-[#f6ddd6] text-[#b23c26]"
                       aria-hidden>
-                      <X className="h-2.5 w-2.5" strokeWidth={4} />
+                      <X
+                        className="h-2.5 w-2.5"
+                        strokeWidth={4}
+                      />
                     </span>
                     <span>
                       <span className="sr-only">The old way: </span>
                       {row.old}
                     </span>
                   </span>
-                  <ArrowRight className="mx-auto hidden h-4 w-4 text-primary/30 sm:block" aria-hidden />
+                  <ArrowRight
+                    className="mx-auto hidden h-4 w-4 text-primary/30 sm:block"
+                    aria-hidden
+                  />
                   <span className="flex items-center gap-2.5 text-sm font-semibold text-primary">
                     <CheckChip size="sm" />
                     <span>
@@ -320,13 +352,18 @@ export default async function WaitlistPage() {
 
           <div className="mt-10 flex flex-col items-center text-center">
             <p className="max-w-[440px] text-primary/70">One toolkit for the whole search, built around a board of vetted remote roles.</p>
-            <JoinLink look="ink" className="mt-6" />
+            <JoinLink
+              look="ink"
+              className="mt-6"
+            />
           </div>
         </section>
 
         {/* Act five: what happens after you join */}
         {/* On a phone: pinned, with the three cards sliding across as you scroll (PinnedRail). */}
-        <section className="mx-auto max-w-[1200px] px-4 pt-24 md:pt-32" aria-labelledby="how-heading">
+        <section
+          className="mx-auto max-w-[1200px] px-4 pt-24 md:pt-32"
+          aria-labelledby="how-heading">
           <PinnedRail
             heading={
               <div className="mx-auto mb-8 max-w-[680px] text-center md:mb-12">
@@ -348,7 +385,9 @@ export default async function WaitlistPage() {
                 </h3>
                 <p className="mt-1.5 max-w-[340px] text-sm leading-relaxed text-primary/70">{step.body}</p>
                 {i === 0 ? (
-                  <JoinLink look="text" className="mt-2">
+                  <JoinLink
+                    look="text"
+                    className="mt-2">
                     Do it now
                   </JoinLink>
                 ) : null}
@@ -358,7 +397,9 @@ export default async function WaitlistPage() {
         </section>
 
         {/* FAQ */}
-        <section className="mx-auto max-w-[1200px] px-4 pt-24 md:pt-32" aria-labelledby="faq-heading">
+        <section
+          className="mx-auto max-w-[1200px] px-4 pt-24 md:pt-32"
+          aria-labelledby="faq-heading">
           <div className="mx-auto max-w-[760px]">
             <div className="text-center">
               <Eyebrow>FAQ</Eyebrow>
@@ -373,18 +414,28 @@ export default async function WaitlistPage() {
         </section>
 
         {/* The ask, with the form right here */}
-        <section className="mx-auto max-w-[1200px] px-4 py-24 md:py-32" aria-label="Join the waitlist">
+        <section
+          className="mx-auto max-w-[1200px] px-4 py-24 md:py-32"
+          aria-label="Join the waitlist">
           <div className="relative overflow-hidden rounded-[28px] bg-primary px-5 py-14 text-center text-white sm:px-6 md:px-12 md:py-20">
             <div
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.12)_1px,transparent_1px)] bg-[length:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
               aria-hidden
             />
-            <Sparkle className="absolute left-8 top-8 hidden h-10 w-10 fill-secondary text-secondary md:block" aria-hidden />
-            <Sparkle className="absolute bottom-10 right-10 hidden h-6 w-6 fill-secondary text-secondary md:block" aria-hidden />
+            <Sparkle
+              className="absolute left-8 top-8 hidden h-10 w-10 fill-secondary text-secondary md:block"
+              aria-hidden
+            />
+            <Sparkle
+              className="absolute bottom-10 right-10 hidden h-6 w-6 fill-secondary text-secondary md:block"
+              aria-hidden
+            />
             <div className="relative">
               {/* The ask goes once this browser has joined (owner, 2026-10-01); "You're on the list" stays. */}
               <UnlessJoined>
-                <h2 id="final-heading" className="text-balance text-3xl font-extrabold tracking-tight md:text-5xl">
+                <h2
+                  id="final-heading"
+                  className="text-balance text-3xl font-extrabold tracking-tight md:text-5xl">
                   Your spot is <span className="text-secondary">waiting.</span>
                 </h2>
                 <p className="mx-auto mt-4 max-w-[480px] text-white/75">
@@ -392,8 +443,19 @@ export default async function WaitlistPage() {
                 </p>
               </UnlessJoined>
               <Suspense
-                fallback={<WaitlistForm initialPlan={null} tone="dark" inputId="waitlist-email-final" className="mx-auto max-w-[560px] first:mt-0" />}>
-                <WaitlistFormFromParams tone="dark" inputId="waitlist-email-final" className="mx-auto max-w-[560px] first:mt-0" />
+                fallback={
+                  <WaitlistForm
+                    initialPlan={null}
+                    tone="dark"
+                    inputId="waitlist-email-final"
+                    className="mx-auto max-w-[560px] first:mt-0"
+                  />
+                }>
+                <WaitlistFormFromParams
+                  tone="dark"
+                  inputId="waitlist-email-final"
+                  className="mx-auto max-w-[560px] first:mt-0"
+                />
               </Suspense>
               <Link
                 href="/pricing"
