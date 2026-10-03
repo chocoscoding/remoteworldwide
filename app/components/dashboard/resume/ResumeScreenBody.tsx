@@ -97,13 +97,13 @@ const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
         // columns, not 3, so the freed width goes to the center, not to a
         // reserved-but-empty column.
         overview: "grid-cols-[1fr_360px]",
-        content: "grid-cols-[346px_1fr_350px]",
+        content: "grid-cols-[366px_1fr_320px]",
         customize: "grid-cols-[180px_1fr_450px]",
         ai: "grid-cols-[300px_1fr_360px]",
       }
     : {
         overview: "grid-cols-[1fr_324px]",
-        content: "grid-cols-[328px_1fr_320px]",
+        content: "grid-cols-[348px_1fr_305px]",
         customize: "grid-cols-[188px_1fr_404px]",
         ai: "grid-cols-[308px_1fr_324px]",
       };
@@ -136,7 +136,16 @@ export interface ResumeScreenBodyProps {
   tailorPreset?: TailorPreset | null;
 }
 
-const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, activeDoc, setDocuments, setActiveDocId, onSaved, banner, tailorPreset = null }) => {
+const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({
+  documents,
+  activeDocId,
+  activeDoc,
+  setDocuments,
+  setActiveDocId,
+  onSaved,
+  banner,
+  tailorPreset = null,
+}) => {
   const { design, sections } = useResumeDesign();
   const { collapsed: sidebarCollapsed } = useSidebarCollapse();
 
@@ -151,7 +160,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   const lockedAi = () => openUpgrade({ kind: "plan", requiredPlan: "basic", message: "AI help with your resume is on Basic and up." });
   const startNewResume = () =>
     moreResumesLocked
-      ? openUpgrade({ kind: "plan", requiredPlan: "basic", message: "Free includes one resume — edit it to tailor it, or upgrade to Basic to build more." })
+      ? openUpgrade({
+          kind: "plan",
+          requiredPlan: "basic",
+          message: "Free includes one resume — edit it to tailor it, or upgrade to Basic to build more.",
+        })
       : setNewResumeOpen(true);
   const [creatingResume, setCreatingResume] = useState(false);
 
@@ -250,7 +263,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
   const suggestions = activeDoc.check?.job ? (activeDoc.suggestions ?? null) : null;
   // The rail's suggestion cards: what the standing check found, against the
   // content as it is now — free, and gone the moment the check is removed.
-  const checkSuggestions = useMemo(() => deriveCheckSuggestions(activeDoc.check, content, pageCount), [activeDoc.check, content, pageCount]);
+  const checkSuggestions = useMemo(
+    () => deriveCheckSuggestions(activeDoc.check, content, pageCount),
+    [activeDoc.check, content, pageCount],
+  );
   const downloadFileName = content.name.trim() ? `${content.name.trim().replace(/\s+/g, "-")}-Resume` : "Resume";
   const previewScale = Math.max(0.45, Math.min(1.8, fit.scale * (zoomPercent / 100)));
 
@@ -466,8 +482,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
           landAiTool(id, "Already fits one page — nothing worth cutting.");
           return;
         }
-        const dropped = result.trimmedBullets > 0 ? `, ${result.trimmedBullets} lower-impact bullet${result.trimmedBullets === 1 ? "" : "s"} dropped` : "";
-        landAiTool(id, `Tightened by ${result.removedWords} words${dropped}.`, () => setContent((now) => mergeRewrite(now, sent, result.content)));
+        const dropped =
+          result.trimmedBullets > 0
+            ? `, ${result.trimmedBullets} lower-impact bullet${result.trimmedBullets === 1 ? "" : "s"} dropped`
+            : "";
+        landAiTool(id, `Tightened by ${result.removedWords} words${dropped}.`, () =>
+          setContent((now) => mergeRewrite(now, sent, result.content)),
+        );
       })();
       return;
     }
@@ -707,7 +728,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
       result.rejectedLines > 0
         ? ` ${result.rejectedLines} proposed line${result.rejectedLines === 1 ? "" : "s"} would have added details your resume doesn't have, so ${result.rejectedLines === 1 ? "it was" : "they were"} left as you wrote ${result.rejectedLines === 1 ? "it" : "them"}.`
         : "";
-    setAskStatus(`Rewrote ${parts.join(" and ")} to “${instruction}”.${held} Not quite right? Say what to change next, or edit it directly.`);
+    setAskStatus(
+      `Rewrote ${parts.join(" and ")} to “${instruction}”.${held} Not quite right? Say what to change next, or edit it directly.`,
+    );
   };
 
   return (
@@ -809,7 +832,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
           <section className="min-w-0">
             <div className="mb-2 flex items-center justify-between gap-3 px-1 text-xs text-black/45">
               <p aria-live="polite">
-                {pageCount} page{pageCount === 1 ? "" : "s"} · {content.experience.length} role{content.experience.length === 1 ? "" : "s"} ·{" "}
+                {pageCount} page{pageCount === 1 ? "" : "s"} · {content.experience.length} role{content.experience.length === 1 ? "" : "s"}{" "}
+                ·{" "}
                 {autosave.status.kind === "saved" && (
                   <>
                     saved · last edited <TimeAgo datetime={autosave.savedAt} opts={{ minInterval: 10 }} />
@@ -846,7 +870,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
                   className={ZOOM_BUTTON_CLASS}>
                   −
                 </button>
-                <span className="min-w-[48px] text-center text-xs font-semibold tabular-nums text-black/70 transition-colors group-hover/zoom:text-primary">{zoomPercent}%</span>
+                <span className="min-w-[48px] text-center text-xs font-semibold tabular-nums text-black/70 transition-colors group-hover/zoom:text-primary">
+                  {zoomPercent}%
+                </span>
                 <button
                   type="button"
                   aria-label="Zoom in"
@@ -854,7 +880,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
                   className={ZOOM_BUTTON_CLASS}>
                   +
                 </button>
-                <button type="button" onClick={() => setZoom(100)} className={cn(ZOOM_BUTTON_CLASS, "ml-1 w-auto bg-[#f4f4f0] px-2.5 text-xs font-medium hover:bg-[#e1f073]")}>
+                <button
+                  type="button"
+                  onClick={() => setZoom(100)}
+                  className={cn(ZOOM_BUTTON_CLASS, "ml-1 w-auto bg-[#f4f4f0] px-2.5 text-xs font-medium hover:bg-[#e1f073]")}>
                   Fit
                 </button>
               </div>
@@ -928,7 +957,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
         </div>
       </main>
 
-      <DownloadModal open={downloadOpen} onOpenChange={setDownloadOpen} docLabel="resume" fileName={safeFileName(downloadFileName)} onDownload={handleDownload} />
+      <DownloadModal
+        open={downloadOpen}
+        onOpenChange={setDownloadOpen}
+        docLabel="resume"
+        fileName={safeFileName(downloadFileName)}
+        onDownload={handleDownload}
+      />
       <NewResumeDialog
         open={newResumeOpen}
         onOpenChange={setNewResumeOpen}

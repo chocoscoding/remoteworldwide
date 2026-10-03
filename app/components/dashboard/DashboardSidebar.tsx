@@ -164,11 +164,14 @@ const DashboardSidebar: FC = () => {
     <aside
       className={cn(
         "scrollbar-hover-root flex-none bg-white border-r border-black/10 h-screen sticky top-0 flex flex-col transition-[width] duration-200",
-        collapsed ? "w-[76px]" : "w-[252px]",
+        collapsed ? "w-[52px]" : "w-[252px]",
       )}>
       {/* Header — the notification bell lives at the right end of each page header, not here. */}
       <div
-        className={cn("h-16 flex-none border-b border-black/8 flex items-center", collapsed ? "justify-center px-2" : "justify-between px-[18px]")}>
+        className={cn(
+          "h-16 flex-none border-b border-black/8 flex items-center",
+          collapsed ? "justify-center px-2" : "justify-between px-[18px]",
+        )}>
         {collapsed ? <LogoMini className="h-[22px] w-auto" /> : <LogoFull className="h-[19px] w-auto" />}
         {!collapsed && (
           <button
@@ -193,7 +196,7 @@ const DashboardSidebar: FC = () => {
       )}
 
       {/* Nav body */}
-      <nav className={cn("scrollbar-hover flex-1 overflow-y-auto py-3.5 flex flex-col gap-4", collapsed ? "px-2" : "px-3")}>
+      <nav className={cn("scrollbar-hover flex-1 overflow-y-auto py-3.5 flex flex-col gap-4", collapsed ? "px-1.5" : "px-2")}>
         {NAV_GROUPS.map((group, groupIdx) => (
           <div key={group.label ?? `group-${groupIdx}`}>
             {group.label && !collapsed && (
@@ -295,7 +298,9 @@ const DashboardSidebar: FC = () => {
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold text-primary truncate">{displayName}</p>
-              <p className={cn("text-[11px] truncate", lowCredits ? "font-semibold text-[#b23c26]" : "text-black/50")}>{credits} credits left</p>
+              <p className={cn("text-[11px] truncate", lowCredits ? "font-semibold text-[#b23c26]" : "text-black/50")}>
+                {credits} credits left
+              </p>
             </div>
           )}
           {!collapsed && <Settings className="h-3.5 w-3.5 flex-none text-black/35" />}
