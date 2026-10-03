@@ -49,7 +49,8 @@ export type IconSetId =
 export type ColorArea = "full" | "header" | "border";
 export type ColorMode = "single" | "multi";
 export type PageFormat = "a4" | "letter";
-export type DateFormatId = "mm-yyyy" | "month-yyyy" | "mm-dd-yyyy";
+/** How a resume prints its dates: "Jan 2022", "January 2022" or "01/2022". Older ids are mapped by `dateFormatOf` (app/lib/resume/dates.ts). */
+export type DateFormatId = "short" | "long" | "numeric";
 
 export type BulletGlyph = "dot" | "dash" | "square" | "none";
 export type PhotoShape = "circle" | "square" | "rounded";

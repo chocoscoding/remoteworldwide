@@ -22,7 +22,7 @@ export const DEFAULT_DESIGN: ResumeDesign = {
   chrome: "plain",
   doc: {
     language: "en-us",
-    dateFormat: "mm-yyyy",
+    dateFormat: "short",
     pageFormat: "letter",
   },
   layout: {

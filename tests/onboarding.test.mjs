@@ -284,9 +284,9 @@ describe("work experience", () => {
     { id: "x3", role: "", company: "", dates: "2018", bullets: ["An orphaned bullet"] },
   ];
 
-  it("maps role -> title, keeps company, dates, location and the bullets as written, and drops roles with neither a company nor a title", () => {
+  it("maps role -> title, keeps company, location and the bullets as written, writes the dates as the picker would, and drops roles with neither a company nor a title", () => {
     assert.deepEqual(experienceFromResume({ experience: roles }), [
-      { company: "Kite Labs", title: "Product Designer - Team Lead", dates: "Mar 2022 – present", location: "Remote", bullets: ["Led the checkout redesign", "Cut drop-off by 18%"] },
+      { company: "Kite Labs", title: "Product Designer - Team Lead", dates: "Mar 2022 – Present", location: "Remote", bullets: ["Led the checkout redesign", "Cut drop-off by 18%"] },
       { company: "", title: "Designer", dates: "2019 – 2022", location: "", bullets: ["Shipped the design system"] },
     ]);
   });
@@ -359,8 +359,15 @@ describe("links -> linkedin / github / portfolio", () => {
 describe("education", () => {
   it("maps entries to the profile's shape and drops the ones with no school", () => {
     assert.deepEqual(educationFromResume(resume()), [
-      { school: "University of Lagos", degree: "BSc Computer Science", dates: "2010–2014", location: "Lagos", detail: "First class" },
+      { school: "University of Lagos", degree: "BSc Computer Science", dates: "2010 – 2014", location: "Lagos", detail: "First class" },
     ]);
+  });
+
+  it("writes a resume's dates the way the date picker would, and keeps a line it cannot read in full as written", () => {
+    const dated = (dates) => educationFromResume({ education: [{ id: "e", school: "Unilag", degree: "", dates }] })[0].dates;
+    assert.equal(dated("09/2016 - 07/2020"), "Sep 2016 – Jul 2020");
+    assert.equal(dated("September 2021 – current"), "Sep 2021 – Present");
+    assert.equal(dated("2019 – 2020 (expected)"), "2019 – 2020 (expected)");
   });
 
   it("defaults the optional fields to empty strings and keeps at most 10", () => {

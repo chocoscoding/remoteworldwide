@@ -20,6 +20,9 @@
 // New entries start EMPTY and lean on their inputs' placeholders. A starter
 // value ("New school", "Degree") is on the page the moment it is created, and
 // stays there for anyone who fills in one field and not the other.
+//
+// Dates are picked from dropdowns, never typed (`DateRangeField`); the paper
+// prints them in the Date format chosen under Customize → Document.
 
 import { useRef, useState, type Dispatch, type FC, type SetStateAction } from "react";
 import { Sparkles } from "lucide-react";
@@ -36,6 +39,7 @@ import LinksEditor from "./LinksEditor";
 import EntryListEditor from "./EntryListEditor";
 import BulletsEditor from "./BulletsEditor";
 import SkillsEditor from "./SkillsEditor";
+import DateRangeField from "./DateRangeField";
 
 type ContentGroupId = "personal" | "summary" | "links" | "experience" | "education" | "skills" | "projects" | "certifications";
 
@@ -61,6 +65,12 @@ export interface ContentFormProps {
   summarySuggestion: "pending" | "accepted" | "dismissed";
   onAcceptSummarySuggestion: () => void;
   onDismissSummarySuggestion: () => void;
+}
+
+/** A date picker's name for a screen reader: "Dates for Designer at Kite Labs", or just "Dates" on a blank entry. */
+function entryLabel(prefix: string, ...names: (string | undefined)[]): string {
+  const named = names.map((name) => (name ?? "").trim()).filter(Boolean);
+  return named.length > 0 ? `${prefix} ${named.join(" at ")}` : "Dates";
 }
 
 function groupMeta(id: ContentGroupId, content: ResumeContent): number | null {
@@ -211,22 +221,8 @@ const ContentForm: FC<ContentFormProps> = ({
             renderFields={(item, update, isActive) => (
               <>
                 <TextField value={item.role} onChange={(v) => update({ role: v })} placeholder="Role" isActive={isActive} />
-                <div className="flex gap-2">
-                  <TextField
-                    value={item.company}
-                    onChange={(v) => update({ company: v })}
-                    placeholder="Company"
-                    className="flex-1"
-                    isActive={isActive}
-                  />
-                  <TextField
-                    value={item.dates}
-                    onChange={(v) => update({ dates: v })}
-                    placeholder="2021–Present"
-                    className="w-32 flex-none"
-                    isActive={isActive}
-                  />
-                </div>
+                <TextField value={item.company} onChange={(v) => update({ company: v })} placeholder="Company" isActive={isActive} />
+                <DateRangeField value={item.dates} onChange={(dates) => update({ dates })} label={entryLabel("Dates for", item.role, item.company)} isActive={isActive} />
                 <BulletsEditor bullets={item.bullets} onChange={(bullets) => update({ bullets })} isActive={isActive} />
               </>
             )}
@@ -249,22 +245,8 @@ const ContentForm: FC<ContentFormProps> = ({
             renderFields={(item, update, isActive) => (
               <>
                 <TextField value={item.school} onChange={(v) => update({ school: v })} placeholder="School" isActive={isActive} />
-                <div className="flex gap-2">
-                  <TextField
-                    value={item.degree}
-                    onChange={(v) => update({ degree: v })}
-                    placeholder="Degree"
-                    className="flex-1"
-                    isActive={isActive}
-                  />
-                  <TextField
-                    value={item.dates}
-                    onChange={(v) => update({ dates: v })}
-                    placeholder="2019–2022"
-                    className="w-32 flex-none"
-                    isActive={isActive}
-                  />
-                </div>
+                <TextField value={item.degree} onChange={(v) => update({ degree: v })} placeholder="Degree" isActive={isActive} />
+                <DateRangeField value={item.dates} onChange={(dates) => update({ dates })} label={entryLabel("Dates at", item.school)} isActive={isActive} />
                 <TextField
                   value={item.location ?? ""}
                   onChange={(v) => update({ location: v })}
@@ -337,22 +319,9 @@ const ContentForm: FC<ContentFormProps> = ({
             renderFields={(item, update, isActive) => (
               <>
                 <TextField value={item.name} onChange={(v) => update({ name: v })} placeholder="Certification name" isActive={isActive} />
-                <div className="flex gap-2">
-                  <TextField
-                    value={item.issuer ?? ""}
-                    onChange={(v) => update({ issuer: v })}
-                    placeholder="Issuer (optional)"
-                    className="flex-1"
-                    isActive={isActive}
-                  />
-                  <TextField
-                    value={item.year ?? ""}
-                    onChange={(v) => update({ year: v })}
-                    placeholder="Year"
-                    className="w-20 flex-none"
-                    isActive={isActive}
-                  />
-                </div>
+                <TextField value={item.issuer ?? ""} onChange={(v) => update({ issuer: v })} placeholder="Issuer (optional)" isActive={isActive} />
+                {/* `year` is the field's historical name; it holds the same date line as the others. */}
+                <DateRangeField value={item.year ?? ""} onChange={(year) => update({ year })} label={entryLabel("Dates for", item.name)} isActive={isActive} />
               </>
             )}
           />

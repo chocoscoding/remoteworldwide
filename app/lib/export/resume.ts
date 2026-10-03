@@ -24,8 +24,9 @@ import {
   type ParagraphChild,
 } from "docx";
 import { FONT_REGISTRY } from "@/app/lib/dashboard/resume/font-meta";
-import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
+import type { DateFormatId, ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+import { displayDates } from "@/app/lib/resume/dates";
 
 const TWIPS_PER_MM = 56.6929;
 
@@ -84,6 +85,8 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
   const marginY = Math.round((design.spacing.marginYmm || 14) * TWIPS_PER_MM);
   const textWidth = page.width - marginX * 2;
   const caps = design.headings.caps === "uppercase";
+  // The paper's rule: a date line prints in the resume's format when it reads as a range.
+  const printed = (dates: string | undefined) => displayDates(dates, design.doc.dateFormat);
 
   const heading = (label: string) =>
     new Paragraph({
@@ -145,7 +148,7 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         for (const entry of entries) {
           const title: ParagraphChild[] = [new TextRun({ text: clean(entry.role), bold: true })];
           if (clean(entry.company)) title.push(new TextRun({ text: `${clean(entry.role) ? " — " : ""}${clean(entry.company)}` }));
-          children.push(entryLine(title, entry.dates));
+          children.push(entryLine(title, printed(entry.dates)));
           entry.bullets.filter((b) => clean(b)).forEach((b) => children.push(bullet(clean(b))));
         }
         break;
@@ -157,7 +160,7 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         for (const entry of entries) {
           const title: ParagraphChild[] = [new TextRun({ text: clean(entry.school), bold: true })];
           if (clean(entry.degree)) title.push(new TextRun({ text: `${clean(entry.school) ? " — " : ""}${clean(entry.degree)}` }));
-          children.push(entryLine(title, entry.dates));
+          children.push(entryLine(title, printed(entry.dates)));
           const extra = [clean(entry.location), clean(entry.detail)].filter(Boolean).join(" · ");
           if (extra) children.push(new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: extra, color: muted })] }));
         }
@@ -185,7 +188,7 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         if (entries.length === 0) break;
         children.push(heading(section.label));
         for (const cert of entries) {
-          const detail = [clean(cert.issuer), clean(cert.year)].filter(Boolean).join(", ");
+          const detail = [clean(cert.issuer), printed(cert.year)].filter(Boolean).join(", ");
           children.push(
             new Paragraph({
               spacing: { after: 40 },
@@ -247,8 +250,9 @@ export async function resumeToDocxBuffer(content: ResumeContent, design: ResumeD
   return Packer.toBuffer(buildResumeDocx(content, design, sections));
 }
 
-/** The same content as Markdown: headings, bullets and links, nothing a plain-text reader cannot follow. */
-export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig[]): string {
+/** The same content as Markdown: headings, bullets and links, nothing a plain-text reader cannot follow. Dates print in `dateFormat`, as on the paper. */
+export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig[], dateFormat: DateFormatId = "short"): string {
+  const printed = (dates: string | undefined) => displayDates(dates, dateFormat);
   const lines: string[] = [`# ${clean(content.name) || "Your name"}`];
   if (clean(content.title)) lines.push("", clean(content.title));
   const contacts = contactParts(content).map((part) => (part.link && !part.link.startsWith("mailto:") ? `[${part.text}](${part.link})` : part.text));
@@ -263,7 +267,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
       case "experience":
         for (const e of content.experience) {
           if (!clean(e.role) && !clean(e.company)) continue;
-          block.push(`### ${[clean(e.role), clean(e.company)].filter(Boolean).join(" — ")}${clean(e.dates) ? ` (${clean(e.dates)})` : ""}`);
+          block.push(`### ${[clean(e.role), clean(e.company)].filter(Boolean).join(" — ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
           e.bullets.filter((b) => clean(b)).forEach((b) => block.push(`- ${clean(b)}`));
           block.push("");
         }
@@ -271,7 +275,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
       case "education":
         for (const e of content.education) {
           if (!clean(e.school) && !clean(e.degree)) continue;
-          block.push(`### ${[clean(e.school), clean(e.degree)].filter(Boolean).join(" — ")}${clean(e.dates) ? ` (${clean(e.dates)})` : ""}`);
+          block.push(`### ${[clean(e.school), clean(e.degree)].filter(Boolean).join(" — ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
           const extra = [clean(e.location), clean(e.detail)].filter(Boolean).join(" · ");
           if (extra) block.push(extra);
           block.push("");
@@ -291,7 +295,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
       case "training":
         for (const c of content.certifications) {
           if (!clean(c.name)) continue;
-          const detail = [clean(c.issuer), clean(c.year)].filter(Boolean).join(", ");
+          const detail = [clean(c.issuer), printed(c.year)].filter(Boolean).join(", ");
           block.push(`- ${clean(c.name)}${detail ? ` — ${detail}` : ""}`);
         }
         break;

@@ -2,9 +2,10 @@
 // in, what a save sends, and what the checklist can already tell before the
 // save lands.
 //
-// Pure and type-only in its imports on purpose — `tests/onboarding.test.mjs`
-// runs it under plain `node --test`, and the moment this grows a runtime
-// import Node cannot load, that file stops loading.
+// Pure on purpose — `tests/onboarding.test.mjs` runs it under plain
+// `node --test`, and the moment this grows a runtime import Node cannot load,
+// that file stops loading. Its one runtime import, `app/lib/resume/dates.ts`,
+// is pure for the same reason.
 //
 // The one rule the whole mapping keeps: a resume only ever fills a BLANK
 // field. What someone typed, or already saved, is theirs; the resume is a
@@ -16,6 +17,7 @@
 
 import type { ResumeContent, ResumeLink } from "@/app/lib/dashboard/types";
 import type { Onboarding, OnboardingItem, OnboardingItemId, ProfileEducation, ProfileExperience, ProfileSettings } from "@/app/lib/settings/types";
+import { normalizeDates } from "@/app/lib/resume/dates";
 
 /**
  * The backend validator's ceilings (remoteworldwidebackend
@@ -262,6 +264,13 @@ export function skillsFromResume(raw: readonly unknown[]): ResumeSkills {
   return { skills: all.slice(0, PROFILE_LIMITS.skills), leftOut: all.slice(PROFILE_LIMITS.skills) };
 }
 
+/**
+ * An entry's date line as the picker would have written it ("01/2020 - current" -> "Jan 2020 –
+ * Present"), so a resume's dates arrive in the dropdowns' own form. A line the picker cannot hold in
+ * full ("Summer 2019") is kept as written; the picker shows it and offers to replace it.
+ */
+const dateLine = (value: unknown, max: number): string => normalizeDates(line(value, max)).slice(0, max);
+
 /** One education entry, trimmed and clamped. Null when it names no school: the backend refuses those. */
 export function cleanEducation(entry: Partial<ProfileEducation> | null | undefined): ProfileEducation | null {
   const school = line(entry?.school, EDUCATION_LIMITS.school);
@@ -269,7 +278,7 @@ export function cleanEducation(entry: Partial<ProfileEducation> | null | undefin
   return {
     school,
     degree: line(entry?.degree, EDUCATION_LIMITS.degree),
-    dates: line(entry?.dates, EDUCATION_LIMITS.dates),
+    dates: dateLine(entry?.dates, EDUCATION_LIMITS.dates),
     location: line(entry?.location, EDUCATION_LIMITS.location),
     detail: prose(entry?.detail, EDUCATION_LIMITS.detail),
   };
@@ -294,7 +303,7 @@ export function cleanExperience(entry: Partial<ProfileExperience> | null | undef
   return {
     company,
     title,
-    dates: line(entry?.dates, EXPERIENCE_LIMITS.dates),
+    dates: dateLine(entry?.dates, EXPERIENCE_LIMITS.dates),
     location: line(entry?.location, EXPERIENCE_LIMITS.location),
     bullets: cleanBullets(entry?.bullets),
   };

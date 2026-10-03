@@ -1,12 +1,14 @@
 import type { FC } from "react";
 import { cn } from "@/lib/utils";
 import type { BulletGlyph, ResumeDesign } from "@/app/lib/dashboard/resume/design-types";
+import { displayDates } from "@/app/lib/resume/dates";
 
 export interface EntryHeaderProps {
   /** Role / degree / project or certification name. */
   primary: string;
   /** Company / school / issuer. Pass "" for entry kinds with no counterpart (Projects). */
   secondary: string;
+  /** The entry's stored date line; printed in `design.doc.dateFormat` when it reads as a range, as written when not. */
   dates?: string;
   location?: string;
   design: ResumeDesign;
@@ -21,8 +23,9 @@ export interface EntryHeaderProps {
  * entry kind (Experience's bullets, Education's detail line, Projects' link)
  * is rendered by that section component AFTER this, not here.
  */
-const EntryHeader: FC<EntryHeaderProps> = ({ primary, secondary, dates, location, design }) => {
+const EntryHeader: FC<EntryHeaderProps> = ({ primary, secondary, dates: storedDates, location, design }) => {
   const { entries } = design;
+  const dates = displayDates(storedDates, design.doc.dateFormat);
   const showDates = entries.showDates && Boolean(dates);
   const showLocation = entries.showLocation && Boolean(location);
 

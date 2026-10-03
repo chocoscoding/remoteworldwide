@@ -6,6 +6,9 @@
 // and Settings → Profile, so a school entered in one reads the same in the
 // other.
 //
+// Dates are picked, never typed (`DateRangeField`): a month and year to start,
+// a month and year or "Present" to end, the end optional for a single date.
+//
 // Rows carry an editor-only `id` (the saved list has none); callers strip it
 // on save. A row with a degree or dates but no school is the one shape the
 // backend refuses outright, so it is called out on the row itself — the
@@ -14,6 +17,7 @@
 import type { FC } from "react";
 import { EntryListEditor } from "@/app/components/dashboard/resume/content/EntryListEditor";
 import { TextField } from "@/app/components/dashboard/resume/content/FormField";
+import DateRangeField from "@/app/components/dashboard/resume/content/DateRangeField";
 import { EDUCATION_LIMITS, educationProblems, type EducationRow } from "@/app/lib/onboarding/profile";
 
 export const blankEducationRow = (id: string): EducationRow => ({ id, school: "", degree: "", dates: "", location: "", detail: "" });
@@ -38,10 +42,8 @@ const EducationEditor: FC<{ rows: EducationRow[]; onChange: (rows: EducationRow[
           <>
             <TextField value={item.school} onChange={(v) => update({ school: v })} placeholder="School or university" isActive={isActive} />
             {problems.has(item.id) && <p className="px-0.5 text-xs font-semibold text-[#b23c26]">Add the school&apos;s name, or remove this entry.</p>}
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <TextField value={item.degree} onChange={(v) => update({ degree: v })} placeholder="Degree or course" className="flex-1" isActive={isActive} />
-              <TextField value={item.dates} onChange={(v) => update({ dates: v })} placeholder="2019–2022" className="sm:w-32 sm:flex-none" isActive={isActive} />
-            </div>
+            <TextField value={item.degree} onChange={(v) => update({ degree: v })} placeholder="Degree or course" isActive={isActive} />
+            <DateRangeField value={item.dates} onChange={(dates) => update({ dates })} label={item.school.trim() ? `Dates at ${item.school.trim()}` : "Dates"} isActive={isActive} />
             <TextField value={item.location} onChange={(v) => update({ location: v })} placeholder="Location (optional)" isActive={isActive} />
             <TextField value={item.detail} onChange={(v) => update({ detail: v })} placeholder="Honours, thesis, focus (optional)" isActive={isActive} />
           </>

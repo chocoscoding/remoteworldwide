@@ -20,6 +20,7 @@
 // type, or under a key no default has (a knob removed since it was saved), is
 // dropped and the default stands.
 
+import { dateFormatOf } from "@/app/lib/resume/dates";
 import { DEFAULT_DESIGN, DEFAULT_SECTIONS, sectionsFromSeeds } from "./design-defaults";
 import { deepMerge } from "./design-reducer";
 import type { ColumnSlot, ResumeDesign, ResumeTemplateId, SectionConfig, SectionKind } from "./design-types";
@@ -47,7 +48,12 @@ export function hydrateDesign(template: string | null | undefined, stored: unkno
   const base = tpl ? { ...deepMerge(DEFAULT_DESIGN, tpl.design), chrome: tpl.chrome } : DEFAULT_DESIGN;
   // Nothing stored and no template is the shared default itself, by reference:
   // every untouched document then starts from one object, as it did before.
-  return isPlainObject(stored) ? mergeTrusted(base, stored) : base;
+  if (!isPlainObject(stored)) return base;
+  const design = mergeTrusted(base, stored);
+  // The date format was saved for months before it did anything, under ids since retired: it is
+  // read by meaning, not by type alone.
+  const dateFormat = dateFormatOf(design.doc.dateFormat);
+  return dateFormat === design.doc.dateFormat ? design : { ...design, doc: { ...design.doc, dateFormat } };
 }
 
 const SECTION_KINDS: ReadonlySet<string> = new Set<SectionKind>([

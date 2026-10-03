@@ -12,6 +12,9 @@
 // where the hand is, and a polite live region says what happened, so a screen
 // reader hears the change the eye sees.
 //
+// Dates are picked, never typed (`DateRangeField`): a month and year to start,
+// a month and year or "Present" to end.
+//
 // Rows carry an editor-only `id`; callers strip it on save. A role with dates
 // or bullets but neither a company nor a title is the one shape the backend
 // refuses, so it is called out on the card and callers hold their Save
@@ -22,6 +25,7 @@ import { useEffect, useRef, useState, type ButtonHTMLAttributes, type FC } from 
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import BulletsEditor from "@/app/components/dashboard/resume/content/BulletsEditor";
+import DateRangeField from "@/app/components/dashboard/resume/content/DateRangeField";
 import { FIELD_CLASS, FIELD_TONE } from "@/app/components/dashboard/resume/content/FormField";
 import { EXPERIENCE_LIMITS, experienceProblems, type ExperienceRow } from "@/app/lib/onboarding/profile";
 
@@ -148,7 +152,7 @@ const ExperienceEditor: FC<{ rows: ExperienceRow[]; onChange: (rows: ExperienceR
   };
 
   return (
-    // A container, so the company and dates sit side by side only when the card itself has room —
+    // A container, so the card's controls share the title's row only when the card itself has room —
     // the same editor lives in a narrow onboarding column and in the wider settings page.
     <div className="flex flex-col gap-2.5 [container-type:inline-size]">
       <p className="sr-only" aria-live="polite">
@@ -221,28 +225,17 @@ const ExperienceEditor: FC<{ rows: ExperienceRow[]; onChange: (rows: ExperienceR
                     </p>
                   )}
 
-                  <div className="flex flex-col gap-2 [@container(min-width:440px)]:flex-row">
-                    <RoleInput
-                      label="Company"
-                      placeholder="Company"
-                      value={row.company}
-                      maxLength={EXPERIENCE_LIMITS.company}
-                      onChange={(company) => update(index, { company })}
-                      isActive={isActive}
-                      invalid={problemId !== undefined}
-                      describedBy={problemId}
-                      className="flex-1"
-                    />
-                    <RoleInput
-                      label="Dates"
-                      placeholder="Jan 2022 – Present"
-                      value={row.dates}
-                      maxLength={EXPERIENCE_LIMITS.dates}
-                      onChange={(dates) => update(index, { dates })}
-                      isActive={isActive}
-                      className="[@container(min-width:440px)]:w-44 [@container(min-width:440px)]:flex-none"
-                    />
-                  </div>
+                  <RoleInput
+                    label="Company"
+                    placeholder="Company"
+                    value={row.company}
+                    maxLength={EXPERIENCE_LIMITS.company}
+                    onChange={(company) => update(index, { company })}
+                    isActive={isActive}
+                    invalid={problemId !== undefined}
+                    describedBy={problemId}
+                  />
+                  <DateRangeField value={row.dates} onChange={(dates) => update(index, { dates })} label={`Dates for ${name}`} isActive={isActive} />
                   <RoleInput
                     label="Location"
                     placeholder="Location (optional)"

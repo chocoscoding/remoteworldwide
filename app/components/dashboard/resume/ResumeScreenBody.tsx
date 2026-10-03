@@ -273,7 +273,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ documents, activeDocId, a
       return;
     }
     if (format === "md") {
-      saveText(resumeToMarkdown(content, sections), `${base}.md`);
+      saveText(resumeToMarkdown(content, sections, design.doc.dateFormat), `${base}.md`);
       return;
     }
     const paper = paperWrapRef.current?.firstElementChild;

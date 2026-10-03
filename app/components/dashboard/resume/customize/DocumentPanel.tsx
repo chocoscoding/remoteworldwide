@@ -17,10 +17,11 @@ const LANGUAGE_OPTIONS: LabeledSelectOption<string>[] = [
   { id: "nl-nl", label: "Dutch" },
 ];
 
+/** Each shown as an example, so the choice reads as what the page will print. Entries are stored one way ("Jan 2024"); this only changes how they print. */
 const DATE_FORMAT_OPTIONS: LabeledSelectOption<DateFormatId>[] = [
-  { id: "mm-yyyy", label: "MM/YYYY" },
-  { id: "month-yyyy", label: "Month YYYY" },
-  { id: "mm-dd-yyyy", label: "MM/DD/YYYY" },
+  { id: "short", label: "Jan 2024" },
+  { id: "long", label: "January 2024" },
+  { id: "numeric", label: "01/2024" },
 ];
 
 const PAGE_FORMAT_OPTIONS: SegmentedControlOption<PageFormat>[] = [
