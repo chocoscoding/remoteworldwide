@@ -72,9 +72,11 @@ import {
 } from "@/app/lib/cover/presentation";
 import type { LetterDesign, LetterFontId, LetterheadMode, LetterSpacingId, LetterThemeId, LetterView } from "@/app/lib/dashboard/types";
 import RichTextEditor from "@/app/components/dashboard/ui/RichTextEditor";
+import { LetterSkeleton, ToolbarSelect } from "@/app/components/dashboard/cover/LetterParts";
 import SplitButton from "@/app/components/dashboard/ui/SplitButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
+import SeeAllInDocuments from "@/app/components/dashboard/ui/SeeAllInDocuments";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
 import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
@@ -181,12 +183,13 @@ function snippetOf(letter: LetterView): string {
 }
 
 /**
- * The front door's "pick up where you left off": the last few letters worked
+ * The front door's "pick up where you left off": the latest six letters worked
  * on, written ones and "Write your own" drafts alike, each reopened by its link
- * (`?letter=`), which restores its words, its look and its job.
+ * (`?letter=`), which restores its words, its look and its job. Every letter is
+ * also in My documents, and "See all" opens it on Cover letters (owner, 2026-10-03).
  */
 const RecentLetters: FC<{ letters: LetterView[] }> = ({ letters }) => (
-  <section aria-labelledby="recent-letters" className="mt-10 w-full max-w-[560px] text-left">
+  <section aria-labelledby="recent-letters" className="mt-8 w-full max-w-[560px] text-left">
     <h2 id="recent-letters" className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-black/45">
       Pick up where you left off
     </h2>
@@ -212,6 +215,7 @@ const RecentLetters: FC<{ letters: LetterView[] }> = ({ letters }) => (
         );
       })}
     </ul>
+    <SeeAllInDocuments tab="cover-letters" label="See all cover letters" />
   </section>
 );
 
@@ -223,29 +227,6 @@ function openingHtml(letter: WrittenLetter): string {
   if (letter.text?.trim()) return textToLetterHtml(letter.text);
   return lettersToHtml(letter.greeting, letter.paragraphs, letter.signOff);
 }
-
-/** Compact labelled select for the editor toolbar — every style control in
- *  one bar directly above the letter, not a separate card. */
-const ToolbarSelect: FC<{
-  label: string;
-  value: string;
-  options: { id: string; label: string }[];
-  onChange: (v: string) => void;
-}> = ({ label, value, options, onChange }) => (
-  <label className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.06em] text-black/40">
-    {label}
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="cursor-pointer rounded-md border border-black/12 bg-white px-1.5 py-1 text-[11px] font-bold normal-case tracking-normal text-primary outline-none focus:border-black/30">
-      {options.map((o) => (
-        <option key={o.id} value={o.id}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  </label>
-);
 
 /**
  * A letter is written FROM a resume, so there is nothing to write from until
@@ -268,38 +249,6 @@ const NoResumeNote: FC<{ className?: string }> = ({ className }) => (
 
 /** A saved job's own screen, where the saved jobs list opens it too. */
 const jobHref = (savedJobId: string) => `/dashboard/jdqa?job=${encodeURIComponent(savedJobId)}`;
-
-/** Line widths for one skeleton paragraph; the last line runs short, the way a paragraph ends. */
-const SKELETON_LINES = ["w-full", "w-[97%]", "w-[99%]", "w-[62%]"];
-
-/**
- * Stands in for the letter while a new one is written, so the page says a
- * letter is on its way instead of swapping the text out from under the user
- * when it lands. Shaped like what is coming: a greeting, the tone's paragraph
- * count, a sign-off.
- */
-const LetterSkeleton: FC<{ paragraphs: number; label: string }> = ({ paragraphs, label }) => (
-  <div className="flex min-h-[320px] flex-col gap-5 px-8 py-7" role="status" aria-live="polite">
-    <p className="inline-flex items-center gap-2 text-xs font-semibold text-black/45">
-      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-      {label}
-    </p>
-    <div className="flex flex-col gap-5 motion-safe:animate-pulse" aria-hidden>
-      <div className="h-3 w-32 rounded-full bg-black/[0.08]" />
-      {Array.from({ length: paragraphs }, (_, p) => (
-        <div key={p} className="flex flex-col gap-2.5">
-          {SKELETON_LINES.map((width, l) => (
-            <div key={l} className={cn("h-3 rounded-full bg-black/[0.08]", width)} />
-          ))}
-        </div>
-      ))}
-      <div className="flex flex-col gap-2.5">
-        <div className="h-3 w-20 rounded-full bg-black/[0.08]" />
-        <div className="h-3 w-40 rounded-full bg-black/[0.08]" />
-      </div>
-    </div>
-  </div>
-);
 
 const CoverScreen: FC = () => {
   // Blank draft — true when the user started "Write your own" instead of
@@ -552,6 +501,7 @@ const CoverScreen: FC = () => {
         setBlankSaved({ id: saved.id, edited: blankEdit, design: sentDesign, updatedAt: saved.updatedAt });
         adopt({ ...content, documentId: saved.id }, tone);
         void queryClient.invalidateQueries({ queryKey: qk.letters.recent() });
+        void queryClient.invalidateQueries({ queryKey: qk.letters.library() });
       })
       .catch((error: unknown) => {
         const refused = error instanceof BackendError && error.status >= 400 && error.status < 500;
@@ -793,6 +743,7 @@ const CoverScreen: FC = () => {
     setDraftSeq((seq) => seq + 1);
     router.replace("/dashboard/cover", { scroll: false });
     void queryClient.invalidateQueries({ queryKey: qk.letters.recent() });
+    void queryClient.invalidateQueries({ queryKey: qk.letters.library() });
   };
 
   return (
@@ -875,20 +826,12 @@ const CoverScreen: FC = () => {
           </div>
         ) : !started ? (
           /* The front door: two ways in, neither assumed. You don't need the
-             job to exist anywhere to write a letter. */
-          <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
-            <Lottie
-              src={`/Lottie/neobrutalism/Edit_Pencil_Note_lottie.json`}
-              autoplay
-              loop
-              className=""
-              speed={0.47}
-              style={{ width: 340, height: 340 }}
-            />
+             job to exist anywhere to write a letter. The hero is kept short
+             (owner, 2026-10-03) so the list of letters below has the room. */
+          <div className="-mt-3 flex flex-col items-center text-center">
+            <Lottie src={`/Lottie/neobrutalism/Edit_Pencil_Note_lottie.json`} autoplay loop speed={0.47} style={{ width: 190, height: 190 }} />
 
-            <p className="max-w-[540px] text-sm leading-relaxed relative -top-10 text-black/50">
-              Create a job specific cover letter or just start typing✨
-            </p>
+            <p className="-mt-5 mb-4 max-w-[540px] text-sm leading-relaxed text-black/50">Create a job specific cover letter or just start typing✨</p>
             <div className=" grid w-full max-w-[560px] grid-cols-1 gap-3.5 sm:grid-cols-2">
               <button
                 type="button"

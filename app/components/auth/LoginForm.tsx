@@ -13,7 +13,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { AuthLogo, GitHubIcon, GoogleIcon } from "./AuthIcons";
+import { AuthLogo, GitHubIcon } from "./AuthIcons";
 import {
   AuthDivider,
   brutalistCard,
@@ -23,6 +23,7 @@ import {
   brutalistLink,
   brutalistLogoTile,
 } from "./authStyles";
+import { FcGoogle } from "react-icons/fc";
 
 interface LoginFormProps {
   /** Called after a successful credentials sign-in instead of navigating to "/". */
@@ -99,7 +100,7 @@ export default function LoginForm({
             onClick={() => signIn("google", { callbackUrl: oauthCallbackUrl })}
             type="button"
             variant="brutalist">
-            <GoogleIcon aria-hidden={true} className="size-4" />
+            <FcGoogle aria-hidden={true} className="size-4" />
             <span className="text-sm">Login with Google</span>
           </Button>
         </div>

@@ -193,6 +193,36 @@ body {
   background-color: #000;
 }
 
+/* The same slim bar for dark surfaces (the apply wizard's gap cards): a light
+   thumb, and no arrow buttons. Blink paints it from the pseudo-elements alone;
+   setting scrollbar-width or scrollbar-color here would make Chrome 121+ ignore
+   them and draw its native bar, arrows included. Firefox gets the standard pair. */
+.scrollbar-neo-dark::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-neo-dark::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-neo-dark::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.28);
+  border-radius: 3px;
+}
+.scrollbar-neo-dark::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+.scrollbar-neo-dark::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .scrollbar-neo-dark {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  }
+}
+
 /* Same slim bar, but invisible until the pointer is over the region it belongs
    to — for rails where the bar is chrome, not information (the dashboard
    sidebar). Put .scrollbar-hover-root on the element whose hover reveals it and
@@ -216,6 +246,15 @@ body {
   background-color: transparent;
   border-radius: 3px;
   transition: background-color 0.18s ease;
+}
+.scrollbar-hover-root .scrollbar-hover {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hover-root .scrollbar-hover::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 .scrollbar-hover-root:hover .scrollbar-hover,
 .scrollbar-hover-root:focus-within .scrollbar-hover {
@@ -1092,4 +1131,14 @@ body {
 
 .marquee-hold:hover .marquee-track {
   animation-play-state: paused;
+}
+
+/* The apply wizard's resume preview: what tailoring changed, marked on the real paper with the CSS
+   Custom Highlight API (no DOM is rewritten, so the resume renderer stays untouched). */
+::highlight(rww-resume-change) {
+  background-color: #eef7b8;
+  text-decoration: underline;
+  text-decoration-color: #9aab1f;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
 }

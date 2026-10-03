@@ -244,6 +244,8 @@ export interface LetterSummary {
   tone: "warm" | "formal" | "story" | "short" | null;
   /** The saved job it was written for. */
   jobId: string | null;
+  /** Archived from My documents: left out of the editors' lists and the pickers, shown under Archived there. */
+  archived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -256,6 +258,8 @@ export interface LetterView {
   design: LetterDesign | null;
   tone: "warm" | "formal" | "story" | "short" | null;
   jobId: string | null;
+  /** Archived from My documents: left out of the editors' lists and the pickers, shown under Archived there. */
+  archived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -269,6 +273,8 @@ export interface ResumeDocumentSummary {
   jobId: string | null;
   /** The vault file it was copied from ("Edit a copy"), so the next click reopens this copy. */
   sourceDocumentId: string | null;
+  /** Archived from My documents: left out of the editors' lists and the pickers, shown under Archived there. */
+  archived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -53,16 +53,6 @@ export function formatSize(bytes: number): string {
   return `${bytes} B`;
 }
 
-/**
- * The in-app destination for a document, if it has one. Resumes and cover
- * letters are things you edit here; everything else is just a file.
- */
-export function editorHrefFor(doc: VaultDoc): string | null {
-  if (doc.kind === "resume") return "/dashboard/resume";
-  if (doc.kind === "cover-letter") return "/dashboard/cover";
-  return null;
-}
-
 /** Asks the backend for a signed CDN URL. Ownership is checked there. */
 async function signedUrl(id: string): Promise<string | null> {
   try {

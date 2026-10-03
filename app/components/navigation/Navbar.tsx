@@ -81,7 +81,7 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
             src={image ?? "/images/noimage.png"}
             alt=""
             referrerPolicy="no-referrer"
-            className="h-7 w-7 rounded-full border border-primary/15 object-cover"
+            className="h-9 w-9 rounded-full border border-primary/15 object-cover"
           />
         ) : (
           <span
@@ -175,7 +175,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <div className="flex items-center gap-0.5 sm:gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-2">
             <Link href={JOBS} aria-current={pathname?.startsWith(JOBS) ? "page" : undefined} className={cn(BAR_LINK, FOCUS)}>
               Jobs
             </Link>
@@ -188,8 +188,8 @@ const Navbar = () => {
             <Link
               href={WAITLIST}
               aria-current={pathname === WAITLIST ? "page" : undefined}
-              className={cn("group inline-flex h-11 items-center rounded-full", FOCUS)}>
-              <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press">
+              className={cn("group inline-flex h-10 items-center rounded-full", FOCUS)}>
+              <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
                 Waitlist
               </span>
             </Link>

@@ -50,6 +50,8 @@ export interface KeywordInjection {
   content: ResumeContent;
   /** The terms actually added. Decided from the resume, never claimed by a model. */
   added: string[];
+  /** Advisory only: requested terms worked in although nothing on the resume came close — "make sure you can back these up in an interview". */
+  unbacked: string[];
 }
 
 // ---------------------------------------------------------------------------

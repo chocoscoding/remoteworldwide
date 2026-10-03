@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  */
 export interface SlidingTabsProps<T extends string> {
   value: T;
-  options: { id: T; label: string; count?: number }[];
+  options: { id: T; label: string; count?: number; className?: string; activeClassName?: string }[];
   onChange: (value: T) => void;
   className?: string;
   /**
@@ -44,7 +44,10 @@ export const slidingTabId = (tablistId: string, value: string) => `${tablistId}-
 export const slidingTabPanelId = (tablistId: string, value: string) => `${tablistId}-panel-${value}`;
 
 export default function SlidingTabs<T extends string>({ value, options, onChange, className, tablist }: SlidingTabsProps<T>) {
-  const index = Math.max(0, options.findIndex((o) => o.id === value));
+  const index = Math.max(
+    0,
+    options.findIndex((o) => o.id === value),
+  );
 
   // Selection follows focus: the panels are already in memory, so showing one
   // as its tab is reached costs nothing, and saves a keypress per tab.
@@ -97,7 +100,8 @@ export default function SlidingTabs<T extends string>({ value, options, onChange
             onKeyDown={tablist ? (e) => onKeyDown(e, i) : undefined}
             className={cn(
               "relative z-10 rounded-lg px-3 py-1.5 text-xs font-bold whitespace-nowrap cursor-pointer transition-colors duration-200",
-              active ? "text-white" : "text-black/55 hover:text-[#222325]"
+              active ? "text-white" : "text-black/55 hover:text-[#222325]",
+              active ? o.activeClassName : o.className,
             )}>
             {o.label}
             {/* Subordinate by weight, not by lightness: against the #f0f0ea

@@ -28,8 +28,10 @@ export function useIngestedResumesQuery() {
 
 /**
  * One ingested resume with its parsed content, for the tools that rewrite it.
- * A row never changes once parsed — an edit is a new row — so the cached copy
- * stays true for as long as it is kept. Pass null to read nothing.
+ * An uploaded row never changes once parsed — an edit is a new row. The apply
+ * wizard's draft is the exception: it is updated in place, and whoever updates
+ * it writes the answer into this cache (`setQueryData`), so the copy here is the
+ * newest. Pass null to read nothing.
  */
 export function useIngestedResumeQuery(resumeId: string | null) {
   return useQuery({

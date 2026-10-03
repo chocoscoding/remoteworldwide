@@ -13,6 +13,9 @@
 // before comes back verbatim from their saved-answer library for free,
 // demographic questions are left for them, and whatever is left is one drafted
 // batch for AUTOFILL_CREDITS. An answer they have typed is never overwritten.
+//
+// The questions and answers live in the application's session, so a refresh
+// keeps every one of them.
 
 import { useRef, useState, type FC } from "react";
 import Link from "next/link";
@@ -26,8 +29,9 @@ import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { APPLICATION_LIMITS, type ApplicationAnswer, type ApplicationItem } from "@/app/lib/applications/types";
 import { ATS_BILLING_HREF } from "@/app/lib/ats/api";
-import { AUTOFILL_CREDITS, AUTOFILL_MAX_QUESTIONS, AUTOFILL_QUESTION_MAX, draftAnswers, type AutofillAnswer } from "@/app/lib/autofill/api";
+import { AUTOFILL_CREDITS, AUTOFILL_MAX_QUESTIONS, AUTOFILL_QUESTION_MAX, draftAnswers } from "@/app/lib/autofill/api";
 import { qk } from "@/app/lib/query/keys";
+import type { ApplyQuestion } from "@/app/lib/apply/state";
 import { applyLinkOf, hostOf, type StartedJob } from "../job";
 
 export interface SubmitStepProps {
@@ -43,17 +47,17 @@ export interface SubmitStepProps {
   tracked: boolean;
   onTrack: (answers: ApplicationAnswer[]) => void;
   onEditStep: (step: 2 | 3) => void;
+  /** The form's questions as the session keeps them. */
+  questions: ApplyQuestion[];
+  /** Functional, so a draft that lands after a wait fills the rows as they are then. */
+  onQuestionsChange: (recipe: (rows: ApplyQuestion[]) => ApplyQuestion[]) => void;
 }
 
-interface QuestionRow {
-  id: string;
-  question: string;
-  answer: string;
-  /** What the drafter said about the answer it filled; null before a draft, or once the user has typed. */
-  drafted: Pick<AutofillAnswer, "confidence" | "cat"> | null;
-  /** The user typed this answer, so a draft never replaces it. */
-  edited: boolean;
-}
+type QuestionRow = ApplyQuestion;
+
+/** The next free row number, past every id the session already holds ("q-3" → 4). */
+const nextRowNumber = (rows: readonly QuestionRow[]): number =>
+  rows.reduce((max, row) => Math.max(max, Number(row.id.replace(/^q-/, "")) || 0), 0) + 1;
 
 /** Common screening questions, one click to add. Nothing is asked until the user adds it. */
 const suggestedQuestions = (company: string) => [
@@ -73,10 +77,24 @@ const CHECK_BELOW = 0.6;
 const FIELD =
   "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-primary outline-none transition-colors placeholder:text-black/35 focus:border-[#222325]";
 
-const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, letter, duplicate, alreadyTracked = false, tracked, onTrack, onEditStep }) => {
+const SubmitStep: FC<SubmitStepProps> = ({
+  job,
+  resumeId,
+  resumeName,
+  atsScore,
+  letter,
+  duplicate,
+  alreadyTracked = false,
+  tracked,
+  onTrack,
+  onEditStep,
+  questions,
+  onQuestionsChange,
+}) => {
   const queryClient = useQueryClient();
-  const nextId = useRef(1);
-  const [rows, setRows] = useState<QuestionRow[]>([{ id: "q-0", question: "", answer: "", drafted: null, edited: false }]);
+  const nextId = useRef(nextRowNumber(questions));
+  const rows = questions;
+  const setRows = onQuestionsChange;
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<{ message: string; credits: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -226,7 +244,7 @@ const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, 
                     maxLength={APPLICATION_LIMITS.answerMax}
                     readOnly={drafting}
                     onChange={(e) => patchRow(row.id, { answer: e.target.value, edited: true, drafted: null })}
-                    placeholder={row.drafted?.cat === "demographics" ? "Yours to answer — we never guess these." : "Your answer…"}
+                    placeholder={row.drafted?.cat === "demographics" ? "Yours to answer. We never guess these." : "Your answer…"}
                     className={cn(FIELD, "leading-relaxed")}
                   />
                 </>
@@ -319,8 +337,8 @@ const SubmitStep: FC<SubmitStepProps> = ({ job, resumeId, resumeName, atsScore, 
               <p className="mb-1 text-[15px] font-bold">Send it, then track it</p>
               <p className="text-sm leading-relaxed text-white/60">
                 {link
-                  ? `We don't submit applications for you. Open the form on ${hostOf(link)}, paste your letter and answers, and send it there — then track it here so your tracker and follow-ups know.`
-                  : "There's no link on file for this job, so apply wherever you found it — then track it here so your tracker and follow-ups know."}
+                  ? `We don't submit applications for you. Open the form on ${hostOf(link)}, paste your letter and answers, and send it there, then track it here so your tracker and follow-ups know.`
+                  : "There's no link on file for this job, so apply wherever you found it, then track it here so your tracker and follow-ups know."}
                 {duplicate?.status === "saved" && " Tracking moves the saved card to Applied."}
                 {alreadyTracked && " It's already logged as sent this week, so tracking won't add a second card."}
               </p>

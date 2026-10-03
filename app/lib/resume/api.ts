@@ -18,7 +18,7 @@
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/app/lib/api/client";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
-import type { ResumeContent } from "@/app/lib/dashboard/types";
+import type { ResumeContent, ResumeDocumentSummary } from "@/app/lib/dashboard/types";
 import { getIngestedResume, prepareResumeForDoc } from "@/app/lib/ats/api";
 import { waitForImport, type ResumeImportAccepted, type ResumeImportView } from "./importJob";
 import { MAX_RESUME_BYTES, RESUME_TYPES_HINT, isReadableMime, mimeForFileName } from "./mime";
@@ -215,6 +215,34 @@ export function importResumeContent(content: ResumeContent, label: string): Prom
 }
 
 // ---------------------------------------------------------------------------
+// Draft resumes — one working copy per application
+// ---------------------------------------------------------------------------
+//
+// The apply wizard's tailoring used to file every accepted version as a new
+// ingested resume, and they piled up (owner, 2026-10-03). Now an application
+// keeps ONE draft that each accepted version updates in place: same resume id,
+// its version bumped, so a scan of the new words is a fresh scan. A draft is
+// left out of every resume list until the application is tracked, when it is
+// kept as the version that was sent. The content is stored as given — not
+// re-read from text — so what the preview shows is exactly what was proposed.
+
+const DRAFTS = "/api/ai/resume/drafts";
+
+const draftLabel = (label: string) => label.trim().slice(0, MAX_IMPORT_LABEL) || "Tailored resume";
+
+/** The application's draft, made from the first version it uses. */
+export const createDraftResume = (content: ResumeContent, label: string): Promise<ImportedResume> =>
+  apiPost<ImportedResume>(DRAFTS, { content, label: draftLabel(label) });
+
+/** A later version, into the same draft. Unchanged words keep its version. */
+export const updateDraftResume = (id: string, content: ResumeContent, label?: string): Promise<ImportedResume> =>
+  apiPatch<ImportedResume>(`${DRAFTS}/${encodeURIComponent(id)}`, { content, ...(label ? { label: draftLabel(label) } : {}) });
+
+/** The application was tracked with this draft: kept, under the name it was sent with, in the resume lists from now on. */
+export const keepDraftResume = (id: string, label?: string): Promise<ImportedResume> =>
+  apiPost<ImportedResume>(`${DRAFTS}/${encodeURIComponent(id)}/keep`, label ? { label: draftLabel(label) } : {});
+
+// ---------------------------------------------------------------------------
 // Documents — the library the editor works on
 // ---------------------------------------------------------------------------
 
@@ -389,3 +417,15 @@ export const saveResumeDocument = (id: string, patch: ResumeDocumentPatch, optio
 };
 
 export const deleteResumeDocument = (id: string): Promise<{ id: string }> => tracked(apiDelete<{ id: string }>(`${DOCUMENTS}/${id}`));
+
+/**
+ * Every resume made here, archived ones included, without their content — My
+ * documents' list of them. The editor's own list (`listResumeDocuments`) leaves
+ * archived ones out, as do the extension's pickers.
+ */
+export const listResumeSummaries = (signal?: AbortSignal): Promise<ResumeDocumentSummary[]> =>
+  apiGet<ResumeDocumentSummary[]>(`${DOCUMENTS}?view=summary&archived=include`, signal);
+
+/** Archive (true) or restore (false) a resume from My documents. Not an edit: it keeps its place in "most recent". */
+export const setResumeArchived = (id: string, archived: boolean): Promise<SavedResumeDocument> =>
+  tracked(apiPatch<SavedResumeDocument>(`${DOCUMENTS}/${encodeURIComponent(id)}`, { archived }));

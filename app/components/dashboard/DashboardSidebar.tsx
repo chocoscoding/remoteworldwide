@@ -164,7 +164,7 @@ const DashboardSidebar: FC = () => {
     <aside
       className={cn(
         "scrollbar-hover-root flex-none bg-white border-r border-black/10 h-screen sticky top-0 flex flex-col transition-[width] duration-200",
-        collapsed ? "w-[52px]" : "w-[252px]",
+        collapsed ? "w-[64px]" : "w-[252px]",
       )}>
       {/* Header — the notification bell lives at the right end of each page header, not here. */}
       <div
@@ -196,7 +196,8 @@ const DashboardSidebar: FC = () => {
       )}
 
       {/* Nav body */}
-      <nav className={cn("scrollbar-hover flex-1 overflow-y-auto py-3.5 flex flex-col gap-4", collapsed ? "px-1.5" : "px-2")}>
+      <nav
+        className={cn("scrollbar-hover flex-1 overflow-y-auto py-3.5 flex flex-col gap-4  border-red-500 ", collapsed ? "px-1.5" : "px-2")}>
         {NAV_GROUPS.map((group, groupIdx) => (
           <div key={group.label ?? `group-${groupIdx}`}>
             {group.label && !collapsed && (

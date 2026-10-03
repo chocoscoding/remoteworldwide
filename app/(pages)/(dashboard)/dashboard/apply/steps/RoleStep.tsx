@@ -76,17 +76,9 @@ const RoleStep: FC<RoleStepProps> = ({ job, duplicate, alreadyTracked = false })
 
         {body ? (
           <>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-black/65">
+            <p className="whitespace-pre-line text-base leading-relaxed text-black/65">
               {folded ? `${body.slice(0, DESCRIPTION_PREVIEW_CHARS).trimEnd()}…` : body}
             </p>
-            {body.length > DESCRIPTION_PREVIEW_CHARS && (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="mt-2 cursor-pointer text-xs font-semibold text-black/50 underline decoration-dotted underline-offset-2 hover:text-primary">
-                {expanded ? "Show less" : "Show the whole description"}
-              </button>
-            )}
           </>
         ) : (
           <p className="text-sm text-black/50">No description on file for this job.</p>
@@ -106,15 +98,29 @@ const RoleStep: FC<RoleStepProps> = ({ job, duplicate, alreadyTracked = false })
           </div>
         )}
 
-        {posting && (
-          <a
-            href={posting}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-black/55 transition-colors hover:text-primary">
-            View the posting on {hostOf(posting)}
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </a>
+        {(body.length > DESCRIPTION_PREVIEW_CHARS || posting) && (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            {body.length > DESCRIPTION_PREVIEW_CHARS ? (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="cursor-pointer text-base font-normal text-black underline decoration-dotted underline-offset-4 hover:text-primary">
+                {expanded ? "Show less" : "Show the whole description"}
+              </button>
+            ) : (
+              <span />
+            )}
+            {posting && (
+              <a
+                href={posting}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-base font-normal text-black transition-colors hover:text-primary">
+                View the posting on {hostOf(posting)}
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+            )}
+          </div>
         )}
       </DashCard>
 
@@ -143,12 +149,12 @@ const DuplicateNote: FC<{ duplicate: ApplicationItem; alreadyTracked: boolean }>
         </p>
         <p className="mt-1 text-xs leading-relaxed text-black/60">
           {saved
-            ? `${duplicate.company} — ${duplicate.role} is in your Saved column. Tracking this application moves that card to Applied rather than adding a second one.`
+            ? `${duplicate.role} at ${duplicate.company} is in your Saved column. Tracking this application moves that card to Applied rather than adding a second one.`
             : alreadyTracked
               ? // The same posting, sent this week: usually the extension logging the submit on the posting's own form.
-                `${duplicate.company} — ${duplicate.role} was sent on ${loggedOn(sentOn(duplicate))}. Tracking it here won't add a second card.`
-              : `${duplicate.company} — ${duplicate.role} was logged on ${loggedOn(duplicate.loggedAt)} and is ${STATUS_WORDS[duplicate.status]}. ${
-                  wasApplied(duplicate) ? "You can still go ahead — it's tracked as a repeat, so it won't count twice." : "Going ahead tracks it fresh."
+                `${duplicate.role} at ${duplicate.company} was sent on ${loggedOn(sentOn(duplicate))}. Tracking it here won't add a second card.`
+              : `${duplicate.role} at ${duplicate.company} was logged on ${loggedOn(duplicate.loggedAt)} and is ${STATUS_WORDS[duplicate.status]}. ${
+                  wasApplied(duplicate) ? "You can still go ahead. It's tracked as a repeat, so it won't count twice." : "Going ahead tracks it fresh."
                 }`}
         </p>
       </div>

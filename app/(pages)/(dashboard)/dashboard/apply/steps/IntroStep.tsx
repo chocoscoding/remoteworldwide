@@ -39,7 +39,7 @@ const IntroStep: FC<IntroStepProps> = ({ job, onSkip }) => {
       <DashEmptyState
         icon={Users}
         title="No warm-intro search for this one"
-        body="The people search runs against a saved job, and this one couldn't be saved. Skip ahead — you can search for it later from Referrals once it's in your jobs."
+        body="The people search runs against a saved job, and this one couldn't be saved. Skip ahead. You can search for it later from Referrals once it's in your jobs."
         ctaLabel="Skip this step"
         onCta={onSkip}
       />
@@ -62,7 +62,7 @@ const IntroStep: FC<IntroStepProps> = ({ job, onSkip }) => {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-black/55">
-        Optional. A referral or a note to the hiring manager is worth more than any keyword — but if nobody fits,{" "}
+        Optional. A referral or a note to the hiring manager is worth more than any keyword, but if nobody fits,{" "}
         <button type="button" onClick={onSkip} className="cursor-pointer font-semibold text-primary underline decoration-dotted underline-offset-2">
           skip ahead
         </button>

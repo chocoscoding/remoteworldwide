@@ -66,9 +66,7 @@ export default function Globe() {
         { location: [51.5074, -0.1278], size: 0.1 },
         { location: [-20.082, 20.6753], size: 0.1 },
       ],
-      onRender: (state) => {
-        // Called on every animation frame.
-        // `state` will be an empty object, return updated params.
+      onRender: (state: { phi: number; width: number; height: number }) => {
         const fallbackImage = document.querySelector("#fallbackglobe");
         if (fallbackImage) {
           fallbackImage.remove();
@@ -78,6 +76,8 @@ export default function Globe() {
         state.width = width * scaleFactor;
         state.height = width * scaleFactor;
       },
+    } as Parameters<typeof createGlobe>[1] & {
+      onRender: (state: { phi: number; width: number; height: number }) => void;
     });
     setTimeout(() => {
       if (canvasRef.current) {

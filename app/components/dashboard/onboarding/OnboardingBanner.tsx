@@ -50,8 +50,7 @@ const OnboardingBanner: FC = () => {
       <p className="min-w-0 flex-1 text-sm text-primary">
         <span className="font-semibold">Finish your profile</span>
         <span className="hidden text-primary/70 md:inline">
-          {" "}
-          — the extension fills applications and builds resumes from it. {left.length === 1 ? `One thing left: ${left[0].label}.` : `${left.length} things left.`}
+          . The extension fills applications and builds resumes from it. {left.length === 1 ? `One thing left: ${left[0].label}.` : `${left.length} things left.`}
         </span>
       </p>
       <Link

@@ -1,7 +1,18 @@
 "use client";
 
+// One row of My documents: an uploaded file, or a resume or cover letter made
+// here (app/lib/documents/library.ts). Every action sits behind one ⋯ menu —
+// Download, Rename, Archive, Remove — rather than a row of equal buttons
+// (owner, 2026-10-03). A made-here document also gets Edit beside the menu,
+// and only it does: it is the editor's own document, and an uploaded file is
+// just a file.
+//
+// Remove asks once more in the row itself: there is no undo behind it, for a
+// file or for a made-here document.
+
 import { FC, useState } from "react";
 import Link from "next/link";
+import TimeAgo from "timeago-react";
 import {
   Archive,
   ArchiveRestore,
@@ -10,7 +21,9 @@ import {
   Download,
   FileText,
   Image as ImageIcon,
+  MoreHorizontal,
   Paperclip,
+  PenLine,
   Pencil,
   ShieldCheck,
   Star,
@@ -19,18 +32,19 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import {
   downloadDoc,
-  editorHrefFor,
   formatSize,
   KIND_LABELS,
   openDocFile,
   sourceBadgeLabel,
   useDocuments,
   type DocKind,
-  type VaultDoc,
 } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { createdFileHref, editHref, type LibraryItem } from "@/app/lib/documents/library";
+import { useCreatedDocumentAction } from "@/hooks/queries/useCreatedDocuments";
 
 // Re-exported so the screen's search keeps one import site for row concerns.
 export { KIND_LABELS };
@@ -38,6 +52,9 @@ export { KIND_LABELS };
 /** Quiet inline control — weight is reserved for the page's real actions. */
 const GHOST_BTN =
   "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-black/55 cursor-pointer transition-colors hover:bg-black/[0.05] hover:text-primary";
+
+const MENU_ITEM =
+  "flex w-full items-center gap-2.5 border-b border-black/8 px-3.5 py-2.5 text-left text-xs font-semibold text-primary last:border-b-0 cursor-pointer transition-colors hover:bg-[#fbfbf7]";
 
 const KIND_ICONS: Record<DocKind, LucideIcon> = {
   resume: FileText,
@@ -53,12 +70,12 @@ const KIND_ICONS: Record<DocKind, LucideIcon> = {
  * throws the draft away for free (the AnswerEditor pattern — no reset effect
  * for the compiler to object to, no stale draft on reopen).
  */
-const RowRenamer: FC<{ doc: VaultDoc; onDone: () => void }> = ({ doc, onDone }) => {
-  const { rename } = useDocuments();
-  const [draft, setDraft] = useState(doc.name);
+const RowRenamer: FC<{ name: string; onCommit: (name: string) => void; onDone: () => void }> = ({ name, onCommit, onDone }) => {
+  const [draft, setDraft] = useState(name);
 
   function commit() {
-    rename(doc.id, draft);
+    const next = draft.trim();
+    if (next && next !== name) onCommit(next);
     onDone();
   }
 
@@ -68,7 +85,8 @@ const RowRenamer: FC<{ doc: VaultDoc; onDone: () => void }> = ({ doc, onDone }) 
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         autoFocus
-        aria-label={`Rename ${doc.name}`}
+        maxLength={120}
+        aria-label={`Rename ${name}`}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
           if (e.key === "Escape") onDone();
@@ -86,30 +104,139 @@ const RowRenamer: FC<{ doc: VaultDoc; onDone: () => void }> = ({ doc, onDone }) 
   );
 };
 
+interface MenuEntry {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  /** A link (a made-here document's file, through `/open/…`), opened in a new tab so a refusal page never replaces this one. */
+  href?: string;
+  onSelect?: () => void;
+  danger?: boolean;
+}
+
+const RowMenu: FC<{ name: string; entries: MenuEntry[] }> = ({ name, entries }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`More actions for ${name}`}
+          className={cn(
+            "grid h-8 w-8 flex-none place-content-center rounded-lg text-black/50 transition-colors cursor-pointer hover:bg-black/[0.05] hover:text-primary",
+            open && "bg-black/[0.05] text-primary",
+          )}>
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={4}
+        className="w-52 overflow-hidden rounded-xl border border-2 border-black bg-white p-0 br-bold">
+        {entries.map((entry) => {
+          const content = (
+            <>
+              <entry.icon className={cn("h-3.5 w-3.5 flex-none", entry.danger ? "text-[#b23c26]" : "text-black/55")} aria-hidden />
+              <span className={cn(entry.danger && "text-[#b23c26]")}>{entry.label}</span>
+            </>
+          );
+          return entry.href ? (
+            <a
+              key={entry.id}
+              href={entry.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className={MENU_ITEM}>
+              {content}
+            </a>
+          ) : (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                entry.onSelect?.();
+              }}
+              className={cn(MENU_ITEM, entry.danger && "hover:bg-[#fdf4f2]")}>
+              {content}
+            </button>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 export interface DocRowProps {
-  doc: VaultDoc;
+  item: LibraryItem;
   renaming: boolean;
   onStartRename: () => void;
   onDoneRename: () => void;
 }
 
-const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename }) => {
-  const { remove, toggleArchive, setMaster } = useDocuments();
+const DocRow: FC<DocRowProps> = ({ item, renaming, onStartRename, onDoneRename }) => {
+  const files = useDocuments();
+  const created = useCreatedDocumentAction();
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
-  const isResume = doc.kind === "resume";
-  // Only a live resume can be the master; the server refuses anything else too.
-  const canBeMaster = isResume && !doc.archived && !doc.master;
-  const Icon = KIND_ICONS[doc.kind];
-  const badge = sourceBadgeLabel(doc.source);
+  const doc = item.origin === "uploaded" ? item.doc : null;
+  const isResume = item.kind === "resume";
+  // Only an uploaded resume can be the master; the server refuses anything else too.
+  const canBeMaster = doc !== null && isResume && !doc.archived && !doc.master;
+  const Icon = KIND_ICONS[item.kind];
+  const badge = doc ? sourceBadgeLabel(doc.source) : "Created here";
+  const edit = editHref(item);
 
-  const meta = [KIND_LABELS[doc.kind], doc.ext ? doc.ext.toUpperCase() : null, doc.size != null ? formatSize(doc.size) : null, doc.updatedLabel]
-    .filter(Boolean)
-    .join(" · ");
+  const rename = (name: string) => {
+    if (doc) files.rename(doc.id, name);
+    else if (item.origin === "created") created.mutate({ kind: item.kind, id: item.id, type: "rename", name });
+  };
+  const toggleArchive = () => {
+    if (doc) files.toggleArchive(doc.id);
+    else if (item.origin === "created") created.mutate({ kind: item.kind, id: item.id, type: "archive", archived: !item.archived });
+  };
+  const remove = () => {
+    setConfirmingRemove(false);
+    if (doc) files.remove(doc.id);
+    else if (item.origin === "created") created.mutate({ kind: item.kind, id: item.id, type: "remove" });
+  };
 
-  // The icon and the name are one control: hovering either underlines the
-  // name, and clicking opens the document. Replaces the old "Open" action,
-  // which only ever appeared on resumes anyway.
-  const editorHref = editorHrefFor(doc);
+  const entries: MenuEntry[] = [
+    ...(canBeMaster && doc ? [{ id: "master", label: "Make master", icon: Star, onSelect: () => files.setMaster(doc.id) }] : []),
+    ...(doc
+      ? // Uploads hand back their original bytes.
+        [{ id: "download", label: "Download", icon: Download, onSelect: () => downloadDoc(doc) }]
+      : [
+          { id: "pdf", label: "Download PDF", icon: Download, href: createdFileHref(item, "pdf") ?? undefined },
+          { id: "docx", label: "Download Word", icon: Download, href: createdFileHref(item, "docx") ?? undefined },
+        ]),
+    { id: "rename", label: "Rename", icon: Pencil, onSelect: onStartRename },
+    {
+      id: "archive",
+      label: item.archived ? "Unarchive" : "Archive",
+      icon: item.archived ? ArchiveRestore : Archive,
+      onSelect: toggleArchive,
+    },
+    { id: "remove", label: "Remove", icon: Trash2, onSelect: () => setConfirmingRemove(true), danger: true },
+  ];
+
+  const meta = (
+    <>
+      {[KIND_LABELS[item.kind], doc?.ext ? doc.ext.toUpperCase() : null, item.size !== null ? formatSize(item.size) : null]
+        .filter(Boolean)
+        .join(" · ")}
+      {" · "}
+      {doc ? (
+        doc.updatedLabel
+      ) : (
+        <>
+          edited <TimeAgo datetime={item.at} opts={{ minInterval: 60 }} />
+        </>
+      )}
+    </>
+  );
+
   const iconTile = isResume ? (
     <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
       <FileText className="h-4 w-4 text-white" />
@@ -123,9 +250,9 @@ const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename })
   const title = (
     <span className="flex min-w-0 items-center gap-2">
       <span className="truncate text-sm font-bold text-primary underline decoration-transparent decoration-2 underline-offset-4 transition-colors group-hover/open:decoration-[#222325]">
-        {doc.name}
+        {item.name}
       </span>
-      {doc.master && (
+      {doc?.master && (
         <span
           className="inline-flex flex-none items-center gap-1 rounded-full bg-[#e1f073] px-2 py-0.5 text-[10px] font-bold text-[#222325]"
           title="Your master resume — reviewers read this one when they consider you for recommendations.">
@@ -133,72 +260,74 @@ const DocRow: FC<DocRowProps> = ({ doc, renaming, onStartRename, onDoneRename })
           Master
         </span>
       )}
-      {badge && <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55">{badge}</span>}
+      {badge && (
+        <span
+          className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55"
+          title={doc ? undefined : "Made in RemoteWorldwide — edit it any time; changes save to this same document."}>
+          {badge}
+        </span>
+      )}
     </span>
   );
 
+  // The icon and the name are one control: a made-here document opens in its
+  // editor, an uploaded file opens itself.
   const OPEN_TARGET = "group/open flex min-w-0 flex-1 items-center gap-4 text-left cursor-pointer";
+  const label = (
+    <>
+      {iconTile}
+      <span className="min-w-0 flex-1">
+        {title}
+        <span className="mt-0.5 block truncate text-xs text-black/55">{meta}</span>
+      </span>
+    </>
+  );
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4", doc.archived && "opacity-55")}>
+    <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4", item.archived && !confirmingRemove && "opacity-55")}>
       {renaming ? (
         <>
           {iconTile}
-          <RowRenamer doc={doc} onDone={onDoneRename} />
+          <RowRenamer name={item.name} onCommit={rename} onDone={onDoneRename} />
         </>
       ) : (
         <>
-          {editorHref ? (
-            <Link href={editorHref} className={OPEN_TARGET} title={`Open ${doc.name}`}>
-              {iconTile}
-              <span className="min-w-0 flex-1">
-                {title}
-                <span className="mt-0.5 block truncate text-xs text-black/55">{meta}</span>
-              </span>
+          {edit ? (
+            <Link href={edit} className={OPEN_TARGET} title={`Edit ${item.name}`}>
+              {label}
             </Link>
           ) : (
-            <button type="button" onClick={() => openDocFile(doc)} className={OPEN_TARGET} title={`Open ${doc.name}`}>
-              {iconTile}
-              <span className="min-w-0 flex-1">
-                {title}
-                <span className="mt-0.5 block truncate text-xs text-black/55">{meta}</span>
-              </span>
+            <button type="button" onClick={() => doc && openDocFile(doc)} className={OPEN_TARGET} title={`Open ${item.name}`}>
+              {label}
             </button>
           )}
 
-          <div className="flex flex-none items-center gap-0.5">
-            {canBeMaster && (
+          {confirmingRemove ? (
+            <div className="flex flex-none items-center gap-3 text-xs font-bold">
+              <span className="font-semibold text-black/55">
+                {item.origin === "created" ? "Delete it for good?" : "Remove this file for good?"}
+              </span>
+              <button type="button" onClick={remove} className="cursor-pointer text-[#b23c26] underline decoration-2 underline-offset-2">
+                {item.origin === "created" ? "Delete" : "Remove"}
+              </button>
               <button
                 type="button"
-                className={GHOST_BTN}
-                onClick={() => setMaster(doc.id)}
-                title="Reviewers read your master resume when they consider you for recommendations">
-                <Star className="h-3.5 w-3.5" />
-                Make master
+                onClick={() => setConfirmingRemove(false)}
+                className="cursor-pointer text-black/50 underline decoration-2 underline-offset-2">
+                Keep
               </button>
-            )}
-            {/* Uploads hand back their original bytes; anything else gets a
-                generated summary PDF — the button always delivers a file. */}
-            <button type="button" className={GHOST_BTN} onClick={() => downloadDoc(doc)}>
-              <Download className="h-3.5 w-3.5" />
-              Download
-            </button>
-            <button type="button" className={GHOST_BTN} onClick={onStartRename}>
-              <Pencil className="h-3.5 w-3.5" />
-              Rename
-            </button>
-            <button type="button" className={GHOST_BTN} onClick={() => toggleArchive(doc.id)}>
-              {doc.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-              {doc.archived ? "Unarchive" : "Archive"}
-            </button>
-            <button
-              type="button"
-              className={cn(GHOST_BTN, "hover:bg-[#fdeae6] hover:text-[#b23c26]")}
-              onClick={() => remove(doc.id)}>
-              <Trash2 className="h-3.5 w-3.5" />
-              Remove
-            </button>
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-none items-center gap-1">
+              {edit && (
+                <Link href={edit} className={GHOST_BTN}>
+                  <PenLine className="h-3.5 w-3.5" />
+                  Edit
+                </Link>
+              )}
+              <RowMenu name={item.name} entries={entries} />
+            </div>
+          )}
         </>
       )}
     </div>

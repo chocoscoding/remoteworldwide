@@ -1,5 +1,10 @@
 "use client";
 
+// The resume creator's front door: a top bar like every dashboard screen's,
+// the ways to start one, and the latest six to pick back up. Every resume
+// made here is also in My documents, and "See all" opens it on Resumes
+// (owner, 2026-10-03). The hero is kept short so the list has the room.
+
 import { useRef, useState, type FC, type ReactNode } from "react";
 import { FilePlus2, FileText, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import TimeAgo from "timeago-react";
@@ -7,6 +12,8 @@ import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
+import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
+import SeeAllInDocuments, { FRONT_DOOR_RECENT } from "@/app/components/dashboard/ui/SeeAllInDocuments";
 import { BUILD_CREDITS, RESUME_ACCEPT } from "@/app/lib/resume/api";
 import { isStaleCheck, type ResumeDocument } from "./resume-document";
 
@@ -53,6 +60,8 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // Newest first, whatever order they joined the workspace in; the rest are a click away in My documents.
+  const latest = [...documents].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, FRONT_DOOR_RECENT);
 
   async function create() {
     if (!onCreateBlank || creating) return;
@@ -92,13 +101,18 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
-      <div className="mx-auto flex min-h-screen max-w-[680px] flex-col items-center justify-center px-6 py-12 text-center">
+      <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
+        <h1 className="truncate text-[17px] font-bold text-primary">Resume creator</h1>
+        <NotificationBell />
+      </header>
+
+      <div className="mx-auto flex max-w-[680px] flex-col items-center px-6 pb-14 pt-5 text-center">
         {banner && <div className="mb-2 w-full">{banner}</div>}
         <span aria-hidden className="flex items-center justify-center">
-          <Lottie src={`/Lottie/neobrutalism/Edit_Contract_lottie.json`} autoplay loop speed={0.63} style={{ width: 300, height: 300 }} />
+          <Lottie src={`/Lottie/neobrutalism/Edit_Contract_lottie.json`} autoplay loop speed={0.63} style={{ width: 170, height: 170 }} />
         </span>
 
-        <h1 className="text-[22px] font-bold text-primary leading-tight">Let&apos;s build the resume that gets you hired</h1>
+        <h2 className="text-[22px] font-bold text-primary leading-tight">Let&apos;s build the resume that gets you hired</h2>
         {/* <p className="mt-2 max-w-[440px] text-sm leading-relaxed text-black/50">
           Start one from scratch, bring in a resume you already have, or keep polishing one you made here.
         </p> */}
@@ -208,17 +222,19 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
           </p>
         )}
 
-        {/* The old ones */}
+        {/* The old ones: the latest six, and all of them in My documents */}
         {documents.length > 0 && (
-          <div className="mt-8 w-full">
-            <p className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.09em] text-black/40">Or pick up where you left off</p>
-            <div className="grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {documents.map((d) => {
+          <section aria-labelledby="resume-library" className="mt-8 w-full text-left">
+            <h3 id="resume-library" className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-black/40">
+              Or pick up where you left off
+            </h3>
+            <ul className="flex w-full flex-col gap-2">
+              {latest.map((d) => {
                 const confirming = confirmingDelete === d.id;
                 return (
                   // A row, not one big button: it holds two actions, and a
                   // button cannot contain another.
-                  <div
+                  <li
                     key={d.id}
                     className={cn(
                       "group flex items-center rounded-xl border bg-white transition-colors",
@@ -228,7 +244,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                     <button
                       type="button"
                       onClick={() => onOpen?.(d.id)}
-                      className="flex min-w-0 flex-1 items-center gap-3 p-3.5 text-left cursor-pointer">
+                      className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3 text-left cursor-pointer">
                       <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea] text-primary">
                         <FileText className="h-4 w-4" />
                       </span>
@@ -286,11 +302,12 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     )}
-                  </div>
+                  </li>
                 );
               })}
-            </div>
-          </div>
+            </ul>
+            <SeeAllInDocuments tab="resumes" label="See all resumes" />
+          </section>
         )}
       </div>
     </div>

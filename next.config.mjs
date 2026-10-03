@@ -169,6 +169,11 @@ const nextConfig = {
         source: "/api/applications/:path*",
         destination: `${backend}/api/applications/:path*`,
       },
+      // The apply wizard's saved progress, so a refresh or a later visit continues where it stopped.
+      {
+        source: "/api/apply-sessions/:path*",
+        destination: `${backend}/api/apply-sessions/:path*`,
+      },
       {
         source: "/api/goals/:path*",
         destination: `${backend}/api/goals/:path*`,

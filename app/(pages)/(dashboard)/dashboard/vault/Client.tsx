@@ -1,14 +1,20 @@
 "use client";
 
-// My documents — every file the platform knows about, in one list.
+// My documents — every document the platform knows about, in one list: the
+// files someone uploaded, and the resumes and cover letters they made here,
+// listed by reference (app/lib/documents/library.ts — editing one in its
+// editor changes it here; nothing is copied or re-uploaded).
 //
-// The documents themselves live in DocumentsProvider (app-wide) so the ATS
-// scorer reads the same list; this screen owns only how they're browsed:
-// tab, search, sort, pagination.
+// The uploaded files live in DocumentsProvider (app-wide) so the ATS scorer
+// reads the same list; the made-here ones come from the AI service's library
+// (useCreatedDocuments). This screen owns only how they're browsed: tab (in
+// the address, so the editors' "See all" links open Resumes or Cover letters),
+// search, sort, pagination.
 
 import { FC, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, SearchX } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Loader2, Plus, Search, SearchX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
@@ -17,11 +23,12 @@ import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
-import { useDocuments, type DocKind, type VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { useDocuments, type DocKind } from "@/app/components/dashboard/documents/DocumentsProvider";
 import DocRow, { KIND_LABELS } from "@/app/components/dashboard/vault/DocRow";
 import DropZone from "@/app/components/dashboard/vault/DropZone";
+import { inTab, libraryItems, tabCounts, tabFromParam, type LibraryTab } from "@/app/lib/documents/library";
+import { useCreatedDocuments } from "@/hooks/queries/useCreatedDocuments";
 
-type VaultTab = "all" | "resumes" | "other" | "archived";
 type SortKey = "recent" | "name" | "size";
 
 const SORT_OPTIONS: { id: SortKey; label: string }[] = [
@@ -42,18 +49,24 @@ const KIT: { kind: DocKind; label: string; href?: string }[] = [
 
 const clampPage = (page: number, total: number) => Math.min(Math.max(page, 1), Math.max(total, 1));
 
-function inTab(doc: VaultDoc, tab: VaultTab): boolean {
-  if (tab === "archived") return !!doc.archived;
-  if (doc.archived) return false;
-  if (tab === "resumes") return doc.kind === "resume";
-  if (tab === "other") return doc.kind !== "resume";
-  return true;
-}
+const EMPTY_TITLES: Record<LibraryTab, string> = {
+  all: "No documents yet",
+  resumes: "No resumes yet",
+  "cover-letters": "No cover letters yet",
+  other: "No other files yet",
+  archived: "Nothing archived",
+};
 
 const VaultClient: FC = () => {
   const { docs, addUploads } = useDocuments();
+  const { resumes, letters } = useCreatedDocuments();
 
-  const [tab, setTab] = useState<VaultTab>("all");
+  // The tab is the address's, so "See all" from an editor lands on its own.
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tab = tabFromParam(params.get("tab"));
+
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("recent");
   const [page, setPage] = useState(1);
@@ -64,43 +77,44 @@ const VaultClient: FC = () => {
 
   const q = query.trim().toLowerCase();
 
+  const items = useMemo(() => libraryItems(docs, resumes.data ?? [], letters.data ?? []), [docs, resumes.data, letters.data]);
+
   const filtered = useMemo(() => {
-    const matches = docs.filter((d) => {
-      if (!inTab(d, tab)) return false;
+    const matches = items.filter((item) => {
+      if (!inTab(item, tab)) return false;
       if (!q) return true;
-      return `${d.name} ${KIND_LABELS[d.kind]} ${d.ext ?? ""}`.toLowerCase().includes(q);
+      const ext = item.origin === "uploaded" ? (item.doc.ext ?? "") : "";
+      return `${item.name} ${KIND_LABELS[item.kind]} ${ext}`.toLowerCase().includes(q);
     });
     const sorted = [...matches];
     if (sort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
     else if (sort === "size") sorted.sort((a, b) => (b.size ?? -1) - (a.size ?? -1));
-    else sorted.sort((a, b) => b.addedAt - a.addedAt);
+    else sorted.sort((a, b) => b.at - a.at);
     return sorted;
-  }, [docs, tab, q, sort]);
+  }, [items, tab, q, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = clampPage(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const active = docs.filter((d) => !d.archived);
-  const counts: Record<VaultTab, number> = {
-    all: active.length,
-    resumes: active.filter((d) => d.kind === "resume").length,
-    other: active.filter((d) => d.kind !== "resume").length,
-    archived: docs.length - active.length,
-  };
+  const counts = tabCounts(items);
+  const activeFiles = docs.filter((d) => !d.archived);
+  const createdLoading = resumes.isPending || letters.isPending;
+  const createdFailed = resumes.isError || letters.isError;
 
-  // Application kit coverage — derived, so it moves when documents do.
-  const presentKinds = new Set(active.map((d) => d.kind));
+  // Application kit coverage — derived, so it moves when documents do. A resume or letter made here counts.
+  const presentKinds = new Set(items.filter((item) => !item.archived).map((item) => item.kind));
   const covered = KIT.filter((k) => presentKinds.has(k.kind));
   const missing = KIT.filter((k) => !presentKinds.has(k.kind));
   const kitPct = Math.round((covered.length / KIT.length) * 100);
-  const totalBytes = active.reduce((sum, d) => sum + (d.size ?? 0), 0);
-  // The resume reviewers read. Recommendations need one, so its absence is said out loud.
-  const masterResume = active.find((d) => d.master && d.kind === "resume");
+  const totalBytes = activeFiles.reduce((sum, d) => sum + (d.size ?? 0), 0);
+  // The resume reviewers read — always an uploaded file. Recommendations need one, so its absence is said out loud.
+  const masterResume = activeFiles.find((d) => d.master && d.kind === "resume");
+  const uploadedResumes = activeFiles.filter((d) => d.kind === "resume").length;
 
   /** A tab change abandons browsing state — page and any in-flight rename. */
-  function changeTab(next: VaultTab) {
-    setTab(next);
+  function changeTab(next: LibraryTab) {
+    router.replace(next === "all" ? pathname : `${pathname}?tab=${next}`, { scroll: false });
     setPage(1);
     setRenamingId(null);
   }
@@ -110,8 +124,7 @@ const VaultClient: FC = () => {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const emptyTitle =
-    tab === "archived" ? "Nothing archived" : tab === "resumes" ? "No resumes yet" : tab === "other" ? "No other files yet" : "No documents yet";
+  const emptyTitle = EMPTY_TITLES[tab];
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
@@ -152,8 +165,10 @@ const VaultClient: FC = () => {
                     Application kit: {covered.length} of {KIT.length} covered
                   </p>
                   <span className="text-xs text-white/55">
-                    {counts.resumes} resume{counts.resumes === 1 ? "" : "s"} · {counts.other} other file{counts.other === 1 ? "" : "s"}
-                    {totalBytes > 0 && ` · ${totalBytes >= 1_048_576 ? `${(totalBytes / 1_048_576).toFixed(1)} MB` : `${Math.round(totalBytes / 1024)} KB`}`}
+                    {counts.resumes} resume{counts.resumes === 1 ? "" : "s"} · {counts["cover-letters"]} cover letter
+                    {counts["cover-letters"] === 1 ? "" : "s"} · {counts.other} other file{counts.other === 1 ? "" : "s"}
+                    {totalBytes > 0 &&
+                      ` · ${totalBytes >= 1_048_576 ? `${(totalBytes / 1_048_576).toFixed(1)} MB` : `${Math.round(totalBytes / 1024)} KB`}`}
                   </span>
                 </div>
                 <ProgressBar value={kitPct} dark className="max-w-md" />
@@ -164,7 +179,9 @@ const VaultClient: FC = () => {
                       <span key={m.kind}>
                         {i > 0 && ", "}
                         {m.href ? (
-                          <Link href={m.href} className="font-semibold text-secondary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                          <Link
+                            href={m.href}
+                            className="font-semibold text-secondary underline decoration-dotted underline-offset-2 hover:decoration-solid">
                             {m.label}
                           </Link>
                         ) : (
@@ -179,12 +196,13 @@ const VaultClient: FC = () => {
                 )}
                 {masterResume ? (
                   <p className="mt-1.5 text-xs text-white/55">
-                    Master resume: <span className="font-semibold text-white/80">{masterResume.name}</span> — what reviewers read when they consider you.
+                    Master resume: <span className="font-semibold text-white/80">{masterResume.name}</span> — what reviewers read when they
+                    consider you.
                   </p>
-                ) : counts.resumes > 0 ? (
+                ) : uploadedResumes > 0 ? (
                   <p className="mt-1.5 text-xs text-white/55">
-                    <span className="font-semibold text-secondary">No master resume yet</span> — pick one below with “Make master” so reviewers can
-                    consider you for recommendations.
+                    <span className="font-semibold text-secondary">No master resume yet</span> — pick one below with “Make master” so
+                    reviewers can consider you for recommendations.
                   </p>
                 ) : null}
               </div>
@@ -205,15 +223,16 @@ const VaultClient: FC = () => {
             />
           </div>
 
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
             <SlidingTabs
               value={tab}
               onChange={changeTab}
               options={[
                 { id: "all", label: "All", count: counts.all },
                 { id: "resumes", label: "Resumes", count: counts.resumes },
-                { id: "other", label: "Other", count: counts.other },
-                { id: "archived", label: "Archived", count: counts.archived },
+                { id: "cover-letters", label: "Cover letters", count: counts["cover-letters"] },
+                { id: "other", label: "Others", count: counts.other },
+                { id: "archived", label: "Archived", count: counts.archived, className: "text-red-800", activeClassName: "text-red-500" },
               ]}
             />
 
@@ -231,7 +250,7 @@ const VaultClient: FC = () => {
                   }}
                   className={cn(
                     "cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    sort === s.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary"
+                    sort === s.id ? "bg-[#e1f073] text-primary" : "text-black/55 hover:bg-[#f0f0ea] hover:text-primary",
                   )}>
                   {s.label}
                 </button>
@@ -239,7 +258,27 @@ const VaultClient: FC = () => {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {createdFailed && (
+            <p className="mb-4 rounded-xl border border-black/10 bg-white px-4 py-3 text-xs text-black/60">
+              The resumes and cover letters you made here couldn&apos;t be loaded.{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  if (resumes.isError) void resumes.refetch();
+                  if (letters.isError) void letters.refetch();
+                }}
+                className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2">
+                Try again
+              </button>
+            </p>
+          )}
+
+          {filtered.length === 0 && createdLoading && tab !== "other" ? (
+            <p className="flex items-center justify-center gap-2 py-10 text-xs text-black/45" role="status">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              Loading your documents…
+            </p>
+          ) : filtered.length === 0 ? (
             q ? (
               <DashEmptyState
                 icon={SearchX}
@@ -264,12 +303,12 @@ const VaultClient: FC = () => {
           ) : (
             <DashCard className="overflow-hidden p-0">
               <div className="flex flex-col divide-y divide-black/8">
-                {paged.map((doc) => (
+                {paged.map((item) => (
                   <DocRow
-                    key={doc.id}
-                    doc={doc}
-                    renaming={renamingId === doc.id}
-                    onStartRename={() => setRenamingId(doc.id)}
+                    key={item.key}
+                    item={item}
+                    renaming={renamingId === item.key}
+                    onStartRename={() => setRenamingId(item.key)}
                     onDoneRename={() => setRenamingId(null)}
                   />
                 ))}

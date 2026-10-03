@@ -432,6 +432,25 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({
     };
   };
 
+  /**
+   * A keywords result, applied like `mergeRewrite` (it rewrites the summary and bullets too, since
+   * 2026-10-03) plus its Skills: the service's list, with any skill typed during the round trip kept
+   * on the end. Never `added` appended by hand: it names lines from the posting as well as skills.
+   */
+  const mergeKeywords = (now: ResumeContent, sent: ResumeContent, result: ResumeContent): ResumeContent => {
+    const typed = now.skills.filter((skill) => !sent.skills.includes(skill));
+    const have = new Set(result.skills.map((skill) => skill.toLowerCase()));
+    return { ...mergeRewrite(now, sent, result), skills: [...result.skills, ...typed.filter((skill) => !have.has(skill.toLowerCase()))] };
+  };
+
+  /** What a keywords run worked in, for its caption: short terms by name, lines from the posting by count. */
+  const workedIn = (added: string[]) => {
+    const named = added.filter((term) => term.trim().split(/\s+/).length <= 4);
+    const lines = added.length - named.length;
+    const parts = [named.length > 0 ? quote(named) : null, lines > 0 ? `${lines} ${lines === 1 ? "line" : "lines"} from the posting` : null];
+    return `Worked in ${parts.filter(Boolean).join(" and ")}.`;
+  };
+
   const runAiTool = (id: string) => {
     if (id === "tailor" && tailorPreset && tailorPreset.status !== "failed") {
       if (tailorPreset.status === "ready") void handleTailorJob(tailorPreset.job);
@@ -499,7 +518,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({
         const result = await runSuggestion("tone", () => fixToneAndGrammar({ content: sent }));
         if (!result) return;
         if (result.fixes.length === 0) {
-          landAiTool(id, "No issues found — your resume reads clean.");
+          landAiTool(id, "No issues found. Your resume reads clean.");
           return;
         }
         landAiTool(id, `Fixed: ${result.fixes.join(", ")}.`, () => setContent((now) => mergeRewrite(now, sent, result.content)));
@@ -517,19 +536,18 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({
    * honest "nothing missing" rather than a model declining to answer.
    */
   const handleKeywordsJob = async (job: ResumeJob) => {
+    const sent = content;
     const result = await runSuggestion("keywords", () =>
-      injectKeywords({ content, jdText: job.description, company: job.company, role: job.role }),
+      injectKeywords({ content: sent, jdText: job.description, company: job.company, role: job.role }),
     );
     if (!result) return;
 
     if (result.added.length === 0) {
-      landAiTool("keywords", `Nothing missing — your resume already covers what ${job.company} asked for.`);
+      landAiTool("keywords", `Nothing missing. Your resume already covers what ${job.company} asked for.`);
       return;
     }
-    // The same narrow diff as `tailor`, for the same reason — see the note there.
-    landAiTool("keywords", `Added ${quote(result.added)} to your Summary and Skills.`, () =>
-      setContent((prev) => ({ ...prev, summary: result.content.summary, skills: result.content.skills })),
-    );
+    // Folded onto the content as it is NOW, so typing during the round trip is kept (see `mergeKeywords`).
+    landAiTool("keywords", workedIn(result.added), () => setContent((now) => mergeKeywords(now, sent, result.content)));
   };
 
   /** Tailor lands here from the job picker. */
@@ -539,7 +557,12 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({
     );
     if (!result) return;
 
-    landAiTool("tailor", `Tailored to ${job.role} at ${job.company} — wove ${quote(result.woven)} in.`, () => {
+    // `woven` names only what the result carries, so it can be empty.
+    const caption =
+      result.woven.length > 0
+        ? `Tailored to ${job.role} at ${job.company}: wove ${quote(result.woven)} in.`
+        : `Tailored your summary to ${job.role} at ${job.company}.`;
+    landAiTool("tailor", caption, () => {
       // Only the two fields the service actually rewrote, folded onto the
       // content as it is NOW. `tailorToJob` used to be a pure function this
       // screen could simply re-run against `prev`; it is a round trip now, and
@@ -653,21 +676,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({
       const result = await runSuggestion("keywords", () => injectKeywords({ content: sent, keywords: suggestion.terms }));
       if (!result) return;
       if (result.added.length === 0) {
-        settle("Already covered — nothing to add.");
+        settle("Already covered. Nothing to add.");
         return;
       }
-      // Merged onto the content as it is NOW: the rewritten summary only if the
-      // summary is still what was sent, and the terms appended to Skills
-      // either way — typing during the round trip is never overwritten.
-      setContent((now) => {
-        const have = new Set(now.skills.map((skill) => skill.toLowerCase()));
-        return {
-          ...now,
-          summary: now.summary === sent.summary ? result.content.summary : now.summary,
-          skills: [...now.skills, ...result.added.filter((term) => !have.has(term.toLowerCase()))],
-        };
-      });
-      settle(`Added ${quote(result.added)} to your Summary and Skills.`);
+      // Merged onto the content as it is NOW: the summary and bullets only where they are still
+      // what was sent, and the service's Skills with anything typed meanwhile (`mergeKeywords`).
+      setContent((now) => mergeKeywords(now, sent, result.content));
+      settle(workedIn(result.added));
       return;
     }
 

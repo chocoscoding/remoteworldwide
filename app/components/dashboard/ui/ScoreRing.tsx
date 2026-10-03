@@ -41,7 +41,7 @@ export interface ScoreRingProps {
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 /** Slim by design — the ring is the frame, the number is the content. */
-const STROKE_RATIO = 0.055;
+const STROKE_RATIO = 0.0955;
 const MIN_STROKE = 4;
 const MAX_STROKE = 10;
 
@@ -74,7 +74,7 @@ const ScoreRing: FC<ScoreRingProps> = ({ value, size = 164, label, tone = "light
         {label ?? (
           <>
             <span
-              className={cn("font-bold leading-none tabular-nums", tone === "dark" ? "text-white" : "text-primary")}
+              className={cn("font-bold leading-none tracking-tight tabular-nums", tone === "dark" ? "text-white" : "text-primary")}
               style={{ fontSize: numberSize }}>
               {pct}
             </span>

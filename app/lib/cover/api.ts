@@ -29,7 +29,7 @@
 // saying so rides along as `saveNotice`. A blank draft ("Write your own") is
 // saved too, on its first keystroke (`createLetter`), for free.
 
-import { apiGet, apiPatch, apiPost, apiPostWithMessage } from "@/app/lib/api/client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostWithMessage } from "@/app/lib/api/client";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import type { CoverLetterContent, LetterDesign, LetterSummary, LetterView, StoredLetterContent } from "@/app/lib/dashboard/types";
 
@@ -160,17 +160,32 @@ export async function reviseCoverLetter(input: ReviseCoverLetterInput): Promise<
 // ---------------------------------------------------------------------------
 
 /** How many letters the cover screen offers to pick back up. */
-export const RECENT_LETTERS = 5;
+export const RECENT_LETTERS = 6;
 
 /**
- * Saved letters, most recently worked on first: every one up to 50, or the newest `limit`.
- * Summaries carry no content.
+ * Every letter someone can keep (the AI service's `MAX_SAVED_LETTERS`): My documents asks for this
+ * many summaries. A full view stays at 50 whatever is asked.
  */
-export function listLetters(view: "summary", signal?: AbortSignal, limit?: number): Promise<LetterSummary[]>;
-export function listLetters(view: "full", signal?: AbortSignal, limit?: number): Promise<LetterView[]>;
-export function listLetters(view: "summary" | "full", signal?: AbortSignal, limit?: number): Promise<LetterSummary[] | LetterView[]> {
-  return apiGet<LetterSummary[] | LetterView[]>(`${LETTERS_PATH}?view=${view}${limit ? `&limit=${limit}` : ""}`, signal);
+export const ALL_LETTERS = 200;
+
+/**
+ * Saved letters, most recently worked on first: every one up to 50, or the newest `limit` — up to
+ * `ALL_LETTERS` for summaries. Summaries carry no content. Archived letters are left out unless
+ * `archived` is "include" (My documents).
+ */
+export function listLetters(view: "summary", signal?: AbortSignal, limit?: number, archived?: "include"): Promise<LetterSummary[]>;
+export function listLetters(view: "full", signal?: AbortSignal, limit?: number, archived?: "include"): Promise<LetterView[]>;
+export function listLetters(view: "summary" | "full", signal?: AbortSignal, limit?: number, archived?: "include"): Promise<LetterSummary[] | LetterView[]> {
+  const query = [`view=${view}`, limit ? `limit=${limit}` : "", archived ? `archived=${archived}` : ""].filter(Boolean).join("&");
+  return apiGet<LetterSummary[] | LetterView[]>(`${LETTERS_PATH}?${query}`, signal);
 }
+
+/** Deletes a saved letter for good. Another user's id, or a resume's, is a 404. */
+export const deleteLetter = (id: string): Promise<{ id: string }> => apiDelete<{ id: string }>(`${LETTERS_PATH}/${encodeURIComponent(id)}`);
+
+/** Archive (true) or restore (false) a letter from My documents. Not an edit: it keeps its place in "most recent". */
+export const setLetterArchived = (id: string, archived: boolean): Promise<{ id: string; label: string; updatedAt: Date }> =>
+  apiPatch<{ id: string; label: string; updatedAt: Date }>(`${LETTERS_PATH}/${encodeURIComponent(id)}`, { archived });
 
 /**
  * Saves a blank draft ("Write your own") with what is on the page, and answers

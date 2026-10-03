@@ -50,7 +50,7 @@ const MODES: { id: Mode; label: string; icon: typeof Link2; hint: string }[] = [
 const FIELD =
   "w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm text-primary outline-none transition-colors placeholder:text-black/35 focus:border-black/40";
 
-const PASTE_FIRST_LINE = "Put the company and the role on the first line, like “Stripe — Support Engineer”, then the description below it.";
+const PASTE_FIRST_LINE = "Put the company and the role on the first line, like “Stripe - Support Engineer”, then the description below it.";
 
 /** Why the wizard is running on an unsaved job, in step 1's words. */
 const unsavedBecause = (error: unknown) => `We couldn't save this job to your jobs (${apiMessage(error)}), so the warm-intro search is off for it.`;
@@ -89,7 +89,7 @@ const StartApplication: FC<StartApplicationProps> = ({ onStart }) => {
     if (!looksLikeUrl(input)) {
       const parsed = parseFreeText(input);
       if (!parsed.company || !parsed.role) {
-        setNote("That isn't a link. Paste the posting's URL, or type “Company — Role”.");
+        setNote("That isn't a link. Paste the posting's URL, or type “Company - Role”.");
         return;
       }
       await startFromDraft({ company: parsed.company, role: parsed.role, description: null }, "paste");
@@ -170,7 +170,7 @@ const StartApplication: FC<StartApplicationProps> = ({ onStart }) => {
     <div className="mx-auto max-w-[720px]">
       <h2 className="text-2xl font-bold text-primary">What are you applying to?</h2>
       <p className="mt-1.5 text-sm text-black/50">
-        Bring the job in any shape — we&apos;ll pull out the company, the role and the description, and keep it in your jobs.
+        Bring the job in any shape. We&apos;ll pull out the company, the role and the description, and keep it in your jobs.
       </p>
 
       {/* Mode picker */}
@@ -242,7 +242,7 @@ const StartApplication: FC<StartApplicationProps> = ({ onStart }) => {
               rows={8}
               value={jd}
               onChange={(e) => setJd(e.target.value)}
-              placeholder={"Stripe — Support Engineer\n\nPaste the rest of the description here…"}
+              placeholder={"Stripe - Support Engineer\n\nPaste the rest of the description here…"}
               className={cn(FIELD, "resize-y leading-relaxed")}
             />
             <div className="mt-3 flex items-center gap-3">
