@@ -20,10 +20,11 @@
 import { useRef, useState, type FC } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowUpRight, Check, Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, Copy, Plus, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
+import { LinesSkeleton, Loading } from "@/app/components/dashboard/ui/Skeleton";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
@@ -232,22 +233,29 @@ const SubmitStep: FC<SubmitStepProps> = ({
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
-              {row.question.trim() && (
-                <>
-                  <label className="sr-only" htmlFor={`${row.id}-a`}>
-                    Answer {index + 1}
-                  </label>
-                  <AutoGrowTextarea
-                    id={`${row.id}-a`}
-                    minRows={2}
-                    value={row.answer}
-                    maxLength={APPLICATION_LIMITS.answerMax}
-                    readOnly={drafting}
-                    onChange={(e) => patchRow(row.id, { answer: e.target.value, edited: true, drafted: null })}
-                    placeholder={row.drafted?.cat === "demographics" ? "Yours to answer. We never guess these." : "Your answer…"}
-                    className={cn(FIELD, "leading-relaxed")}
-                  />
-                </>
+              {row.question.trim() && drafting && !row.answer.trim() ? (
+                // Being drafted: the answer's shape, until it lands in the box.
+                <Loading label={`Drafting an answer to question ${index + 1}`} className="rounded-lg border border-black/10 px-3.5 py-3">
+                  <LinesSkeleton lines={2} />
+                </Loading>
+              ) : (
+                row.question.trim() && (
+                  <>
+                    <label className="sr-only" htmlFor={`${row.id}-a`}>
+                      Answer {index + 1}
+                    </label>
+                    <AutoGrowTextarea
+                      id={`${row.id}-a`}
+                      minRows={2}
+                      value={row.answer}
+                      maxLength={APPLICATION_LIMITS.answerMax}
+                      readOnly={drafting}
+                      onChange={(e) => patchRow(row.id, { answer: e.target.value, edited: true, drafted: null })}
+                      placeholder={row.drafted?.cat === "demographics" ? "Yours to answer. We never guess these." : "Your answer…"}
+                      className={cn(FIELD, "leading-relaxed")}
+                    />
+                  </>
+                )
               )}
             </div>
           ))}
@@ -255,8 +263,8 @@ const SubmitStep: FC<SubmitStepProps> = ({
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <StickerButton variant="primary" size="md" disabled={drafting || toDraft.length === 0} onClick={() => void draft()}>
-            {drafting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {drafting ? "Drafting…" : `Draft answers · up to ${AUTOFILL_CREDITS} credit`}
+            <Sparkles className="h-4 w-4" />
+            Draft answers · up to {AUTOFILL_CREDITS} credit
           </StickerButton>
           <StickerButton variant="outline" size="md" disabled={full} onClick={() => addRow()}>
             <Plus className="h-4 w-4" />

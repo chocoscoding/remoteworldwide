@@ -33,9 +33,10 @@ import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState, type R
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Loader2 } from "lucide-react";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { Bone, LinesSkeleton, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
@@ -94,7 +95,7 @@ const ApplyClient: FC = () => (
   <Suspense
     fallback={
       <FrontFrame>
-        <Opening label="Loading…" />
+        <FrontDoorSkeleton />
       </FrontFrame>
     }>
     <ApplyScreen />
@@ -125,11 +126,44 @@ const FrontFrame: FC<{ children: ReactNode }> = ({ children }) => (
   </div>
 );
 
-const Opening: FC<{ label: string }> = ({ label }) => (
-  <p role="status" className="mx-auto flex max-w-[720px] items-center gap-2 text-sm text-black/50">
-    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-    {label}
-  </p>
+/** The front door's shape while the page reads its address: skeletons, not a spinner (owner, 2026-10-03). */
+const FrontDoorSkeleton: FC = () => (
+  <Loading label="Loading" className="mx-auto flex max-w-[720px] flex-col gap-4">
+    <Bone className="h-7 w-72 max-w-full" />
+    <Bone className="h-3 w-96 max-w-full" />
+    <div className="mt-2 flex flex-wrap gap-2">
+      {["w-24", "w-36", "w-28", "w-40"].map((width) => (
+        <Bone key={width} className={cn("h-9 rounded-md", width)} />
+      ))}
+    </div>
+    <div className="rounded-2xl border border-black/10 bg-white p-6">
+      <LinesSkeleton lines={1} className="max-w-sm" />
+      <Bone className="mt-4 h-10 w-full rounded-lg" />
+    </div>
+  </Loading>
+);
+
+/** An application's shape while it opens: the steps, the resume card and the score card. */
+const WizardSkeleton: FC = () => (
+  <Loading label="Opening your application" className="mx-auto flex max-w-[1100px] flex-col gap-5">
+    <div className="flex flex-wrap items-center gap-3">
+      {[0, 1, 2, 3, 4].map((step) => (
+        <Bone key={step} className="h-8 w-32 rounded-full" />
+      ))}
+    </div>
+    <div className="rounded-2xl border border-black/10 bg-white p-6">
+      <Bone className="h-4 w-56 max-w-full" />
+      <Bone className="mt-2 h-3 w-96 max-w-full" />
+      <RowsSkeleton rows={2} className="mt-4" />
+    </div>
+    <div className="flex flex-col gap-5 rounded-2xl border border-black/10 bg-white p-6 sm:flex-row sm:items-start sm:gap-7">
+      <Bone className="h-32 w-32 flex-none rounded-full" />
+      <div className="flex flex-1 flex-col gap-3 pt-1">
+        <Bone className="h-7 w-28 rounded-full" />
+        <LinesSkeleton lines={3} className="max-w-xl" />
+      </div>
+    </div>
+  </Loading>
 );
 
 const FrontDoor: FC<{ onOpen: (id: string) => void }> = ({ onOpen }) => {
@@ -190,10 +224,9 @@ const FrontDoor: FC<{ onOpen: (id: string) => void }> = ({ onOpen }) => {
       <div className="mx-auto max-w-[720px]">
         <ContinueList sessions={resumable.data ?? []} onOpen={onOpen} onDismiss={(id) => void dismiss(id)} />
         {starting && !prompt && (
-          <p role="status" className="mb-4 flex items-center gap-2 text-sm text-black/55">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Starting your application…
-          </p>
+          <Loading label="Starting your application" className="mb-4">
+            <RowsSkeleton rows={1} />
+          </Loading>
         )}
       </div>
       <StartApplication onStart={(picked) => void start(picked)} />
@@ -229,7 +262,7 @@ const SessionLoader: FC<{ id: string; onLeave: () => void }> = ({ id, onLeave })
   if (session.isPending) {
     return (
       <FrontFrame>
-        <Opening label="Opening your application…" />
+        <WizardSkeleton />
       </FrontFrame>
     );
   }

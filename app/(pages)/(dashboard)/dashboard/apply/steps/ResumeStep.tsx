@@ -36,11 +36,11 @@ import { toast } from "sonner";
 import {
   Check,
   ChevronDown,
+  Download,
   ExternalLink,
   Eye,
   FileText,
   Library,
-  Loader2,
   MoreHorizontal,
   RotateCw,
   Sparkles,
@@ -54,6 +54,7 @@ import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { Bone, LinesSkeleton, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import { useDocuments } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { changeCount, resumeChanges } from "@/app/lib/apply/changes";
@@ -81,7 +82,8 @@ import type { StartedJob } from "../job";
 import type { useApplyScan } from "../useApplyScan";
 import ChangesPaper from "../parts/ChangesPaper";
 import GapPicker from "../parts/GapPicker";
-import ResumePreviewDialog from "../parts/ResumePreviewDialog";
+import ResumePreviewDialog, { DownloadButton } from "../parts/ResumePreviewDialog";
+import { useResumeDownload } from "../parts/useResumeDownload";
 import SelectResumeDialog, { type PickedResume } from "../parts/SelectResumeDialog";
 
 export interface ResumeStepProps {
@@ -96,6 +98,9 @@ export interface ResumeStepProps {
 
 /** The service's cap on a tool's want-list: every gap the panel shows fits. */
 const MAX_TOOL_GAPS = 20;
+
+/** The least time between two reads of the resume creator's copy: focus and visibility both fire on a tab switch. */
+const PULL_GAP_MS = 5_000;
 
 const withoutExtension = (name: string) => name.replace(/\.[a-z0-9]{1,5}$/i, "");
 
@@ -114,6 +119,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   const { docs, loading: docsLoading } = useDocuments();
   const ingested = useIngestedResumesQuery();
   const tools = useResumeSuggestion();
+  const { download, printer } = useResumeDownload();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const toolsRef = useRef<HTMLDivElement | null>(null);
   const paperRef = useRef<HTMLDivElement | null>(null);
@@ -141,6 +147,15 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   const content = sending.data?.content ?? null;
   const version = sending.data?.version ?? null;
   const sendingReady = sending.data?.status === "ready";
+
+  // A resume that couldn't be opened (the AI service restarting, say) is said, with a way to try
+  // again, rather than left looking like it is still being read (owner, 2026-10-03: "I am stuck").
+  const resumeFailed = (sendingId !== null && sending.isError) || (resume.baseId !== null && base.isError) || (resume.draftId !== null && draft.isError);
+  function retryResumes() {
+    if (sendingId && sending.isError) void sending.refetch();
+    if (resume.baseId && base.isError) void base.refetch();
+    if (resume.draftId && draft.isError) void draft.refetch();
+  }
 
   // ---- The default: the master resume, else the newest one that was read ----------------------
   const masterImport = useRef(false);
@@ -244,12 +259,15 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   // Without this the creator's copy drifted from the draft, and neither the preview nor the score
   // ever saw those edits (owner, 2026-10-03). Read when this tab is shown again, and once on load.
   const pulling = useRef(false);
+  const lastPull = useRef(0);
   useEffect(() => {
     const docId = resume.creatorDocId;
     const draftId = resume.draftId;
     if (!editable || !docId || !draftId) return;
     async function pull() {
       if (document.visibilityState !== "visible" || pulling.current || !docId || !draftId) return;
+      if (Date.now() - lastPull.current < PULL_GAP_MS) return;
+      lastPull.current = Date.now();
       pulling.current = true;
       try {
         const copy = await getResumeDocument(docId);
@@ -302,6 +320,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   async function runTool(tool: ResumeToolId, only?: string[]): Promise<boolean> {
     if (!sendingId || !content) return false;
     setToolFrom(only ? "gaps" : "tools");
+    // Started from the gaps above: the tools card, where the result takes shape, comes into view.
+    if (only) requestAnimationFrame(() => toolsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
     const forResumeId = sendingId;
     const wanted = only ?? gaps.map((gap) => gap.label).slice(0, MAX_TOOL_GAPS);
     const input = { content, jdText: job.description, company: job.company, role: job.role, keywords: wanted.length > 0 ? wanted : null };
@@ -413,22 +433,20 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   const toolsIdle = editable && Boolean(content) && tools.running === null;
   const sendingName = sendingDraft ? (resume.draftName ?? draftLabel) : (resume.baseName ?? base.data?.fileName ?? "Your resume");
 
-  const toolsNote = !sendingId
+  // The two buttons say what they do; a line under them only when one can't run (owner, 2026-10-03: "it's just two buttons").
+  const toolsBlocked = !sendingId
     ? "Pick a resume first."
     : !content
-      ? sending.isPending
-        ? "Opening the resume…"
-        : "It can be worked on once it has been read."
-      : [
-          canTailor
-            ? "Tailor rewrites your summary toward this posting and adds the skills it asks for."
-            : "Tailoring needs the job's description.",
-          gaps.length > 0
-            ? `Keywords works all ${gaps.length} gap${gaps.length === 1 ? "" : "s"} into your summary, skills and bullets.`
-            : canKeywords
-              ? "Keywords works the posting's own terms in."
-              : "Keywords needs the description or a score.",
-        ].join(" ");
+      ? sending.isError
+        ? "The resume couldn't be opened just now. Try again above."
+        : sending.isPending
+          ? null
+          : "It can be worked on once it has been read."
+      : !canTailor
+        ? "Tailoring needs the job's description."
+        : null;
+  const draftName = resume.draftName ?? draftLabel;
+  const baseName = resume.baseName ?? base.data?.fileName ?? "Your resume";
 
   return (
     <div className="flex flex-col gap-5">
@@ -443,8 +461,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StickerButton variant="outline" size="sm" disabled={!editable || uploading} onClick={() => fileRef.current?.click()}>
-              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-              {uploading ? "Reading" : "Upload"}
+              <Upload className="h-3.5 w-3.5" />
+              Upload
             </StickerButton>
             <StickerButton variant="outline" size="sm" disabled={!editable} onClick={() => setSelectOpen(true)}>
               <Library className="h-3.5 w-3.5" />
@@ -465,31 +483,50 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
 
         {uploadError && <p className="mt-3 text-sm text-[#b23c26]">{uploadError}</p>}
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-col gap-2">
+          {uploading && (
+            <Loading label="Reading your upload">
+              <RowsSkeleton rows={1} />
+            </Loading>
+          )}
+          {using && !resume.draftId && (
+            <Loading label="Saving this version">
+              <RowsSkeleton rows={1} />
+            </Loading>
+          )}
           {!resume.baseId ? (
             ingested.isPending ? (
-              <p role="status" className="inline-flex items-center gap-2 text-sm text-black/55">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                Finding your resume…
-              </p>
+              <Loading label="Finding your resume">
+                <RowsSkeleton rows={1} />
+              </Loading>
             ) : (
-              <p className="text-sm leading-relaxed text-black/55">
-                No resume picked yet. Upload one (PDF, DOCX, TXT or MD) or select one you already have.
-              </p>
+              !uploading && (
+                <p className="text-sm leading-relaxed text-black/55">
+                  No resume picked yet. Upload one (PDF, DOCX, TXT or MD) or select one you already have.
+                </p>
+              )
             )
           ) : (
-            <div className="flex flex-col gap-2">
+            <>
               {resume.draftId && (
                 <ResumeRow
                   icon={<Sparkles className="h-4 w-4 flex-none text-[#6c7a1e]" aria-hidden />}
                   name={resume.draftName ?? `Tailored for ${job.company}`}
-                  meta={[
-                    "Draft for this application",
-                    draft.data ? `version ${draft.data.version}` : null,
-                    fromOtherBase ? "made from an earlier pick" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  meta={
+                    draft.isPending ? (
+                      <Bone className="mt-1 h-2.5 w-40" />
+                    ) : draft.isError ? (
+                      "Couldn't open it just now"
+                    ) : (
+                      [
+                        "Draft for this application",
+                        draft.data ? `version ${draft.data.version}` : null,
+                        fromOtherBase ? "made from an earlier pick" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
+                    )
+                  }
                   selected={resume.sendDraft}
                   disabled={!editable}
                   onSelect={() => update((s) => ({ ...s, resume: { ...s.resume, sendDraft: true } }))}
@@ -501,9 +538,11 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                             label: "Open in resume creator",
                             icon: ExternalLink,
                             busy: openingCreator,
-                            onSelect: () => void openInCreator(draftContent, resume.draftName ?? draftLabel),
+                            onSelect: () => void openInCreator(draftContent, draftName),
                           },
                           { id: "preview", label: "Preview", icon: Eye, onSelect: () => setPreviewing("draft") },
+                          { id: "pdf", label: "Download as PDF", icon: Download, onSelect: () => download(draftContent, draftName, "pdf") },
+                          { id: "docx", label: "Download as DOCX", icon: Download, onSelect: () => download(draftContent, draftName, "docx") },
                         ]
                       : undefined
                   }
@@ -513,21 +552,46 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                 icon={<FileText className="h-4 w-4 flex-none text-black/40" aria-hidden />}
                 name={resume.baseName ?? base.data?.fileName ?? "Your resume"}
                 meta={
-                  base.data?.status === "pending"
-                    ? "Still being read…"
-                    : base.data?.status === "failed"
-                      ? (base.data.error ?? "Couldn't be read")
-                      : resume.draftId
-                        ? "The original, kept as it is"
-                        : "Your resume, as it is"
+                  base.isPending || base.data?.status === "pending" ? (
+                    <Bone className="mt-1 h-2.5 w-40" />
+                  ) : base.isError ? (
+                    "Couldn't open it just now"
+                  ) : base.data?.status === "failed" ? (
+                    (base.data.error ?? "Couldn't be read")
+                  ) : resume.draftId ? (
+                    "The original, kept as it is"
+                  ) : (
+                    "Your resume, as it is"
+                  )
                 }
                 selected={!resume.sendDraft}
-                disabled={!editable || base.data?.status !== "ready"}
+                // Pickable unless it is known not to be readable: one still loading, or that failed to load, can still be chosen.
+                disabled={!editable || (base.data !== undefined && base.data.status !== "ready")}
                 onSelect={() => update((s) => ({ ...s, resume: { ...s.resume, sendDraft: false } }))}
                 menu={
-                  base.data?.content ? [{ id: "preview", label: "Preview", icon: Eye, onSelect: () => setPreviewing("base") }] : undefined
+                  base.data?.content
+                    ? [
+                        { id: "preview", label: "Preview", icon: Eye, onSelect: () => setPreviewing("base") },
+                        { id: "pdf", label: "Download as PDF", icon: Download, onSelect: () => base.data?.content && download(base.data.content, baseName, "pdf") },
+                        {
+                          id: "docx",
+                          label: "Download as DOCX",
+                          icon: Download,
+                          onSelect: () => base.data?.content && download(base.data.content, baseName, "docx"),
+                        },
+                      ]
+                    : undefined
                 }
               />
+            </>
+          )}
+          {resumeFailed && (
+            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-[#b23c26]/20 bg-[#fdf4f2] px-3.5 py-2.5">
+              <p className="min-w-0 flex-1 text-sm text-[#b23c26]">Your resume couldn&apos;t be opened just now.</p>
+              <StickerButton variant="outline" size="sm" onClick={retryResumes}>
+                <RotateCw className="h-3.5 w-3.5" />
+                Try again
+              </StickerButton>
             </div>
           )}
         </div>
@@ -554,10 +618,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
         {!sendingId ? (
           <p className="text-[15px] text-black/60">Pick or upload a resume. It&apos;s scored as soon as there is one.</p>
         ) : scoring ? (
-          <p role="status" className="inline-flex items-center gap-2 text-[15px] text-black/60">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            {state.scan ? "Scoring your latest version…" : "Scoring against the posting…"}
-          </p>
+          <Loading label={state.scan ? "Scoring your latest version" : "Scoring against the posting"}>
+            <ScoreSkeleton />
+          </Loading>
         ) : report ? (
           <>
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-7">
@@ -568,10 +631,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                   {scoreChange !== null && <ScoreChange delta={scoreChange} />}
                 </div>
                 {live?.status === "explaining" && (
-                  <p className="inline-flex items-center gap-2 text-sm text-black/55">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                    Writing up why…
-                  </p>
+                  <Loading label="Writing up why" className="w-full max-w-xl">
+                    <LinesSkeleton lines={2} />
+                  </Loading>
                 )}
                 {report.explanation && <p className="text-[15px] leading-relaxed text-black/75">{withoutEmDashes(report.explanation)}</p>}
                 {report.degraded && (
@@ -611,32 +673,35 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
             </div>
           </div>
         ) : sending.isPending ? (
-          <p role="status" className="inline-flex items-center gap-2 text-[15px] text-black/60">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Opening the resume…
-          </p>
+          <Loading label="Opening the resume">
+            <ScoreSkeleton />
+          </Loading>
+        ) : sending.isError ? (
+          <div className="flex flex-col items-start gap-2.5" role="alert">
+            <p className="text-[15px] text-[#b23c26]">The resume couldn&apos;t be opened just now, so it hasn&apos;t been scored.</p>
+            <StickerButton variant="outline" size="sm" onClick={retryResumes}>
+              <RotateCw className="h-3.5 w-3.5" />
+              Try again
+            </StickerButton>
+          </div>
+        ) : sending.data?.status === "pending" ? (
+          <Loading label="Reading the resume">
+            <ScoreSkeleton />
+          </Loading>
         ) : !sendingReady ? (
-          <p className="text-[15px] text-black/60">It&apos;s scored once the resume has been read.</p>
+          <p className="text-[15px] text-black/60">{sending.data?.error ?? "This resume couldn't be read, so it can't be scored. Upload or select another."}</p>
         ) : (
-          <p role="status" className="inline-flex items-center gap-2 text-[15px] text-black/60">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Getting ready to score…
-          </p>
+          <Loading label="Getting ready to score">
+            <ScoreSkeleton />
+          </Loading>
         )}
       </DashCard>
 
-      {/* The tools */}
-      <div ref={toolsRef} className="scroll-mt-40">
-        <DashCard className="flex flex-col gap-4 p-6">
-          <div>
-            <p className="text-base font-bold text-primary">Make it fit this job</p>
-            <p className="mt-0.5 text-sm text-black/55">
-              Works every gap the score found into your resume, {SUGGESTION_CREDITS} credit a run. Nothing changes until you use the new
-              version, which updates this application&apos;s one draft. Your original stays as it is.
-            </p>
-          </div>
-
-          {proposal ? (
+      {/* The tools: two small buttons, no card or title around them (owner, 2026-10-03). A card appears only for
+          what they make: a result taking shape, and the proposal to add or discard. */}
+      <div ref={toolsRef} className="flex scroll-mt-40 flex-col gap-3">
+        {proposal ? (
+          <DashCard className="p-6">
             <ProposalPanel
               proposal={proposal}
               original={content}
@@ -646,36 +711,52 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
               onPreview={() => setPreviewing("proposal")}
               onDiscard={() => update((s) => ({ ...s, proposal: null }))}
             />
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <StickerButton variant="outline" size="md" disabled={!toolsIdle || !canTailor} onClick={() => void runTool("tailor")}>
-                  {tools.running === "tailor" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Tailor summary &amp; skills
-                </StickerButton>
-                <StickerButton variant="outline" size="md" disabled={!toolsIdle || !canKeywords} onClick={() => void runTool("keywords")}>
-                  {tools.running === "keywords" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Work in missing keywords
-                </StickerButton>
-              </div>
-              <p className="text-sm leading-relaxed text-black/55">{toolsNote}</p>
-              {toolFrom === "tools" && tools.failure && !tools.running && (
-                <p role="alert" className="text-sm text-[#b23c26]">
-                  {tools.failure.message}
-                </p>
-              )}
-              {tools.failure?.needsCredits && (
-                <Link
-                  href={ATS_BILLING_HREF}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-semibold text-primary underline underline-offset-2">
-                  Top up credits
-                </Link>
-              )}
-            </>
-          )}
-        </DashCard>
+          </DashCard>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <ToolButton
+                label="Tailor summary & skills"
+                hint={`Rewrites your summary toward this posting and adds the skills it asks for. ${SUGGESTION_CREDITS} credit.`}
+                disabled={!toolsIdle || !canTailor}
+                onClick={() => void runTool("tailor")}
+              />
+              <ToolButton
+                label="Work in missing keywords"
+                hint={`Works every gap the score found into your summary, skills and bullets. ${SUGGESTION_CREDITS} credit.`}
+                disabled={!toolsIdle || !canKeywords}
+                onClick={() => void runTool("keywords")}
+              />
+            </div>
+            {tools.running ? (
+              <DashCard className="p-6">
+                <Loading label={tools.running === "tailor" ? "Tailoring your resume" : "Working the gaps in"}>
+                  <ProposalSkeleton />
+                </Loading>
+              </DashCard>
+            ) : sendingId && !content && sending.isPending ? (
+              <Loading label="Opening the resume">
+                <LinesSkeleton lines={1} className="max-w-md" />
+              </Loading>
+            ) : (
+              toolsBlocked && <p className="text-sm leading-relaxed text-black/55">{toolsBlocked}</p>
+            )}
+            {toolFrom === "tools" && tools.failure && !tools.running && (
+              <p role="alert" className="text-sm text-[#b23c26]">
+                {tools.failure.message}
+              </p>
+            )}
+            {tools.failure?.needsCredits && (
+              <Link
+                href={ATS_BILLING_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-primary underline underline-offset-2">
+                Top up credits
+              </Link>
+            )}
+          </>
+        )}
       </div>
 
       {/* The resume, whole: collapsed until "Preview" or its header opens it */}
@@ -700,19 +781,26 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
 
             {paperOpen && (
               <div className="border-t border-black/8 bg-[#f0f0ea] px-4 py-5 sm:px-8 sm:py-7">
-                {sending.isPending ? (
-                  <p role="status" className="inline-flex items-center gap-2 text-sm text-black/55">
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                    Opening the resume…
-                  </p>
+                {sending.isPending || sending.data?.status === "pending" ? (
+                  <Loading label="Opening the resume">
+                    <PaperSkeleton />
+                  </Loading>
                 ) : !content ? (
-                  <p className="text-sm text-black/60">
-                    {sending.isError ? apiMessage(sending.error) : "This resume hasn't been read yet."}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-sm text-black/60">
+                      {sending.isError ? "The resume couldn't be opened just now." : (sending.data?.error ?? "This resume couldn't be read.")}
+                    </p>
+                    {sending.isError && (
+                      <StickerButton variant="outline" size="sm" onClick={retryResumes}>
+                        <RotateCw className="h-3.5 w-3.5" />
+                        Try again
+                      </StickerButton>
+                    )}
+                  </div>
                 ) : (
                   <>
-                    {sendingDraft && (
-                      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                      {sendingDraft ? (
                         <p className="text-sm text-black/65">
                           {paperChanges > 0 ? (
                             <>
@@ -726,18 +814,19 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                             "Nothing here differs from the original yet."
                           )}
                         </p>
-                        {draftContent && (
-                          <StickerButton
-                            variant="outline"
-                            size="sm"
-                            disabled={openingCreator}
-                            onClick={() => void openInCreator(draftContent, resume.draftName ?? draftLabel)}>
-                            {openingCreator ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+                      ) : (
+                        <p className="text-sm text-black/65">Your resume, as it is.</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DownloadButton onDownload={(format) => download(content, sendingName, format)} />
+                        {sendingDraft && draftContent && (
+                          <StickerButton variant="outline" size="sm" disabled={openingCreator} onClick={() => void openInCreator(draftContent, draftName)}>
+                            <ExternalLink className="h-3.5 w-3.5" />
                             Open in resume creator
                           </StickerButton>
                         )}
                       </div>
-                    )}
+                    </div>
                     <ChangesPaper content={content} before={paperBefore} />
                   </>
                 )}
@@ -766,8 +855,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
           content={draftContent}
           // What it was made from, once that is in; until then nothing is marked rather than everything.
           before={draftBase ?? draftContent}
-          onOpenInCreator={() => void openInCreator(draftContent, resume.draftName ?? draftLabel)}
+          onOpenInCreator={() => void openInCreator(draftContent, draftName)}
           openingInCreator={openingCreator}
+          onDownload={(format) => download(draftContent, draftName, format)}
         />
       )}
       {previewing === "base" && base.data?.content && (
@@ -777,11 +867,71 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
           title={resume.baseName ?? base.data.fileName}
           content={base.data.content}
           before={base.data.content}
+          onDownload={(format) => base.data?.content && download(base.data.content, baseName, format)}
         />
       )}
+      {printer}
     </div>
   );
 };
+
+/**
+ * One of the two tools: a small button, no icon, with a lime-green edge at rest and ink on hover so it
+ * reads apart from the score card above (owner, 2026-10-03). What it does and costs is its tooltip,
+ * not text around it.
+ */
+const ToolButton: FC<{ label: string; hint: string; disabled: boolean; onClick: () => void }> = ({ label, hint, disabled, onClick }) => (
+  <button
+    type="button"
+    title={hint}
+    disabled={disabled}
+    onClick={onClick}
+    className="br-plain-press br-lime inline-flex h-9 cursor-pointer items-center rounded-lg border-2 border-[#c9d65a] bg-[#f8fbe8] px-3.5 text-sm font-bold whitespace-nowrap text-primary transition-colors hover:border-[#222325] hover:bg-[#222325] hover:text-white disabled:pointer-events-none disabled:opacity-45">
+    {label}
+  </button>
+);
+
+/** The score card's shape while a score is on its way: the ring, the tier and a few lines. */
+const ScoreSkeleton: FC = () => (
+  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-7">
+    <Bone className="h-32 w-32 flex-none rounded-full" />
+    <div className="flex min-w-0 flex-1 flex-col gap-3 pt-1">
+      <Bone className="h-7 w-28 rounded-full" />
+      <LinesSkeleton lines={3} className="max-w-xl" />
+    </div>
+  </div>
+);
+
+/** A tool's proposal while it is written: the terms, the change line and the new summary. */
+const ProposalSkeleton: FC = () => (
+  <div className="flex flex-col gap-3.5">
+    <div className="flex flex-wrap gap-1.5">
+      {["w-24", "w-36", "w-20"].map((width) => (
+        <Bone key={width} className={cn("h-7 rounded-full", width)} />
+      ))}
+    </div>
+    <Bone className="h-3 w-56" />
+    <div className="rounded-xl border border-black/8 p-4">
+      <LinesSkeleton lines={3} />
+    </div>
+  </div>
+);
+
+/** A page of resume while it opens: a name, then a few sections. */
+const PaperSkeleton: FC = () => (
+  <div className="mx-auto flex w-full max-w-[816px] flex-col gap-7 bg-white p-8 sm:p-10">
+    <div className="flex flex-col gap-2">
+      <Bone className="h-6 w-1/3" />
+      <Bone className="h-3 w-1/4" />
+    </div>
+    {[0, 1, 2].map((section) => (
+      <div key={section} className="flex flex-col gap-2.5">
+        <Bone className="h-3 w-28" />
+        <LinesSkeleton lines={3} />
+      </div>
+    ))}
+  </div>
+);
 
 /** How much the latest change moved the score. */
 const ScoreChange: FC<{ delta: number }> = ({ delta }) => (
@@ -848,11 +998,7 @@ const RowMenu: FC<{ name: string; entries: RowMenuEntry[] }> = ({ name, entries 
               setOpen(false);
             }}
             className={MENU_ITEM}>
-            {entry.busy ? (
-              <Loader2 className="h-3.5 w-3.5 flex-none animate-spin text-black/55" aria-hidden />
-            ) : (
-              <entry.icon className="h-3.5 w-3.5 flex-none text-black/55" aria-hidden />
-            )}
+            <entry.icon className="h-3.5 w-3.5 flex-none text-black/55" aria-hidden />
             {entry.label}
           </button>
         ))}
@@ -864,7 +1010,7 @@ const RowMenu: FC<{ name: string; entries: RowMenuEntry[] }> = ({ name, entries 
 const ResumeRow: FC<{
   icon: ReactNode;
   name: string;
-  meta: string;
+  meta: ReactNode;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
@@ -913,7 +1059,8 @@ const ProposalPanel: FC<{
   const nothing = changeCount(changes) === 0;
 
   return (
-    <div className="flex flex-col gap-3.5">
+    // Saving the version: the panel holds still and pulses until the draft is in.
+    <div className={cn("flex flex-col gap-3.5", using && "animate-pulse")} aria-busy={using}>
       {nothing ? (
         <p className="text-[15px] text-black/65">Nothing to change. Your resume already says all of this.</p>
       ) : (
@@ -968,8 +1115,8 @@ const ProposalPanel: FC<{
       <div className="flex flex-wrap gap-2">
         {!nothing && (
           <StickerButton variant="primary" size="sm" disabled={using} onClick={onUse}>
-            {using ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            Use this version
+            <Check className="h-3.5 w-3.5" />
+            Add to resume
           </StickerButton>
         )}
         {!nothing && (
@@ -983,7 +1130,6 @@ const ProposalPanel: FC<{
           {nothing ? "Close" : "Discard"}
         </StickerButton>
       </div>
-      {!nothing && <p className="text-xs text-black/45">Using it updates this application&apos;s draft and scores it again.</p>}
     </div>
   );
 };

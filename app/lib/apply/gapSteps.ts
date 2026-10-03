@@ -9,7 +9,9 @@
 // Short by design (owner: "so much information ... your eyes are going
 // everywhere"): each step is a few words for a pill with one sentence of how
 // behind it, and the closest line is cut to the one sentence of it that shares
-// the most with the requirement.
+// the most with the requirement. Each pill is a different thing to do: using
+// the posting's words is part of the step it belongs to, not a pill of its own
+// (owner, 2026-10-03: "what's the difference?").
 //
 // They say what to do, not whether to (owner: "our company does not stand for
 // telling the user what they want or what they don't want"). When nothing on
@@ -90,8 +92,6 @@ export function excerpt(text: string, requirement: string): string {
   return `${(space > MAX_EXCERPT * 0.6 ? cut.slice(0, space) : cut).replace(/[,;:\s]+$/, "")}…`;
 }
 
-const POSTING_WORDS: GapAction = { label: "Use the posting's words", how: "Scanners match words, not meaning, so copy the posting's wording." };
-
 export function stepsForGap(verdict: RequirementVerdict, label: string): GapSteps {
   const { requirement } = verdict;
   const status = verdict.state === "partial" ? "partial" : "missing";
@@ -105,11 +105,13 @@ export function stepsForGap(verdict: RequirementVerdict, label: string): GapStep
     case "skill":
       actions.push(
         closest
-          ? { label: "Name it in that line", how: `Say ${named} outright in that line, in the posting's words, so a scanner finds it.` }
-          : { label: "Add a bullet", how: `Under your most relevant role, show ${named}: what you built with it, and what came of it.` },
+          ? { label: "Name it in that line", how: `Add ${named} to that line, worded the way the posting words it: scanners match words, not meaning.` }
+          : {
+              label: "Add a bullet",
+              how: `Under your most relevant role, show ${named}: what you built with it and what came of it, in the posting's words.`,
+            },
       );
       if (skill) actions.push({ label: "Add it to Skills", how: `Add ${named} to your Skills list.` });
-      actions.push(POSTING_WORDS);
       break;
     case "education":
       actions.push({ label: "Add it under Education", how: "The degree or course, the school, and the year." });
@@ -118,10 +120,9 @@ export function stepsForGap(verdict: RequirementVerdict, label: string): GapStep
     case "responsibility":
       actions.push(
         closest
-          ? { label: "Reword that line", how: "Say plainly what you were responsible for, and what changed because of you." }
-          : { label: "Add a bullet", how: "About owning this: what you did, and what changed because of it." },
+          ? { label: "Reword that line", how: "Say plainly what you were responsible for and what changed because of you, in the posting's own words." }
+          : { label: "Add a bullet", how: "About owning this: what you did and what changed because of it, in the posting's own words." },
       );
-      actions.push(POSTING_WORDS);
       break;
     default:
       // "experience", and anything a newer scorer adds.

@@ -6,7 +6,6 @@
 // the skeleton that stands in for a letter on its way.
 
 import type { FC } from "react";
-import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Compact labelled select for the editor toolbar: every style control in one bar directly above the letter, not a separate card. */
@@ -38,14 +37,12 @@ const SKELETON_LINES = ["w-full", "w-[97%]", "w-[99%]", "w-[62%]"];
  * Stands in for the letter while a new one is written, so the page says a
  * letter is on its way instead of swapping the text out from under the user
  * when it lands. Shaped like what is coming: a greeting, the tone's paragraph
- * count, a sign-off.
+ * count, a sign-off. Shapes only, no spinner or "Writing…" line (owner,
+ * 2026-10-03); the label is read to screen readers.
  */
 export const LetterSkeleton: FC<{ paragraphs: number; label: string }> = ({ paragraphs, label }) => (
   <div className="flex min-h-[320px] flex-col gap-5 px-8 py-7" role="status" aria-live="polite">
-    <p className="inline-flex items-center gap-2 text-xs font-semibold text-black/45">
-      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-      {label}
-    </p>
+    <span className="sr-only">{label}</span>
     <div className="flex flex-col gap-5 motion-safe:animate-pulse" aria-hidden>
       <div className="h-3 w-32 rounded-full bg-black/[0.08]" />
       {Array.from({ length: paragraphs }, (_, p) => (

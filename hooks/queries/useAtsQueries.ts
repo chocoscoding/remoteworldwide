@@ -7,6 +7,7 @@
 // the same reason `documents` stays out.
 
 import { useQuery } from "@tanstack/react-query";
+import { BackendError } from "@/app/lib/api/core";
 import { getIngestedResume, getScan, listIngestedResumes, lookupStoredScan, storedScanKey } from "@/app/lib/ats/api";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
 
@@ -39,6 +40,11 @@ export function useIngestedResumeQuery(resumeId: string | null) {
     queryFn: ({ signal }) => getIngestedResume(resumeId ?? "", signal),
     staleTime: STALE_TIME.ats,
     enabled: resumeId !== null,
+    // The apply wizard can't move without it, so an AI service restarting (a deploy, a dev reload)
+    // must not leave it failed for good: retried for about a minute (the client's backoff, up to
+    // 30s apart), and again whenever the tab is shown while it is still failed. A 4xx is final.
+    retry: (failures, error) => !(error instanceof BackendError && error.status >= 400 && error.status < 500) && failures < 6,
+    refetchOnWindowFocus: (query) => query.state.status === "error",
   });
 }
 

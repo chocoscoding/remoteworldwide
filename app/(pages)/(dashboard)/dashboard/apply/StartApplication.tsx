@@ -21,11 +21,12 @@
 // falls through to the paste tab with the reason, as it always has.
 
 import { useState, type FC, type FormEvent } from "react";
-import { ArrowRight, Briefcase, Clipboard, Link2, Loader2, Search } from "lucide-react";
+import { ArrowRight, Briefcase, Clipboard, Link2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Pill from "@/app/components/dashboard/ui/Pill";
+import { LinesSkeleton, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import { apiMessage } from "@/app/lib/api/core";
 import { looksLikeUrl, parseFreeText, parseJobUrl } from "@/app/lib/dashboard/parse-jd";
@@ -224,8 +225,8 @@ const StartApplication: FC<StartApplicationProps> = ({ onStart }) => {
                 />
               </div>
               <StickerButton variant="primary" size="md" type="submit" disabled={!url.trim() || busy}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-                {busy ? "Reading" : "Start"}
+                <ArrowRight className="h-4 w-4" />
+                Start
               </StickerButton>
             </div>
           </form>
@@ -247,7 +248,7 @@ const StartApplication: FC<StartApplicationProps> = ({ onStart }) => {
             />
             <div className="mt-3 flex items-center gap-3">
               <StickerButton variant="primary" size="md" type="submit" disabled={!jd.trim() || busy}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                <ArrowRight className="h-4 w-4" />
                 Start
               </StickerButton>
               <span className="text-xs text-black/40">First line is read as company and role.</span>
@@ -300,11 +301,24 @@ const StartApplication: FC<StartApplicationProps> = ({ onStart }) => {
                 size="md"
                 disabled={!selectedId || busy}
                 onClick={() => (mode === "saved" ? startSaved() : void startListing())}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                <ArrowRight className="h-4 w-4" />
                 Start
               </StickerButton>
             </div>
           </div>
+        )}
+
+        {/* The job being read or saved: its shape, until the wizard opens on it. */}
+        {busy && (
+          <Loading label="Reading the job" className="mt-5 border-t border-black/8 pt-5">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <LinesSkeleton lines={1} className="max-w-xs" />
+                <LinesSkeleton lines={1} className="max-w-[12rem]" />
+              </div>
+              <LinesSkeleton lines={3} />
+            </div>
+          </Loading>
         )}
       </DashCard>
     </div>
@@ -343,10 +357,9 @@ const JobList: FC<{
 }> = ({ loading, error, empty, rows, selectedId, onSelect }) => {
   if (loading) {
     return (
-      <p role="status" className="inline-flex items-center gap-2 py-3 text-sm text-black/50">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        Loading…
-      </p>
+      <Loading label="Loading jobs">
+        <RowsSkeleton rows={4} bordered={false} />
+      </Loading>
     );
   }
   if (error) return <p className="py-3 text-sm text-[#b23c26]">{error}</p>;

@@ -13,9 +13,10 @@
 
 import { useMemo, useState, type FC } from "react";
 import TimeAgo from "timeago-react";
-import { FileText, Loader2, PenLine, Search, Star } from "lucide-react";
+import { FileText, PenLine, Search, Star } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useDocuments } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import { apiMessage } from "@/app/lib/api/core";
 import { prepareResumeForDoc } from "@/app/lib/ats/api";
 import { getResumeDocument, importResumeContent, resumeContentToText } from "@/app/lib/resume/api";
@@ -113,10 +114,9 @@ const SelectResumeDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => v
 
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-black/8 px-3 py-3">
           {(loading || created.isPending) && rows.length === 0 ? (
-            <p role="status" className="flex items-center gap-2 px-3 py-4 text-sm text-black/50">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Loading your resumes…
-            </p>
+            <Loading label="Loading your resumes">
+              <RowsSkeleton rows={4} bordered={false} />
+            </Loading>
           ) : shown.length === 0 ? (
             <p className="px-3 py-4 text-sm text-black/50">{q ? `No resume matches “${query.trim()}”.` : "No resumes yet. Upload one instead."}</p>
           ) : (
@@ -129,12 +129,10 @@ const SelectResumeDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => v
                     onClick={() => void pick(row)}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer hover:bg-[#f6f6f2] disabled:cursor-wait",
-                      picking === row.key && "bg-[#f6faea]",
+                      picking === row.key && "animate-pulse bg-[#f6faea]",
                     )}>
                     <span className="grid h-8 w-8 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
-                      {picking === row.key ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden />
-                      ) : row.origin === "created" ? (
+                      {row.origin === "created" ? (
                         <PenLine className="h-3.5 w-3.5 text-primary" aria-hidden />
                       ) : (
                         <FileText className="h-3.5 w-3.5 text-primary" aria-hidden />

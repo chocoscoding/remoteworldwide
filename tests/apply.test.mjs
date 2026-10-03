@@ -170,11 +170,14 @@ describe("the steps behind a gap", () => {
     assert.ok(help.actions.every((action) => action.label !== "Add it to Skills"));
   });
 
-  it("keeps every pill short", () => {
+  it("keeps every pill short, and each one a different thing to do", () => {
     for (const category of ["skill", "experience", "education", "responsibility", "leadership"]) {
       for (const state of ["missing", "partial"]) {
         const help = stepsForGap(verdict(category, state, [{ chunkId: "c1", text: "Ran ECS", section: "experience", role: "Kite", score: 0.5 }]), "Docker");
         for (const action of help.actions) assert.ok(action.label.split(" ").length <= 5, action.label);
+        // The posting's wording is said once, inside the step it belongs to (owner, 2026-10-03).
+        const wording = help.actions.filter((action) => /posting/.test(action.label) || /posting/.test(action.how));
+        assert.ok(wording.length <= 1, `${category}/${state}: ${wording.map((action) => action.label).join(", ")}`);
       }
     }
   });

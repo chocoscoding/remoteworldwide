@@ -6,7 +6,6 @@
 
 import type { FC } from "react";
 import TimeAgo from "timeago-react";
-import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import type { ApplySessionSummary } from "@/app/lib/apply/sessions";
@@ -35,7 +34,6 @@ const ContinuePrompt: FC<ContinuePromptProps> = ({ existing, starting, onContinu
           </div>
           <div className="flex items-center justify-end gap-2.5 border-t border-black/8 px-6 py-4">
             <StickerButton variant="outline" size="md" disabled={starting} onClick={onStartNew}>
-              {starting && <Loader2 className="h-4 w-4 animate-spin" />}
               No, start a new one
             </StickerButton>
             <StickerButton variant="primary" size="md" disabled={starting} onClick={onContinue}>

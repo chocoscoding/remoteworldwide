@@ -9,8 +9,9 @@
 // same theme, font, spacing and letterhead controls, bold, italic and lists,
 // Copy, download as PDF or Word, Print, and "say how to change it" for
 // COVER_REVISE_CREDITS. The letter's text is what gets recorded with the
-// application, edits included. Writing your own costs nothing, and so does
-// sending none.
+// application, edits included. Writing your own costs nothing (the editor opens
+// on a blank letter to type into, no button needed: owner, 2026-10-03), and so
+// does sending none.
 //
 // Tone is a choice for the NEXT letter, never a trigger: each tone is a
 // separate letter at a different length, so switching to an unwritten one only
@@ -25,7 +26,7 @@
 import { useState, type FC } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Download, Loader2, PenLine, Printer, RotateCw, Send, SkipForward, Sparkles, X } from "lucide-react";
+import { Check, Copy, Download, PenLine, Printer, Send, SkipForward, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
@@ -100,7 +101,7 @@ const textOf = (letter: Pick<CoverLetterContent, "greeting" | "paragraphs" | "si
 /** The editor's text as the application records it: no stray non-breaking spaces or runs of blank lines. */
 const tidy = (text: string): string =>
   text
-    .replace(/ /g, " ")
+    .replace(/\u00a0/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
@@ -122,8 +123,13 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
   const [prompt, setPrompt] = useState("");
   const [revising, setRevising] = useState(false);
   const [reviseNote, setReviseNote] = useState<string | null>(null);
+  // Nothing written yet: a blank letter to type into, which is how a letter of your own starts.
+  const blankLetter = `Hi ${job.company} team,\n\n\n\nBest,`;
   // What the editor loads: bumped whenever a different letter lands, never while it is typed in.
-  const [seed, setSeed] = useState(() => ({ key: 0, html: openingHtml(saved) }));
+  const [seed, setSeed] = useState(() => ({
+    key: 0,
+    html: saved.shown === null && !saved.letter.trim() ? textToLetterHtml(blankLetter) : openingHtml(saved),
+  }));
   const { tone, shown, writtenFrom, letter, skipped, design } = saved;
 
   const load = (html: string) => setSeed((prev) => ({ key: prev.key + 1, html }));
@@ -159,12 +165,6 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
       return text !== undefined ? { ...state, tone: next, drafts: kept, shown: next, letter: text, html: "" } : { ...state, tone: next, drafts: kept };
     });
     if (existing !== undefined) load(textToLetterHtml(existing));
-  }
-
-  function writeOwn() {
-    const text = keepShown(saved).own ?? `Hi ${job.company} team,\n\n\n\nBest,`;
-    onCoverChange((state) => ({ ...state, drafts: keepShown(state), shown: "own", letter: text, html: "", skipped: false }));
-    load(textToLetterHtml(text));
   }
 
   const setSkipped = (next: boolean) => onCoverChange((state) => ({ ...state, skipped: next }));
@@ -273,54 +273,16 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
   return (
     <div className="flex flex-col gap-5">
       <DashCard className="p-6">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          {/* Half the width on a wide screen; a long resume name wraps onto the next line rather than being cut. */}
+          <div className="min-w-0 max-w-full md:max-w-[50%]">
             <p className="text-base font-bold text-primary">Cover letter</p>
-            <p className="mt-0.5 text-sm text-black/55">
-              Written from {resumeName ?? "your resume"} and this posting. Edit it freely. What&apos;s on the page is what gets recorded.
-            </p>
+            <p className="mt-0.5 break-words text-sm text-black/55">Written from {resumeName ?? "your resume"} and this posting.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {hasLetter && (
-              <SplitButton
-                label={copied ? "Copied" : "Copy"}
-                icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                onClick={() => void copy()}
-                items={[
-                  { id: "pdf", label: "Download as PDF", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => openDownload("pdf") },
-                  { id: "docx", label: "Download as DOCX", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => openDownload("docx") },
-                  // The letter alone, not the page around it.
-                  { id: "print", label: "Print", icon: <Printer className="h-3.5 w-3.5" />, onSelect: () => void printLetter() },
-                ]}
-              />
-            )}
-            <StickerButton variant="outline" size="sm" disabled={!editable} onClick={() => setSkipped(true)}>
+          {editable && (
+            <StickerButton variant="outline" size="sm" className="ml-auto" onClick={() => setSkipped(true)}>
               <SkipForward className="h-3.5 w-3.5" />
-              Send without one
-            </StickerButton>
-          </div>
-        </div>
-
-        {/* Tone, for the next letter */}
-        <div className="mb-4">
-          <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={(next) => chooseTone(next as CoverTone)} />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <StickerButton variant="primary" size="md" disabled={!editable || busy} onClick={() => void write(tone)}>
-            {cover.writing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : nextIsRewrite ? (
-              <RotateCw className="h-4 w-4" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {cover.writing ? "Writing…" : nextIsRewrite ? `Rewrite · ${COVER_CREDITS} credits` : `Write a ${TONE_LABELS[tone].toLowerCase()} letter · ${COVER_CREDITS} credits`}
-          </StickerButton>
-          {shown !== "own" && (
-            <StickerButton variant="outline" size="md" disabled={!editable || busy} onClick={writeOwn}>
-              <PenLine className="h-4 w-4" />
-              Write my own
+              Skip
             </StickerButton>
           )}
         </div>
@@ -356,13 +318,50 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
         </p>
       )}
 
-      {/* The letter, in the cover letter creator's editor: the look in the toolbar, the letterhead on the page. */}
-      {hasLetter &&
+      {/* Right above the letter box (owner, 2026-10-03): the tone for the next letter on the left; on the right,
+          Generate in the brand's lime (what it costs is its tooltip), then Copy letter. */}
+      {(editable || hasLetter) && (
+        <div className="-mb-2 flex flex-wrap items-center justify-between gap-3">
+          {editable && <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={(next) => chooseTone(next as CoverTone)} />}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {editable && (
+              <StickerButton
+                variant="secondary"
+                size="md"
+                // An ink shadow on hover: a lime one would vanish into the lime button.
+                className="[--br-c:#222325]"
+                disabled={busy}
+                title={`Writes ${nextIsRewrite ? "a new" : "a"} ${TONE_LABELS[tone].toLowerCase()} letter from your resume and this posting. ${COVER_CREDITS} credits.`}
+                onClick={() => void write(tone)}>
+                <Sparkles className="h-4 w-4" />
+                Generate
+              </StickerButton>
+            )}
+            {hasLetter && (
+              <SplitButton
+                label={copied ? "Copied" : "Copy letter"}
+                icon={copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                onClick={() => void copy()}
+                items={[
+                  { id: "pdf", label: "Download as PDF", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => openDownload("pdf") },
+                  { id: "docx", label: "Download as DOCX", icon: <Download className="h-3.5 w-3.5" />, onSelect: () => openDownload("docx") },
+                  // The letter alone, not the page around it.
+                  { id: "print", label: "Print", icon: <Printer className="h-3.5 w-3.5" />, onSelect: () => void printLetter() },
+                ]}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* The letter, in the cover letter creator's editor: the look in the toolbar, the letterhead on the page.
+          Before anything is written it holds a blank letter; typing into it makes it your own. */}
+      {(editable || hasLetter) &&
         (editable ? (
           <RichTextEditor
-            docKey={`${shown}-${seed.key}`}
+            docKey={String(seed.key)}
             initialHtml={seed.html}
-            onChange={({ text, html }) => onCoverChange((state) => ({ ...state, letter: tidy(text), html }))}
+            onChange={({ text, html }) => onCoverChange((state) => ({ ...state, shown: state.shown ?? "own", letter: tidy(text), html, skipped: false }))}
             ariaLabel="Cover letter"
             toolbarLeading={
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -389,7 +388,7 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
               busy ? (
                 <LetterSkeleton
                   paragraphs={TONE_PARAGRAPHS[tone]}
-                  label={revising ? "Changing your letter…" : `Writing your ${TONE_LABELS[tone].toLowerCase()} letter…`}
+                  label={revising ? "Changing your letter" : `Writing your ${TONE_LABELS[tone].toLowerCase()} letter`}
                 />
               ) : undefined
             }
@@ -442,7 +441,7 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
                   onClick={() => void revise()}
                   disabled={!prompt.trim() || busy || !letter.trim()}
                   aria-label={revising ? "Changing the letter" : "Change the letter"}>
-                  {revising ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <Send className="h-4 w-4" />
                 </StickerButton>
               </div>
               {reviseNote && (

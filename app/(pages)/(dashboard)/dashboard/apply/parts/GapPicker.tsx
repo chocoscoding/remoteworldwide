@@ -16,7 +16,7 @@
 // (`stepsForGap`).
 
 import { useEffect, useRef, useState, type FC } from "react";
-import { Check, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { Check, ChevronRight, Sparkles } from "lucide-react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { INTERVIEW_ADVICE_LABEL, stepsForGap, type GapSteps } from "@/app/lib/apply/gapSteps";
@@ -62,50 +62,54 @@ const Tag: FC<{ children: React.ReactNode; className?: string; title?: string }>
 /**
  * What one gap needs, kept short: the closest line (one sentence, with whose it is), the steps as
  * pills, and the advice when nothing came close. In the summary the pills open, one at a time, to
- * say how; on the hover card they carry it as a tooltip.
+ * say how; on the hover card they carry it as a tooltip. A gap with one step has nothing to choose
+ * between, so that step is just said, with no pill (owner, 2026-10-03).
  */
 const GapDetail: FC<{ help: GapSteps; interactive: boolean }> = ({ help, interactive }) => {
   const [shown, setShown] = useState(0);
-  const active = interactive ? help.actions[shown] : null;
+  const single = help.actions.length === 1 ? help.actions[0] : null;
+  const active = interactive && !single ? help.actions[shown] : null;
   return (
     <div className="flex flex-col gap-3">
       {help.closest && (
         <div className="flex flex-col gap-1.5">
           {help.closest.role && <Tag className="self-start">On your resume · {help.closest.role}</Tag>}
-          <p className="line-clamp-3 border-l-2 border-[#e1f073]/60 pl-3 text-[13px] leading-relaxed text-white/70">
+          <p className="line-clamp-3 border-l-2 border-[#e1f073]/60 pl-3 text-[13px] leading-relaxed text-white">
             “<WithQuantities text={help.closest.text} />”
           </p>
         </div>
       )}
-      <div className="flex flex-wrap gap-1.5">
-        {help.actions.map((action, index) =>
-          interactive ? (
-            <button
-              key={action.label}
-              type="button"
-              aria-pressed={index === shown}
-              onClick={() => setShown(index)}
-              className={cn(
-                "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors",
-                index === shown ? "border-[#e1f073] bg-[#e1f073] text-primary" : "border-white/20 text-white/80 hover:border-white/45 hover:text-white",
-              )}>
-              <span className={cn("tabular-nums", index === shown ? "text-primary/60" : "text-[#e1f073]")}>{index + 1}</span>
-              {action.label}
-            </button>
-          ) : (
-            <Tag key={action.label} title={action.how} className="py-1 text-[12px] text-white/85">
-              <span className="tabular-nums text-[#e1f073]">{index + 1}</span>
-              {action.label}
-            </Tag>
-          ),
-        )}
+      {single && <p className="text-[13px] leading-relaxed text-white">{single.how}</p>}
+      <div className="flex flex-wrap gap-1.5 empty:hidden">
+        {!single &&
+          help.actions.map((action, index) =>
+            interactive ? (
+              <button
+                key={action.label}
+                type="button"
+                aria-pressed={index === shown}
+                onClick={() => setShown(index)}
+                className={cn(
+                  "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors",
+                  index === shown ? "border-[#e1f073] bg-[#e1f073] text-primary" : "border-white/20 text-white/80 hover:border-white/45 hover:text-white",
+                )}>
+                <span className={cn("tabular-nums", index === shown ? "text-primary/60" : "text-[#e1f073]")}>{index + 1}</span>
+                {action.label}
+              </button>
+            ) : (
+              <Tag key={action.label} title={action.how} className="py-1 text-[12px] text-white/85">
+                <span className="tabular-nums text-[#e1f073]">{index + 1}</span>
+                {action.label}
+              </Tag>
+            ),
+          )}
         {help.advice && (
           <Tag title={help.advice} className="border-dashed border-[#e1f073]/50 py-1 text-[12px] text-[#e1f073]">
             {INTERVIEW_ADVICE_LABEL}
           </Tag>
         )}
       </div>
-      {active && <p className="text-[13px] leading-relaxed text-white/75">{active.how}</p>}
+      {active && <p className="text-[13px] leading-relaxed text-white">{active.how}</p>}
     </div>
   );
 };
@@ -320,7 +324,7 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <StickerButton variant="primary" size="sm" disabled={!onFix || fixing} onClick={fix}>
-              {fixing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              <Sparkles className="h-3.5 w-3.5" />
               {chosen.length === 1 ? "Fix it with AI" : `Fix all ${chosen.length} with AI`} · {SUGGESTION_CREDITS} credit
             </StickerButton>
             <span className="text-xs text-black/50">One credit for all of them. Nothing changes until you use the new version.</span>
