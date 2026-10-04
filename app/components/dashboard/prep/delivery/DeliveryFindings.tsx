@@ -1,23 +1,24 @@
 "use client";
 
-import type { FC, ReactNode } from "react";
+import { useId, type FC, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FLAG_KIND_META, SEVERITY_LABELS, formatMeasure, formatSigned, numberAnswers, type DeliveryTurn } from "@/app/lib/voice/format";
-import { DELIVERY_FLAG_KINDS, type DeliveryFlag, type DeliveryFlagKind, type DeliveryMetrics } from "@/app/lib/voice/types";
+import { DELIVERY_FLAG_KINDS, type DeliveryFlag, type DeliveryMetrics } from "@/app/lib/voice/types";
+import { deliveryHeadline, energyWord, paceVerdict } from "../report/reportScales";
 import TimestampChip from "./TimestampChip";
 
 /**
- * What the recording measured, in words a candidate can act on.
+ * "How you delivered it": the session's measured numbers in one row, and
+ * under them the moments that stood out against the user's own averages,
+ * strongest kind first, each with its measure ("Pace 182 wpm vs your 150
+ * average"), one line of coaching and a chip that plays it. Filler words are
+ * among them: the Delivery tab is the one place they are listed.
  *
- * Two halves. The tiles are the session's numbers, each with a sentence on
- * what it means, so a figure never stands alone. The findings are the moments
- * that stood out against the user's own averages, grouped by kind, each with
- * its measure ("Pace 182 wpm vs your 150 average"), one line of coaching and
- * a chip that plays it.
- *
- * Everything here is measured pace, pauses, fillers, pitch movement and
- * loudness. Nothing describes the speaker, only how they used their voice in
- * this session.
+ * What each number means is one click away ("What these mean"), so a figure
+ * never stands alone. Everything here is measured pace, pauses, fillers,
+ * pitch movement and loudness. Nothing describes the speaker, only how they
+ * used their voice in this session.
  */
 export interface DeliveryFindingsProps {
   flags: readonly DeliveryFlag[];
@@ -29,184 +30,93 @@ export interface DeliveryFindingsProps {
   className?: string;
 }
 
-/** Below this change per answer, energy reads as steady. */
-const STEADY_DB = 0.5;
-
 const DeliveryFindings: FC<DeliveryFindingsProps> = ({ flags, metrics, turns = [], noWordTimings = false, className }) => {
-  const untimed = noWordTimings ? NO_WORD_TIMINGS : undefined;
+  const titleId = useId();
   const numbers = numberAnswers(turns);
-  const groups = groupFlags(flags);
+  const ordered = orderFlags(flags);
+  const wpm = noWordTimings ? null : metrics.wpmMean;
+  const fillers = noWordTimings ? null : metrics.fillersPer100Words;
 
   return (
-    <section aria-label="Delivery findings" className={cn("rounded-2xl border border-black/10 bg-white", className)}>
-      <header className="px-5 pb-4 pt-5 sm:px-6">
-        <h3 className="text-[14.5px] font-bold text-primary">How you delivered it</h3>
-        <p className="mt-1 max-w-[560px] text-xs leading-relaxed text-black/50">
-          Measured from your recording and compared with your own averages in this session, so the numbers describe how you spoke here, not a standard you
-          were held to.
-        </p>
-      </header>
-
-      <div className="grid grid-cols-1 gap-2.5 px-5 pb-5 xs:grid-cols-2 sm:px-6 lg:grid-cols-5">
-        <PaceTile wpm={metrics.wpmMean} band={metrics.wpmReferenceBand} missing={untimed} />
-        <MetricTile
-          label="Long pauses"
-          value={String(metrics.longPauses)}
-          unit={metrics.longPauses === 1 ? "pause" : "pauses"}
-          note={
-            <>
-              Silences over 1.2 s mid-answer. A few read as thinking time; many can read as losing the thread.
-              {metrics.speechRatio !== null && <> You were speaking for {Math.round(metrics.speechRatio * 100)}% of your answer time.</>}
-            </>
-          }
-        />
-        <MetricTile
-          label="Filler words"
-          value={metrics.fillersPer100Words === null ? null : metrics.fillersPer100Words.toFixed(1)}
-          unit="per 100 words"
-          note="“Um”, “uh”, “you know” and the like. A short pause does the same job without the sound."
-          missing={untimed}
-        />
-        <MetricTile
-          label="Pitch variation"
-          value={metrics.pitchVariationSt === null ? null : metrics.pitchVariationSt.toFixed(1)}
-          unit="semitones"
-          note="How far your pitch moved as you spoke. Movement helps key points stand out; very little can sound flat."
-        />
-        <EnergyTile trend={metrics.energyTrendDbPerAnswer} />
+    <section aria-labelledby={titleId} className={cn("overflow-hidden rounded-[14px] border border-black/[0.16] bg-white", className)}>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <h2 id={titleId} className="text-sm font-extrabold text-[#222325]">
+          How you delivered it <span className="font-semibold text-[#5f6062]">· {deliveryHeadline(flags)}</span>
+        </h2>
+        <WhatTheseMean />
       </div>
 
-      <div className="border-t border-black/10">
-        {groups.length === 0 ? (
-          <p className="px-5 py-5 text-sm leading-relaxed text-black/55 sm:px-6">
-            Nothing stood out. Your {noWordTimings ? "pauses" : "pace, pauses"} and energy stayed close to your own averages all the way through.
-          </p>
-        ) : (
-          groups.map(({ kind, items }) => (
-            <div key={kind} className="border-b border-black/10 px-5 py-5 last:border-b-0 sm:px-6">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <h4 className="flex items-center gap-2 text-sm font-bold text-primary">
-                  <span aria-hidden className="h-2 w-2 flex-none rotate-45 bg-[#b23c26]" />
-                  {FLAG_KIND_META[kind].label}
-                </h4>
-                <span className="text-xs text-black/45">
-                  {items.length} {items.length === 1 ? "moment" : "moments"}
-                </span>
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-black/50">{FLAG_KIND_META[kind].what}</p>
-
-              <ul className="mt-3 flex flex-col gap-2.5">
-                {items.map((flag) => {
-                  const answer = numbers.get(flag.turnId);
-                  return (
-                    <li key={flag.id} className="flex items-start gap-3 rounded-xl border border-black/10 p-3.5">
-                      <SeverityMeter severity={flag.severity} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-primary">{formatMeasure(flag.measure)}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-black/60">{flag.coaching}</p>
-                        <p className="mt-1.5 text-[11.5px] text-black/40">
-                          {answer !== undefined && <>Answer {answer} · </>}
-                          {SEVERITY_LABELS[flag.severity]}
-                        </p>
-                      </div>
-                      <TimestampChip atMs={flag.atMs} endMs={flag.endMs} className="mt-0.5" />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))
-        )}
+      <div className="overflow-hidden border-t border-black/[0.12]">
+        <dl className="-mb-px -mr-px grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          <Stat label="Pace" value={wpm === null ? null : String(Math.round(wpm))} unit={wpm === null ? "" : `wpm · ${paceVerdict(wpm, metrics.wpmReferenceBand)}`} />
+          <Stat label="Long pauses" value={String(metrics.longPauses)} unit="" />
+          <Stat label="Filler words" value={fillers === null ? null : fillers.toFixed(1)} unit="per 100 words" />
+          <Stat label="Pitch variation" value={metrics.pitchVariationSt === null ? null : metrics.pitchVariationSt.toFixed(1)} unit="semitones" />
+          <Stat
+            label="Energy"
+            value={metrics.energyTrendDbPerAnswer === null ? null : energyWord(metrics.energyTrendDbPerAnswer)}
+            unit={metrics.energyTrendDbPerAnswer === null ? "" : `${formatSigned(metrics.energyTrendDbPerAnswer)} dB per answer`}
+          />
+        </dl>
       </div>
+
+      {ordered.length > 0 && (
+        <ul aria-label="What stood out" className="divide-y divide-black/[0.12] border-t border-black/[0.12]">
+          {ordered.map((flag) => {
+            const answer = numbers.get(flag.turnId);
+            return (
+              <li key={flag.id} className="flex items-start gap-3 px-4 py-3">
+                <SeverityMeter severity={flag.severity} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-bold leading-snug text-[#222325]">
+                    {FLAG_KIND_META[flag.kind].label}
+                    <span className="font-semibold text-[#5f6062]"> · {formatMeasure(flag.measure)}</span>
+                  </p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-black/60">{flag.coaching}</p>
+                  <p className="mt-1 text-[11px] text-black/45">
+                    {answer !== undefined && <>Answer {answer} · </>}
+                    {SEVERITY_LABELS[flag.severity]}
+                  </p>
+                </div>
+                <TimestampChip atMs={flag.atMs} endMs={flag.endMs} className="mt-0.5" />
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 };
 
-/** Strongest group first; within a group, in the order they happened. */
-function groupFlags(flags: readonly DeliveryFlag[]): Array<{ kind: DeliveryFlagKind; items: DeliveryFlag[] }> {
-  return DELIVERY_FLAG_KINDS.map((kind) => ({ kind, items: flags.filter((f) => f.kind === kind).sort((a, b) => a.atMs - b.atMs) }))
+/** Strongest kind first; within a kind, in the order they happened. */
+function orderFlags(flags: readonly DeliveryFlag[]): DeliveryFlag[] {
+  return DELIVERY_FLAG_KINDS.map((kind, order) => ({ kind, order, items: flags.filter((f) => f.kind === kind).sort((a, b) => a.atMs - b.atMs) }))
     .filter((g) => g.items.length > 0)
-    .map((g, order) => ({ ...g, order, top: Math.max(...g.items.map((f) => f.severity)) }))
+    .map((g) => ({ ...g, top: Math.max(...g.items.map((f) => f.severity)) }))
     .sort((a, b) => b.top - a.top || a.order - b.order)
-    .map(({ kind, items }) => ({ kind, items }));
+    .flatMap((g) => g.items);
 }
 
-// ---------------------------------------------------------------------------
-// Tiles
-// ---------------------------------------------------------------------------
-
-const TILE = "flex flex-col rounded-xl border border-black/10 bg-[#fbfbf7] p-3.5";
-
-const NOT_MEASURED = "Not enough speech in the recording to measure this.";
-const NO_WORD_TIMINGS = "Measured from word timings, which this report doesn't have.";
-
-const TileValue: FC<{ value: string | null; unit: string }> = ({ value, unit }) =>
-  value === null ? (
-    <p className="text-[18px] font-bold leading-[26px] text-black/35">Unavailable</p>
-  ) : (
-    <p className="flex flex-wrap items-baseline gap-x-1.5 leading-none">
-      <span className="text-[26px] font-bold text-primary">{value}</span>
-      <span className="text-xs font-semibold text-black/45">{unit}</span>
-    </p>
-  );
-
-const MetricTile: FC<{ label: string; value: string | null; unit: string; note: ReactNode; missing?: string }> = ({ label, value, unit, note, missing = NOT_MEASURED }) => (
-  <div className={TILE}>
-    <p className="mb-2 text-[11.5px] font-medium text-black/50">{label}</p>
-    <TileValue value={value} unit={unit} />
-    <p className="mt-2.5 text-xs leading-relaxed text-black/50">{value === null ? missing : note}</p>
+/** One figure in the row; "Not measured" when the recording gave nothing to measure it from. */
+const Stat: FC<{ label: string; value: string | null; unit: string }> = ({ label, value, unit }) => (
+  <div className="flex min-w-0 flex-col border-b border-r border-black/[0.12] px-4 py-2.5">
+    <dt className="text-xs text-[#5f6062]">{label}</dt>
+    <dd className="min-w-0">
+      {value === null ? (
+        <span className="text-sm font-bold leading-[27px] text-[#5f6062]">Not measured</span>
+      ) : (
+        <span className="text-lg font-extrabold tabular-nums text-[#222325]">
+          {value}
+          {unit && <span className="ml-1 text-xs font-semibold text-[#5f6062]">{unit}</span>}
+        </span>
+      )}
+    </dd>
   </div>
 );
 
-const SCALE_LO = 100;
-const SCALE_HI = 200;
-const toScale = (wpm: number) => ((Math.min(SCALE_HI, Math.max(SCALE_LO, wpm)) - SCALE_LO) / (SCALE_HI - SCALE_LO)) * 100;
-
-/** Pace with its reference band drawn: where the average sat against 140–160, on a 100–200 scale. */
-const PaceTile: FC<{ wpm: number | null; band: DeliveryMetrics["wpmReferenceBand"]; missing?: string }> = ({ wpm, band, missing = NOT_MEASURED }) => {
-  const where = wpm === null ? null : wpm < band.low ? "Slower than" : wpm > band.high ? "Faster than" : "Inside";
-  return (
-    <div className={TILE}>
-      <p className="mb-2 text-[11.5px] font-medium text-black/50">Pace</p>
-      <TileValue value={wpm === null ? null : String(Math.round(wpm))} unit="wpm" />
-      {wpm !== null && (
-        // Positions on a continuous scale can't be literal classes, so the
-        // band and the marker are placed inline.
-        <div aria-hidden className="relative mt-3 h-1.5 rounded-full bg-[#f0f0ea]">
-          <div className="absolute inset-y-0 rounded-full bg-[#e1f073]" style={{ left: `${toScale(band.low)}%`, width: `${toScale(band.high) - toScale(band.low)}%` }} />
-          <div className="absolute -top-[3px] h-3 w-1 -translate-x-1/2 rounded-full bg-[#222325] ring-2 ring-[#fbfbf7]" style={{ left: `${toScale(wpm)}%` }} />
-        </div>
-      )}
-      <p className="mt-2.5 text-xs leading-relaxed text-black/50">
-        {where === null ? missing : `${where} the ${band.low}–${band.high} range many listeners find easy to follow. The range is context, not a score.`}
-      </p>
-    </div>
-  );
-};
-
-const EnergyTile: FC<{ trend: number | null }> = ({ trend }) => {
-  const word = trend === null ? null : trend <= -STEADY_DB ? "Fading" : trend >= STEADY_DB ? "Building" : "Steady";
-  return (
-    <div className={TILE}>
-      <p className="mb-2 text-[11.5px] font-medium text-black/50">Energy</p>
-      {trend === null ? (
-        <TileValue value={null} unit="" />
-      ) : (
-        <p className="flex flex-wrap items-baseline gap-x-1.5 leading-none">
-          <span className="text-[26px] font-bold text-primary">{word}</span>
-          <span className="text-xs font-semibold text-black/45">{formatSigned(trend)} dB per answer</span>
-        </p>
-      )}
-      <p className="mt-2.5 text-xs leading-relaxed text-black/50">
-        {trend === null ? NOT_MEASURED : "How your loudness changed from one answer to the next. Steady or rising holds attention to the end."}
-      </p>
-    </div>
-  );
-};
-
 /** Three bars, filled up to the severity. The word sits beside it, so colour never carries it alone. */
 const SeverityMeter: FC<{ severity: 1 | 2 | 3 }> = ({ severity }) => (
-  <span aria-hidden className="mt-1 flex h-4 flex-none items-end gap-[3px]">
+  <span aria-hidden className="mt-0.5 flex h-4 flex-none items-end gap-[3px]">
     {[1, 2, 3].map((level) => (
       <span
         key={level}
@@ -214,6 +124,42 @@ const SeverityMeter: FC<{ severity: 1 | 2 | 3 }> = ({ severity }) => (
       />
     ))}
   </span>
+);
+
+const MEANINGS: ReadonlyArray<{ term: string; what: ReactNode }> = [
+  { term: "Pace", what: "Words a minute across your answers. Many listeners find 140 to 160 easy to follow. The range is context, not a score." },
+  { term: "Long pauses", what: "Silences over 1.2 s in the middle of an answer. A few read as thinking time; many can read as losing the thread." },
+  { term: "Filler words", what: "“Um”, “uh”, “you know” and the like, per 100 words. A short pause does the same job without the sound." },
+  { term: "Pitch variation", what: "How far your voice rose and fell, in semitones. Movement helps key points stand out; very little can sound flat." },
+  { term: "Energy", what: "How your loudness changed from one answer to the next. Steady or rising holds attention to the end." },
+];
+
+/** "What these mean": each figure in a line, so none of them needs a guess. */
+const WhatTheseMean: FC = () => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button
+        type="button"
+        className="h-7 cursor-pointer rounded text-xs font-bold text-[#44453f] underline underline-offset-[3px] hover:text-[#222325] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073]">
+        What these mean
+      </button>
+    </PopoverTrigger>
+    <PopoverContent align="end" sideOffset={6} className="w-[min(380px,calc(100vw-32px))] border-0 bg-transparent p-0 shadow-none">
+      <div className="rounded-xl bg-white p-4 text-[#222325] br-shadow">
+        <dl className="flex flex-col gap-2.5 text-xs leading-relaxed">
+          {MEANINGS.map(({ term, what }) => (
+            <div key={term}>
+              <dt className="font-extrabold">{term}</dt>
+              <dd className="text-black/60">{what}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-3 border-t border-black/10 pt-2.5 text-[11px] leading-relaxed text-black/50">
+          Each is measured from your recording and compared with your own averages in this session, not a standard you were held to.
+        </p>
+      </div>
+    </PopoverContent>
+  </Popover>
 );
 
 export default DeliveryFindings;

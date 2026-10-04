@@ -10,7 +10,13 @@
 // session predates saved tracks).
 //
 // A finished report opens on the tab in `?tab=` (an id from PrepReport's
-// REPORT_TABS), so a tab can be linked to and survives a refresh.
+// REPORT_TABS), so a tab can be linked to and survives a refresh. The old
+// `?tab=diction` opens Delivery, where grammar and word choice now live.
+//
+// "Answer this one again", "Pick up from this question" and the positioning
+// "Practise" buttons start a live session on exactly the questions they name
+// (app/lib/prep/practice.ts), on the session's own track, formats and
+// difficulty.
 //
 // The report's Positioning and Diction sections are written after it is out,
 // so a `ready` session can still have them `pending`; the page keeps reading
@@ -25,7 +31,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePrep } from "../../../PrepProvider";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
-import PrepReport, { DEFAULT_REPORT_TAB, isDictionFinding, parseReportTab, type ReportTab } from "@/app/components/dashboard/prep/PrepReport";
+import PrepReport, { DEFAULT_REPORT_TAB, parseReportTab, type ReportTab } from "@/app/components/dashboard/prep/PrepReport";
+import { pickUpFrom } from "@/app/components/dashboard/prep/report/practiceSets";
 import type { SectionsPoll } from "@/app/components/dashboard/prep/report/SectionStates";
 import PrepPageShell from "@/app/components/dashboard/prep/PrepPageShell";
 import PrepEmptyState from "@/app/components/dashboard/prep/PrepEmptyState";
@@ -36,8 +43,6 @@ import {
   AccuracyRating,
   AnalysisProgress,
   DeleteSessionButton,
-  DeliveryFindings,
-  DeliveryTimeline,
   LockedReport,
   PlaybackProvider,
   RecordingPlayer,
@@ -46,6 +51,7 @@ import {
 } from "@/app/components/dashboard/prep/delivery";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { formatsLabel, type PrepTrack, type SessionFormat } from "@/app/lib/dashboard/prep-data";
+import { practiceHref, type PracticeQuestion } from "@/app/lib/prep/practice";
 import { qk } from "@/app/lib/query/keys";
 import { getPlaybackLink, insufficientCreditsOf } from "@/app/lib/voice/api";
 import { withoutAudioTags } from "@/app/lib/voice/audioTags";
@@ -78,7 +84,7 @@ const UnknownReport: FC<{ trackId: string }> = ({ trackId }) => {
       <PrepEmptyState
         icon={SearchX}
         title="Report not found"
-        body="Every report is saved with its session. This link doesn't point to one — run a fresh session to get a new report."
+        body="Every report is saved with its session. This link doesn't point to one. Run a fresh session to get a new report."
         ctaLabel={track ? "Back to track" : "Back to all interviews"}
         onCta={() => router.push(track ? `/dashboard/prep/${trackId}` : "/dashboard/prep")}
       />
@@ -116,9 +122,10 @@ const SavedReport: FC<ReportClientProps> = ({ trackId, sessionId }) => {
     );
   }
 
-  // The tracks too: the report puts its actions on the plan tagged with the
-  // session's track, and a report shown before the track arrived would add
-  // them untagged — on the plan but missing from the track's checklist.
+  // The tracks too: "Add all to my plan" tags the report's actions with the
+  // session's track, and practice runs on it, so the report waits for it
+  // rather than add them untagged (on the plan but missing from the track's
+  // checklist) or offer no practice.
   if (isPending || tracksStatus === "loading") {
     return (
       <PrepPageShell>
@@ -160,6 +167,7 @@ const SavedReport: FC<ReportClientProps> = ({ trackId, sessionId }) => {
         track={liveTrack ?? trackFromSnapshot(detail)}
         backHref={backHref}
         runAnotherHref={liveTrack ? setupHref(liveTrack.id, detail.prep.formats) : "/dashboard/prep"}
+        practiceTrackId={liveTrack?.id ?? null}
         onDeleted={() => setDeleted(true)}
       />
     </PrepPageShell>
@@ -171,6 +179,8 @@ interface SavedReportBodyProps {
   track: PrepTrack;
   backHref: string;
   runAnotherHref: string;
+  /** The track a practice session runs on: the session's own, while it is still there. Null: nothing to practise on. */
+  practiceTrackId: string | null;
   /** Called before the page leaves, so nothing reads the deleted session again. */
   onDeleted: () => void;
 }
@@ -185,7 +195,7 @@ const resetFailedSteps = (steps: PrepSessionDetail["analysis"]["steps"]): PrepSe
   return next;
 };
 
-const SavedReportBody: FC<SavedReportBodyProps> = ({ detail, track, backHref, runAnotherHref, onDeleted }) => {
+const SavedReportBody: FC<SavedReportBodyProps> = ({ detail, track, backHref, runAnotherHref, practiceTrackId, onDeleted }) => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const id = detail.id;
@@ -256,32 +266,67 @@ const SavedReportBody: FC<SavedReportBodyProps> = ({ detail, track, backHref, ru
   const accountBalance = typeof subscription?.creditBalance === "number" && Number.isFinite(subscription.creditBalance) ? subscription.creditBalance : null;
   const refusal = insufficientCreditsOf(unlock.error);
 
+  // --- Practice -----------------------------------------------------------
+  // A session on exactly the questions a button names, on this session's
+  // track, formats and difficulty. Without the track (deleted since) there is
+  // nowhere to run it, so the report shows no practice buttons; the
+  // transcript's "Pick up" says it couldn't start instead.
+
+  // The questions the session set out to ask. Never with an audio tag: how a
+  // line was voiced, not what was asked. The snapshot stores none; this is the
+  // page's own guard, as the transcript has.
+  const questions = useMemo(
+    () => detail.prep.questions.map((question) => ({ id: question.id, text: withoutAudioTags(question.text) })),
+    [detail.prep.questions]
+  );
+
+  const practise = useCallback(
+    (picked: readonly PracticeQuestion[]) => {
+      const href = practiceTrackId
+        ? practiceHref({ trackId: practiceTrackId, questions: picked, formats: detail.prep.formats, difficulty: detail.prep.difficulty })
+        : null;
+      if (!href) {
+        toast.error("Couldn't start that practice session");
+        return;
+      }
+      router.push(href);
+    },
+    [practiceTrackId, detail.prep.formats, detail.prep.difficulty, router]
+  );
+
+  // "Pick up from this question": that one, then every later one the session
+  // didn't reach, in order.
+  const pickUp = useCallback(
+    (questionId: string) => practise(pickUpFrom(questions, session.transcript, questionId)),
+    [practise, questions, session.transcript]
+  );
+
   // --- Pieces -------------------------------------------------------------
 
-  const player = playable ? <RecordingPlayer getUrl={getUrl} title={`${detail.company || track.company} · ${detail.prep.trackSnapshot.roundLabel || detail.role}`} /> : null;
+  // The report puts it in its header; the other states give it a frame of its own.
+  const renderPlayer = (className?: string) => (playable ? <RecordingPlayer getUrl={getUrl} className={className} /> : null);
 
-  // Without the batch transcript (locked reports withhold it; typed sessions
-  // never have one) the turns carry the text.
-  const transcript = voice ? (
-    <SyncedTranscript segments={detail.delivery?.transcript.segments ?? []} words={detail.delivery?.transcript.words ?? []} turns={detail.turns} />
-  ) : undefined;
-
-  // It rates the transcript, so the report puts it on the Transcript tab.
+  // It rates the transcript, so it sits under it, on the Transcript tab.
   const accuracyRating =
     voice && detail.status === "ready" ? <AccuracyRating value={detail.rating?.score ?? null} onRate={(score) => rating.mutateAsync({ id, score })} /> : null;
 
-  const deleteButton = (
-    <div className="flex justify-end">
-      <DeleteSessionButton mode={detail.mode} onDelete={deleteSession} deleting={removal.isPending} />
-    </div>
+  // Without the batch transcript (locked reports withhold it; typed sessions
+  // never have one) the turns carry the text.
+  const transcript = (
+    <SyncedTranscript
+      segments={detail.delivery?.transcript.segments ?? []}
+      words={detail.delivery?.transcript.words ?? []}
+      turns={detail.turns}
+      questions={questions}
+      dimensions={session.dimensions}
+      rewrites={session.rewrites}
+      diction={session.diction ?? null}
+      onPickUp={pickUp}
+      footer={accuracyRating}
+    />
   );
 
-  const footer = (
-    <div className="flex flex-col gap-3">
-      {accuracyRating}
-      {deleteButton}
-    </div>
-  );
+  const deleteButton = <DeleteSessionButton mode={detail.mode} onDelete={deleteSession} deleting={removal.isPending} />;
 
   // --- States -------------------------------------------------------------
 
@@ -296,29 +341,13 @@ const SavedReportBody: FC<SavedReportBodyProps> = ({ detail, track, backHref, ru
         onRunAnother={() => router.push(runAnotherHref)}
         tab={tab}
         onTabChange={showTab}
-        player={player}
-        delivery={
-          (detail.delivery || noWordTimings) && (
-            <>
-              {noWordTimings && <NoWordTimingsNotice />}
-              {detail.delivery && (
-                <>
-                  {/* Filler words are on the Diction tab, so they aren't listed twice. */}
-                  <DeliveryFindings
-                    flags={detail.delivery.flags.filter((flag) => !isDictionFinding(flag))}
-                    metrics={detail.delivery.metrics}
-                    turns={detail.turns}
-                    noWordTimings={noWordTimings}
-                  />
-                  <DeliveryTimeline delivery={detail.delivery} turns={detail.turns} />
-                </>
-              )}
-            </>
-          )
-        }
+        player={renderPlayer()}
+        roundLabel={detail.prep.trackSnapshot.roundLabel || undefined}
+        questions={questions}
+        onPractise={practiceTrackId ? practise : undefined}
+        noWordTimings={noWordTimings}
         transcript={transcript}
-        transcriptFooter={accuracyRating}
-        footer={deleteButton}
+        deleteAction={deleteButton}
         sectionsPoll={sectionsPoll}
       />
     );
@@ -336,12 +365,12 @@ const SavedReportBody: FC<SavedReportBodyProps> = ({ detail, track, backHref, ru
           onClick={() => router.push(backHref)}
           className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 hover:text-primary cursor-pointer w-fit">
           <ArrowLeft className="h-3.5 w-3.5" />
-          {track.company} — {track.role}
+          {[track.role, track.company].filter((part) => part.trim() !== "").join(" at ")}
         </button>
 
         <SessionHeader detail={detail} />
 
-        {player}
+        {renderPlayer("sticky top-3 z-30 overflow-hidden rounded-2xl border-[1.5px] border-[#222325]")}
 
         {detail.locked ? (
           <LockedReport
@@ -378,9 +407,9 @@ const SavedReportBody: FC<SavedReportBodyProps> = ({ detail, track, backHref, ru
           />
         )}
 
-        {turnsFinal && hasAnswers && (transcript ?? <TypedTranscript turns={detail.turns} />)}
+        {turnsFinal && hasAnswers && transcript}
 
-        {footer}
+        <div className="flex justify-end">{deleteButton}</div>
       </div>
     );
   }
@@ -510,30 +539,9 @@ const PlaybackHandoff: FC<{ sessionId: string; layout: Layout }> = ({ sessionId,
   return null;
 };
 
-/** D15: the report transcript failed for good, so delivery says what it could not measure instead of reporting zeros. */
-const NoWordTimingsNotice: FC = () => (
-  <p role="note" className={cn(PANEL, "px-6 py-4 text-sm leading-relaxed text-black/60")}>
-    <span className="font-bold text-primary">Word timings unavailable</span> — this report was built from what the interviewer heard, without a transcript.
-  </p>
-);
-
 // ---------------------------------------------------------------------------
 // The pieces around a report that isn't showing yet
 // ---------------------------------------------------------------------------
-
-/** A typed session's answers while its report is on the way (or failed): nothing was recorded, so nothing plays. */
-const TypedTranscript: FC<{ turns: PrepSessionDetail["turns"] }> = ({ turns }) => (
-  <section aria-label="Transcript" className={cn(PANEL, "p-6 flex flex-col gap-3.5")}>
-    <h3 className="text-[14.5px] font-bold text-primary">What you wrote</h3>
-    {turns.map((turn) => (
-      <div key={turn.id}>
-        <p className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/35 mb-1">{turn.who === "user" ? "You" : "Interviewer"}</p>
-        {/* An interviewer line never shows an audio tag (how it was voiced, not what was asked); the answer is the candidate's own. */}
-        <p className={cn("text-sm leading-relaxed", turn.who === "user" ? "text-primary" : "text-black/60")}>{turn.who === "user" ? turn.text : withoutAudioTags(turn.text)}</p>
-      </div>
-    ))}
-  </section>
-);
 
 const SessionHeader: FC<{ detail: PrepSessionDetail }> = ({ detail }) => {
   const chip = savedSessionChip(detail.status, detail.locked);

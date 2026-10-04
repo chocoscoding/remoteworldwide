@@ -1,47 +1,49 @@
 "use client";
 
-import { useId, type FC } from "react";
+import { useId, useState, type FC } from "react";
 import { format as formatDate } from "date-fns";
-import { CircleCheck, CircleDashed, CircleDot, Quote, TriangleAlert, type LucideIcon } from "lucide-react";
+import { ChevronDown, CircleCheck, CircleDashed, CircleDot, Quote, TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TranscriptTurn } from "@/app/lib/dashboard/prep-data";
+import type { PracticeQuestion } from "@/app/lib/prep/practice";
 import {
-  POSITIONING_AREAS,
-  POSITIONING_AREA_LABELS,
   POSITIONING_LEVELS,
   type CompanyValuesState,
-  type PositioningArea,
   type PositioningCriterion,
   type PositioningLevel,
   type PositioningSection,
   type PostingUsed,
 } from "@/app/lib/voice/types";
 import Chip, { type ChipTone } from "../Chip";
-import { PANEL } from "../prep-styles";
 import AnswerMeta, { useAnswerIndex, type AnswerIndex } from "./AnswerMeta";
+import Disclosure from "./Disclosure";
+import { criteriaToPractise, criterionQuestion } from "./practiceSets";
+import { listOf } from "./reportScales";
 import { SectionArrival, SectionNotAnalysed, SectionPending, SectionUnavailable, type SectionsPoll } from "./SectionStates";
 
 /**
  * The Positioning tab: how the answers position the candidate for this role,
- * in the owner's four areas of two criteria each.
+ * criterion by criterion, and a question to practise for each.
  *
  * Nothing here is a score. Each criterion has a level and the candidate's own
  * words behind it; a claim about the role cites the posting it read. "Not
- * enough evidence" is what most criteria say after a short interview, so it
- * reads as calm and useful (what kind of question would show it), never as a
- * failure. The company's values come from the posting and nowhere else: when
- * the posting doesn't state them, the tab says they aren't known.
+ * shown yet" is what most criteria say after a short interview, so it reads
+ * as calm and useful (here is a question that would show it, practise it now),
+ * never as a failure. The company's values come from the posting and nowhere
+ * else: when the posting doesn't state them, the tab says they aren't known.
  */
 export interface PositioningPanelProps {
   /** Absent: the session was analysed before Positioning existed. */
   section: PositioningSection | undefined;
   turns: readonly TranscriptTurn[];
   poll?: SectionsPoll;
+  /** Starts a practice session on these questions; without it, no practice button shows. */
+  onPractise?: (questions: PracticeQuestion[]) => void;
 }
 
 const TITLE = "Positioning";
 
-const PositioningPanel: FC<PositioningPanelProps> = ({ section, turns, poll }) => {
+const PositioningPanel: FC<PositioningPanelProps> = ({ section, turns, poll, onPractise }) => {
   const index = useAnswerIndex(turns);
   return (
     <>
@@ -56,7 +58,7 @@ const PositioningPanel: FC<PositioningPanelProps> = ({ section, turns, poll }) =
       ) : section.status === "unavailable" ? (
         <SectionUnavailable title={TITLE} failure={section.failure} />
       ) : (
-        <ReadyPositioning section={section} index={index} />
+        <ReadyPositioning section={section} index={index} onPractise={onPractise} />
       )}
     </>
   );
@@ -71,24 +73,24 @@ export default PositioningPanel;
 /**
  * Each level's word, tone and glyph. The tones are the prep Chip's, whose
  * colour means outcome: green went well, blue is information, red went badly,
- * white implies nothing. "Not enough evidence" is white on purpose. The glyphs
+ * white implies nothing. "Not shown yet" is white on purpose. The glyphs
  * differ in shape (check, dot, triangle, dashed ring) and the word is always
  * written, so colour never carries a level alone.
  */
-const LEVEL_META: Record<PositioningLevel, { label: string; tally: (n: number) => string; tone: ChipTone; icon: LucideIcon }> = {
-  strong: { label: "Strong", tally: (n) => `${n} strong`, tone: "green", icon: CircleCheck },
-  "some-evidence": { label: "Some evidence", tally: (n) => `${n} with some evidence`, tone: "blue", icon: CircleDot },
-  concern: { label: "A concern", tally: (n) => `${n} ${n === 1 ? "concern" : "concerns"}`, tone: "red", icon: TriangleAlert },
-  "not-enough-evidence": { label: "Not enough evidence yet", tally: (n) => `${n} not enough evidence yet`, tone: "white", icon: CircleDashed },
+const LEVEL_META: Record<PositioningLevel, { label: string; tally: (n: number) => string; tone: ChipTone; icon: LucideIcon; segment: string }> = {
+  strong: { label: "Strong", tally: (n) => `${n} strong`, tone: "green", icon: CircleCheck, segment: "bg-[#222325]" },
+  "some-evidence": { label: "Some evidence", tally: (n) => `${n} with some evidence`, tone: "blue", icon: CircleDot, segment: "border border-[#222325] bg-[#e1f073]" },
+  concern: { label: "A concern", tally: (n) => `${n} ${n === 1 ? "concern" : "concerns"}`, tone: "red", icon: TriangleAlert, segment: "bg-[#e5533d]" },
+  "not-enough-evidence": { label: "Not shown yet", tally: (n) => `${n} not shown yet`, tone: "white", icon: CircleDashed, segment: "border border-dashed border-black/50" },
 };
 
-const LevelChip: FC<{ level: PositioningLevel; text?: string }> = ({ level, text }) => {
+const LevelBadge: FC<{ level: PositioningLevel }> = ({ level }) => {
   const meta = LEVEL_META[level];
   const Icon = meta.icon;
   return (
-    <Chip tone={meta.tone}>
+    <Chip tone={meta.tone} className="px-2 py-0.5 text-[10.5px]">
       <Icon aria-hidden className="h-3 w-3" strokeWidth={2.5} />
-      {text ?? meta.label}
+      {meta.label}
     </Chip>
   );
 };
@@ -99,36 +101,35 @@ const LevelChip: FC<{ level: PositioningLevel; text?: string }> = ({ level, text
 
 const LABEL = "text-[10.5px] font-bold uppercase tracking-[0.07em] text-black/45";
 
-const ReadyPositioning: FC<{ section: PositioningSection; index: AnswerIndex }> = ({ section, index }) => {
-  const headingId = useId();
+const ReadyPositioning: FC<{ section: PositioningSection; index: AnswerIndex; onPractise?: (questions: PracticeQuestion[]) => void }> = ({
+  section,
+  index,
+  onPractise,
+}) => {
+  const listId = useId();
   const { criteria } = section;
-  const tally = POSITIONING_LEVELS.map((level) => ({ level, n: criteria.filter((c) => c.level === level).length })).filter((t) => t.n > 0);
-  const nothingJudged = criteria.length > 0 && criteria.every((c) => c.level === "not-enough-evidence");
-
   return (
     <>
-      <section aria-labelledby={headingId} className={cn(PANEL, "p-6")}>
-        <h3 id={headingId} className="text-[14.5px] font-bold text-primary">
-          {TITLE}
-        </h3>
-        <p className="mt-1 max-w-[600px] text-sm leading-relaxed text-black/55">
-          How your answers position you for this role, one criterion at a time. Each level rests on your own words, quoted below. None of it is a score.
-        </p>
-        {nothingJudged && (
-          <p className="mt-3 max-w-[600px] text-sm leading-relaxed text-black/70">
-            None of these came up in this interview. The list below names a question for each, to practise with next time.
-          </p>
-        )}
-        {tally.length > 0 && (
-          <ul aria-label="Criteria by level" className="mt-4 flex flex-wrap gap-2">
-            {tally.map(({ level, n }) => (
-              <li key={level}>
-                <LevelChip level={level} text={LEVEL_META[level].tally(n)} />
-              </li>
-            ))}
-          </ul>
-        )}
-        <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-black/10 pt-4 sm:grid-cols-[max-content_1fr]">
+      {criteria.length === 0 ? (
+        <p className="rounded-[14px] border border-black/[0.16] bg-white px-5 py-4 text-sm leading-relaxed text-black/55">The analysis finished without any criteria to show.</p>
+      ) : (
+        <>
+          <Summary criteria={criteria} onPractise={onPractise} />
+          <section aria-labelledby={listId} className="overflow-hidden rounded-[14px] border border-black/[0.16] bg-white">
+            <h2 id={listId} className="px-[18px] py-3.5 text-[15px] font-extrabold text-[#222325]">
+              A question to practise for each
+            </h2>
+            <ul>
+              {criteria.map((criterion) => (
+                <CriterionRow key={criterion.id} criterion={criterion} index={index} onPractise={onPractise} />
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+
+      <Disclosure standalone title="What your answers are read against" summary={readAgainstSummary(section)}>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 pt-1 sm:grid-cols-[max-content_1fr]">
           <dt className={cn(LABEL, "sm:pt-0.5")}>Posting read</dt>
           <dd className="min-w-0">
             <PostingRead posting={section.posting} />
@@ -138,72 +139,203 @@ const ReadyPositioning: FC<{ section: PositioningSection; index: AnswerIndex }> 
             <CompanyValues state={section.companyValues} values={section.statedValues} />
           </dd>
         </dl>
-      </section>
-
-      {criteria.length === 0 ? (
-        <p className={cn(PANEL, "p-6 text-sm leading-relaxed text-black/55")}>The analysis finished without any criteria to show.</p>
-      ) : (
-        <>
-          {/* Judged criteria get the room; the rest are one compact list, not a card each. */}
-          {POSITIONING_AREAS.map((area) => (
-            <AreaSection
-              key={area}
-              area={area}
-              criteria={criteria.filter((c) => c.area === area && c.level !== "not-enough-evidence")}
-              index={index}
-            />
-          ))}
-          <NotShown criteria={criteria.filter((c) => c.level === "not-enough-evidence")} posting={section.posting} />
-        </>
-      )}
+      </Disclosure>
     </>
   );
 };
 
 /**
- * The criteria this interview gave nothing on, in one list: each with the
- * question that would show it, so the next session can go after them.
+ * The featured card: how many criteria this interview showed anything on,
+ * one segment each, and one button to practise every one not yet strong.
  */
-const NotShown: FC<{ criteria: readonly PositioningCriterion[]; posting: PostingUsed | null }> = ({ criteria, posting }) => {
-  const headingId = useId();
-  if (criteria.length === 0) return null;
-  const needsPosting = criteria.some((c) => c.gap === "no-posting") && posting?.source !== "unavailable";
+const Summary: FC<{ criteria: readonly PositioningCriterion[]; onPractise?: (questions: PracticeQuestion[]) => void }> = ({ criteria, onPractise }) => {
+  const total = criteria.length;
+  const shown = criteria.filter((c) => c.level !== "not-enough-evidence").length;
+  const toPractise = criteriaToPractise(criteria);
+  const tally = listOf(
+    POSITIONING_LEVELS.filter((level) => level !== "not-enough-evidence")
+      .map((level) => ({ level, n: criteria.filter((c) => c.level === level).length }))
+      .filter((t) => t.n > 0)
+      .map(({ level, n }) => LEVEL_META[level].tally(n))
+  );
+  const headline =
+    shown === 0
+      ? `None of the ${total} criteria came up in this interview`
+      : shown === total
+        ? `All ${total} criteria came up in this interview`
+        : `${shown} of the ${total} criteria came up in this interview`;
+  const sub =
+    shown === 0
+      ? "Nothing you said showed these either way. Practise a question below to fill one in. None of it is a score."
+      : shown === total
+        ? `${capitalise(tally)}. None of it is a score.`
+        : `${capitalise(tally)}. Practise a question below to show the rest. None of it is a score.`;
+  const practiseLabel = toPractise.length === 1 ? "Practise it now" : `Practise all ${toPractise.length} in one session`;
+
   return (
-    <section aria-labelledby={headingId} className={cn(PANEL, "p-6")}>
-      <h4 id={headingId} className="text-[14.5px] font-bold text-primary">
-        Not shown in this interview
-      </h4>
-      <p className="mt-1 text-xs leading-relaxed text-black/50">
-        Nothing you said showed these either way. Practise with questions like these to show them next time.
-        {needsPosting && " Some need the job posting on this track first."}
-      </p>
-      <ul className="mt-4 flex flex-col divide-y divide-black/8">
-        {criteria.map((c) => (
-          <li key={c.id} className="flex flex-col gap-0.5 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:gap-4">
-            <span className="flex-none text-sm font-bold text-primary sm:w-[200px]">{c.label}</span>
-            <span className="min-w-0 text-sm leading-relaxed text-black/60">{c.probe.example.trim() ? `“${c.probe.example.trim()}”` : c.note}</span>
-          </li>
-        ))}
-      </ul>
+    <section aria-label="Positioning summary" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[14px] bg-white px-5 py-4 br-bold br-lime">
+      <div className="flex min-w-0 flex-[999_1_380px] flex-col gap-0.5">
+        <h2 className="text-lg font-extrabold leading-snug tracking-[-0.01em] text-[#222325]">{headline}</h2>
+        <p className="text-[13px] text-[#55564f]">{sub}</p>
+      </div>
+      <div className="flex min-w-0 flex-[1_1_220px] flex-col gap-2">
+        <div className="flex items-center gap-2.5">
+          <div role="img" aria-label={`${shown} of ${total} criteria shown`} className="grid flex-1 gap-[3px]" style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}>
+            {criteria.map((c) => (
+              <span key={c.id} className={cn("h-2 rounded-[2px]", LEVEL_META[c.level].segment)} />
+            ))}
+          </div>
+          <span aria-hidden className="flex-none text-xs font-extrabold tabular-nums text-[#222325]">
+            {shown} of {total}
+          </span>
+        </div>
+        {onPractise && toPractise.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onPractise(toPractise)}
+            className="inline-flex h-9 items-center justify-center rounded-lg border-[1.5px] border-[#222325] bg-[#e1f073] px-3 text-[13px] font-extrabold text-[#222325] br-shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2">
+            {practiseLabel}
+          </button>
+        )}
+      </div>
     </section>
   );
 };
 
+const capitalise = (text: string) => (text ? text[0].toUpperCase() + text.slice(1) : text);
+
+/** One criterion: its name and level, the question that would show it, and its notes and evidence a click away. */
+const CriterionRow: FC<{ criterion: PositioningCriterion; index: AnswerIndex; onPractise?: (questions: PracticeQuestion[]) => void }> = ({
+  criterion: c,
+  index,
+  onPractise,
+}) => {
+  const [open, setOpen] = useState(false);
+  const detailId = useId();
+  const question = criterionQuestion(c);
+  return (
+    <li className="border-t border-black/[0.12]">
+      <div className="flex min-h-12 flex-wrap items-center gap-x-4 gap-y-1.5 px-[18px] py-2">
+        <span className="flex min-w-0 flex-[0_0_220px] flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[13px] font-extrabold text-[#222325]">{c.label}</span>
+          <LevelBadge level={c.level} />
+        </span>
+        <span className="min-w-0 flex-[999_1_320px] text-[13px] text-[#44453f]">{question ? `“${question.text}”` : c.note}</span>
+        <span className="flex flex-none items-center gap-1">
+          {onPractise && question && (
+            <button
+              type="button"
+              onClick={() => onPractise([question])}
+              aria-label={`Practise: ${question.text}`}
+              className="inline-flex h-[30px] cursor-pointer items-center rounded-lg border border-[#222325] bg-white px-3 text-xs font-extrabold text-[#222325] transition-colors hover:bg-[#f6faea] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-1">
+              Practise
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-controls={detailId}
+            aria-label={`${open ? "Hide" : "Show"} the notes on ${c.label}`}
+            className="inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-md text-[#5f6062] hover:bg-black/5 hover:text-[#222325] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073]">
+            <ChevronDown aria-hidden className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", open && "rotate-180")} />
+          </button>
+        </span>
+      </div>
+      <div id={detailId} hidden={!open} className="bg-[#fbfbf7] px-[18px] pb-4 pt-3">
+        <CriterionDetail criterion={c} index={index} />
+      </div>
+    </li>
+  );
+};
+
+/** What the evidence shows, or why there is none, in the candidate's own words and the posting's. */
+const CriterionDetail: FC<{ criterion: PositioningCriterion; index: AnswerIndex }> = ({ criterion: c, index }) => (
+  <div className="max-w-[760px]">
+    <p className="text-sm leading-relaxed text-black/65">{c.note}</p>
+    {c.probe.kind.trim() && (
+      <p className="mt-1.5 text-xs leading-relaxed text-black/55">
+        <span className="font-bold text-black/65">What would show it: </span>
+        {c.probe.kind}
+      </p>
+    )}
+
+    {c.evidence.length > 0 && (
+      <div className="mt-3.5">
+        <p className={LABEL}>In your words</p>
+        <ul className="mt-2 flex flex-col gap-2">
+          {c.evidence.map((quote, i) => (
+            <li key={`${quote.turnId}-${i}`} className="rounded-xl border border-black/10 bg-white p-3.5">
+              <AnswerMeta index={index} turnId={quote.turnId} question={quote.question} atMs={quote.atMs} endMs={quote.endMs} />
+              <blockquote className="mt-2 flex gap-2 text-sm leading-relaxed text-black/75">
+                <Quote aria-hidden className="mt-1 h-3.5 w-3.5 flex-none text-black/25" />
+                <span className="italic">{quote.quote}</span>
+              </blockquote>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+
+    {c.posting.length > 0 && (
+      <div className="mt-3.5">
+        <p className={LABEL}>From the posting</p>
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {c.posting.map((cite, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-black/60">
+              {cite.requirement !== null ? (
+                <RequirementTag n={cite.requirement} />
+              ) : (
+                <span className="flex-none rounded-md border border-black/15 bg-white px-1.5 py-0.5 text-[10.5px] font-bold leading-none text-black/55">
+                  <span aria-hidden>Line</span>
+                  <span className="sr-only">A line of the posting:</span>
+                </span>
+              )}
+              <span className="min-w-0">{cite.requirement === null ? `“${cite.text}”` : cite.text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </div>
+);
+
+// ---------------------------------------------------------------------------
+// What the answers are read against
+// ---------------------------------------------------------------------------
+
 /** When the posting was read, if the service recorded a real time (a missing one arrives as the epoch). */
-function readWhen(readAt: string): string | null {
-  const ms = Date.parse(readAt);
-  return Number.isFinite(ms) && ms > 0 ? formatDate(new Date(ms), "d MMM yyyy 'at' HH:mm") : null;
+function readAt(readAtIso: string, pattern: string): string | null {
+  const ms = Date.parse(readAtIso);
+  return Number.isFinite(ms) && ms > 0 ? formatDate(new Date(ms), pattern) : null;
+}
+
+/** "The posting as of 4 Oct 2026 · 15 requirements · company values": the closed row's summary. */
+function readAgainstSummary(section: PositioningSection): string {
+  const posting = section.posting;
+  const parts: string[] = [];
+  if (!posting) parts.push("No posting was read");
+  else if (posting.source === "none") parts.push("No posting on this track");
+  else if (posting.source === "unavailable") parts.push("The posting couldn't be read");
+  else {
+    const when = readAt(posting.readAt, "d MMM yyyy");
+    parts.push(when ? `The posting as of ${when}` : "The posting");
+    if (posting.requirements.length > 0) parts.push(`${posting.requirements.length} ${posting.requirements.length === 1 ? "requirement" : "requirements"}`);
+  }
+  if (section.companyValues === "stated") parts.push("company values");
+  else if (section.companyValues === "not-stated") parts.push("values not stated");
+  return parts.join(" · ");
 }
 
 /**
  * Which posting the criteria were read against, and when: postings change
  * after a session, so this is the version behind the citations. The numbered
- * requirements are listed so a "#3" below can be looked up.
+ * requirements are listed so a "#3" above can be looked up.
  */
 const PostingRead: FC<{ posting: PostingUsed | null }> = ({ posting }) => {
   const text = "text-sm leading-relaxed text-black/65";
   if (!posting) return <p className={text}>Not read. Too little was said in this interview to compare with it.</p>;
-  const when = readWhen(posting.readAt);
+  const when = readAt(posting.readAt, "d MMM yyyy 'at' HH:mm");
   switch (posting.source) {
     case "none":
       return <p className={text}>None. This track has no job posting, so the criteria that need one say so.</p>;
@@ -218,7 +350,7 @@ const PostingRead: FC<{ posting: PostingUsed | null }> = ({ posting }) => {
           </p>
           {posting.requirements.length > 0 && (
             <details className="mt-2">
-              <summary className="w-fit cursor-pointer rounded text-xs font-bold text-primary hover:text-[#55591f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2">
+              <summary className="w-fit cursor-pointer rounded text-xs font-bold text-[#222325] hover:text-[#55591f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2">
                 The {posting.requirements.length === 1 ? "requirement" : `${posting.requirements.length} requirements`} it was read against
               </summary>
               <ol className="mt-2 flex flex-col gap-1.5">
@@ -251,7 +383,7 @@ const CompanyValues: FC<{ state: CompanyValuesState | null; values: readonly str
           {values.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1.5">
               {values.map((value, i) => (
-                <li key={i} className="rounded-md border border-black/12 bg-[#fbfbf7] px-2 py-1 text-xs text-primary">
+                <li key={i} className="rounded-md border border-black/12 bg-[#fbfbf7] px-2 py-1 text-xs text-[#222325]">
                   {value}
                 </li>
               ))}
@@ -270,78 +402,8 @@ const CompanyValues: FC<{ state: CompanyValuesState | null; values: readonly str
 
 /** "#3" on screen; "Requirement 3" to a screen reader, which reads "#" as "number sign". */
 const RequirementTag: FC<{ n: number }> = ({ n }) => (
-  <span className="flex-none rounded-md border border-black/15 bg-white px-1.5 py-0.5 text-[10.5px] font-bold leading-none tabular-nums text-primary">
+  <span className="flex-none rounded-md border border-black/15 bg-white px-1.5 py-0.5 text-[10.5px] font-bold leading-none tabular-nums text-[#222325]">
     <span aria-hidden>#{n}</span>
     <span className="sr-only">Requirement {n}:</span>
   </span>
-);
-
-// ---------------------------------------------------------------------------
-// Areas and criteria
-// ---------------------------------------------------------------------------
-
-const AreaSection: FC<{ area: PositioningArea; criteria: readonly PositioningCriterion[]; index: AnswerIndex }> = ({ area, criteria, index }) => {
-  const headingId = useId();
-  if (criteria.length === 0) return null;
-  return (
-    <section aria-labelledby={headingId} className={cn(PANEL, "overflow-hidden")}>
-      <h4 id={headingId} className="border-b border-black/10 px-5 py-4 text-[14.5px] font-bold text-primary sm:px-6">
-        {POSITIONING_AREA_LABELS[area]}
-      </h4>
-      <div className="divide-y divide-black/10">
-        {criteria.map((criterion) => (
-          <Criterion key={criterion.id} criterion={criterion} index={index} />
-        ))}
-      </div>
-    </section>
-  );
-};
-
-const Criterion: FC<{ criterion: PositioningCriterion; index: AnswerIndex }> = ({ criterion: c, index }) => (
-  <article className="px-5 py-5 sm:px-6">
-    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-      <h5 className="text-sm font-bold text-primary">{c.label}</h5>
-      <LevelChip level={c.level} />
-    </div>
-    <p className="mt-1.5 max-w-[640px] text-sm leading-relaxed text-black/60">{c.note}</p>
-
-    {c.evidence.length > 0 && (
-      <div className="mt-3.5">
-        <p className={LABEL}>In your words</p>
-        <ul className="mt-2 flex flex-col gap-2">
-          {c.evidence.map((quote, i) => (
-            <li key={`${quote.turnId}-${i}`} className="rounded-xl border border-black/10 p-3.5">
-              <AnswerMeta index={index} turnId={quote.turnId} question={quote.question} atMs={quote.atMs} endMs={quote.endMs} />
-              <blockquote className="mt-2 flex gap-2 text-sm leading-relaxed text-black/75">
-                <Quote aria-hidden className="mt-1 h-3.5 w-3.5 flex-none text-black/25" />
-                <span className="italic">{quote.quote}</span>
-              </blockquote>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-
-    {c.posting.length > 0 && (
-      <div className="mt-3.5">
-        <p className={LABEL}>From the posting</p>
-        <ul className="mt-2 flex flex-col gap-1.5">
-          {c.posting.map((cite, i) => (
-            <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-black/60">
-              {cite.requirement !== null ? (
-                <RequirementTag n={cite.requirement} />
-              ) : (
-                <span className="flex-none rounded-md border border-black/15 bg-white px-1.5 py-0.5 text-[10.5px] font-bold leading-none text-black/55">
-                  <span aria-hidden>Line</span>
-                  <span className="sr-only">A line of the posting:</span>
-                </span>
-              )}
-              <span className="min-w-0">{cite.requirement === null ? `“${cite.text}”` : cite.text}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-
-  </article>
 );

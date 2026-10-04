@@ -1,209 +1,121 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type FC, type MouseEvent } from "react";
+import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FC, type MouseEvent, type ReactNode } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { withoutAudioTags } from "@/app/lib/voice/audioTags";
-import { ariaTime, formatClock, numberAnswers, type DeliveryTurn } from "@/app/lib/voice/format";
-import type { DeliveryTranscriptSegment, DeliveryTranscriptWord } from "@/app/lib/voice/types";
+import type { SessionQuestionRef } from "@/app/components/dashboard/prep/report/answerNotes";
+import RewritePopover from "@/app/components/dashboard/prep/report/RewritePopover";
+import type { DimensionScore, Rewrite, TranscriptTurn } from "@/app/lib/dashboard/prep-data";
+import { ariaTime, clip, formatClock, formatDuration } from "@/app/lib/voice/format";
+import type { DeliveryTranscriptSegment, DeliveryTranscriptWord, DictionSection } from "@/app/lib/voice/types";
 import { usePlaybackControls, usePlaybackState, usePlaybackTime } from "./PlaybackProvider";
+import TranscriptNote from "./transcriptNote";
+import { buildTranscript, stretchAt, wordAt, type InterviewerRow, type PickUpRow, type Piece, type SpeechRow } from "./transcriptModel";
 
 /**
- * The transcript that follows the recording: the word being spoken is lit,
- * a click on any word plays from it, and while the line being played is off
- * screen a button offers the way back to it.
+ * The Transcript tab: every line of the session in order, the interviewer's
+ * and the candidate's, with what the report found written onto the words.
+ *
+ * - The word being spoken is a dark pill, and a click on any word plays from
+ *   it. Filler words sit in a dashed box. A phrase the analysis left a note on
+ *   is underlined, and its note opens on hover, keyboard focus or a tap.
+ * - Under each answer: its flags and "How you could have said it".
+ * - Where a question went unanswered, or the session ended before the next
+ *   one, a line offers to pick up from there.
  *
  * It never scrolls by itself. It used to follow along inside its own capped
  * scroll box, and that box fought the reader: it took the wheel from the page
  * and would not hand it back at its end, and a scrollbar drag didn't count as
  * the reader taking over, so the next line pulled them back. Now it is part of
- * the page, scrolled with the page, and the page moves only when the reader
- * asks it to.
+ * the page, scrolled with the page, and while the word being played is off
+ * screen a button offers the way back to it.
  *
- * Words are matched onto each segment's own text rather than rendered from
- * the word list, because the transcript may carry punctuation on the words,
- * as separate tokens or not at all; the text is always what the user reads.
- * A word the matcher can't place is simply not clickable.
+ * Playback touches one row at a time: each row subscribes to the time store
+ * with selectors that return its current stretch and word (or -1), so a frame
+ * re-renders at most the row being spoken, and only when the word changes.
  *
- * Playback touches one segment at a time: each segment subscribes to the time
- * store with a selector that returns its current word index (or "not me"), so
- * a frame re-renders at most the segment being spoken, and only when the word
- * changes.
+ * For a screen reader the words are plain running text, not a button each:
+ * the row's clock is the button that plays it, and each noted phrase is a
+ * button (Enter plays from it) described by its note.
  *
- * Without segments (a locked report withholds them; a typed session has
- * none) the turns' own text is shown, playable from each answer's start when
- * its time is known.
+ * Without word timings (a locked report withholds them; a typed session has
+ * none; older sessions lack them) the turns' own text is shown, with the same
+ * notes, fillers and flags wherever the quotes match.
  */
 export interface SyncedTranscriptProps {
   segments: readonly DeliveryTranscriptSegment[];
   words: readonly DeliveryTranscriptWord[];
-  turns: readonly DeliveryTurn[];
+  turns: readonly TranscriptTurn[];
+  /** The session's questions, in order. */
+  questions?: readonly SessionQuestionRef[];
+  dimensions?: readonly DimensionScore[];
+  rewrites?: readonly Rewrite[];
+  diction?: DictionSection | null;
+  /** "Pick up from this question": practise from this unanswered question on. */
+  onPickUp?: (questionId: string) => void;
+  /** Under the transcript card: the accuracy rating. */
+  footer?: ReactNode;
   className?: string;
 }
 
 /** Start a word this far early so its first sound isn't clipped. */
 const WORD_PREROLL_MS = 250;
-const SEGMENT_PREROLL_MS = 500;
-/** A segment stays lit this long after its last word, so short gaps don't flicker. */
-const SEGMENT_TAIL_MS = 300;
-/** Words are matched to a segment within this much of its edges. */
-const WORD_SLACK_MS = 60;
-/** How far ahead in the word list the matcher looks for a token before giving up on it. */
-const MATCH_LOOKAHEAD = 3;
-
-/** The selector's "this segment isn't playing". */
-const OUTSIDE = -2;
-/** Inside the segment, before its first word, or a segment without word times. */
-const WHOLE = -1;
+const ROW_PREROLL_MS = 500;
 
 /**
- * The part of the screen a line counts as seen in: below the recording player,
+ * The part of the screen a word counts as seen in: below the recording player,
  * which sticks to the top of the report (RecordingPlayer, about 80px with its
  * offset), and above the "back to what's playing" button at the bottom.
  */
 const SEEN_MARGIN = "-96px 0px -64px 0px";
 
-/** Where the line being played is when it is off screen. */
+const NO_QUESTIONS: readonly SessionQuestionRef[] = [];
+const NO_DIMENSIONS: readonly DimensionScore[] = [];
+const NO_REWRITES: readonly Rewrite[] = [];
+
+/** Where the word being played is when it is off screen. */
 type Offscreen = "above" | "below" | null;
 
-// ---------------------------------------------------------------------------
-// Preparing the text
-// ---------------------------------------------------------------------------
+type Seek = ((ms: number, preroll: number) => void) | null;
 
-interface Token {
-  text: string;
-  /** Index into the segment's `times`, or -1 for text that isn't a timed word. */
-  word: number;
-}
+/** Called by a row as it is being spoken: the word to watch, and the row it is in. */
+type Activate = (target: HTMLElement, row: HTMLElement) => void;
 
-interface PreparedSegment {
-  id: string;
-  startMs: number;
-  endMs: number;
-  tokens: Token[];
-  /** Word start/end times in token order. */
-  times: Array<{ s: number; e: number }>;
-}
-
-type Block =
-  | { kind: "ai"; key: string; turn: DeliveryTurn }
-  | { kind: "answer"; key: string; turn: DeliveryTurn; number: number; segments: PreparedSegment[] }
-  | { kind: "loose"; key: string; segments: PreparedSegment[] };
-
-/**
- * Letters and digits only, so "Sure." matches "sure" and "I'd" matches "Id".
- * Latin, Greek and Cyrillic letters are kept by range: the `u` flag's `\p{L}`
- * needs an ES2018 target, and this app compiles for ES2017.
- */
-const normalize = (text: string) => text.toLowerCase().replace(/[^0-9a-zÀ-ɏͰ-ϿЀ-ӿ]+/g, "");
-
-/** Words and the spaces and hyphens between them, kept in order so the text reads exactly as written. */
-function tokenize(text: string): string[] {
-  return text.split(/(\s+|[-–—]+)/).filter((part) => part.length > 0);
-}
-
-function prepareSegment(segment: DeliveryTranscriptSegment, words: readonly DeliveryTranscriptWord[]): PreparedSegment {
-  const times: Array<{ s: number; e: number }> = [];
-  let next = 0;
-  const tokens = tokenize(segment.text).map((text): Token => {
-    const key = normalize(text);
-    if (!key) return { text, word: -1 };
-    for (let k = next; k < Math.min(words.length, next + MATCH_LOOKAHEAD + 1); k++) {
-      if (normalize(words[k].w) !== key) continue;
-      next = k + 1;
-      times.push({ s: words[k].s, e: words[k].e });
-      return { text, word: times.length - 1 };
-    }
-    return { text, word: -1 };
-  });
-  return { id: segment.id, startMs: segment.startMs, endMs: segment.endMs, tokens, times };
-}
-
-function buildBlocks(segments: readonly DeliveryTranscriptSegment[], words: readonly DeliveryTranscriptWord[], turns: readonly DeliveryTurn[]): Block[] {
-  const sortedWords = [...words].filter((w) => Number.isFinite(w.s)).sort((a, b) => a.s - b.s);
-  // Punctuation-only words carry no time worth lighting; drop them before matching.
-  const spoken = sortedWords.filter((w) => normalize(w.w).length > 0);
-  const sorted = [...segments].sort((a, b) => a.startMs - b.startMs);
-
-  let cursor = 0;
-  const prepared = sorted.map((segment) => {
-    while (cursor < spoken.length && spoken[cursor].s < segment.startMs - WORD_SLACK_MS) cursor++;
-    let end = cursor;
-    while (end < spoken.length && spoken[end].s < segment.endMs + WORD_SLACK_MS) end++;
-    const own = spoken.slice(cursor, end);
-    cursor = end;
-    return { segment, prepared: prepareSegment(segment, own) };
-  });
-
-  const turnIds = new Set(turns.map((t) => t.id));
-  const byTurn = new Map<string, PreparedSegment[]>();
-  const loose: Array<{ at: number; segment: PreparedSegment }> = [];
-  for (const { segment, prepared: p } of prepared) {
-    if (segment.turnId !== null && turnIds.has(segment.turnId)) {
-      const list = byTurn.get(segment.turnId) ?? [];
-      list.push(p);
-      byTurn.set(segment.turnId, list);
-    } else {
-      loose.push({ at: segment.startMs, segment: p });
-    }
-  }
-
-  const numbers = numberAnswers(turns);
-  const blocks: Block[] = [];
-  let looseAt = 0;
-  // Speech outside every answer is placed by time between the turns around it.
-  const flushLoose = (before: number) => {
-    const run: PreparedSegment[] = [];
-    while (looseAt < loose.length && loose[looseAt].at < before) run.push(loose[looseAt++].segment);
-    if (run.length > 0) blocks.push({ kind: "loose", key: `loose-${run[0].id}`, segments: run });
-  };
-  for (const turn of turns) {
-    if (turn.startMs !== undefined) flushLoose(turn.startMs);
-    if (turn.who === "ai") blocks.push({ kind: "ai", key: turn.id, turn });
-    else blocks.push({ kind: "answer", key: turn.id, turn, number: numbers.get(turn.id) ?? 0, segments: byTurn.get(turn.id) ?? [] });
-  }
-  flushLoose(Infinity);
-  return blocks;
-}
-
-/** The current word's index in `times`, WHOLE, or OUTSIDE. */
-function activeWord(segment: PreparedSegment, ms: number): number {
-  if (ms < segment.startMs || ms >= segment.endMs + SEGMENT_TAIL_MS) return OUTSIDE;
-  const { times } = segment;
-  if (times.length === 0 || ms < times[0].s) return WHOLE;
-  let lo = 0;
-  let hi = times.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (times[mid].s <= ms) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo;
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, className }) => {
+const SyncedTranscript: FC<SyncedTranscriptProps> = ({
+  segments,
+  words,
+  turns,
+  questions = NO_QUESTIONS,
+  dimensions = NO_DIMENSIONS,
+  rewrites = NO_REWRITES,
+  diction = null,
+  onPickUp,
+  footer,
+  className,
+}) => {
+  const titleId = useId();
   const controls = usePlaybackControls();
   const canPlay = controls !== null;
   const playing = usePlaybackState()?.playing ?? false;
   const [offscreen, setOffscreen] = useState<Offscreen>(null);
-  const currentRow = useRef<HTMLElement | null>(null);
+  const watched = useRef<HTMLElement | null>(null);
+  const watchedRow = useRef<HTMLElement | null>(null);
   const watcher = useRef<IntersectionObserver | null>(null);
 
-  const blocks = useMemo(() => buildBlocks(segments, words, turns), [segments, words, turns]);
-  const synced = segments.length > 0;
+  const model = useMemo(
+    () => buildTranscript({ segments, words, turns, questions, dimensions, rewrites, diction }),
+    [segments, words, turns, questions, dimensions, rewrites, diction]
+  );
+  const follows = model.timed && canPlay;
 
-  // Watches the line being played, so the way back to it shows only while it
+  // Watches the word being played, so the way back to it shows only while it
   // is off screen. It only ever offers: the page is the reader's to move.
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return undefined;
     const observer = new IntersectionObserver(
       (entries) => {
-        // A report queued for the line before is stale once another is playing.
-        const entry = entries.filter((e) => e.target === currentRow.current).pop();
+        // A report queued for the word before is stale once another is playing.
+        const entry = entries.filter((e) => e.target === watched.current).pop();
         if (!entry) return;
         if (!entry.target.isConnected || entry.isIntersecting) setOffscreen(null);
         else setOffscreen(entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0) ? "above" : "below");
@@ -211,94 +123,120 @@ const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, c
       { rootMargin: SEEN_MARGIN }
     );
     watcher.current = observer;
-    if (currentRow.current) observer.observe(currentRow.current);
+    if (watched.current) observer.observe(watched.current);
     return () => {
       observer.disconnect();
       watcher.current = null;
     };
   }, []);
 
-  // Called by a segment as it becomes the one being spoken. Stable, so a
-  // segment's memoised props never change with play state.
-  const onActivate = useCallback((row: HTMLElement) => {
+  // Stable, so a row's memoised props never change with play state.
+  const onActivate = useCallback<Activate>((target, row) => {
+    watchedRow.current = row;
+    if (watched.current === target) return;
     const observer = watcher.current;
-    if (currentRow.current && observer) observer.unobserve(currentRow.current);
-    currentRow.current = row;
-    observer?.observe(row);
+    if (watched.current && observer) observer.unobserve(watched.current);
+    watched.current = target;
+    observer?.observe(target);
   }, []);
 
   const backToPlaying = () => {
-    const row = currentRow.current;
-    if (!row?.isConnected) return;
+    const target = watched.current;
+    if (!target?.isConnected) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     // The one scroll this component makes, and only on the reader's click.
-    row.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
-    // The button goes once the line is in view; focus lands on the line's own
+    target.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+    // The button goes once the word is in view; focus lands on the row's own
     // play button rather than falling back to the top of the page.
-    row.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
+    watchedRow.current?.querySelector<HTMLElement>("[data-row-play]")?.focus({ preventScroll: true });
   };
 
   const seek = useCallback((ms: number, preroll: number) => controls?.seekTo(ms, { preroll }), [controls]);
+  const onSeek: Seek = canPlay ? seek : null;
+
+  const intro = [
+    follows ? "Click any word to hear it." : "What was said in the session.",
+    model.notes ? "Notes sit beside the line they are about." : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <section aria-label="Transcript" className={cn("rounded-2xl border border-black/10 bg-white", className)}>
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-black/10 px-5 py-3.5 sm:px-6">
-        <div className="min-w-0">
-          <h3 className="text-[14.5px] font-bold text-primary">Transcript</h3>
-          <p className="mt-0.5 text-xs text-black/50">
-            {synced && canPlay ? "Click any word to hear it." : "What you said, as transcribed from the recording."}
-          </p>
-        </div>
-      </header>
+    <div className={cn("flex flex-col gap-4", className)}>
+      <section aria-labelledby={titleId} className="rounded-2xl border border-black/10 bg-white">
+        <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2.5 border-b border-black/10 px-5 py-4 sm:px-6">
+          <div className="min-w-0">
+            <h3 id={titleId} className="text-[15px] font-bold text-[#222325]">
+              Transcript
+            </h3>
+            <p className="mt-0.5 text-[12.5px] text-black/55">{intro}</p>
+          </div>
+          <Legend playing={follows} filler={model.fillers} note={model.notes} />
+        </header>
 
-      {/* No height cap and no scroll box of its own: the page is the only
-          thing that scrolls, so the wheel always moves the page. */}
-      <div className="flex flex-col gap-4 px-5 py-4 sm:px-6">
-        {blocks.length === 0 && <p className="text-sm text-black/50">There&apos;s no transcript for this session.</p>}
-        {blocks.map((block) => {
-          if (block.kind === "ai") return <InterviewerTurn key={block.key} turn={block.turn} onSeek={canPlay ? seek : null} />;
-          if (block.kind === "loose") {
-            return (
-              <div key={block.key} className="flex flex-col gap-1">
-                <p className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/35">Between answers</p>
-                {block.segments.map((segment) => (
-                  <SegmentRow key={segment.id} segment={segment} muted onSeek={canPlay ? seek : null} onActivate={onActivate} />
-                ))}
+        {/* No height cap and no scroll box of its own: the page is the only
+            thing that scrolls, so the wheel always moves the page. */}
+        <div>
+          {model.rows.length === 0 && <p className="px-5 py-6 text-sm text-black/50 sm:px-6">There&apos;s no transcript for this session.</p>}
+          {model.rows.map((row, i) => {
+            if (row.kind === "pickup") return <PickUpLine key={row.key} row={row} onPickUp={onPickUp} />;
+            if (row.kind === "interviewer") return <InterviewerLine key={row.key} row={row} ruled={i > 0} onSeek={onSeek} />;
+            return <SpeechLine key={row.key} row={row} ruled={i > 0} onSeek={onSeek} onActivate={onActivate} />;
+          })}
+        </div>
+
+        {follows && (
+          // Sticks to the bottom of the screen while the transcript runs past
+          // it, and takes no room of its own, so the card ends at its last row.
+          // Clicks pass through everything but the button.
+          <div className="pointer-events-none sticky bottom-3 z-20 h-0">
+            {playing && offscreen && (
+              <div className="absolute inset-x-0 bottom-0 flex justify-center">
+                <button
+                  type="button"
+                  onClick={backToPlaying}
+                  className="pointer-events-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[#e1f073] px-3.5 py-1.5 text-xs font-bold text-[#222325] br-shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2">
+                  {offscreen === "above" ? <ArrowUp aria-hidden className="h-3.5 w-3.5" /> : <ArrowDown aria-hidden className="h-3.5 w-3.5" />}
+                  Back to what&apos;s playing
+                </button>
               </div>
-            );
-          }
-          return (
-            <div key={block.key} className="flex flex-col gap-1">
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/35">
-                You{block.number > 0 && <span className="text-black/30"> · Answer {block.number}</span>}
-              </p>
-              {block.segments.length > 0 ? (
-                block.segments.map((segment) => <SegmentRow key={segment.id} segment={segment} onSeek={canPlay ? seek : null} onActivate={onActivate} />)
-              ) : (
-                <PlainTurn turn={block.turn} onSeek={canPlay ? seek : null} />
-              )}
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </div>
+        )}
+      </section>
+      {footer}
+    </div>
+  );
+};
 
-      {synced && canPlay && (
-        // A row of its own at the end, so where the transcript ends the button
-        // sits under the last line instead of on it; above that, it sticks to
-        // the bottom of the screen. Clicks pass through everything but the button.
-        <div className="pointer-events-none sticky bottom-3 z-20 -mt-2 flex h-11 items-center justify-center">
-          {playing && offscreen && (
-            <button
-              type="button"
-              onClick={backToPlaying}
-              className="pointer-events-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[#e1f073] px-3.5 py-1.5 text-xs font-bold text-[#222325] br-shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2">
-              {offscreen === "above" ? <ArrowUp aria-hidden className="h-3.5 w-3.5" /> : <ArrowDown aria-hidden className="h-3.5 w-3.5" />}
-              Back to what&apos;s playing
-            </button>
-          )}
-        </div>
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+
+/** What the marks on the words mean; each shows only where it can appear. For the eye: the marks themselves aren't read out. */
+const Legend: FC<{ playing: boolean; filler: boolean; note: boolean }> = ({ playing, filler, note }) => {
+  if (!playing && !filler && !note) return null;
+  return (
+    <div aria-hidden className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-black/60">
+      {playing && (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="rounded-[4px] bg-[#222325] px-1.5 py-px text-[11px] font-bold text-[#e1f073]">now</span>
+          Playing
+        </span>
       )}
-    </section>
+      {filler && (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="rounded-[4px] border border-dashed border-[#222325]/60 px-1 text-[11px] font-semibold text-[#222325]">uh</span>
+          Filler
+        </span>
+      )}
+      {note && (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-[#222325] underline decoration-[#222325] decoration-[1.5px] underline-offset-[4px]">text</span>
+          Has a note
+        </span>
+      )}
+    </div>
   );
 };
 
@@ -306,96 +244,220 @@ const SyncedTranscript: FC<SyncedTranscriptProps> = ({ segments, words, turns, c
 // Rows
 // ---------------------------------------------------------------------------
 
-type Seek = ((ms: number, preroll: number) => void) | null;
+/** Who and when on the left, the words on the right; stacked on a phone. */
+const Row: FC<{ ruled: boolean; tinted?: boolean; rowRef?: (el: HTMLDivElement | null) => void; children: ReactNode }> = ({
+  ruled,
+  tinted = false,
+  rowRef,
+  children,
+}) => (
+  <div
+    ref={rowRef}
+    className={cn(
+      "grid gap-x-5 gap-y-1.5 px-5 py-4 last:rounded-b-2xl sm:grid-cols-[108px_minmax(0,1fr)] sm:px-6",
+      ruled && "border-t border-black/[0.08]",
+      tinted && "bg-[#f9faf2]"
+    )}>
+    {children}
+  </div>
+);
 
-/** The clock at the start of a row: a button when there is a recording, plain text otherwise. */
-const RowClock: FC<{ atMs: number; current?: boolean; onSeek: Seek; label: string }> = ({ atMs, current = false, onSeek, label }) =>
+const RowLabel: FC<{ title: string; meta: ReactNode[] }> = ({ title, meta }) => (
+  <div className="min-w-0">
+    <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#222325]/80">{title}</p>
+    {meta.length > 0 && (
+      <p className="mt-0.5 text-[11.5px] leading-snug text-black/45 tabular-nums">
+        {meta.map((part, i) => (
+          <Fragment key={i}>
+            {i > 0 && " · "}
+            {part}
+          </Fragment>
+        ))}
+      </p>
+    )}
+  </div>
+);
+
+/** The time a row starts: the button that plays it when there is a recording, plain text otherwise. */
+const Clock: FC<{ atMs: number; onSeek: Seek; label: string; current?: boolean }> = ({ atMs, onSeek, label, current = false }) =>
   onSeek ? (
     <button
       type="button"
-      onClick={() => onSeek(atMs, SEGMENT_PREROLL_MS)}
-      aria-label={`Play from ${ariaTime(atMs)}: ${label}`}
+      data-row-play
+      onClick={() => onSeek(atMs, ROW_PREROLL_MS)}
+      aria-label={`${label} ${ariaTime(atMs)}`}
       className={cn(
-        "mt-[3px] w-11 flex-none cursor-pointer rounded-md px-1 py-0.5 text-left text-[11px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073]",
-        current ? "bg-[#e1f073] text-[#222325]" : "text-black/35 hover:bg-[#f0f0ea] hover:text-primary"
+        "-mx-1 cursor-pointer rounded-[4px] px-1 tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325]",
+        current ? "bg-[#e1f073] text-[#222325]" : "hover:bg-black/[0.06] hover:text-[#222325]"
       )}>
       {formatClock(atMs)}
     </button>
   ) : (
-    <span className="mt-[3px] w-11 flex-none px-1 py-0.5 text-[11px] font-semibold tabular-nums text-black/35">{formatClock(atMs)}</span>
+    <span>{formatClock(atMs)}</span>
   );
 
-const InterviewerTurn: FC<{ turn: DeliveryTurn; onSeek: Seek }> = ({ turn, onSeek }) => (
-  <div className="flex flex-col gap-1">
-    <p className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-black/35">Interviewer</p>
-    <div className="flex gap-2">
-      {turn.startMs !== undefined ? <RowClock atMs={turn.startMs} onSeek={onSeek} label="interviewer" /> : <span className="w-11 flex-none" />}
-      {/* The stored question, which carries no audio tag; stripped anyway, since a tag is how a line was voiced, never what was asked. */}
-      <p className="min-w-0 flex-1 border-l-2 border-black/10 pl-3 text-sm leading-relaxed text-black/55">{withoutAudioTags(turn.text)}</p>
-    </div>
-  </div>
-);
+const InterviewerLine = memo(function InterviewerLine({ row, ruled, onSeek }: { row: InterviewerRow; ruled: boolean; onSeek: Seek }) {
+  return (
+    <Row ruled={ruled}>
+      <RowLabel title="Interviewer" meta={row.startMs !== undefined ? [<Clock key="at" atMs={row.startMs} onSeek={onSeek} label="Play the interviewer from" />] : []} />
+      <p className="min-w-0 text-[14.5px] leading-[1.65] text-black/60">{row.text}</p>
+    </Row>
+  );
+});
 
-const PlainTurn: FC<{ turn: DeliveryTurn; onSeek: Seek }> = ({ turn, onSeek }) => (
-  <div className="flex gap-2">
-    {turn.startMs !== undefined ? <RowClock atMs={turn.startMs} onSeek={onSeek} label="your answer" /> : <span className="w-11 flex-none" />}
-    <p className="min-w-0 flex-1 text-sm leading-relaxed text-primary">{turn.text.trim() || <span className="text-black/40">Nothing was said here.</span>}</p>
-  </div>
-);
+/** Each word's box: padding drawn out over a negative margin, so lighting a word never moves the text. */
+const WORD = "-mx-[3px] rounded-[5px] px-[3px] py-[1px] box-decoration-clone transition-colors";
+const PLAYING = "bg-[#222325] text-[#e1f073]";
 
-interface SegmentRowProps {
-  segment: PreparedSegment;
-  muted?: boolean;
+interface SpeechLineProps {
+  row: SpeechRow;
+  ruled: boolean;
   onSeek: Seek;
-  onActivate: (row: HTMLElement) => void;
+  onActivate: Activate;
 }
 
-const SegmentRow = memo(function SegmentRow({ segment, muted = false, onSeek, onActivate }: SegmentRowProps) {
-  const active = usePlaybackTime((ms) => activeWord(segment, ms));
-  const current = active !== OUTSIDE;
-  const rowRef = useRef<HTMLDivElement | null>(null);
+const SpeechLine = memo(function SpeechLine({ row, ruled, onSeek, onActivate }: SpeechLineProps) {
+  const { speech } = row;
+  const { tokens, times } = speech;
+  const stretch = usePlaybackTime((ms) => stretchAt(speech, ms));
+  const playingWord = usePlaybackTime((ms) => wordAt(speech, stretchAt(speech, ms), ms));
+  const rowEl = useRef<HTMLDivElement | null>(null);
+  const setRowEl = useCallback((el: HTMLDivElement | null) => {
+    rowEl.current = el;
+  }, []);
+  const seekable = onSeek !== null && times.length > 0;
+  const answer = row.role === "answer";
 
+  // Hands the word being spoken (or, before its first word, the stretch's
+  // first) to the transcript's watcher.
   useEffect(() => {
-    if (current && rowRef.current) onActivate(rowRef.current);
-  }, [current, onActivate]);
+    const el = rowEl.current;
+    if (stretch < 0 || !el) return;
+    const { firstWord, lastWord } = speech.stretches[stretch];
+    const word = playingWord >= 0 ? playingWord : lastWord >= firstWord ? firstWord : -1;
+    onActivate(el.querySelector<HTMLElement>(`[data-word="${word}"]`) ?? el, el);
+  }, [stretch, playingWord, speech, onActivate]);
 
   const onClick = (e: MouseEvent<HTMLParagraphElement>) => {
-    if (!onSeek) return;
+    if (!seekable || !onSeek) return;
     // Selecting text to copy it ends in a click too; that isn't a request to play.
     if ((window.getSelection()?.toString() ?? "").length > 0) return;
     const target = (e.target as HTMLElement).closest<HTMLElement>("[data-word]");
-    const index = target ? Number(target.dataset.word) : -1;
-    const time = segment.times[index];
+    const time = target ? times[Number(target.dataset.word)] : undefined;
     if (time) onSeek(time.s, WORD_PREROLL_MS);
-    else onSeek(segment.startMs, SEGMENT_PREROLL_MS);
   };
 
-  const text = segment.tokens.map((t) => t.text).join("");
+  const word = (i: number, withLead = true, withTrail = true): ReactNode => {
+    const token = tokens[i];
+    if (!token.core) return <Fragment key={i}>{token.text}</Fragment>;
+    const timed = seekable && token.word >= 0;
+    return (
+      <Fragment key={i}>
+        {withLead && token.lead}
+        {timed ? (
+          <span data-word={token.word} className={cn(WORD, token.word === playingWord ? PLAYING : "cursor-pointer hover:bg-black/[0.07]")}>
+            {token.core}
+          </span>
+        ) : (
+          token.core
+        )}
+        {withTrail && token.trail}
+      </Fragment>
+    );
+  };
+
+  /** Where a noted phrase plays from: its first timed word, else the time the note gives. */
+  const playFrom = (from: number, to: number, atMs?: number): (() => void) | null => {
+    if (!onSeek) return null;
+    for (let i = from; i <= to; i++) {
+      const time = tokens[i].word >= 0 ? times[tokens[i].word] : undefined;
+      if (time) return () => onSeek(time.s, WORD_PREROLL_MS);
+    }
+    return atMs !== undefined ? () => onSeek(atMs, WORD_PREROLL_MS) : null;
+  };
+
+  const render = (pieces: readonly Piece[]): ReactNode[] =>
+    pieces.map((piece) => {
+      if (piece.kind === "token") return word(piece.index);
+      if (piece.kind === "filler") {
+        const inner: ReactNode[] = [];
+        for (let i = piece.from; i <= piece.to; i++) inner.push(word(i, i !== piece.from, i !== piece.to));
+        return (
+          <Fragment key={`filler-${piece.from}`}>
+            {tokens[piece.from].lead}
+            <span className="rounded-[5px] border border-dashed border-[#222325]/60 px-[3px] box-decoration-clone">{inner}</span>
+            {tokens[piece.to].trail}
+          </Fragment>
+        );
+      }
+      return (
+        <TranscriptNote key={`note-${piece.from}`} note={piece.note} onPlay={playFrom(piece.from, piece.to, piece.note.atMs)}>
+          {render(piece.inner)}
+        </TranscriptNote>
+      );
+    });
+
+  const meta: ReactNode[] = [];
+  if (row.startMs !== undefined) {
+    const label = answer && row.number !== null ? `Play answer ${row.number} from` : "Play from";
+    meta.push(<Clock key="at" atMs={row.startMs} onSeek={onSeek} current={stretch >= 0} label={label} />);
+  }
+  if (!answer) meta.unshift("Between answers");
+  if (row.durationMs !== undefined) meta.push(formatDuration(row.durationMs));
+  if (row.wordCount > 0) meta.push(`${row.wordCount} ${row.wordCount === 1 ? "word" : "words"}`);
 
   return (
-    <div ref={rowRef} data-current={current} className={cn("-mx-2 flex gap-2 rounded-lg px-2 py-1 transition-colors", current && "bg-[#f6faea]")}>
-      <RowClock atMs={segment.startMs} current={current} onSeek={onSeek} label={text} />
-      <p onClick={onClick} className={cn("min-w-0 flex-1 text-sm leading-relaxed", muted ? "text-black/50" : "text-primary", onSeek && "cursor-pointer")}>
-        {segment.tokens.map((token, i) => {
-          if (token.word < 0) return <span key={i}>{token.text}</span>;
-          const lit = current && token.word === active;
-          const ahead = current && active !== WHOLE && token.word > active;
-          return (
-            <span
-              key={i}
-              data-word={token.word}
-              className={cn(
-                "rounded-[3px] transition-colors",
-                lit ? "bg-[#e1f073] text-[#222325] shadow-[0_0_0_2px_#e1f073]" : ahead ? "text-black/55" : undefined,
-                onSeek && !lit && "hover:bg-[#f0f0ea]"
-              )}>
-              {token.text}
-            </span>
-          );
-        })}
-      </p>
-    </div>
+    <Row ruled={ruled} tinted={answer} rowRef={setRowEl}>
+      <RowLabel title={answer && row.number !== null ? `You · Answer ${row.number}` : "You"} meta={meta} />
+      <div className="min-w-0">
+        {row.wordCount === 0 ? (
+          <p className="text-sm text-black/40">Nothing was said here.</p>
+        ) : (
+          <p onClick={onClick} className={cn("text-base leading-[1.8]", answer ? "text-[#222325]" : "text-black/55")}>
+            {render(row.pieces)}
+          </p>
+        )}
+        {(row.flags.length > 0 || row.rewrite) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {row.flags.map((flag) => (
+              <span key={flag} className="inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-2.5 py-1 text-xs font-semibold text-[#222325]">
+                <span aria-hidden className="h-1.5 w-1.5 flex-none rounded-full bg-[#222325]" />
+                {flag}
+              </span>
+            ))}
+            {row.rewrite && <RewritePopover text={row.rewrite} />}
+          </div>
+        )}
+      </div>
+    </Row>
   );
 });
+
+/** Where the session left a question: say so, and offer to practise from it. */
+const PickUpLine: FC<{ row: PickUpRow; onPickUp?: (questionId: string) => void }> = ({ row, onPickUp }) => {
+  const line = !row.asked
+    ? `The session ended here, before question ${row.number}.`
+    : row.atEnd
+      ? "The session ended here, before you answered this question."
+      : "You moved on before answering this question.";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-dashed border-black/25 px-5 py-4 last:rounded-b-2xl sm:px-6">
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] text-black/60">{line}</p>
+        {/* A question never asked has no line above to say what it was. */}
+        {!row.asked && row.text && <p className="mt-0.5 text-xs text-black/45">{clip(row.text, 140)}</p>}
+      </div>
+      {onPickUp && (
+        <button
+          type="button"
+          onClick={() => onPickUp(row.questionId)}
+          aria-label={`Pick up from this question, question ${row.number}`}
+          className="br-plain-press flex-none rounded-lg border-[#222325] bg-white px-3.5 py-2 text-[13px] font-bold text-[#222325] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2">
+          Pick up from this question
+        </button>
+      )}
+    </div>
+  );
+};
 
 export default SyncedTranscript;

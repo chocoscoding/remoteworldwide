@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import PrepLive from "@/app/components/dashboard/prep/PrepLive";
 import { TrackLoadError, TrackLoading, TrackNotFound } from "@/app/components/dashboard/prep/PrepTrackStates";
 import { FORMAT_META, SESSION_LENGTHS, type SessionFormat } from "@/app/lib/dashboard/prep-data";
 import type { SessionConfig } from "@/app/components/dashboard/prep/PrepSetup";
+import { PRACTICE_PARAM, readPracticeQuestions } from "@/app/lib/prep/practice";
+import type { SessionQuestion } from "@/app/lib/prep/sessionQuestions";
 import { sessionResumeReady } from "@/app/lib/prep/trackResume";
 import { useLikelyQuestions } from "@/hooks/queries/usePrepTrackQueries";
 
@@ -27,6 +29,15 @@ const CAP_MINUTES_MAX = 120;
  * AI service slow.
  */
 const LIKELY_QUESTIONS_WAIT_MS = 5_000;
+
+/** Each `?practice=` key's questions, read from sessionStorage once: a stable snapshot for useSyncExternalStore. */
+const practiceByKey = new Map<string, SessionQuestion[] | null>();
+const practiceFor = (key: string): SessionQuestion[] | null => {
+  if (!practiceByKey.has(key)) practiceByKey.set(key, readPracticeQuestions(key));
+  return practiceByKey.get(key) ?? null;
+};
+/** sessionStorage is not watched: the handover is written before this page opens. */
+const subscribeNever = () => () => undefined;
 
 function parseConfig(searchParams: URLSearchParams): SessionConfig | null {
   const rawFormats = searchParams.get("format");
@@ -50,6 +61,20 @@ const LiveClient: FC<LiveClientProps> = ({ trackId }) => {
   const config = parseConfig(searchParams);
   const [attempt, setAttempt] = useState(0);
 
+  // A practice session a report started asks exactly the questions it handed
+  // over (app/lib/prep/practice.ts). They sit in sessionStorage, so the server
+  // render has none yet: undefined until the browser reads them, null when there are none.
+  const practiceKey = searchParams.get(PRACTICE_PARAM);
+  const practice = useSyncExternalStore<SessionQuestion[] | null | undefined>(
+    subscribeNever,
+    () => (practiceKey ? practiceFor(practiceKey) : null),
+    () => (practiceKey ? undefined : null)
+  );
+  useEffect(() => {
+    // Opened in another tab, or after the browser was closed: the handover is gone.
+    if (practiceKey && practice === null) toast("Those practice questions aren't here any more, so this is a regular session.", { id: "prep-practice-missing" });
+  }, [practiceKey, practice]);
+
   // The questions are frozen when the interview mounts, so it waits for the
   // track's likely questions: asked in place of the general bank when there
   // are some. Read only, never written — a set costs a credit and is only
@@ -64,8 +89,11 @@ const LiveClient: FC<LiveClientProps> = ({ trackId }) => {
     return () => clearTimeout(t);
   }, [questionsTrackId]);
   // Not before the track is known: settling on "no track to read" would latch before its questions are asked for.
+  // A practice session needs only its own questions.
   const questionsSettled =
-    track !== undefined && (!questionsTrackId || likely.data !== undefined || likely.isError || likely.failureCount > 0 || questionsWaitOver);
+    track !== undefined &&
+    practice !== undefined &&
+    (practice !== null || !questionsTrackId || likely.data !== undefined || likely.isError || likely.failureCount > 0 || questionsWaitOver);
   // Latched: a refetch going back to pending must not unmount an interview under way.
   const [questionsReady, setQuestionsReady] = useState(false);
   if (questionsSettled && !questionsReady) setQuestionsReady(true);
@@ -136,6 +164,7 @@ const LiveClient: FC<LiveClientProps> = ({ trackId }) => {
       track={track}
       config={config}
       likelyQuestions={likely.data?.set?.questions ?? null}
+      fixedQuestions={practice}
       onEnd={handleEnd}
       onSaved={handleSaved}
       onExit={() => router.push(`/dashboard/prep/${trackId}`)}

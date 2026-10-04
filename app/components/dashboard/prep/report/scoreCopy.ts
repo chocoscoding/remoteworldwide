@@ -1,5 +1,6 @@
-// How a report's score reads in words: the header's one line, the Overall
-// tab's notice, and the amounts it rests on.
+// How a report's score reads in words: the header's one line under the score
+// ("Short session · scored on 1 answer"), the Overall tab's notice, and the
+// amounts it rests on. No em dashes: the owner's copy rule for every screen.
 //
 // Whether there is a score, and whether it is provisional, is mapSession's
 // `scoreDisplayOf`, the one answer the hub reads too; this file only says why,
@@ -36,58 +37,58 @@ function missingScoreReason(evidence: ScoreEvidence): { short: string; long: str
   };
 }
 
-/** Why a score is provisional: the charge rule it fell under, with the session's own amount. */
+/** Why a score is provisional: the charge rule it fell under, with the session's own amount ("scored on 1 answer"). */
 function provisionalReason(session: ScoreFacts): { short: string; long: string } {
   const evidence = session.scoreEvidence ?? null;
   switch (session.scoreReason) {
     case "few-answers":
       return evidence
         ? {
-            short: `based on only ${count(evidence.answers, "answer")}`,
+            short: `scored on ${count(evidence.answers, "answer")}`,
             long: `It rests on ${evidence.answers === 0 ? "no answers" : `only ${count(evidence.answers, "answer")}`}, and a full score needs at least ${SCORE_RULES.minAnswers}.`,
           }
-        : { short: "based on too few answers", long: `It rests on fewer than ${SCORE_RULES.minAnswers} answers, which a full score needs.` };
+        : { short: "scored on too few answers", long: `It rests on fewer than ${SCORE_RULES.minAnswers} answers, which a full score needs.` };
     case "little-speech":
       return evidence && evidence.speechMs !== null
         ? {
-            short: `based on only ${formatDuration(evidence.speechMs)} of your voice`,
+            short: `scored on ${formatDuration(evidence.speechMs)} of your voice`,
             long: `It rests on only ${formatDuration(evidence.speechMs)} of your voice, and a full score needs ${formatDuration(SCORE_RULES.minSpeechMs)}. Pauses and silence inside an answer don't count towards it.`,
           }
-        : { short: "based on too little of your voice", long: `It rests on less than ${formatDuration(SCORE_RULES.minSpeechMs)} of your voice, which a full score needs.` };
+        : { short: "scored on too little of your voice", long: `It rests on less than ${formatDuration(SCORE_RULES.minSpeechMs)} of your voice, which a full score needs.` };
     case "few-words":
       // The rule counts every typed word; the evidence counts the words that
       // carry an answer (fillers aside). Under the rule, both are short of it.
       return evidence
         ? {
-            short: `based on only ${count(evidence.contentWords, "word")} of typed answer`,
+            short: `scored on ${count(evidence.contentWords, "word")} of typed answer`,
             long: `Your typed answers came to ${count(evidence.contentWords, "word")} of real answer, and a full score needs at least ${SCORE_RULES.minTypedWords} words.`,
           }
-        : { short: "based on too few typed words", long: `Your typed answers came to fewer than ${SCORE_RULES.minTypedWords} words, which a full score needs.` };
+        : { short: "scored on too few typed words", long: `Your typed answers came to fewer than ${SCORE_RULES.minTypedWords} words, which a full score needs.` };
     default:
-      return { short: "the session was too short for a full score", long: "The session was too short for a full score." };
+      return { short: "too short for a full score", long: "The session was too short for a full score." };
   }
 }
 
 /**
- * The header's line under a score that isn't a full one: "Provisional — based
- * on only 12 s of your voice", "Not scored — only 3 of 6 parts of the
- * scorecard had enough to judge". Null for a full score. The hub says
- * "provisional" and "not scored" for the same sessions (both read
- * `scoreDisplayOf`); this adds the reason.
+ * The header's line under a score: "Short session · scored on 1 answer",
+ * "Not scored · this report is from before every session was scored", and for
+ * a full score what it rests on ("Scored on 4 answers"), or null when the
+ * report doesn't say. The hub says "provisional" and "not scored" for the
+ * same sessions (both read `scoreDisplayOf`); this adds the reason.
  */
 export function scoreHeadline(display: ScoreDisplay, session: ScoreFacts): string | null {
-  if (display.kind === "scored") return null;
-  if (display.kind === "provisional") return `Short session — ${provisionalReason(session).short}`;
-  if (isLegacyTooShort(session)) return "Not scored — the session was too short to score";
+  if (display.kind === "scored") return session.scoreEvidence ? `Scored on ${count(session.scoreEvidence.answers, "answer")}` : null;
+  if (display.kind === "provisional") return `Short session · ${provisionalReason(session).short}`;
+  if (isLegacyTooShort(session)) return "Not scored · the session was too short to score";
   const evidence = session.scoreEvidence;
-  if (!evidence) return "Not scored — there wasn't enough to judge";
-  return `Not scored — ${missingScoreReason(evidence).short}`;
+  if (!evidence) return "Not scored · there wasn't enough to judge";
+  return `Not scored · ${missingScoreReason(evidence).short}`;
 }
 
 /**
  * The Overall tab's explanation of a missing score, in full sentences. Null for
  * any score: a short session's is real, and the header's one line says what it
- * rests on — a card above the feedback would only push the feedback down.
+ * rests on; a card above the feedback would only push the feedback down.
  */
 export function scoreExplanation(display: ScoreDisplay, session: ScoreFacts): string | null {
   if (display.kind !== "unscored") return null;

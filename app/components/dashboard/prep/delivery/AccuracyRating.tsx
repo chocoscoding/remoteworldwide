@@ -72,9 +72,9 @@ const AccuracyRating: FC<AccuracyRatingProps> = ({ value, onRate, disabled = fal
   };
 
   return (
-    <section aria-label="Transcript accuracy" className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-2xl border border-black/10 bg-white px-5 py-4 sm:px-6", className)}>
+    <section aria-labelledby={titleId} className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-2xl border border-black/10 bg-white px-5 py-4 sm:px-6", className)}>
       <div className="min-w-0">
-        <h3 id={titleId} className="text-sm font-bold text-primary">
+        <h3 id={titleId} className="text-[14.5px] font-bold text-[#222325]">
           How accurate was the transcript?
         </h3>
         {/* A status region, so saving, saved and failures are announced. */}
@@ -88,18 +88,22 @@ const AccuracyRating: FC<AccuracyRatingProps> = ({ value, onRate, disabled = fal
             ) : mine?.status === "saved" ? (
               <span className="inline-flex items-center gap-1 text-[#55591f]">
                 <Check aria-hidden className="h-3 w-3" strokeWidth={3} />
-                Thanks, saved. It helps us choose how sessions are transcribed.
+                Thanks, saved.
               </span>
             ) : shown === null ? (
-              "Just the words, not the feedback. It helps us choose how sessions are transcribed."
+              "Just the words, not the feedback."
             ) : (
               `You rated it ${shown} of ${PREP_LIMITS.ratingMax}. Pick again to change it.`
             ))}
         </p>
       </div>
 
-      <div className="flex flex-none flex-col items-stretch gap-1.5">
-        <div role="group" aria-labelledby={titleId} className="flex items-center gap-2">
+      {/* The scale's ends in words on either side; each button also says its own. */}
+      <div className="flex flex-none items-center gap-2 sm:gap-2.5">
+        <span aria-hidden className="text-xs text-black/45">
+          {SCORE_LABELS[PREP_LIMITS.ratingMin]}
+        </span>
+        <div role="group" aria-labelledby={titleId} className="flex items-center gap-1.5 sm:gap-2">
           {SCORES.map((score) => {
             const on = shown === score;
             return (
@@ -112,20 +116,17 @@ const AccuracyRating: FC<AccuracyRatingProps> = ({ value, onRate, disabled = fal
                 title={SCORE_LABELS[score]}
                 onClick={() => rate(score)}
                 className={cn(
-                  "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[6px] border-2 border-[#222325] text-sm font-bold tabular-nums text-[#222325] transition-[transform,box-shadow,background-color] duration-100 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-40",
-                  on
-                    ? "bg-[#e1f073] br-shadow"
-                    : "bg-white br-shadow-press"
+                  "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-[#222325] text-sm font-bold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#222325] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-40 sm:h-10 sm:w-10",
+                  on ? "bg-[#222325] text-[#e1f073]" : "bg-white text-[#222325] hover:bg-[#f6f6f0]"
                 )}>
                 {score}
               </button>
             );
           })}
         </div>
-        <div aria-hidden className="flex justify-between text-[10.5px] font-semibold text-black/40">
-          <span>{SCORE_LABELS[PREP_LIMITS.ratingMin]}</span>
-          <span>{SCORE_LABELS[PREP_LIMITS.ratingMax]}</span>
-        </div>
+        <span aria-hidden className="text-xs text-black/45">
+          {SCORE_LABELS[PREP_LIMITS.ratingMax]}
+        </span>
       </div>
     </section>
   );

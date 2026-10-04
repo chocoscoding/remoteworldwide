@@ -101,8 +101,10 @@ describe("the Basic gates", () => {
     // A win is still logged and celebrated on Free; only the pod post is left out.
     assert.ok(site("app/components/dashboard/win/WinProvider.tsx").includes("if (!podLock.locked) recordJobWin.mutate("));
     assert.ok(site("app/components/dashboard/win/WinLogDialog.tsx").includes("usePlanLock(BASIC_GATES.pod)"));
-    // A report opened after moving to Free adds nothing to the plan by itself.
-    assert.ok(site("app/components/dashboard/prep/PrepReport.tsx").includes('const autoPlanDue = display.kind === "scored" && !planLock.locked;'));
+    // A report adds nothing to the plan by itself (owner, 2026-10-04: an explicit "Add all to my plan" only),
+    // and on Free that button asks to upgrade instead of adding.
+    assert.ok(!/autoPlan|AUTO_PLAN/.test(site("app/components/dashboard/prep/PrepReport.tsx")));
+    assert.match(site("app/components/dashboard/prep/report/FixChecklist.tsx"), /if \(lock\.locked\) \{\s*lock\.upgrade\(\);\s*return;\s*\}/);
   });
 
   it("show Talk as locked rather than hiding it", () => {

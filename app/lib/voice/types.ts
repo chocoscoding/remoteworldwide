@@ -751,6 +751,18 @@ export interface DictionSection {
   fillers: { value: string; good: boolean } | null;
   /** Words of the candidate's answers the analysis read. */
   wordsRead: number;
+  /**
+   * Each answer said again, cleaner: the same points and facts, with fillers,
+   * repeats and grammar fixed and nothing added. Absent on reports from before
+   * it existed; an answer missing from it has no cleaner version.
+   */
+  cleaner?: DictionCleaner[];
+}
+
+/** One answer, cleaner (`DictionSection.cleaner`): keyed by the answer's turn. */
+export interface DictionCleaner {
+  turnId: string;
+  text: string;
 }
 
 // ---------------------------------------------------------------------------

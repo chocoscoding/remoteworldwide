@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FC, type KeyboardEvent } from "react";
-import { AlertTriangle, ChevronDown, Loader2, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
+import { AlertTriangle, Loader2, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiMessage } from "@/app/lib/api/core";
@@ -18,8 +18,12 @@ import {
 } from "./PlaybackProvider";
 
 /**
- * The one player for a session's recording, pinned while the report scrolls
- * so every chip below it has somewhere visible to play.
+ * The one player for a session's recording: the dark half of the report's
+ * header, which sticks while the report scrolls so every chip below it has
+ * somewhere visible to play. It sits outside the tabs, so its <audio> stays
+ * mounted whichever tab is open. The panel has no corners or outline of its
+ * own: whatever holds it (the header, or the page while the report is on its
+ * way) frames it, through `className`.
  *
  * The URL is a presigned S3 GET that expires, and that the service may have to
  * reissue early (role credentials end sooner than the link says). So:
@@ -35,7 +39,7 @@ import {
 export interface RecordingPlayerProps {
   /** The session's playback link (`GET …/playback`). Called on mount, before expiry and after a failed load. */
   getUrl: () => Promise<PlaybackLink>;
-  /** The label over the scrubber. */
+  /** The label over the scrubber, in lime. */
   title?: string;
   className?: string;
 }
@@ -122,7 +126,7 @@ function useRequiredPlayback(): { controls: PlaybackControls; state: PlaybackSta
   return { controls, state };
 }
 
-const RecordingPlayer: FC<RecordingPlayerProps> = ({ getUrl, title = "Your recording", className }) => {
+const RecordingPlayer: FC<RecordingPlayerProps> = ({ getUrl, title = "Recording", className }) => {
   const { controls, state } = useRequiredPlayback();
   const { register, holdForReload } = controls;
 
@@ -221,24 +225,19 @@ const RecordingPlayer: FC<RecordingPlayerProps> = ({ getUrl, title = "Your recor
   const disabled = !hasSource || failed;
 
   return (
-    <section
-      aria-label="Recording player"
-      className={cn(
-        "sticky top-3 z-30 rounded-2xl bg-[#222325] px-3.5 py-3 text-white br-bold br-lime sm:px-5",
-        className
-      )}>
+    <section aria-label="Recording player" className={cn("flex min-w-0 flex-col justify-center bg-[#222325] px-3.5 py-3 text-white sm:px-[18px]", className)}>
       {/* No `controls`: this bar is the interface. No `crossOrigin`: playback
           needs no CORS, and asking for it would make S3 refuse the GET. */}
       <audio ref={setAudio} src={url ?? undefined} preload="metadata" onError={onMediaError} onLoadedData={onMediaLoaded} className="hidden" />
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         <SkipButton direction={-1} disabled={disabled} onSkip={controls.seekBy} />
         <button
           type="button"
           onClick={controls.toggle}
           disabled={disabled}
           aria-label={state.playing ? "Pause recording" : "Play recording"}
-          className="inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-full bg-[#e1f073] text-[#222325] br-shadow-press br-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#222325] disabled:cursor-default disabled:opacity-40 disabled:shadow-none">
+          className="inline-flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full bg-[#e1f073] text-[#222325] transition-colors hover:bg-[#d4e35f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#222325] disabled:cursor-default disabled:opacity-40">
           {status === "loading" ? (
             <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
           ) : state.playing ? (
@@ -249,7 +248,7 @@ const RecordingPlayer: FC<RecordingPlayerProps> = ({ getUrl, title = "Your recor
         </button>
         <SkipButton direction={1} disabled={disabled} onSkip={controls.seekBy} />
 
-        <div className="min-w-0 flex-1 pl-1 sm:pl-2">
+        <div className="min-w-0 flex-1 pl-1 sm:pl-1.5">
           <Scrubber title={title} durationMs={state.duration} playing={state.playing} disabled={disabled} controls={controls} />
         </div>
 
@@ -289,7 +288,7 @@ const RecordingPlayer: FC<RecordingPlayerProps> = ({ getUrl, title = "Your recor
 // ---------------------------------------------------------------------------
 
 const ICON_ON_DARK =
-  "relative inline-flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-lg text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
+  "relative inline-flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 
 const SkipButton: FC<{ direction: -1 | 1; disabled: boolean; onSkip: (deltaMs: number) => void }> = ({ direction, disabled, onSkip }) => {
   const Icon = direction < 0 ? RotateCcw : RotateCw;
@@ -300,8 +299,8 @@ const SkipButton: FC<{ direction: -1 | 1; disabled: boolean; onSkip: (deltaMs: n
       onClick={() => onSkip(direction * SKIP_MS)}
       aria-label={direction < 0 ? "Back 5 seconds" : "Forward 5 seconds"}
       className={ICON_ON_DARK}>
-      <Icon aria-hidden className="h-[18px] w-[18px]" strokeWidth={1.75} />
-      <span aria-hidden className="absolute text-[8px] font-bold leading-none">
+      <Icon aria-hidden className="h-6 w-6" strokeWidth={1.8} />
+      <span aria-hidden className="absolute pt-px text-[8.5px] font-extrabold leading-none">
         5
       </span>
     </button>
@@ -338,9 +337,9 @@ const Scrubber: FC<ScrubberProps> = ({ title, durationMs, playing, disabled, con
 
   return (
     <>
-      <div className="mb-1.5 flex items-baseline justify-between gap-3">
-        <p className="truncate text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#e1f073]">{title}</p>
-        <p className="flex-none text-xs font-semibold tabular-nums text-white/70">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <p className="truncate text-xs font-bold text-[#e1f073]">{title}</p>
+        <p className="flex-none text-xs font-bold tabular-nums text-white/70">
           <span className="text-white">{formatClock(value * 1000)}</span>
           <span aria-hidden> / </span>
           <span className="sr-only"> of </span>
@@ -360,8 +359,8 @@ const Scrubber: FC<ScrubberProps> = ({ title, durationMs, playing, disabled, con
         onKeyDown={onKeyDown}
         // The filled part of the track is the one continuous value on this
         // bar; a literal class can't hold a percentage, so it is inline.
-        style={{ background: `linear-gradient(to right, #e1f073 ${pct}%, rgba(255,255,255,0.18) ${pct}%)` }}
-        className="block h-1.5 w-full cursor-pointer appearance-none rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2 focus-visible:ring-offset-[#222325] disabled:cursor-default disabled:opacity-40 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#222325] [&::-moz-range-thumb]:bg-white [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#222325] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0_0_1.5px_#e1f073]"
+        style={{ background: `linear-gradient(to right, #e1f073 ${pct}%, rgba(255,255,255,0.2) ${pct}%)` }}
+        className="block h-1.5 w-full cursor-pointer appearance-none rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2 focus-visible:ring-offset-[#222325] disabled:cursor-default disabled:opacity-40 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-[#222325] [&::-moz-range-thumb]:bg-white [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#222325] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0_0_1.5px_#e1f073]"
       />
     </>
   );
@@ -379,9 +378,11 @@ const RateControl: FC<{ rate: PlaybackRate; disabled: boolean; onRate: (rate: Pl
           type="button"
           disabled={disabled}
           aria-label={`Playback speed ${rateLabel(rate)}`}
-          className="inline-flex h-9 flex-none cursor-pointer items-center gap-1 rounded-lg bg-white/10 pl-2.5 pr-2 text-[11px] font-bold tabular-nums text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-40">
+          className={cn(
+            "inline-flex h-8 min-w-8 flex-none cursor-pointer items-center justify-center rounded-lg px-2.5 text-xs font-bold tabular-nums text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] disabled:cursor-default disabled:opacity-40",
+            open ? "bg-white/20" : "bg-white/[0.14]"
+          )}>
           {rateLabel(rate)}
-          <ChevronDown className={cn("h-3.5 w-3.5 text-white/60 transition-transform", open && "rotate-180")} aria-hidden />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={6} className="w-28 rounded-xl border border-white/10 bg-[#222325] p-1 text-white shadow-lg">
