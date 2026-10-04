@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
+import { JobRowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import LogoMini from "@/app/components/svg/LogoMini";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
@@ -179,21 +180,18 @@ const SavedJobRow: FC<{ job: SavedJobItem }> = ({ job }) => {
   );
 };
 
-/** Flat pulse rows in the list's own layout, while it loads. */
+/**
+ * The list as it will look, while it loads (owner, 2026-10-04): each row as
+ * SavedJobRow lays it out. The widths are the controls as they render: Posting
+ * and Remove; Ask about it, then Tailor resume, Cover letter, ATS score and
+ * Find a referral.
+ */
 const ListSkeleton: FC = () => (
-  <DashCard className="overflow-hidden p-0" aria-busy="true" aria-label="Loading your saved jobs">
-    <div className="flex flex-col divide-y divide-black/8">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="flex items-center gap-4 px-6 py-5">
-          <span className="h-11 w-11 flex-none animate-pulse rounded-full bg-black/[0.07]" />
-          <div className="min-w-0 flex-1">
-            <span className="block h-4 w-44 animate-pulse rounded bg-black/[0.07]" />
-            <span className="mt-2 block h-3 w-64 animate-pulse rounded bg-black/[0.06]" />
-          </div>
-        </div>
-      ))}
-    </div>
-  </DashCard>
+  <JobRowsSkeleton
+    label="Loading your saved jobs"
+    actions={["w-[81px]", "w-[82px]"]}
+    chips={["w-[93px]", "w-[124px]", "w-[114px]", "w-[103px]", "w-[125px]"]}
+  />
 );
 
 const SavedJobsClient: FC = () => {

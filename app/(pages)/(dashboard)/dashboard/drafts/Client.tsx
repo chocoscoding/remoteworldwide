@@ -21,6 +21,7 @@ import Link from "next/link";
 import { FilePen, Send } from "lucide-react";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
+import { JobRowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import SlidingTabs, { slidingTabId, slidingTabPanelId } from "@/app/components/dashboard/ui/SlidingTabs";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
@@ -36,21 +37,19 @@ type DraftsTab = "draft" | "applied";
 /** Latest application first; the list arrives in `updatedAt` order, which a later save to a fused draft can disturb. */
 const byAppliedAt = (a: ApplicationDraftItem, b: ApplicationDraftItem) => (b.appliedAt ?? "").localeCompare(a.appliedAt ?? "");
 
-/** Flat pulse rows in the list's own layout, while it loads. */
+/**
+ * The list as it will look, while it loads (owner, 2026-10-04): each row as
+ * DraftRow lays out an in-progress draft, the tab that opens first. The
+ * widths are the controls as they render: View answers and Delete; Continue,
+ * then Mark as applied. The count line is the one long sentence over it.
+ */
 const ListSkeleton: FC = () => (
-  <DashCard className="overflow-hidden p-0" aria-busy="true" aria-label="Loading your drafts">
-    <div className="flex flex-col divide-y divide-black/8">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="flex items-center gap-4 px-6 py-5">
-          <span className="h-11 w-11 flex-none animate-pulse rounded-full bg-black/[0.07]" />
-          <div className="min-w-0 flex-1">
-            <span className="block h-4 w-44 animate-pulse rounded bg-black/[0.07]" />
-            <span className="mt-2 block h-3 w-64 animate-pulse rounded bg-black/[0.06]" />
-          </div>
-        </div>
-      ))}
-    </div>
-  </DashCard>
+  <JobRowsSkeleton
+    label="Loading your drafts"
+    actions={["w-[110px]", "w-[74px]"]}
+    chips={["w-[98px]", "w-[138px]"]}
+    countWidth="w-[44rem] max-w-full"
+  />
 );
 
 const DraftsClient: FC = () => {

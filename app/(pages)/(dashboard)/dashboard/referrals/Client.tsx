@@ -17,11 +17,12 @@
 
 import { FC, Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Briefcase, Loader2, Network, RotateCw, Search, SearchX, Upload, Users, X } from "lucide-react";
+import { Briefcase, Network, RotateCw, Search, SearchX, Upload, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import DashPagination, { PAGE_SIZE_OPTIONS, type PageSize } from "@/app/components/dashboard/ui/DashPagination";
+import { Bone, LineBone, Loading } from "@/app/components/dashboard/ui/Skeleton";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
@@ -87,6 +88,77 @@ const targetOf = (job: PickedJob<typeof REFERRAL_JOB_SPEC>): ReferralTarget => (
 });
 
 const askJobOf = (job: ReferralTarget | null) => (job ? { company: job.company, role: job.role, savedJobId: job.id } : undefined);
+
+/** Name, tie, detail and status widths that vary row to row, the way real contacts do. */
+const CONTACT_SKELETON_ROWS = [
+  { name: "w-32", tie: "w-[84px]", detail: "w-72", status: "w-44" },
+  { name: "w-40", tie: "w-[104px]", detail: "w-60", status: "w-52" },
+  { name: "w-28", tie: "w-[84px]", detail: "w-80", status: "w-40" },
+  { name: "w-36", tie: "w-[100px]", detail: "w-64", status: "w-48" },
+  { name: "w-32", tie: "w-[84px]", detail: "w-56", status: "w-44" },
+  { name: "w-44", tie: "w-[104px]", detail: "w-72", status: "w-36" },
+];
+
+/**
+ * All contacts as it will look, while it loads (owner, 2026-10-04: the
+ * skeleton must match the page): the search box, the source filters with
+ * Import or add at the right, then each row as ContactRow lays it out —
+ * avatar, name and tie pill, detail and status lines, the reach buttons and
+ * Write the intro — and the pagination under it, on the same sizes.
+ */
+const ContactsSkeleton: FC = () => (
+  <Loading label="Loading your contacts">
+    <div className="relative mb-4 flex h-11 items-center rounded-xl border border-black/10 bg-white pl-10 pr-4">
+      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/20" aria-hidden />
+      <Bone className="h-3 w-52" />
+    </div>
+
+    {/* All (selected), LinkedIn, Found online, Added by you; Import or add */}
+    <div className="mb-4 flex flex-wrap items-center gap-1.5">
+      {["w-[58px]", "w-[92px]", "w-[112px]", "w-[110px]"].map((width, index) => (
+        <Bone key={width} className={cn("h-7 rounded-full", index === 0 && "bg-[#e1f073]/45", width)} />
+      ))}
+      <Bone className="ml-auto h-7 w-[104px] rounded-lg" />
+    </div>
+
+    <DashCard className="overflow-hidden p-0">
+      <div className="flex flex-col divide-y divide-black/8">
+        {CONTACT_SKELETON_ROWS.map((row, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
+            <Bone className="h-11 w-11 flex-none rounded-full" />
+            <div className="min-w-0 flex-1 basis-[260px]">
+              <div className="flex items-center gap-2">
+                <LineBone line="h-5" className={cn("h-3.5", row.name)} />
+                <Bone className={cn("h-7 rounded-full", row.tie)} />
+              </div>
+              <LineBone line="mt-0.5 h-4" className={cn("h-3 max-w-full", row.detail)} />
+              <LineBone line="mt-1 h-4" className={cn("h-3", row.status)} />
+            </div>
+            {/* LinkedIn, and the bin */}
+            <div className="flex flex-none items-center gap-0.5">
+              <Bone className="h-7 w-[84px] rounded-lg" />
+              <Bone className="h-7 w-[30px] rounded-lg" />
+            </div>
+            {/* Write the intro */}
+            <Bone className="h-8 w-[128px] flex-none rounded-lg border-[1.5px] border-black/15 bg-white" />
+          </div>
+        ))}
+      </div>
+    </DashCard>
+
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <LineBone line="h-4" className="h-3 w-48" />
+      <div className="flex items-center gap-4">
+        <Bone className="h-[30px] w-[62px] rounded-lg" />
+        <div className="flex items-center gap-1">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Bone key={i} className={cn("h-8 w-8 rounded-lg", i === 1 && "bg-black/15")} />
+          ))}
+        </div>
+      </div>
+    </div>
+  </Loading>
+);
 
 const ReferralsScreen: FC = () => {
   const { isAsked, askedContactIds } = useNetwork();
@@ -359,10 +431,7 @@ const ReferralsScreen: FC = () => {
             </div>
           )
         ) : contacts.isPending ? (
-          <p className="inline-flex items-center gap-2 text-sm text-black/50" role="status">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Loading your contacts…
-          </p>
+          <ContactsSkeleton />
         ) : contacts.isError && !contacts.data ? (
           <DashEmptyState
             icon={RotateCw}
