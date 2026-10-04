@@ -98,7 +98,9 @@ function costLabel(credits: number | null, state: BillingState | null): string |
 /** `scoreDisplayOf`, for a row: the score it shows, and whether it is provisional. The report reads the same. */
 function rowScore(session: Parameters<typeof scoreDisplayOf>[0]): Pick<HistoryRow, "score" | "provisional"> {
   const shown = scoreDisplayOf(session);
-  return shown.kind === "unscored" ? { score: null, provisional: false } : { score: shown.score, provisional: shown.kind === "provisional" };
+  return shown.kind === "unscored"
+    ? { score: null, provisional: false }
+    : { score: shown.score, provisional: shown.kind === "provisional" };
 }
 
 function savedRow(summary: PrepSessionSummary): HistoryRow {
@@ -176,7 +178,8 @@ const PrepHub: FC<PrepHubProps> = ({
   const [tab, setTab] = useState<Tab>(initialTab ?? "overview");
   // The bar swaps panels in place, so it is marked up as tabs: each panel below names the tab that shows it.
   const tabsId = useId();
-  const panel = (id: Tab) => ({ role: "tabpanel", id: slidingTabPanelId(tabsId, id), "aria-labelledby": slidingTabId(tabsId, id) }) as const;
+  const panel = (id: Tab) =>
+    ({ role: "tabpanel", id: slidingTabPanelId(tabsId, id), "aria-labelledby": slidingTabId(tabsId, id) }) as const;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [roundEditor, setRoundEditor] = useState<RoundEditor>(null);
   const [outcomeBusy, setOutcomeBusy] = useState<PrepRoundOutcome | null>(null);
@@ -464,17 +467,7 @@ const PrepHub: FC<PrepHubProps> = ({
                 written from, and what a session needs before it starts. */}
             {saved && <TrackResumeCard track={saved} />}
 
-            {!lastSession ? (
-              <div className={cn(PANEL, "p-5")}>
-                <p className="text-sm font-bold text-primary mb-1">No sessions yet</p>
-                <p className="text-sm text-black/50 leading-relaxed mb-4">
-                  Your score stays at 0 until you run one. Six minutes gives you a scorecard and a first checklist.
-                </p>
-                <button type="button" onClick={() => onStartSession()} className={BUTTON_SOLID}>
-                  Run the first session
-                </button>
-              </div>
-            ) : (
+            {!lastSession ? null : (
               <div className={cn(PANEL, "p-5")}>
                 <div className="flex items-baseline justify-between gap-3 mb-1">
                   <p className="text-sm font-bold text-primary">Last session</p>

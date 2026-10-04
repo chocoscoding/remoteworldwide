@@ -6,7 +6,16 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
-import { FORMAT_META, QUESTIONS_FOR_LENGTH, SESSION_LENGTHS, formatsLabel, type Difficulty, type PrepTrack, type SessionFormat, type SessionLength } from "@/app/lib/dashboard/prep-data";
+import {
+  FORMAT_META,
+  QUESTIONS_FOR_LENGTH,
+  SESSION_LENGTHS,
+  formatsLabel,
+  type Difficulty,
+  type PrepTrack,
+  type SessionFormat,
+  type SessionLength,
+} from "@/app/lib/dashboard/prep-data";
 import { pickSessionQuestions, usableLikelyQuestions } from "@/app/lib/prep/sessionQuestions";
 import { SOURCE_LABELS } from "@/app/lib/prep/trackResume";
 import { RESUME_ACCEPT } from "@/app/lib/resume/mime";
@@ -132,12 +141,16 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   const voiceOffered = voiceSettings?.interviewsEnabled === true;
   const rule = voiceSettings?.credits ?? DEFAULT_VOICE_CREDIT_RULE;
   const maxMinutes = voiceSettings?.maxMinutes ?? DEFAULT_VOICE_MAX_MINUTES;
-  const balance = typeof subscription?.creditBalance === "number" && Number.isFinite(subscription.creditBalance) ? subscription.creditBalance : null;
+  const balance =
+    typeof subscription?.creditBalance === "number" && Number.isFinite(subscription.creditBalance) ? subscription.creditBalance : null;
   const voiceCost = creditsFor(lengthMinutes * MINUTE_MS, rule);
   // A known balance under the base price: no voice session at all (the service would answer 402).
   const lowBalance = voiceOffered && balance !== null && balance < rule.base;
   // A known balance that covers the base but not the chosen length: offer the longest session it covers.
-  const offerMinutes = voiceOffered && !lowBalance && balance !== null && voiceCost > balance ? Math.max(0, Math.min(affordableMinutesFor(balance, rule), maxMinutes)) : null;
+  const offerMinutes =
+    voiceOffered && !lowBalance && balance !== null && voiceCost > balance
+      ? Math.max(0, Math.min(affordableMinutesFor(balance, rule), maxMinutes))
+      : null;
   const voiceMinutes = offerMinutes ?? lengthMinutes;
   const voiceQuestionLength = offerMinutes !== null ? questionPresetFor(offerMinutes) : lengthMinutes;
   // The live screen sends the consent version from this config, and the cap above needs its rule.
@@ -172,7 +185,10 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   const generalLead = <b className="font-bold text-primary">These will be general practice questions</b>;
   // Straight to the Questions tab: that is where a set is written, and the Overview only previews it.
   const toTrack = (
-    <button type="button" onClick={onOpenQuestions ?? onBack} className="font-bold text-primary underline underline-offset-2 cursor-pointer">
+    <button
+      type="button"
+      onClick={onOpenQuestions ?? onBack}
+      className="font-bold text-primary underline underline-offset-2 cursor-pointer">
       Go to the track
     </button>
   );
@@ -187,8 +203,8 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   } else if (!likelySet) {
     questionsNote = hasPosting ? (
       <>
-        {generalLead}, not ones written for this job. Write likely questions on the track ({plural(likely.data?.cost ?? 1, "credit")}) and the
-        interview asks those instead: questions from this posting&apos;s requirements and your resume. {toTrack}
+        {generalLead}, not ones written for this job. Write likely questions on the track ({plural(likely.data?.cost ?? 1, "credit")}) and
+        the interview asks those instead: questions from this posting&apos;s requirements and your resume. {toTrack}
       </>
     ) : (
       <>
@@ -199,7 +215,8 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   } else if (tailoredCount === 0) {
     questionsNote = (
       <>
-        {generalLead}: none of this job&apos;s likely questions are {formatsLabel(formats)} ones.{moreIn ? ` Add ${moreIn} to be asked them.` : ""}
+        {generalLead}: none of this job&apos;s likely questions are {formatsLabel(formats)} ones.
+        {moreIn ? ` Add ${moreIn} to be asked them.` : ""}
       </>
     );
   } else {
@@ -216,7 +233,8 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
           </>
         ) : (
           <>
-            <b className="font-bold text-primary">All {questionTotal} questions are written for this job</b>, from its posting&apos;s requirements
+            <b className="font-bold text-primary">All {questionTotal} questions are written for this job</b>, from its posting&apos;s
+            requirements
             {likelySet.grounding.resume ? " and your resume" : ""}.
           </>
         )}
@@ -273,7 +291,10 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   return (
     <div className="max-w-[720px] mx-auto flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 hover:text-primary cursor-pointer w-fit">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 hover:text-primary cursor-pointer w-fit">
           <ArrowLeft className="h-3.5 w-3.5" />
           {track.company} — {track.role}
         </button>
@@ -319,10 +340,16 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
             // No resume anywhere: the upload is here, not a trip to My documents and back.
             <div className="flex flex-col items-start gap-3">
               <p className="text-sm text-black/60 leading-relaxed">
-                <b className="font-bold text-primary">Add your resume to start.</b> Upload the one you sent {track.company}: this job&apos;s questions are
-                written from it. It&apos;s saved to My documents as your master resume.
+                <b className="font-bold text-primary">Add your resume to start.</b> Upload the one you sent {track.company}: this job&apos;s
+                questions are written from it. It&apos;s saved to My documents as your master resume.
               </p>
-              <input ref={uploadRef} type="file" accept={RESUME_ACCEPT} className="hidden" onChange={(e) => void uploadResume(e.target.files?.[0])} />
+              <input
+                ref={uploadRef}
+                type="file"
+                accept={RESUME_ACCEPT}
+                className="hidden"
+                onChange={(e) => void uploadResume(e.target.files?.[0])}
+              />
               <button
                 type="button"
                 onClick={() => uploadRef.current?.click()}
@@ -371,7 +398,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
                 className={cn(
                   "flex items-start gap-2.5 rounded-xl border p-3.5 text-left transition-colors cursor-pointer",
                   selected ? "border-primary bg-[#fbfbf7]" : "border-black/10 hover:border-black/25",
-                  isLast && "cursor-default"
+                  isLast && "cursor-default",
                 )}>
                 <span className="mt-0.5 group">
                   <NeoCheckbox checked={selected} size="sm" interactive={!isLast} />
@@ -387,9 +414,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
             );
           })}
         </div>
-        <p className="text-xs text-black/45 mt-3">
-          Pick as many as you want — questions alternate between them.
-        </p>
+        <p className="text-xs text-black/45 mt-3">Pick as many as you want — questions alternate between them.</p>
       </DashCard>
 
       <DashCard className="p-6">
@@ -402,7 +427,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
               onClick={() => setDifficulty(d.id)}
               className={cn(
                 "rounded-lg px-3.5 py-2 text-sm font-semibold cursor-pointer transition-colors border-[1.5px]",
-                difficulty === d.id ? "bg-[#222325] text-white border-[#222325]" : "border-black/14 text-black/60 hover:border-black/30"
+                difficulty === d.id ? "bg-[#222325] text-white border-[#222325]" : "border-black/14 text-black/60 hover:border-black/30",
               )}>
               {d.label}
             </button>
@@ -424,7 +449,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
               onClick={() => setLengthMinutes(len)}
               className={cn(
                 "rounded-lg px-3.5 py-2 text-sm font-semibold cursor-pointer transition-colors border-[1.5px]",
-                lengthMinutes === len ? "bg-[#222325] text-white border-[#222325]" : "border-black/14 text-black/60 hover:border-black/30"
+                lengthMinutes === len ? "bg-[#222325] text-white border-[#222325]" : "border-black/14 text-black/60 hover:border-black/30",
               )}>
               {len} min
             </button>
@@ -455,14 +480,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
         <p className="text-xs text-black/60 leading-relaxed">
           {configLoading ? (
             "Checking how this session will handle your voice…"
-          ) : voiceOffered ? (
-            <>
-              A voice session records your answers: after the interview the recording is transcribed by ElevenLabs (Scribe) to build your
-              delivery report and measured by our own service for delivery, and it is kept until you delete the session or your account.
-              {voiceSettings?.liveProvider === "web-speech" &&
-                " The live captions during the interview come from your browser's own speech service (in Chrome, that's Google's)."}
-            </>
-          ) : (
+          ) : voiceOffered ? null : (
             <>
               This session isn&apos;t recorded, and nothing you say is saved. Where your browser can, its own speech recognition turns what
               you say into text as you go (in Chrome, that&apos;s Google&apos;s speech service).
@@ -479,7 +497,11 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
           {!blocked && resumeBlocked && (
             // Said down here too, beside the button it holds back.
             <p className="text-xs font-bold text-[#e1f073] mb-1">
-              {resumeGate === "checking" ? "Checking your resumes…" : resumeGate === "upload" ? "Add your resume above to start." : "Pick your resume above to start."}
+              {resumeGate === "checking"
+                ? "Checking your resumes…"
+                : resumeGate === "upload"
+                  ? "Add your resume above to start."
+                  : "Pick your resume above to start."}
             </p>
           )}
           <p className="text-xs text-white/60 leading-relaxed">
@@ -490,17 +512,19 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
                   // so the live screen runs unsaved: no report, so no scorecard to promise.
                   `${questionTotal} questions, answered out loud. Practice only for now — this run won't be saved or scored.`
                 : `${questionTotal} questions, spoken answers, a scorecard and delivery coaching at the end.${
-                  !voiceOffered
-                    ? ""
-                    : offerMinutes !== null
-                      ? // The recording stops at what the balance covers, so there are no extra minutes to price.
-                        ` At most ${plural(creditsFor(offerMinutes * MINUTE_MS, rule), "credit")}: recording stops at ${offerMinutes}:00.`
-                      : ` ${plural(voiceCost, "credit")} for ${lengthMinutes} minutes, +${rule.perExtraMinute} per extra minute.`
-                }`}
+                    !voiceOffered
+                      ? ""
+                      : offerMinutes !== null
+                        ? // The recording stops at what the balance covers, so there are no extra minutes to price.
+                          ` At most ${plural(creditsFor(offerMinutes * MINUTE_MS, rule), "credit")}: recording stops at ${offerMinutes}:00.`
+                        : ` ${plural(voiceCost, "credit")} for ${lengthMinutes} minutes, +${rule.perExtraMinute} per extra minute.`
+                  }`}
           </p>
         </div>
         {blocked ? (
-          <span className="text-sm font-bold bg-white/10 text-white/40 rounded-lg px-5 py-3 flex-none whitespace-nowrap">Start session</span>
+          <span className="text-sm font-bold bg-white/10 text-white/40 rounded-lg px-5 py-3 flex-none whitespace-nowrap">
+            Start session
+          </span>
         ) : (
           <button
             type="button"
