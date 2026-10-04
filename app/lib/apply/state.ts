@@ -41,6 +41,8 @@ export interface ApplyProposal {
   terms: string[];
   /** Terms it worked in with nothing on the resume behind them yet: advice to be ready to back them up. */
   unbacked: string[];
+  /** Picked terms that wouldn't go in as resume lines: nothing of them is in `content`, and they can be tried again on it. */
+  missed: string[];
 }
 
 export interface ApplyResumeState {
@@ -190,6 +192,7 @@ export function readApplyState(raw: unknown): ApplyState {
             terms: strings(proposal.terms),
             // `skipped` is what a build from earlier on 2026-10-03 called it.
             unbacked: strings(proposal.unbacked ?? proposal.skipped),
+            missed: strings(proposal.missed),
           }
         : null,
     cover: {

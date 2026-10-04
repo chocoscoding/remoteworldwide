@@ -578,15 +578,16 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     });
   };
 
-  /** What a keywords run worked in, for its caption: short terms by name, lines from the posting by count. */
-  const workedIn = (added: string[]) => {
+  /** What a keywords run worked in, for its caption: short terms by name, lines from the posting by count, and how many didn't go in. */
+  const workedIn = (added: string[], missed = 0) => {
     const named = added.filter((term) => term.trim().split(/\s+/).length <= 4);
     const lines = added.length - named.length;
     const parts = [
       named.length > 0 ? quote(named) : null,
       lines > 0 ? `${lines} ${lines === 1 ? "line" : "lines"} from the posting` : null,
     ];
-    return `Worked in ${parts.filter(Boolean).join(" and ")}.`;
+    const left = missed > 0 ? ` ${missed} didn't go in this time.` : "";
+    return `Worked in ${parts.filter(Boolean).join(" and ")}.${left}`;
   };
 
   const runAiTool = (id: string) => {
@@ -1093,7 +1094,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       }
       // Merged onto the content as it is NOW: the summary and bullets only where they are still
       // what was sent, and the service's Skills with anything typed meanwhile (`mergeKeywords`).
-      settleWith(workedIn(result.added), (now) => mergeKeywords(now, sent, result.content));
+      settleWith(workedIn(result.added, result.missed?.length ?? 0), (now) => mergeKeywords(now, sent, result.content));
       return;
     }
 

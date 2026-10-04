@@ -133,7 +133,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   const [openingCreator, setOpeningCreator] = useState(false);
   const [paperOpen, setPaperOpen] = useState(false);
   // Where the last tool run was started, so its failure is said there: the gaps' fix button, or the tools card.
-  const [toolFrom, setToolFrom] = useState<"gaps" | "tools">("tools");
+  const [toolFrom, setToolFrom] = useState<"gaps" | "tools" | "proposal">("tools");
   const scrollOnOpen = useRef(false);
 
   const { resume } = state;
@@ -316,15 +316,25 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   }
 
   // ---- The tools -------------------------------------------------------------------------------
-  /** Runs a tool against the resume being sent; true once its proposal is in. */
-  async function runTool(tool: ResumeToolId, only?: string[]): Promise<boolean> {
+  /**
+   * Runs a tool against the resume being sent; true once its proposal is in. With `onto`, the
+   * keywords tool works that proposal's missed terms into the proposal itself, so what already
+   * went in stays and the two runs read as one.
+   */
+  async function runTool(tool: ResumeToolId, only?: string[], onto?: ApplyProposal): Promise<boolean> {
     if (!sendingId || !content) return false;
-    setToolFrom(only ? "gaps" : "tools");
+    setToolFrom(onto ? "proposal" : only ? "gaps" : "tools");
     // Started from the gaps above: the tools card, where the result takes shape, comes into view.
-    if (only) requestAnimationFrame(() => toolsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+    if (only && !onto) requestAnimationFrame(() => toolsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
     const forResumeId = sendingId;
     const wanted = only ?? gaps.map((gap) => gap.label).slice(0, MAX_TOOL_GAPS);
-    const input = { content, jdText: job.description, company: job.company, role: job.role, keywords: wanted.length > 0 ? wanted : null };
+    const input = {
+      content: onto?.content ?? content,
+      jdText: job.description,
+      company: job.company,
+      role: job.role,
+      keywords: wanted.length > 0 ? wanted : null,
+    };
     // A gap the score found a close line for isn't "unbacked", whatever the tool's own check says:
     // the steps above showed that line, and the two must agree.
     const closeOnResume = new Set(
@@ -339,12 +349,16 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
     let proposal: ApplyProposal | null = null;
     if (tool === "tailor") {
       const result = await tools.run("tailor", () => tailorToJob(input));
-      if (result) proposal = { tool, forResumeId, content: result.content, terms: result.woven, unbacked: [] };
+      if (result) proposal = { tool, forResumeId, content: result.content, terms: result.woven, unbacked: [], missed: [] };
     } else {
       const result = await tools.run("keywords", () => injectKeywords(input));
       if (result) {
         const unbacked = result.unbacked.filter((term) => !closeOnResume.has(term));
-        proposal = { tool, forResumeId, content: result.content, terms: result.added, unbacked };
+        // `missed` is absent from a service that predates it, which worked every term in or failed.
+        const missed = result.missed ?? [];
+        proposal = onto
+          ? { ...onto, content: result.content, terms: [...onto.terms, ...result.added], unbacked: [...onto.unbacked, ...unbacked], missed }
+          : { tool, forResumeId, content: result.content, terms: result.added, unbacked, missed };
       }
     }
     if (!proposal) return false;
@@ -710,6 +724,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
               onUse={() => void adoptProposal()}
               onPreview={() => setPreviewing("proposal")}
               onDiscard={() => update((s) => ({ ...s, proposal: null }))}
+              retrying={tools.running === "keywords"}
+              retryError={toolFrom === "proposal" && !tools.running ? (tools.failure?.message ?? null) : null}
+              onRetryMissed={
+                proposal.tool === "keywords" && proposal.missed.length > 0 && toolsIdle
+                  ? () => void runTool("keywords", proposal.missed, proposal)
+                  : undefined
+              }
             />
           </DashCard>
         ) : (
@@ -1054,9 +1075,15 @@ const ProposalPanel: FC<{
   onUse: () => void;
   onPreview: () => void;
   onDiscard: () => void;
-}> = ({ proposal, original, using, error, onUse, onPreview, onDiscard }) => {
+  /** Works the missed terms into this version, one credit; absent while no tool may run. */
+  onRetryMissed?: () => void;
+  retrying: boolean;
+  /** Why the last retry of the missed terms failed. */
+  retryError: string | null;
+}> = ({ proposal, original, using, error, onUse, onPreview, onDiscard, onRetryMissed, retrying, retryError }) => {
   const changes = resumeChanges(original, proposal.content);
   const nothing = changeCount(changes) === 0;
+  const busy = using || retrying;
 
   return (
     // Saving the version: the panel holds still and pulses until the draft is in.
@@ -1096,6 +1123,34 @@ const ProposalPanel: FC<{
           )}
         </>
       )}
+      {/* Picked lines the AI couldn't put in resume language this time (owner, 2026-10-04: a run used to
+          throw the rest away with them). Tried again on this version, so what went in stays. */}
+      {proposal.missed.length > 0 && (
+        <div className="rounded-xl border border-dashed border-[#b23c26]/35 p-4">
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#b23c26]">Didn&apos;t go in</p>
+          <p className="mb-2.5 text-sm leading-relaxed text-black/65">
+            These wouldn&apos;t go in as resume lines this time, so nothing of them was added.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {proposal.missed.map((term) => (
+              <Pill key={term} variant="outline-dashed">
+                {term}
+              </Pill>
+            ))}
+          </div>
+          {onRetryMissed && (
+            <StickerButton variant="outline" size="sm" className="mt-3" disabled={busy} onClick={onRetryMissed}>
+              <RotateCw className={cn("h-3.5 w-3.5", retrying && "animate-spin")} />
+              {retrying ? "Working them in" : `Try ${proposal.missed.length === 1 ? "it" : "these"} again · ${SUGGESTION_CREDITS} credit`}
+            </StickerButton>
+          )}
+          {retryError && (
+            <p role="alert" className="mt-2 text-sm text-[#b23c26]">
+              {retryError}
+            </p>
+          )}
+        </div>
+      )}
       {proposal.unbacked.length > 0 && (
         <div className="rounded-xl border border-dashed border-black/20 p-4">
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-black/45">Be ready to back these up</p>
@@ -1114,18 +1169,18 @@ const ProposalPanel: FC<{
       {error && <p className="text-sm text-[#b23c26]">{error}</p>}
       <div className="flex flex-wrap gap-2">
         {!nothing && (
-          <StickerButton variant="primary" size="sm" disabled={using} onClick={onUse}>
+          <StickerButton variant="primary" size="sm" disabled={busy} onClick={onUse}>
             <Check className="h-3.5 w-3.5" />
             Add to resume
           </StickerButton>
         )}
         {!nothing && (
-          <StickerButton variant="outline" size="sm" disabled={using} onClick={onPreview}>
+          <StickerButton variant="outline" size="sm" disabled={busy} onClick={onPreview}>
             <Eye className="h-3.5 w-3.5" />
             Preview
           </StickerButton>
         )}
-        <StickerButton variant="outline" size="sm" disabled={using} onClick={onDiscard}>
+        <StickerButton variant="outline" size="sm" disabled={busy} onClick={onDiscard}>
           <X className="h-3.5 w-3.5" />
           {nothing ? "Close" : "Discard"}
         </StickerButton>
