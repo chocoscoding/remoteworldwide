@@ -31,11 +31,13 @@
 import { useEffect, useState } from "react";
 
 /**
- * The Chrome Web Store listing. Empty until the extension is published —
- * every "Get it" prompt stays hidden while it is, which is the honest default
- * for a link that would 404.
+ * The Chrome Web Store listing, published 2026-10-04. In code rather than env
+ * so every deploy links the same listing; `NEXT_PUBLIC_EXTENSION_URL` still
+ * wins when set (a beta listing, say). Every "Get it" prompt keys off this, and
+ * an empty value would hide them all again.
  */
-export const EXTENSION_URL = process.env.NEXT_PUBLIC_EXTENSION_URL ?? "";
+export const EXTENSION_URL =
+  process.env.NEXT_PUBLIC_EXTENSION_URL || "https://chromewebstore.google.com/detail/remoteworldwide-autofill/beilfbphhehmlihmpfijjciobcnccecn";
 
 export type ExtensionStatus = "checking" | "installed" | "absent";
 

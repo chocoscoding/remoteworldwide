@@ -24,7 +24,8 @@ export interface ExtensionDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const TOGGLES: { key: keyof SavedExtensionSettings; label: string; hint: string }[] = [
+/** Also the switches on Settings → Browser extension, so the two never word a setting differently. */
+export const EXTENSION_TOGGLES: { key: keyof SavedExtensionSettings; label: string; hint: string }[] = [
   {
     key: "fillOnLoad",
     label: "Fill as the form loads",
@@ -74,7 +75,7 @@ const ExtensionDialog: FC<ExtensionDialogProps> = ({ open, onOpenChange }) => {
             <div>
               <DialogPrimitive.Title className="text-lg font-bold text-primary">Browser extension</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-1 text-sm text-black/50">
-                It will fill application forms on company sites from this library.
+                It fills application forms on company sites from this library.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press">
@@ -116,7 +117,7 @@ const ExtensionDialog: FC<ExtensionDialogProps> = ({ open, onOpenChange }) => {
           </div>
 
           <div className="border-t border-black/10">
-            {TOGGLES.map((t) => {
+            {EXTENSION_TOGGLES.map((t) => {
               const on = extension[t.key];
               return (
                 <div key={t.key} className="flex items-center justify-between gap-5 border-b border-black/8 px-6 py-3.5 last:border-b-0">

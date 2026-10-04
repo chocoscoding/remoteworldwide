@@ -31,6 +31,7 @@ import LogoMini from "@/app/components/svg/LogoMini";
 import { useSidebarCollapse } from "./SidebarCollapseContext";
 import { useSettings } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
+import ExtensionCard from "./ExtensionCard";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
 import { useInviteSummary } from "@/hooks/queries/useInviteSummary";
 import type { InviteSummary } from "@/app/lib/invites/types";
@@ -258,8 +259,12 @@ const DashboardSidebar: FC = () => {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className={cn("flex-none border-t border-black/8", collapsed ? "p-2" : "p-3")}>
+      {/* Right above the account row, the way an "on your phone" card sits;
+          open rail only, it needs the width. */}
+      {!collapsed && <ExtensionCard />}
+
+      {/* Footer, kept short so the card above costs the nav little height. */}
+      <div className={cn("flex-none border-t border-black/8", collapsed ? "p-1.5" : "px-2 py-1")}>
         {/* The profile block is the way into settings — clicking your own name
             is where people look for it first. The credit meter rides the avatar
             rather than a panel of its own: it is a standing fact about the
@@ -275,18 +280,18 @@ const DashboardSidebar: FC = () => {
               : "No credits yet"
           }
           className={cn(
-            "flex min-w-0 items-center rounded-lg py-1.5 transition-colors cursor-pointer",
+            "flex min-w-0 items-center rounded-lg py-1 transition-colors cursor-pointer",
             collapsed ? "justify-center px-1" : "gap-2.5 px-1",
             isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]",
           )}>
           <ScoreRing
             value={allowance > 0 ? Math.min(100, Math.round((credits / allowance) * 100)) : 0}
-            size={40}
+            size={32}
             // Red, and a red track too, so an empty ring still reads as "out".
             fillColor={lowCredits ? "#b23c26" : undefined}
             trackColor={lowCredits ? "#f2d3cc" : undefined}
             label={
-              <span className="grid h-full w-full place-content-center overflow-hidden rounded-full bg-[#222325] text-xs font-extrabold text-[#e1f073]">
+              <span className="grid h-full w-full place-content-center overflow-hidden rounded-full bg-[#222325] text-[10px] font-extrabold text-[#e1f073]">
                 {profile.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -298,8 +303,8 @@ const DashboardSidebar: FC = () => {
           />
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-primary truncate">{displayName}</p>
-              <p className={cn("text-[11px] truncate", lowCredits ? "font-semibold text-[#b23c26]" : "text-black/50")}>
+              <p className="text-[13px] font-bold leading-tight text-primary truncate">{displayName}</p>
+              <p className={cn("text-[11px] leading-tight truncate", lowCredits ? "font-semibold text-[#b23c26]" : "text-black/50")}>
                 {credits} credits left
               </p>
             </div>
