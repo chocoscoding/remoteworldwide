@@ -10,7 +10,7 @@ import type {
   SeparatorMode,
 } from "@/app/lib/dashboard/resume/design-types";
 import { ICON_SETS, type IconSet } from "@/app/lib/dashboard/resume/icon-sets";
-import { detectPlatform } from "@/app/lib/dashboard/resume/link-platforms";
+import { detectPlatform, displayUrl } from "@/app/lib/dashboard/resume/link-platforms";
 
 export interface HeaderBlockProps {
   content: ResumeContent;
@@ -145,8 +145,9 @@ const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
                   {(design.links.style === "icon" || design.links.style === "both") && (
                     <platform.Icon aria-hidden className="h-[1em] w-[1em] flex-none text-[color:var(--r-c-link-icon)]" />
                   )}
+                  {/* The address itself, so it reads on paper; the label only while there is none yet. */}
                   {(design.links.style === "text" || design.links.style === "both") && (
-                    <span className={cn(design.links.underline && "underline")}>{link.label}</span>
+                    <span className={cn(design.links.underline && "underline")}>{displayUrl(link.url) || link.label}</span>
                   )}
                 </span>
               );

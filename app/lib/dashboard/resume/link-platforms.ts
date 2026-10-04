@@ -104,6 +104,18 @@ export function hostOf(url: string): string {
   return bare.split(/[/?#]/)[0] ?? "";
 }
 
+/**
+ * A link as it prints on the page (owner, 2026-10-04: the link itself shows, not just a label with
+ * the address hidden behind it): "https://www.linkedin.com/in/you/" reads "linkedin.com/in/you".
+ */
+export function displayUrl(url: string): string {
+  return url
+    .trim()
+    .replace(/^[a-z]+:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/+$/, "");
+}
+
 export function detectPlatform(url: string, label = ""): LinkPlatform {
   const host = hostOf(url);
   if (host) {

@@ -60,7 +60,8 @@ function contactParts(content: ResumeContent): { text: string; link?: string }[]
   for (const link of content.links ?? []) {
     const url = clean(link.url);
     if (!url) continue;
-    parts.push({ text: clean(link.label) || url, link: /^https?:\/\//i.test(url) ? url : undefined });
+    // The address itself as the text, as on the paper, so a printed copy still says where it goes.
+    parts.push({ text: displayUrl(url), link: /^https?:\/\//i.test(url) ? url : undefined });
   }
   return parts;
 }
