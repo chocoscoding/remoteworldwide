@@ -42,6 +42,35 @@ export interface CheckSuggestion {
    * longer be applied to anything, so the card is not offered.
    */
   rewrite?: { before: string; after: string; why: string; at: { entryIndex: number; bulletIndex: number } | null };
+  /** Rewrite: the role its line stands in now ("Remote Worldwide"), for the card's header. */
+  where?: string;
+}
+
+/** A card as the rail shows it: a rewrite carries the number the preview pins beside its line. */
+export interface RailCard extends CheckSuggestion {
+  n: number | null;
+}
+
+/**
+ * The cards the rail shows, in order: none that was dismissed, and a rewrite
+ * only while its line still stands or once it was used (to show that it was).
+ * Rewrites are numbered 1, 2… in that order, and the preview pins the same
+ * number beside each line still waiting for one (`pinnedLines`).
+ */
+export function railCards(suggestions: CheckSuggestion[], outcomes: Record<string, string>, dismissed: string[]): RailCard[] {
+  let n = 0;
+  return suggestions
+    .filter((s) => !dismissed.includes(s.id) && (s.kind !== "rewrite" || s.rewrite?.at || outcomes[s.id]))
+    .map((s) => ({ ...s, n: s.kind === "rewrite" ? (n += 1) : null }));
+}
+
+/** The lines the preview numbers: each rewrite card's line, while it waits to be used. */
+export function pinnedLines(cards: RailCard[], content: ResumeContent, outcomes: Record<string, string>) {
+  return cards.flatMap((card) => {
+    const at = card.rewrite?.at;
+    const entry = at ? content.experience[at.entryIndex] : undefined;
+    return at && entry && card.n !== null && !outcomes[card.id] ? [{ entryId: entry.id, bulletIndex: at.bulletIndex, n: card.n }] : [];
+  });
 }
 
 /** The `keywords` tool caps each term at this many characters; a longer "keyword" is a requirement sentence, not a term to append. */
@@ -94,6 +123,30 @@ export function applyBulletRewrite(content: ResumeContent, before: string, after
   };
 }
 
+/** Words a requirement is padded with: they say nothing about whether the resume covers it. */
+const FILLER = new Set(["and", "or", "the", "of", "to", "with", "for", "in", "on", "a", "an", "as", "at", "by", "using", "including", "e.g", "eg", "etc", "your", "our"]);
+
+/** A term's words that carry its meaning: "work ethic and strong prioritization skills" -> work, ethic, strong, prioritization, skills. */
+const meaningfulWords = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .split(/[^a-z0-9+#.]+/)
+    .map((word) => word.replace(/^\.+|\.+$/g, ""))
+    .filter((word) => word.length > 1 && !FILLER.has(word));
+
+/**
+ * Whether the resume already says this. Word for word for a short term ("Docker",
+ * "system design"); for a longer requirement, every one of its meaningful words
+ * somewhere in the text, so a line the keywords tool worked in in its own words
+ * ("strong work ethic and prioritization skills") counts as covered rather than
+ * staying "missing" forever.
+ */
+function covered(term: string, text: string, words: Set<string>): boolean {
+  if (text.includes(term.toLowerCase())) return true;
+  const wanted = meaningfulWords(term);
+  return wanted.length >= 3 && wanted.every((word) => words.has(word));
+}
+
 const needsWork = (value: number | undefined): value is number => value !== undefined && scanTier(value).tone === "urgent";
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
@@ -111,29 +164,33 @@ export function deriveCheckSuggestions(check: ResumeCheck | null, content: Resum
   const out: CheckSuggestion[] = [];
 
   // 1 · Missing keywords — a job check only; a general check has no posting
-  // for anything to be missing from. Terms already in the skills or summary
-  // (typed since the check ran) are not offered again.
+  // for anything to be missing from. Terms the resume covers now (typed since
+  // the check ran, or worked in by the keywords tool, which writes into the
+  // summary, skills and bullets) are not offered again.
   if (check.posting) {
-    const inDoc = `${content.skills.join(" \n ")} \n ${content.summary}`.toLowerCase();
+    const inDoc = [...content.skills, content.summary, ...content.experience.flatMap((entry) => entry.bullets)].join(" \n ").toLowerCase();
+    const docWords = new Set(meaningfulWords(inDoc));
     const seen = new Set<string>();
     const terms = missingGaps(report)
       .map((gap) => keywordLabel(gap.label))
       .filter((term) => {
         const key = term.toLowerCase();
-        if (!term || term.length > MAX_TERM_CHARS || seen.has(key) || inDoc.includes(key)) return false;
+        if (!term || term.length > MAX_TERM_CHARS || seen.has(key) || covered(term, inDoc, docWords)) return false;
         seen.add(key);
         return true;
       })
       .slice(0, MAX_TERMS);
 
     if (terms.length > 0) {
-      const quoted = terms.map((term) => `“${term}”`).join(", ");
+      // The card lists the terms themselves, so its words only say what adding them does. Its id
+      // names them: once a run has worked some in, what is still missing is a new card with its
+      // own button, rather than the old card's "Worked in…" standing where the button should be.
       out.push({
-        id: `${scope}:keywords`,
+        id: `${scope}:keywords:${terms.map((term) => term.toLowerCase()).join("|")}`,
         kind: "keywords",
         terms,
-        title: terms.length === 1 ? `Missing keyword: ${quoted}` : `${terms.length} keywords this posting wants are missing`,
-        detail: `Your check against ${check.job ?? "this job"} didn't find ${terms.length === 1 ? "it" : quoted} on your resume. Worked into your Summary and Skills in your own voice — only add what's honestly true of your work.`,
+        title: `Add ${terms.length} missing ${plural(terms.length, "keyword", "keywords")}`,
+        detail: "Worked into your Summary and Skills in your own voice. Only add what's honestly true of your work.",
       });
     }
   }
@@ -143,12 +200,15 @@ export function deriveCheckSuggestions(check: ResumeCheck | null, content: Resum
   // and paid for with the check.
   for (const rewrite of report.rewrites.slice(0, MAX_REWRITE_CARDS)) {
     if (!rewrite.after.trim() || comparable(rewrite.after) === comparable(rewrite.before)) continue;
+    const at = locateBullet(content, rewrite.before);
+    const entry = at ? content.experience[at.entryIndex] : undefined;
     out.push({
       id: `${scope}:rewrite:${rewrite.chunkId}`,
       kind: "rewrite",
       title: "Sharpen a bullet",
       detail: rewrite.why || `Suggested by your check against ${check.job ?? "this job"}.`,
-      rewrite: { before: rewrite.before, after: rewrite.after, why: rewrite.why, at: locateBullet(content, rewrite.before) },
+      rewrite: { before: rewrite.before, after: rewrite.after, why: rewrite.why, at },
+      where: entry ? entry.company.trim() || entry.role.trim() || undefined : undefined,
     });
   }
 
@@ -161,7 +221,7 @@ export function deriveCheckSuggestions(check: ResumeCheck | null, content: Resum
       id: `${scope}:quantify`,
       kind: "quantify",
       title: `${bare} ${plural(bare, "bullet carries", "bullets carry")} no number`,
-      detail: `Impact language scored ${impact}/100 on your check. Get a measurable outcome proposed for each — you review every one before it's used.`,
+      detail: `Impact language scored ${impact}/100 on your check. Get a measurable outcome proposed for each. You review every one before it's used.`,
     });
   }
 
