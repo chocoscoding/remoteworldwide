@@ -91,7 +91,40 @@ export interface PickSessionQuestionsInput {
 }
 
 /**
- * The session's questions, in the order they are asked.
+ * Asked in every interview, whatever the role or format (owner, 2026-10-04):
+ * the opener first and the closer last. Marked tailored, so a session written
+ * for the job never labels them "general practice".
+ */
+export const OPENING_QUESTION: SessionQuestion = {
+  id: "core:tell-me-about-yourself",
+  text: "Tell me about yourself.",
+  sub: "Every interview opens here: who you are and why this role",
+  tailored: true,
+};
+export const CLOSING_QUESTION: SessionQuestion = {
+  id: "core:why-should-we-hire-you",
+  text: "Why should we hire you?",
+  sub: "Every interview closes here: your case, in a few lines",
+  tailored: true,
+};
+/** A picked question that is one of the two already: not asked twice. */
+const CORE_QUESTION = /\btell me about yourself\b|\bwhy should (?:we|i|they) hire you\b/i;
+
+/**
+ * The session's questions, in the order they are asked: the opener, the
+ * role's own (`pickRoleQuestions`), then the closer, the same count in all as
+ * the length asks for.
+ */
+export function pickSessionQuestions(input: PickSessionQuestionsInput): SessionQuestion[] {
+  const count = QUESTIONS_FOR_LENGTH[input.lengthMinutes];
+  const middle = pickRoleQuestions(input)
+    .filter((q) => !CORE_QUESTION.test(q.text))
+    .slice(0, Math.max(1, count - 2));
+  return [OPENING_QUESTION, ...middle, CLOSING_QUESTION];
+}
+
+/**
+ * The role's questions, in the order they are asked.
  *
  * With likely questions in the chosen formats:
  *  - Only the chosen formats: a salary drill is not handed a behavioural question.
@@ -113,7 +146,7 @@ export interface PickSessionQuestionsInput {
  * With none (no set yet, none in the chosen formats, or no track): the bank
  * path exactly as before.
  */
-export function pickSessionQuestions({ formats, lengthMinutes, seed, likely }: PickSessionQuestionsInput): SessionQuestion[] {
+function pickRoleQuestions({ formats, lengthMinutes, seed, likely }: PickSessionQuestionsInput): SessionQuestion[] {
   const chosen: SessionFormat[] = formats.length > 0 ? formats : ["behavioural"];
   const count = QUESTIONS_FOR_LENGTH[lengthMinutes];
 

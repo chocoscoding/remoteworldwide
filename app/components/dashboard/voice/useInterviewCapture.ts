@@ -16,6 +16,10 @@
 //     then sends answers on mic-level silence.
 //   - or, on an `elevenlabs` session, the speech engine is the interviewer and
 //     the captions (engineInterview.ts). Without one there is no interview.
+//     Its text for an answer only arrives once the answer is over, so desktop
+//     Chrome and Edge also run the browser's recognizer as a live preview of
+//     the candidate's words (`preview`): shown, never sent or stored, and
+//     replaced by the engine's text for the turn (startPreview).
 // Captions are a convenience and fail cheaply. Nothing about them can stop the
 // recording, and the report transcript always comes from ElevenLabs Scribe.
 //
@@ -77,6 +81,7 @@ import { putPart } from "@/app/lib/voice/capture/s3Upload";
 import type { InterviewOpening, MintVoiceConversationInput, MintVoiceConversationResult } from "@/app/lib/voice/conversation";
 import { beaconRelease, mintConversation, mintRefusalOf, releaseConversation } from "@/app/lib/voice/conversations";
 import { formatClock } from "@/app/lib/voice/format";
+import { echoesQuestion } from "@/app/lib/voice/turnEnd";
 import {
   PREP_LIMITS,
   type CapReason,
@@ -159,6 +164,16 @@ const RECOGNITION_MAX_QUICK_ENDS = 3;
  * spare, and a background tab's one-second timer floor still makes it.
  */
 const MUTE_HOLD_MS = 1_000;
+/**
+ * The engine preview's echo guard, PrepLive's for dictation: what the browser's
+ * recognizer hands over while the interviewer speaks, and for this long after,
+ * is the interviewer heard through the speakers and still being recognised,
+ * until the mic has heard the candidate (PREVIEW_SPEAKING_LEVEL, past
+ * PREVIEW_ECHO_DECAY_MS). PrepLive's ECHO_TAIL_MS, ECHO_DECAY_MS and SPEAKING_LEVEL.
+ */
+const PREVIEW_ECHO_TAIL_MS = 2_500;
+const PREVIEW_ECHO_DECAY_MS = 400;
+const PREVIEW_SPEAKING_LEVEL = 0.12;
 
 const MIC_DENIED = "Your browser blocked the microphone. Allow it for this site, then try again.";
 const MIC_UNAVAILABLE = "We couldn't use a microphone. Check one is connected and not in use by another app.";
@@ -321,6 +336,15 @@ export interface CaptureSnapshot {
   engineProblem: EngineProblem | null;
   /** How the engine interview opens, as begin was told; null otherwise. */
   opening: InterviewOpening | null;
+  /**
+   * An engine interview's live preview of the candidate's words, this turn so
+   * far, from the browser's own recognizer. For the screen only: never sent,
+   * never stored, never an answer. Empty while the interviewer speaks, and
+   * from the moment the engine's text for the turn lands, which is the record.
+   */
+  preview: string;
+  /** Whether that preview runs (or waits on an unmute). `none` without one: Firefox, Safari, a phone, or a recognizer that stopped. */
+  previewCaptions: CaptionState;
 }
 
 export interface InterviewCapture extends CaptureSnapshot {
@@ -408,6 +432,8 @@ const INITIAL_SNAPSHOT: CaptureSnapshot = {
   engineTurns: [],
   engineProblem: null,
   opening: null,
+  preview: "",
+  previewCaptions: "none",
 };
 
 export interface CaptureStore {
@@ -482,8 +508,44 @@ function recognitionCtor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+/**
+ * The recognizer for an engine interview's preview: desktop Chrome and Edge
+ * only. Everywhere else it would run beside two live captures of the same mic
+ * (the recording and the engine's) untried, and the interview must never pay
+ * for a preview: WebKit (Safari, every iOS browser) can mute one capture when
+ * another starts, and Android's recognizer can sound a chime as it starts. Null there,
+ * as in Firefox, which has none: no preview, nothing else changes.
+ */
+function previewRecognitionCtor(): RecognitionCtor | null {
+  const Ctor = recognitionCtor();
+  if (!Ctor || typeof navigator === "undefined") return null;
+  const hints = (navigator as Navigator & { userAgentData?: { mobile?: boolean; brands?: ReadonlyArray<{ brand: string }> } }).userAgentData;
+  if (hints && Array.isArray(hints.brands)) return !hints.mobile && hints.brands.some((entry) => entry.brand === "Chromium") ? Ctor : null;
+  const agent = typeof navigator.userAgent === "string" ? navigator.userAgent : "";
+  return /\bChrome\/\d/.test(agent) && !/Android|Mobile/i.test(agent) ? Ctor : null;
+}
+
 /** Errors a fresh recognizer would only meet again. */
 const RECOGNITION_FATAL: ReadonlySet<string> = new Set(["not-allowed", "service-not-allowed", "language-not-supported", "audio-capture"]);
+
+/**
+ * One preview recognizer's place in its own results, which hold everything it
+ * heard since it started: results below `skipBelow` are not this turn's words
+ * (an earlier turn's, or the interviewer's through the speakers), `seen` is how
+ * many it has reported, and `shown` is what it adds to the preview now.
+ */
+interface PreviewTrack {
+  skipBelow: number;
+  seen: number;
+  shown: string;
+}
+
+/** Recognised pieces as one line: the browser starts each result after the first with a space, and the carry joins on one. */
+const joinWords = (parts: readonly string[]): string =>
+  parts
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" ");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -641,6 +703,17 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
   let runRecognition: (() => boolean) | null = null;
   /** A recognizer stopped by a mute, still handing over the words said before it. */
   let draining: RecognitionLike | null = null;
+  /** What the recognizer runs for: a `web-speech` session's captions, or an engine interview's preview (display only). */
+  let recognitionRole: "captions" | "preview" = "captions";
+  /** The preview's words from recognizers that already ended, this turn. */
+  let previewCarry = "";
+  /** The preview recognizers running or draining, oldest first. */
+  let previewTracks: PreviewTrack[] = [];
+  /** When the interviewer last went quiet, on the session clock: the preview's echo tail starts there. */
+  let previewQuietAt = Number.NEGATIVE_INFINITY;
+  /** The mic has heard the candidate since the interviewer last spoke (or they talked over it): the echo tail is over. */
+  let previewHeard = false;
+  let previewUnlisten: (() => void) | null = null;
   /**
    * The candidate's own mute. Not `muted`, which is this engine being disposed.
    * A wanted state rather than an action: the track, the engine's call and the
@@ -833,25 +906,68 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
   }
 
   function startWebSpeech() {
-    const Ctor = recognitionCtor();
     set({ liveProvider: "web-speech", liveMode: "web-speech", interim: "" });
+    startRecognition("captions", recognitionCtor());
+  }
+
+  /**
+   * An engine interview's live preview of the candidate's words (`preview`).
+   * The engine sends its text for an answer only once the answer is over, so
+   * until then the candidate could not tell they were heard. The browser's
+   * recognizer, for the screen alone: nothing it hears is sent, stored, or an
+   * answer, and the interview carries on as before when it never starts,
+   * errors or stops. The captions' own recognizer, so the candidate's mute
+   * stops it the same way, and every way out (end, cap, close) stops it.
+   */
+  function startPreview() {
+    if (runRecognition) return;
+    try {
+      startRecognition("preview", previewRecognitionCtor());
+      if (recognitionWanted && meter) previewUnlisten = meter.onLevel(hearCandidate);
+    } catch {
+      // No preview, then: the interview is the same without one.
+      stopCaptions();
+    }
+  }
+
+  /**
+   * The browser's recognizer, for what `role` it serves:
+   *  - `captions`, a `web-speech` session's: partials are `interim`, and each
+   *    final goes to the page as words of the answer (emitFinal).
+   *  - `preview`, an engine interview's: only ever `preview` (previewResult).
+   *    The engine's turns are the answers, so nothing goes to the page.
+   */
+  function startRecognition(role: "captions" | "preview", Ctor: RecognitionCtor | null) {
+    recognitionRole = role;
     if (!Ctor || closed || capHit || ending) {
-      set({ captions: "none" });
+      recognitionOver();
       return;
     }
     recognitionWanted = true;
     let quickEnds = 0;
 
     const run = (): boolean => {
-      const rec = new Ctor();
+      let rec: RecognitionLike;
+      try {
+        rec = new Ctor();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = "en-US";
+      } catch {
+        return false;
+      }
       const startedAt = performance.now();
       let fatal = false;
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = "en-US";
+      /** This recognizer's place in its own results, for the preview. */
+      const track: PreviewTrack | null = role === "preview" ? { skipBelow: 0, seen: 0, shown: "" } : null;
       rec.onresult = (event) => {
         const current = recognition === rec;
         if (!current && draining !== rec) return;
+        // The preview takes a stopped recognizer's last words too: said before the mute, they are still this turn's.
+        if (track) {
+          previewResult(track, event);
+          return;
+        }
         let finalText = "";
         let partial = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -864,27 +980,31 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
         if (finalText.trim()) emitFinal({ text: finalText, startMs: null, endMs: null });
       };
       rec.onerror = (event) => {
-        if (RECOGNITION_FATAL.has(event.error ?? "")) fatal = true;
+        const error = event.error ?? "";
+        // The preview also stops quietly on a speech service it cannot reach, rather than retrying through the interview.
+        if (RECOGNITION_FATAL.has(error) || (track && error === "network")) fatal = true;
       };
       // A continuous recognizer still ends whenever the browser decides (a
       // pause, a network blip, Safari after each utterance). A fresh one takes
       // over while captions are wanted, within bounds, so one that can never
       // run does not spin.
       rec.onend = () => {
+        if (track) endPreviewTrack(track);
         if (draining === rec) draining = null;
         if (recognition !== rec) return;
         recognition = null;
         set({ interim: "" });
         quickEnds = performance.now() - startedAt < RECOGNITION_QUICK_END_MS ? quickEnds + 1 : 0;
         if (recognitionWanted && !fatal && quickEnds < RECOGNITION_MAX_QUICK_ENDS && run()) return;
-        recognitionWanted = false;
-        set({ captions: "none" });
+        recognitionOver();
       };
       recognition = rec;
+      if (track) previewTracks.push(track);
       try {
         rec.start();
       } catch {
         recognition = null;
+        if (track) previewTracks = previewTracks.filter((each) => each !== track);
         return false;
       }
       return true;
@@ -893,11 +1013,26 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
     runRecognition = run;
     // Muted before the captions began: the first recognizer waits for the unmute (resumeCaptions).
     const running = selfMuted || run();
-    if (!running) recognitionWanted = false;
-    set({ captions: running ? "live" : "none" });
+    if (!running) {
+      recognitionOver();
+      return;
+    }
+    set(role === "preview" ? { previewCaptions: "live" } : { captions: "live" });
   }
 
-  /** Stops the browser's captions, if they run. */
+  /** The recognizer will not run again: the captions, or the preview, are over. A preview's words so far stay until the turn's own replace them. */
+  function recognitionOver() {
+    recognitionWanted = false;
+    if (recognitionRole === "captions") {
+      set({ captions: "none" });
+      return;
+    }
+    previewUnlisten?.();
+    previewUnlisten = null;
+    set({ previewCaptions: "none" });
+  }
+
+  /** Stops the browser's captions, or an engine interview's preview, if they run. */
   function stopCaptions() {
     recognitionWanted = false;
     const rec = recognition;
@@ -911,15 +1046,97 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
         // Already ended.
       }
     }
-    set({ interim: "" });
+    previewUnlisten?.();
+    previewUnlisten = null;
+    previewTracks = [];
+    previewCarry = "";
+    set(recognitionRole === "preview" ? { interim: "", preview: "", previewCaptions: "none" } : { interim: "", preview: "" });
+  }
+
+  // --- the engine interview's preview ------------------------------------------
+
+  /**
+   * One preview recognizer's results as this turn's words: everything it
+   * heard past `skipBelow`, finals and the partial alike, so nothing vanishes
+   * as the browser closes one result and opens the next. What the interviewer
+   * says is never the candidate's (previewEchoes): it is passed over now and
+   * once final, for good.
+   */
+  function previewResult(track: PreviewTrack, event: RecognitionEventLike) {
+    if (!previewTracks.includes(track)) return;
+    const results = event.results;
+    track.seen = results.length;
+    const pieces: string[] = [];
+    for (let i = track.skipBelow; i < results.length; i++) pieces.push(results[i]?.[0]?.transcript ?? "");
+    let said = joinWords(pieces);
+    if (said && previewEchoes(said)) {
+      track.skipBelow = track.seen;
+      said = "";
+    }
+    if (said === track.shown) return;
+    track.shown = said;
+    publishPreview();
+  }
+
+  function publishPreview() {
+    set({ preview: joinWords([previewCarry, ...previewTracks.map((track) => track.shown)]) });
+  }
+
+  /** A preview recognizer ended: its words stay, ahead of the fresh one's. */
+  function endPreviewTrack(track: PreviewTrack) {
+    if (!previewTracks.includes(track)) return;
+    previewTracks = previewTracks.filter((each) => each !== track);
+    previewCarry = joinWords([previewCarry, track.shown]);
+    publishPreview();
+  }
+
+  /**
+   * The preview starts again from nothing, past everything the recognizers
+   * have reported so far: the turn's words are the engine's now, or the
+   * interviewer is talking. The caller publishes the empty preview.
+   */
+  function resetPreview() {
+    previewCarry = "";
+    for (const track of previewTracks) {
+      track.skipBelow = track.seen;
+      track.shown = "";
+    }
+  }
+
+  /**
+   * Words the recognizer heard that are the interviewer through the speakers,
+   * the dictation rule (PrepLive's isInterviewerEcho): everything while they
+   * talk (the engine's turn, or the page's own first question, which holds the
+   * engine's mic); and, inside PREVIEW_ECHO_TAIL_MS of them stopping, anything
+   * before the mic has heard the candidate, or that is only a stretch of
+   * their line. A talk-over counts as hearing the candidate.
+   */
+  function previewEchoes(said: string): boolean {
+    if (engineHeld || interviewerTurns?.speaking) return true;
+    if (clock.now() - previewQuietAt >= PREVIEW_ECHO_TAIL_MS) return false;
+    return !previewHeard || echoesQuestion(said, interviewerTurns?.aiText ?? "");
+  }
+
+  /** The recording mic's level: loud with nobody else talking, past the echo's own decay, is the candidate. */
+  function hearCandidate(level: number) {
+    if (previewHeard || level <= PREVIEW_SPEAKING_LEVEL || engineHeld || interviewerTurns?.speaking) return;
+    if (clock.now() - previewQuietAt < PREVIEW_ECHO_DECAY_MS) return;
+    previewHeard = true;
+  }
+
+  /** The interviewer starts talking: the last answer's preview goes, and nothing heard from now is the candidate's until they stop. */
+  function previewInterviewerSpeaks() {
+    previewHeard = false;
+    resetPreview();
   }
 
   /**
    * The candidate muted. The browser's recognizer opens a mic of its own, which
    * our disabled track does not silence, and Chrome sends what it hears to its
    * speech service: so it stops. Stopped rather than aborted, so the words
-   * said before the press still arrive (`draining`); `captions` stays as it
-   * is, because they come back on the unmute and the page judges its send by it.
+   * said before the press still arrive (`draining`); `captions` (or
+   * `previewCaptions`) stays as it is, because they come back on the unmute
+   * and the page judges its send by it.
    */
   function pauseCaptions() {
     const rec = recognition;
@@ -944,15 +1161,15 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
   function resumeCaptions() {
     if (!recognitionWanted || recognition || !runRecognition || closed || capHit || ending) return;
     if (runRecognition()) return;
-    recognitionWanted = false;
-    set({ captions: "none" });
+    recognitionOver();
   }
 
   // --- the engine interviewer ---------------------------------------------------
 
-  function publishInterviewer() {
+  /** `also`: what changes with it, in the same snapshot (the preview emptying as the turn it previewed lands). */
+  function publishInterviewer(also?: Partial<CaptureSnapshot>) {
     if (!interviewerTurns) return;
-    set({ engineTurns: interviewerTurns.turns, agentSpeaking: interviewerTurns.speaking, aiText: interviewerTurns.aiText });
+    set({ engineTurns: interviewerTurns.turns, agentSpeaking: interviewerTurns.speaking, aiText: interviewerTurns.aiText, ...also });
   }
 
   /** On an engine session the service keeps the words; the finish sends only its turns' ids and times. */
@@ -1009,10 +1226,13 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
         onAgentSpeakStart: (atMs) => {
           if (closed) return;
           turns.speakStart(atMs);
-          publishInterviewer();
+          previewInterviewerSpeaks();
+          publishInterviewer({ preview: "" });
         },
         onAgentSpeakEnd: (atMs) => {
           turns.speakEnd(atMs);
+          // The preview's echo tail runs from where the audio ran out.
+          previewQuietAt = atMs;
           publishInterviewer();
         },
         onAgentText: (text) => {
@@ -1027,10 +1247,16 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
         },
         onUserText: (text, _atMs, eventId) => {
           if (closed) return;
-          turns.userText(text, "voice", eventId);
-          publishInterviewer();
+          // The engine's words for the answer, which are its record: the browser's preview of it goes.
+          const turn = turns.userText(text, "voice", eventId);
+          if (turn) resetPreview();
+          publishInterviewer(turn ? { preview: "" } : undefined);
         },
-        onInterrupted: () => turns.interrupted(),
+        onInterrupted: () => {
+          turns.interrupted();
+          // The candidate talked over the interviewer: they are what the mic hears now.
+          previewHeard = true;
+        },
         onStatus: (status) => {
           if (status === "disconnected") interviewerLost();
         },
@@ -1077,6 +1303,7 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
     syncMuteHold();
     rereadAgc();
     set({ status: "live", micStatus: "live", captions: "live" });
+    startPreview();
     return { ok: true };
   }
 
@@ -1166,6 +1393,13 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
 
   /** The page's hold, ORed with the candidate's mute: the page releasing its hold (an opening line ending) must not unmute them. */
   function setMicMuted(held: boolean) {
+    // The page's own first question playing is the interviewer talking, for the preview too.
+    if (held && !engineHeld) {
+      previewInterviewerSpeaks();
+      set({ preview: "" });
+    } else if (!held && engineHeld) {
+      previewQuietAt = clock.now();
+    }
     engineHeld = held;
     interviewer?.setMicMuted(engineHeld || selfMuted);
   }

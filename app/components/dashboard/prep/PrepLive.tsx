@@ -68,6 +68,11 @@ export interface PrepLiveProps {
    * questions are fixed for the session from its start.
    */
   likelyQuestions?: readonly LikelyQuestion[] | null;
+  /**
+   * Exactly these questions, in this order, in place of the usual pick: a
+   * practice session a report started (app/lib/prep/practice.ts).
+   */
+  fixedQuestions?: readonly SessionQuestion[] | null;
   /** The in-memory report. Used only when the session could not be saved in the AI service. */
   onEnd: (input: SessionInput) => void;
   /** Opens a saved session's report: this one once it is finished, or the one a conflict says is still open. */
@@ -189,7 +194,7 @@ const ENGINE_PROBLEM_TITLE: Record<EngineProblemKind, string> = {
 
 /** How an interview on the voice engine begins. A `browser` opening reads the first question out as before, so it adds nothing. */
 const INTERVIEW_OPENING_NOTE: Record<InterviewOpening, string | null> = {
-  greeting: "The interviewer will say hello first — say hello back to begin.",
+  greeting: "The interviewer will say hello first. Say hello back to begin.",
   "first-question": "The interviewer will ask the first question as soon as you start.",
   browser: null,
 };
@@ -398,16 +403,19 @@ function isRefusal(error: unknown): error is BackendError {
   return error instanceof BackendError && ((error.status >= 400 && error.status < 500) || error.status === 503);
 }
 
-const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, onSaved, onExit, onRestart }) => {
+const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQuestions, onEnd, onSaved, onExit, onRestart }) => {
   // A shorter session the balance covers asks the largest question set that fits.
-  // The track's likely questions when it has them; the general bank otherwise.
+  // The track's likely questions when it has them; the general bank otherwise;
+  // a practice session from a report, exactly the questions it chose.
   const [questions] = useState(() =>
-    pickSessionQuestions({
-      formats: config.formats,
-      lengthMinutes: questionPresetFor(Math.min(config.lengthMinutes, config.capMinutes ?? config.lengthMinutes)),
-      seed: `${track.id}-${config.formats.join(",")}-${config.lengthMinutes}`,
-      likely: likelyQuestions,
-    })
+    fixedQuestions && fixedQuestions.length > 0
+      ? [...fixedQuestions]
+      : pickSessionQuestions({
+          formats: config.formats,
+          lengthMinutes: questionPresetFor(Math.min(config.lengthMinutes, config.capMinutes ?? config.lengthMinutes)),
+          seed: `${track.id}-${config.formats.join(",")}-${config.lengthMinutes}`,
+          likely: likelyQuestions,
+        })
   );
   const tailoredSession = questions.some((q) => q.tailored);
   const [phase, setPhase] = useState<Phase>("connecting");
@@ -683,8 +691,16 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
     },
     [start],
   );
+  /**
+   * An engine interview's answer in progress: the browser's preview of the
+   * candidate's words (the capture's `preview`). Only ever shown, never sent or
+   * kept, and gone once the engine's own text for the answer lands. Never while
+   * an interviewer is talking: the capture already passes over what it hears
+   * then, and this keeps the line off the screen for the same span.
+   */
+  const enginePreview = aiSpeaking || capture.agentSpeaking || phase !== "active" ? "" : capture.preview;
   const interim = engine
-    ? ""
+    ? enginePreview
     : recording
       ? capture.interim
       : // An unsaved session has no draft box any more, so what has been heard
@@ -1884,37 +1900,37 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
         </div>
       ) : phase === "connecting" ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
-          <PrepOrb state="connecting" />
-          <p className="text-[15px] font-bold">{start.kind === "starting" ? "Starting your recording…" : "Connecting to your interviewer…"}</p>
-          <p className="text-sm text-white/50">This is a practice session — keep this tab open.</p>
-          {openingNote && start.kind !== "local" && <p className="text-xs font-bold text-[#e1f073]">{openingNote}</p>}
-          {/* An unsaved session has no recording to keep the interviewer out
-              of, and the mic opens itself here, so both halves of the line
-              change: what is about to happen, and why echo matters anyway. */}
-          {start.kind === "local" ? (
-            <div className="flex flex-col items-center gap-1.5 text-xs text-white/45">
-              {/* Only where the browser has speech recognition at all. Firefox
-                  has none, the mic is never opened there, and someone told to
-                  answer out loud would be left waiting on a mic that is not
-                  coming. */}
-              {dictationSupported ? (
-                <>
-                  <p>Your mic opens by itself — just answer out loud. Your browser turns what you say into text.</p>
-                  <p className="flex items-center gap-2">
-                    <Headphones className="h-3.5 w-3.5 flex-none" />
-                    Use headphones if you can: they stop the interviewer being heard as your answer.
-                  </p>
-                </>
-              ) : (
-                <p>This browser can&apos;t turn speech into text, so you&apos;ll type your answers here.</p>
-              )}
-            </div>
-          ) : (
-            <p className="flex items-center gap-2 text-xs text-white/45">
-              <Headphones className="h-3.5 w-3.5 flex-none" />
-              Use headphones if you can: they keep the interviewer&apos;s voice out of your recording.
-            </p>
-          )}
+          <PrepOrb state="connecting" spinner={false} />
+          <div className="flex flex-col items-center gap-1.5">
+            {openingNote && start.kind !== "local" && <p className="text-xs font-bold text-[#e1f073]">{openingNote}</p>}
+            {/* An unsaved session has no recording to keep the interviewer out
+                of, and the mic opens itself here, so both halves of the line
+                change: what is about to happen, and why echo matters anyway. */}
+            {start.kind === "local" ? (
+              <div className="flex flex-col items-center gap-1.5 text-xs text-white/45">
+                {/* Only where the browser has speech recognition at all. Firefox
+                    has none, the mic is never opened there, and someone told to
+                    answer out loud would be left waiting on a mic that is not
+                    coming. */}
+                {dictationSupported ? (
+                  <>
+                    <p>Your mic opens by itself. Just answer out loud. Your browser turns what you say into text.</p>
+                    <p className="flex items-center gap-2">
+                      <Headphones className="h-3.5 w-3.5 flex-none" />
+                      Use headphones if you can: they stop the interviewer being heard as your answer.
+                    </p>
+                  </>
+                ) : (
+                  <p>This browser can&apos;t turn speech into text, so you&apos;ll type your answers here.</p>
+                )}
+              </div>
+            ) : (
+              <p className="flex items-center gap-2 text-xs text-white/45">
+                <Headphones className="h-3.5 w-3.5 flex-none" />
+                Use headphones if you can: they keep the interviewer&apos;s voice out of your recording.
+              </p>
+            )}
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-8 py-10">
@@ -1993,7 +2009,9 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, onEnd, on
               <div className="flex flex-col items-center gap-1.5 text-center text-[11px] text-white/35">
                 <p>
                   {engine
-                    ? "Transcript updates after each answer."
+                    ? capture.previewCaptions === "live"
+                      ? "Live captions by your browser's speech service. The final transcript follows each answer."
+                      : "Transcript updates after each answer."
                     : captionsLive
                       ? capture.liveProvider === "web-speech"
                         ? "Live captions by your browser's speech service."

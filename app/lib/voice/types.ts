@@ -127,6 +127,21 @@ export type PrepDifficulty = (typeof PREP_DIFFICULTIES)[number];
 export const PREP_SESSION_LENGTHS = [6, 15, 25] as const;
 export type PrepSessionLength = (typeof PREP_SESSION_LENGTHS)[number];
 
+/** The interviewer's voice on the engine: female unless the posting names a male interviewer (interviewerVoice.ts). */
+export const INTERVIEWER_VOICES = ["female", "male"] as const;
+export type InterviewerVoice = (typeof INTERVIEWER_VOICES)[number];
+
+/**
+ * The ElevenLabs voice for each interviewer, kept in code rather than the env: a voice id is public. Both must be in
+ * the account's My Voices, or ElevenLabs answers voice_not_found. The female one is also the coach's voice.
+ */
+export const INTERVIEWER_VOICE_IDS = {
+  /** Veda Sky: natural, mindful and caring. */
+  female: "XcXEQzuLXRU9RcfWzEJt",
+  /** Brady J: friendly, casual and warm. */
+  male: "3svOJAOhuPHXwQC2H5eq",
+} as const satisfies Record<InterviewerVoice, string>;
+
 /** Why a create was refused with 429. */
 export const PREP_LIMIT_REASONS = ["voice-minutes", "text-sessions"] as const;
 export type PrepLimitReason = (typeof PREP_LIMIT_REASONS)[number];

@@ -33,6 +33,8 @@ export interface PrepOrbProps {
   caption?: string;
   /** Draws the caption forward, for captions that are about to cause something ("Sending in 3…"). */
   captionEmphasis?: boolean;
+  /** Whether "connecting" shows the small spinner over the caption (and reserves its row). */
+  spinner?: boolean;
   size?: "md" | "lg" | "xl";
   className?: string;
 }
@@ -49,7 +51,7 @@ export interface PrepOrbProps {
  */
 const ASSUMED_OUTPUT_LEVEL = 0.55;
 
-const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, getInputVolume, getOutputVolume, label, caption, captionEmphasis, size = "lg", className }) => {
+const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, getInputVolume, getOutputVolume, label, caption, captionEmphasis, spinner = true, size = "lg", className }) => {
   const [input, setInput] = useState(0);
   const [output, setOutput] = useState(0);
   const measured = Boolean(getInputVolume && getOutputVolume);
@@ -92,9 +94,11 @@ const PrepOrb: FC<PrepOrbProps> = ({ state, onLevel, micActive, getInputVolume, 
 
       <div className="flex flex-col items-center text-center">
         {/* Reserved height, so the caption does not jump when the spinner comes and goes. */}
-        <span className="flex h-4 items-center justify-center" aria-hidden>
-          {state === "connecting" && <Loader2 className="h-4 w-4 animate-spin text-[#e1f073]" />}
-        </span>
+        {spinner && (
+          <span className="flex h-4 items-center justify-center" aria-hidden>
+            {state === "connecting" && <Loader2 className="h-4 w-4 animate-spin text-[#e1f073]" />}
+          </span>
+        )}
         {label && <p className="mt-1 text-sm font-bold text-white">{label}</p>}
         <p
           role="status"
