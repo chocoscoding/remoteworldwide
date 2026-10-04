@@ -12,6 +12,9 @@ export type { ResumePaperProps } from "./ResumePaper";
 export { default as PageGuides } from "./PageGuides";
 export type { PageGuidesProps } from "./PageGuides";
 
+export { default as PagedResume } from "./PagedResume";
+export type { PagedResumeProps } from "./PagedResume";
+
 export { default as SectionRenderer } from "./SectionRenderer";
 export type { SectionRendererProps } from "./SectionRenderer";
 

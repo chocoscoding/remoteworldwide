@@ -29,10 +29,13 @@ const PHOTO_POSITION_WRAP_CLASS: Record<PhotoPosition, string> = {
   above: "flex-col",
 };
 
+// "split" keeps every item on one row, so a crowded row shrinks its items. Under the paper's
+// `overflow-wrap: anywhere` an email or a URL would then break mid-word; `normal` keeps each
+// item at least as wide as its longest word, as before.
 const ARRANGE_CLASS: Record<HeaderArrange, string> = {
   stack: "flex flex-col items-start gap-[2pt]",
   inline: "flex flex-wrap items-center gap-x-[10pt] gap-y-[2pt]",
-  split: "flex items-center justify-between gap-x-[10pt] gap-y-[2pt]",
+  split: "flex items-center justify-between gap-x-[10pt] gap-y-[2pt] [&>*]:[overflow-wrap:normal]",
 };
 
 // Text-separator glyphs for the "bullet"/"bar" SeparatorMode values, static

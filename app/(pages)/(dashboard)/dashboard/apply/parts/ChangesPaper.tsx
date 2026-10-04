@@ -7,14 +7,17 @@
 //
 // The paper is `ResumePaper` exactly as the creator and the print page render
 // it, in the default look, scaled down to fit a narrow column (CSS zoom, so the
-// height follows) and never up. The marks are the CSS Custom Highlight API:
-// ranges over the paper's text, painted by `::highlight(rww-resume-change)` in
-// globals.css, so the renderer is never touched and no DOM is rewritten under
-// React. Every paper on screen adds its ranges to the one shared highlight. A
-// browser without the API gets the same changes as a list instead.
+// height follows) and never up. Like the creator's, it shows each page as its
+// own A4 sheet, 25px apart (`PagedResume`). The marks are the CSS Custom
+// Highlight API: ranges over the paper's text, painted by
+// `::highlight(rww-resume-change)` in globals.css, so the renderer is never
+// touched and no DOM is rewritten under React. Every sheet holds a copy of the
+// paper and gets its own ranges, and every paper on screen adds them to the one
+// shared highlight. A browser without the API gets the same changes as a list
+// instead.
 
 import { useEffect, useMemo, useRef, useState, type FC } from "react";
-import { ResumePaper } from "@/app/components/dashboard/resume/paper";
+import { PagedResume } from "@/app/components/dashboard/resume/paper";
 import { DEFAULT_DESIGN, DEFAULT_SECTIONS } from "@/app/lib/dashboard/resume/design-defaults";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
@@ -94,6 +97,8 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className }) => 
   const texts = useMemo(() => highlightTexts(changes), [changes]);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const [fit, setFit] = useState(1);
+  // The sheets after the first mount once the paper is measured, so the marks are found again then.
+  const [pages, setPages] = useState(1);
   // Rendered in the browser only (inside a collapsed section or a dialog), so reading this in render is safe.
   const canHighlight = highlightRegistry() !== null;
 
@@ -119,13 +124,22 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className }) => 
       rangesByPaper.delete(key);
       publish();
     };
-  }, [texts]);
+  }, [texts, pages]);
 
   return (
     <div ref={setBox} className={cn("w-full", className)}>
       {!canHighlight && texts.length > 0 && <ChangeList changes={changes} />}
-      <div ref={paperRef} style={{ zoom: fit }} className={cn("mx-auto w-fit bg-white shadow-[0_2px_18px_rgba(0,0,0,0.12)]", ALL_FONT_VARS)}>
-        <ResumePaper design={DEFAULT_DESIGN} sections={DEFAULT_SECTIONS} content={content} chrome={DEFAULT_DESIGN.chrome} />
+      <div ref={paperRef} style={{ zoom: fit }} className={cn("mx-auto w-fit", ALL_FONT_VARS)}>
+        {/* The gap is zoomed with the paper, so it's divided by the zoom to stay 25px on screen. */}
+        <PagedResume
+          design={DEFAULT_DESIGN}
+          sections={DEFAULT_SECTIONS}
+          content={content}
+          chrome={DEFAULT_DESIGN.chrome}
+          gap={25 / fit}
+          sheetClassName="shadow-[0_2px_18px_rgba(0,0,0,0.12)]"
+          onPageCountChange={setPages}
+        />
       </div>
     </div>
   );

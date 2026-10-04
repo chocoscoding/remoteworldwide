@@ -89,11 +89,14 @@ const ResumePaper: FC<ResumePaperProps> = ({ design, sections, content, chrome =
 
   const Chrome = CHROME_COMPONENTS[chrome];
 
+  // `overflow-wrap: anywhere` breaks a word too long for its line at the margin, as Word does, so
+  // it never runs off the page (or, in the paged preview, onto the next sheet). It also lets a flex
+  // item such as a bullet's text shrink below that word's width, which `break-word` would not.
   return (
     <div
       style={cssVars}
       className={cn(
-        "relative w-[var(--r-page-w)] min-h-[var(--r-page-h)] bg-[color:var(--r-page-bg)] px-[var(--r-mx)] py-[var(--r-my)] text-[color:var(--r-text)]",
+        "relative w-[var(--r-page-w)] min-h-[var(--r-page-h)] bg-[color:var(--r-page-bg)] px-[var(--r-mx)] py-[var(--r-my)] text-[color:var(--r-text)] [overflow-wrap:anywhere]",
         className
       )}>
       <Chrome design={design} content={content} header={header} side={sideContent}>
