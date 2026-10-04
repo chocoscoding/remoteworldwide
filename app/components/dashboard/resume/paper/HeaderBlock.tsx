@@ -11,6 +11,7 @@ import type {
 } from "@/app/lib/dashboard/resume/design-types";
 import { ICON_SETS, type IconSet } from "@/app/lib/dashboard/resume/icon-sets";
 import { detectPlatform, displayUrl } from "@/app/lib/dashboard/resume/link-platforms";
+import { SectionFrame } from "./highlight";
 
 export interface HeaderBlockProps {
   content: ResumeContent;
@@ -93,10 +94,11 @@ const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
   return (
     <div
       className={cn(
-        "flex gap-[var(--r-gap)]",
+        "relative flex gap-[var(--r-gap)]",
         PHOTO_POSITION_WRAP_CLASS[design.photo.position],
         alignCenter && "items-center text-center"
       )}>
+      <SectionFrame section="personal" />
       {photoBlock}
       <div className={cn("min-w-0 flex-1", alignCenter && "flex flex-col items-center")}>
         <p className="font-[family-name:var(--r-font-name)] text-[length:var(--r-fs-name)] font-bold leading-tight text-[color:var(--r-c-name)]">

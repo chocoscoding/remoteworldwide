@@ -2,6 +2,7 @@ import type { FC } from "react";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { ResumeDesign } from "@/app/lib/dashboard/resume/design-types";
 import EntryHeader from "../EntryHeader";
+import { EntryFrame } from "../highlight";
 
 export interface EducationSectionProps {
   content: ResumeContent;
@@ -15,7 +16,8 @@ const EducationSection: FC<EducationSectionProps> = ({ content, design }) => {
   return (
     <div className="flex flex-col gap-[var(--r-gap)]">
       {content.education.map((edu) => (
-        <div key={edu.id}>
+        <div key={edu.id} className="relative">
+          <EntryFrame entryId={edu.id} />
           <EntryHeader primary={edu.degree} secondary={edu.school} dates={edu.dates} location={edu.location} design={design} />
           {edu.detail && (
             <p className="mt-[2pt] text-[length:var(--r-fs-small)] leading-[var(--r-lh)] text-[color:var(--r-text-muted)]">{edu.detail}</p>

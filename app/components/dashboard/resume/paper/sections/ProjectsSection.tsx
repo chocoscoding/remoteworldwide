@@ -3,6 +3,7 @@ import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { ResumeDesign } from "@/app/lib/dashboard/resume/design-types";
 import { ICON_SETS } from "@/app/lib/dashboard/resume/icon-sets";
 import EntryHeader from "../EntryHeader";
+import { EntryFrame } from "../highlight";
 
 export interface ProjectsSectionProps {
   content: ResumeContent;
@@ -25,7 +26,8 @@ const ProjectsSection: FC<ProjectsSectionProps> = ({ content, design }) => {
   return (
     <div className="flex flex-col gap-[var(--r-gap)]">
       {content.projects.map((proj) => (
-        <div key={proj.id}>
+        <div key={proj.id} className="relative">
+          <EntryFrame entryId={proj.id} />
           <EntryHeader primary={proj.name} secondary="" design={design} />
           {proj.detail && (
             <p className="mt-[2pt] text-[length:var(--r-fs-base)] leading-[var(--r-lh)] text-[color:var(--r-text)]">{proj.detail}</p>

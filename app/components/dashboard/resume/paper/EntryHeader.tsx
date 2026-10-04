@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { cn } from "@/lib/utils";
 import type { BulletGlyph, ResumeDesign } from "@/app/lib/dashboard/resume/design-types";
 import { displayDates } from "@/app/lib/resume/dates";
+import { BulletText } from "./highlight";
 
 export interface EntryHeaderProps {
   /** Role / degree / project or certification name. */
@@ -118,6 +119,8 @@ const BULLET_GLYPH_CHAR: Record<Exclude<BulletGlyph, "none">, string> = {
 export interface EntryBulletsProps {
   items: string[];
   design: ResumeDesign;
+  /** The entry these belong to, so a line the editor points at can be highlighted (see `highlight.tsx`). */
+  entryId?: string;
 }
 
 /**
@@ -127,19 +130,20 @@ export interface EntryBulletsProps {
  * while it is being typed into, and a marker with nothing beside it is not
  * something a resume should print.
  */
-export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design }) => {
-  const items = allItems.filter((item) => item.trim());
+export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design, entryId }) => {
+  // Each line keeps its index in the stored list, which is what the editor's pointers name.
+  const items = allItems.map((text, index) => ({ text, index })).filter((item) => item.text.trim());
   if (items.length === 0) return null;
   const { bulletGlyph, indentBullets } = design.entries;
   const showGlyph = bulletGlyph !== "none";
 
   return (
     <ul className={cn("mt-[var(--r-gap-half)] flex flex-col gap-[2pt]", showGlyph && indentBullets && "pl-[14pt]")}>
-      {items.map((item, i) => (
+      {items.map(({ text, index }) => (
         <li
-          key={i}
+          key={index}
           className={cn(
-            "text-[length:var(--r-fs-base)] leading-[var(--r-lh)] text-[color:var(--r-text)]",
+            "relative text-[length:var(--r-fs-base)] leading-[var(--r-lh)] text-[color:var(--r-text)]",
             showGlyph && "flex gap-[6pt]"
           )}>
           {showGlyph && (
@@ -147,7 +151,7 @@ export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design })
               {BULLET_GLYPH_CHAR[bulletGlyph]}
             </span>
           )}
-          <span>{item}</span>
+          <BulletText entryId={entryId} index={index} text={text} />
         </li>
       ))}
     </ul>

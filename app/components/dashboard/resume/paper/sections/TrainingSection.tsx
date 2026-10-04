@@ -2,6 +2,7 @@ import type { FC } from "react";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { ResumeDesign } from "@/app/lib/dashboard/resume/design-types";
 import EntryHeader from "../EntryHeader";
+import { EntryFrame } from "../highlight";
 
 export interface TrainingSectionProps {
   content: ResumeContent;
@@ -24,7 +25,10 @@ const TrainingSection: FC<TrainingSectionProps> = ({ content, design }) => {
   return (
     <div className="flex flex-col gap-[var(--r-gap)]">
       {content.certifications.map((cert) => (
-        <EntryHeader key={cert.id} primary={cert.name} secondary={cert.issuer ?? ""} dates={cert.year} design={design} />
+        <div key={cert.id} className="relative">
+          <EntryFrame entryId={cert.id} />
+          <EntryHeader primary={cert.name} secondary={cert.issuer ?? ""} dates={cert.year} design={design} />
+        </div>
       ))}
     </div>
   );

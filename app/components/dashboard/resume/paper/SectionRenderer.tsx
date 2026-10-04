@@ -2,6 +2,7 @@ import type { FC } from "react";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { ResumeDesign, SectionConfig, SectionKind } from "@/app/lib/dashboard/resume/design-types";
 import SectionHeading from "./SectionHeading";
+import { SectionFrame } from "./highlight";
 import {
   SummarySection,
   ExperienceSection,
@@ -70,8 +71,10 @@ const SectionRenderer: FC<SectionRendererProps> = ({ items, content, design }) =
         const Body = SECTION_BODY[item.kind];
         // `data-resume-section` lets the PDF export drop a section whose body
         // is only its "No … added yet." placeholder (`data-resume-placeholder`).
+        // `relative` holds the editor's frame when it points at the whole section.
         return (
-          <div key={item.id} data-resume-section={item.kind}>
+          <div key={item.id} data-resume-section={item.kind} className="relative">
+            {item.kind !== "custom" && <SectionFrame section={item.kind} />}
             <SectionHeading config={item} design={design} />
             <div className="mt-[var(--r-gap-half)]">
               <Body content={content} design={design} />
