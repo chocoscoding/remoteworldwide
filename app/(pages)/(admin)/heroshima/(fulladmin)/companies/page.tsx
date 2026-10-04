@@ -3,7 +3,9 @@ import { CompanyList } from "@/types/main";
 
 const getCompanies = async (): Promise<{ data: CompanyList[]; count: number }> => {
   try {
-    const response = await fetch("/api/companies", { cache: "no-cache" });
+    const response = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/companies", { cache: "no-cache" });
+    console.log(response);
+
     if (!response.ok) {
       throw new Error("Failed to fetch companies");
     }
