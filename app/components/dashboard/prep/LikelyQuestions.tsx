@@ -1,6 +1,6 @@
 "use client";
 
-import type { FC } from "react";
+import { useEffect, type FC } from "react";
 import Link from "next/link";
 import { format as formatDate } from "date-fns";
 import { FileText, Loader2, RefreshCw, Sparkles } from "lucide-react";
@@ -11,6 +11,8 @@ import { describeLikelyQuestionsFailure } from "@/app/lib/prep/api";
 import { PREP_BILLING_HREF } from "@/app/lib/voice/api";
 import { useGenerateLikelyQuestions } from "@/hooks/mutations/usePrepTrackMutations";
 import { useLikelyQuestions } from "@/hooks/queries/usePrepTrackQueries";
+import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
+import { usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
 import Chip from "./Chip";
 import PrepEmptyState from "./PrepEmptyState";
 import { useTrackResume } from "./useTrackResume";
@@ -31,11 +33,19 @@ const PREVIEW_COUNT = 3;
 const credits = (n: number) => `${n} ${n === 1 ? "credit" : "credits"}`;
 
 /**
+ * Tracks whose first set this page has started writing by itself: once each per visit, however
+ * many places show the questions (the overview and the Questions tab) and whatever came of it.
+ */
+const autoWritten = new Set<string>();
+
+/**
  * The questions this track's interviewers are most likely to ask, written by
- * the AI service from the posting's requirements and the user's resume. Never
- * written on its own: a set costs a credit, so it is only ever written from a
- * click, and reopening one is free. Nothing here claims to know who is in the
- * room — there is no source for that.
+ * the AI service from the posting's requirements and the user's resume. The
+ * first set is written on its own as soon as the track has a posting (owner,
+ * 2026-10-04: "I don't need to click it"), when the plan and the balance allow
+ * it, so opening a track never pops an upgrade; otherwise, and for every later
+ * set, from a click. Reopening one is free. Nothing here claims to know who is
+ * in the room — there is no source for that.
  */
 const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise, onAddPosting, onSeeAll }) => {
   const saved = track.saved;
@@ -64,6 +74,20 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
     generate.mutate({ trackId, refresh });
   }
 
+  // The first set, without a click: a posting to write from, nothing written yet, and a plan and
+  // balance that cover it. Once per track per visit; a refusal or failure leaves the button.
+  const { allows } = usePlanGate();
+  const { subscription } = useBilling();
+  const covered = allows("pro") && subscription.creditBalance >= cost;
+  const due = Boolean(trackId && hasPosting && covered && !set && query.isSuccess && !busy && !generate.isError);
+  useEffect(() => {
+    if (!due || !trackId || autoWritten.has(trackId)) return;
+    autoWritten.add(trackId);
+    void write(false);
+    // `write` is redefined every render; `due` is what decides when it runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [due, trackId]);
+
   const failureNote = (failure || resume.error) && (
     <p role="alert" className="text-xs leading-relaxed text-red-700">
       {failure?.message ?? resume.error}
@@ -79,7 +103,14 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
   );
 
   if (!saved) {
-    return <PrepEmptyState bare icon={Sparkles} title="No questions for this session" body="Its track is gone, so there is no posting to write questions from." />;
+    return (
+      <PrepEmptyState
+        bare
+        icon={Sparkles}
+        title="No questions for this session"
+        body="Its track is gone, so there is no posting to write questions from."
+      />
+    );
   }
 
   if (query.isPending) {
@@ -122,6 +153,19 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
         />
       );
     }
+    if (busy) {
+      return (
+        <div className="flex flex-col gap-2 px-5 py-4" aria-busy="true">
+          <p role="status" className="mb-1 flex items-center gap-2 text-xs font-semibold text-black/50">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Writing the questions they&apos;re likely to ask, from the posting and your resume
+          </p>
+          {Array.from({ length: variant === "preview" ? 3 : 5 }, (_, i) => (
+            <div key={i} className="h-10 rounded-lg bg-[#f0f0ea] animate-pulse" />
+          ))}
+        </div>
+      );
+    }
     return (
       <div className="px-6 py-8 flex flex-col items-center text-center gap-3">
         <span className="h-12 w-12 rounded-full bg-[#f0f0ea] flex items-center justify-center">
@@ -130,12 +174,17 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
         <div>
           <p className="text-sm font-bold text-primary mb-1">No questions yet</p>
           <p className="text-sm text-black/50 max-w-sm mx-auto leading-relaxed">
-            Written from the posting&apos;s requirements and your resume: where you&apos;re strong, and where they&apos;ll probe. {credits(cost)}; reopening them is free.
+            Written from the posting&apos;s requirements and your resume: where you&apos;re strong, and where they&apos;ll probe.{" "}
+            {credits(cost)}; reopening them is free.
           </p>
         </div>
-        <button type="button" onClick={() => void write(false)} disabled={busy} className={cn(BUTTON_SOLID, "disabled:opacity-50 disabled:pointer-events-none")}>
+        <button
+          type="button"
+          onClick={() => void write(false)}
+          disabled={busy}
+          className={cn(BUTTON_SOLID, "disabled:opacity-50 disabled:pointer-events-none")}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {busy ? "Writing questions…" : `Write likely questions · ${credits(cost)}`}
+          {busy ? "Writing questions…" : `Write likely questions`}
         </button>
         {failureNote}
       </div>
@@ -175,7 +224,10 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
         </p>
         <div className="flex items-center gap-3">
           {variant === "preview" && set.questions.length > PREVIEW_COUNT && onSeeAll && (
-            <button type="button" onClick={onSeeAll} className="text-xs font-bold text-black/50 hover:text-primary cursor-pointer whitespace-nowrap">
+            <button
+              type="button"
+              onClick={onSeeAll}
+              className="text-xs font-bold text-black/50 hover:text-primary cursor-pointer whitespace-nowrap">
               See all {set.questions.length} →
             </button>
           )}
