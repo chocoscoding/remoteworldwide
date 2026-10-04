@@ -1,45 +1,18 @@
 "use client";
 
 import type { FC } from "react";
-import { StepperSlider, ThumbnailPicker, type ThumbnailOption } from "../controls";
+import { Columns2, LayoutPanelTop, RectangleVertical } from "lucide-react";
+import { SegmentedControl, StepperSlider, type SegmentedControlOption } from "../controls";
 import SectionOrderList from "./SectionOrderList";
 import { useResumeDesign } from "../useResumeDesign";
 import { SIDE_WIDTH_PCT_STEPS } from "@/app/lib/dashboard/resume/design-defaults";
 import type { ColumnsMode } from "@/app/lib/dashboard/resume/design-types";
 
-const COLUMNS_OPTIONS: ThumbnailOption<ColumnsMode>[] = [
-  {
-    id: "one",
-    label: "One",
-    preview: (
-      <div className="flex h-12 gap-1 p-1.5">
-        <div className="h-full w-full rounded bg-black/15" />
-      </div>
-    ),
-  },
-  {
-    id: "two",
-    label: "Two",
-    preview: (
-      <div className="flex h-12 gap-1 p-1.5">
-        <div className="h-full flex-[2] rounded bg-black/15" />
-        <div className="h-full flex-1 rounded bg-black/10" />
-      </div>
-    ),
-  },
-  {
-    id: "mix",
-    label: "Mix",
-    preview: (
-      <div className="flex h-12 flex-col gap-1 p-1.5">
-        <div className="h-3 w-full flex-none rounded bg-black/15" />
-        <div className="flex flex-1 gap-1">
-          <div className="h-full flex-[2] rounded bg-black/15" />
-          <div className="h-full flex-1 rounded bg-black/10" />
-        </div>
-      </div>
-    ),
-  },
+/** A switch, not picture cards (owner, 2026-10-04): the icon says the shape, the paper beside it shows the rest. */
+const COLUMNS_OPTIONS: SegmentedControlOption<ColumnsMode>[] = [
+  { id: "one", label: "One", icon: RectangleVertical },
+  { id: "two", label: "Two", icon: Columns2 },
+  { id: "mix", label: "Mix", icon: LayoutPanelTop },
 ];
 
 const formatPct = (v: number) => `${v}%`;
@@ -55,9 +28,8 @@ const LayoutPanel: FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <ThumbnailPicker
+      <SegmentedControl
         label="Columns"
-        columns={3}
         options={COLUMNS_OPTIONS}
         value={design.layout.columns}
         onChange={(columns) => dispatch({ type: "layout/setColumns", columns })}

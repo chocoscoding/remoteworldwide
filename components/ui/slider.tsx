@@ -12,15 +12,16 @@ const Slider = React.forwardRef<
   <SliderPrimitive.Root
     ref={ref}
     className={cn(
-      "relative flex w-full touch-none select-none items-center py-2.5",
+      "relative flex w-full touch-none select-none items-center py-2",
       className
     )}
     {...props}
   >
-    <SliderPrimitive.Track className="relative h-2.5 w-full grow overflow-hidden rounded-none border border-black/15 bg-[#f0f0ea]">
-      <SliderPrimitive.Range className="absolute h-full bg-transparent" />
+    {/* The editor's slider (owner, 2026-10-04): a slim rounded track filled in ink up to a round ink thumb. */}
+    <SliderPrimitive.Track className="relative h-[7px] w-full grow overflow-hidden rounded-full border border-black/15 bg-[#f0f0ea]">
+      <SliderPrimitive.Range className="absolute h-full rounded-full bg-[#222325]" />
     </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className="block h-6 w-8 flex-none rounded bg-[#222325] br-shadow br-lime transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-black/30 disabled:pointer-events-none disabled:opacity-40" />
+    <SliderPrimitive.Thumb className="block h-[18px] w-[18px] flex-none cursor-grab rounded-full bg-[#222325] transition-transform duration-100 hover:scale-110 active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40" />
   </SliderPrimitive.Root>
 ))
 Slider.displayName = SliderPrimitive.Root.displayName
