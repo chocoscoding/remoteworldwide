@@ -600,9 +600,9 @@ const CoverScreen: FC = () => {
    * letterhead when it is on. The editor's HTML is sanitised first; a letter
    * nobody has touched yet prints from the letter itself, already escaped.
    */
-  const printLetter = () =>
+  const printLetter = (title = safeFileName(downloadFileName)) =>
     printDocument({
-      title: safeFileName(downloadFileName),
+      title,
       html: `<main class="${cn(FONT_CLASS[font], spacingCfg.text)}">${letterheadHtml(letterheadInfo())}${letterHtml ? sanitizeLetterHtml(letterHtml) : initialHtml}</main>`,
       // Shared with the server's print page (print-css.ts), so the two PDFs agree.
       pageSize: LETTER_PAGE_SIZE,
@@ -610,11 +610,12 @@ const CoverScreen: FC = () => {
       css: LETTER_PRINT_CSS,
     });
 
-  const handleDownload = async (format: DownloadFormat) => {
-    const base = safeFileName(downloadFileName);
+  const handleDownload = async (format: DownloadFormat, fileName: string) => {
+    // The name from the download dialog's field: the suggestion below, or what they changed it to.
+    const base = fileName;
     const body = letterBody();
     if (!body.trim()) throw new Error("There's no letter to download yet.");
-    if (format === "pdf") return printLetter();
+    if (format === "pdf") return printLetter(base);
     if (format === "docx") saveBlob(await coverToDocx(body, letterheadInfo(), wordFontFor(font)), `${base}.docx`);
     else saveText(coverToMarkdown(body, letterheadInfo()), `${base}.md`);
   };

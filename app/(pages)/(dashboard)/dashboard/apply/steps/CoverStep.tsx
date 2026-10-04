@@ -209,9 +209,9 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
     }
   }
 
-  const printLetter = () =>
+  const printLetter = (title = fileBase) =>
     printDocument({
-      title: fileBase,
+      title,
       html: `<main class="${cn(FONT_CLASS[design.font], SPACING_CLASS[design.spacing].text)}">${letterheadHtml(letterhead)}${pageHtml()}</main>`,
       // Shared with the server's print page, so this PDF matches the creator's.
       pageSize: LETTER_PAGE_SIZE,
@@ -219,11 +219,12 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
       css: LETTER_PRINT_CSS,
     });
 
-  async function download(format: DownloadFormat) {
+  /** Under the name from the download dialog's field: `fileBase`, or what they changed it to. */
+  async function download(format: DownloadFormat, name: string) {
     if (!letter.trim()) throw new Error("There's no letter to download yet.");
-    if (format === "pdf") return printLetter();
-    if (format === "docx") saveBlob(await coverToDocx(letter, letterhead, wordFontFor(design.font)), `${fileBase}.docx`);
-    else saveText(coverToMarkdown(letter, letterhead), `${fileBase}.md`);
+    if (format === "pdf") return printLetter(name);
+    if (format === "docx") saveBlob(await coverToDocx(letter, letterhead, wordFontFor(design.font)), `${name}.docx`);
+    else saveText(coverToMarkdown(letter, letterhead), `${name}.md`);
   }
 
   const openDownload = (format: DownloadFormat) => {

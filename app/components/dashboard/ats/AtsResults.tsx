@@ -136,21 +136,22 @@ const AtsResults: FC<AtsResultsProps> = ({
   /**
    * Writes the report on screen out, in the format picked. Read from `report`
    * at the moment of the click, so a write-up that landed after the score is
-   * in it. The modal stays open and busy until this settles and shows a
-   * failure itself.
+   * in it. Saved under the name in the download dialog's field (`reportFileName`,
+   * or what they changed it to). The modal stays open and busy until this
+   * settles and shows a failure itself.
    */
-  async function handleDownload(format: DownloadFormat) {
-    if (!report) throw new Error("The scan hasn't finished yet — try again in a moment.");
+  async function handleDownload(format: DownloadFormat, fileName: string) {
+    if (!report) throw new Error("The scan hasn't finished yet. Try again in a moment.");
     const input = { report, resumeName: resume.name, job: job ? { company: job.company, role: job.role } : null, scannedAt };
     if (format === "docx") {
-      saveBlob(await atsReportToDocx(input), `${reportFileName}.docx`);
+      saveBlob(await atsReportToDocx(input), `${fileName}.docx`);
       return;
     }
     if (format === "md") {
-      saveText(atsReportToMarkdown(input), `${reportFileName}.md`);
+      saveText(atsReportToMarkdown(input), `${fileName}.md`);
       return;
     }
-    await printDocument({ title: reportFileName, html: atsReportHtml(input), pageSize: "A4", pageMargin: "16mm 16mm", css: ATS_REPORT_CSS });
+    await printDocument({ title: fileName, html: atsReportHtml(input), pageSize: "A4", pageMargin: "16mm 16mm", css: ATS_REPORT_CSS });
   }
 
   return (
@@ -411,11 +412,6 @@ const AtsResults: FC<AtsResultsProps> = ({
         docLabel="scan report"
         fileName={reportFileName}
         onDownload={handleDownload}
-        helpers={{
-          pdf: "A clean, printable layout of this scan — score, metrics, gaps and rewrites. Opens your browser's print dialog — choose \"Save as PDF\".",
-          docx: "The same report as an editable Word document.",
-          md: "The same report as plain-text markup — handy for notes or pasting elsewhere.",
-        }}
       />
     </div>
   );

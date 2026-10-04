@@ -1,18 +1,24 @@
 "use client";
 
 import { FC, useState } from "react";
-import { Check, ChevronDown, Download, FileCode, FileText, FileType2, Info, Loader2 } from "lucide-react";
+import { Check, ChevronDown, Download, FileCode, FileText, FileType2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import { safeFileName } from "@/app/lib/export/save";
 
 /**
- * Shared "download this document" overlay, used by both the Resume and
- * Cover-letter screens. The screen does the export (`onDownload`) — DOCX and
- * Markdown are built in the browser and saved; PDF opens the browser's print
- * dialog on the document alone (see app/lib/export/save.ts on why) — and this
- * stays open, busy, until it finishes, so a failure is shown here rather than
- * lost behind a closed dialog.
+ * Shared "download this document" overlay, used by the Resume, Cover-letter
+ * and ATS report screens and the apply wizard. The screen does the export
+ * (`onDownload`) — DOCX and Markdown are built in the browser and saved; PDF
+ * opens the browser's print dialog on the document alone (see
+ * app/lib/export/save.ts on why) — and this stays open, busy, until it
+ * finishes, so a failure is shown here rather than lost behind a closed dialog.
+ *
+ * The name it downloads as is the user's to change (owner, 2026-10-04): the
+ * screen's suggestion fills the field, and what is in it when they press
+ * Download is the name the screen saves under. No help text under the format,
+ * no note repeating the name: the field says it.
  */
 
 export type DownloadFormat = "pdf" | "docx" | "md";
@@ -22,31 +28,12 @@ interface FormatOption {
   label: string;
   ext: string;
   icon: typeof FileText;
-  helper: string;
 }
 
 const FORMAT_OPTIONS: FormatOption[] = [
-  {
-    id: "pdf",
-    label: "PDF",
-    ext: ".pdf",
-    icon: FileText,
-    helper: "Exactly as it looks here, with real text ATS systems can read. Opens your browser's print dialog — choose \"Save as PDF\".",
-  },
-  {
-    id: "docx",
-    label: "Word",
-    ext: ".docx",
-    icon: FileType2,
-    helper: "Fully editable in Word or Google Docs. Laid out in one clean column, which ATS systems read most reliably.",
-  },
-  {
-    id: "md",
-    label: "Markdown",
-    ext: ".md",
-    icon: FileCode,
-    helper: "Plain-text markup — handy for pasting into your own site or another tool.",
-  },
+  { id: "pdf", label: "PDF", ext: ".pdf", icon: FileText },
+  { id: "docx", label: "Word", ext: ".docx", icon: FileType2 },
+  { id: "md", label: "Markdown", ext: ".md", icon: FileCode },
 ];
 
 export interface DownloadModalProps {
@@ -56,25 +43,29 @@ export interface DownloadModalProps {
   onOpenChange: (open: boolean) => void;
   /** What's being downloaded, used in the title copy, e.g. "resume" or "cover letter". */
   docLabel?: string;
-  /** Base filename shown next to the chosen extension, e.g. "Amara-Okafor-Resume". */
+  /** The suggested name, without its extension, e.g. "Amara-Okafor-Resume". The field starts on it. */
   fileName?: string;
   /** The format selected on open. Key the modal on it to change it between openings. */
   defaultFormat?: DownloadFormat;
-  /** Does the export. The modal stays open and busy until it settles; a rejection is shown here. */
-  onDownload?: (format: DownloadFormat) => void | Promise<void>;
   /**
-   * Per-format help text, for a document that is not a copy of what is on
-   * screen — the ATS report prints a clean layout of the scan, not the page, so
-   * "exactly as it looks here" would be untrue of it. Unset formats keep the default.
+   * Does the export, under the name in the field (made safe for a file system, the suggestion when
+   * left empty). The modal stays open and busy until it settles; a rejection is shown here.
    */
-  helpers?: Partial<Record<DownloadFormat, string>>;
+  onDownload?: (format: DownloadFormat, fileName: string) => void | Promise<void>;
 }
 
-const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = "document", fileName = "Document", defaultFormat = "pdf", onDownload, helpers }) => {
+const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = "document", fileName = "Document", defaultFormat = "pdf", onDownload }) => {
   const [format, setFormat] = useState<DownloadFormat>(defaultFormat);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState(fileName);
+  // A new suggestion (another document) replaces what was typed for the last one.
+  const [suggested, setSuggested] = useState(fileName);
+  if (fileName !== suggested) {
+    setSuggested(fileName);
+    setName(fileName);
+  }
 
   const selected = FORMAT_OPTIONS.find((f) => f.id === format) ?? FORMAT_OPTIONS[0];
 
@@ -83,10 +74,10 @@ const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = 
     setBusy(true);
     setError(null);
     try {
-      await onDownload?.(format);
+      await onDownload?.(format, safeFileName(name.trim() || fileName));
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : "That download didn't work — please try again.");
+      setError(err instanceof Error && err.message ? err.message : "That download didn't work. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -111,7 +102,7 @@ const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = 
             </div>
             <DialogTitle className="text-[17px] font-bold text-primary leading-none">Download your {docLabel}</DialogTitle>
           </div>
-          <p className="text-xs text-black/45 mb-5 pl-[52px]">Choose a format — you can download this again anytime.</p>
+          <p className="text-xs text-black/45 mb-5 pl-[52px]">Choose a format. You can download this again anytime.</p>
 
           {/* Format dropdown */}
           <div className="relative mb-4">
@@ -158,18 +149,24 @@ const DownloadModal: FC<DownloadModalProps> = ({ open, onOpenChange, docLabel = 
             )}
           </div>
 
-          <p className="text-xs text-black/50 leading-relaxed mb-5">{helpers?.[selected.id] ?? selected.helper}</p>
-
-          <div className="flex items-center gap-2 rounded-xl bg-[#f0f0ea] px-4 py-3 mb-1">
-            <Info className="h-4 w-4 flex-none text-black/45" />
-            <p className="text-xs font-medium text-black/55">
-              {format === "pdf" ? "The dialog suggests the name " : "Saves to your downloads as "}
-              <span className="font-semibold text-primary">
-                {fileName}
-                {selected.ext}
-              </span>
-              .
-            </p>
+          {/* The name it downloads as: the screen's suggestion, theirs to change. */}
+          <label htmlFor="download-file-name" className="mb-1.5 block text-xs font-semibold text-black/55">
+            File name
+          </label>
+          <div className="flex items-center rounded-xl border border-black/12 bg-white transition-colors focus-within:border-[#222325]">
+            <input
+              id="download-file-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleDownload();
+              }}
+              disabled={busy}
+              spellCheck={false}
+              className="min-w-0 flex-1 rounded-l-xl bg-transparent px-4 py-3 text-sm font-semibold text-primary outline-none placeholder:text-black/35"
+              placeholder={fileName}
+            />
+            <span className="flex-none pr-4 text-sm font-medium text-black/40">{selected.ext}</span>
           </div>
 
           {error && (
