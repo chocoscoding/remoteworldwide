@@ -33,6 +33,15 @@
 // A document link wins over ?tailor: it names the resume, where Tailor would
 // only open whichever was saved last. The workspace mounts once whichever of
 // these is in play has settled, so it is seeded once, with the resume it opens.
+// That link is followed once, on arrival.
+//
+// From then on the address keeps up with the screen (owner, 2026-10-04: the
+// resume creator uses URL query parameters): `?doc=<id>` names the resume
+// open, none means the landing, and `?tab=` the editor's tab. Opening or
+// switching a resume adds a history entry (`pushState`, so nothing is fetched
+// again), a tab only replaces the current one, and the browser's Back and
+// Forward, or the sidebar's link, move the screen to whatever the address
+// says. `?from=` is spent once followed; `?tailor=` stays for its banner.
 //
 // Why the provider is keyed like that: `ResumeDesignProvider` (chunk A3a)
 // owns its design/section state via an uncontrolled `useReducer` — it has no
@@ -98,6 +107,23 @@ const VAULT_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 const paramMatching = (value: string | null, pattern: RegExp): string | null => (value && pattern.test(value) ? value : null);
 
+/**
+ * The creator's address with `doc` set to the resume open, or cleared for the landing (which has
+ * no tab either). `?from=` is spent once followed; every other parameter (`?tailor=` and its
+ * job context, `?tab=` while a resume is open) is kept.
+ */
+function creatorHref(doc: string | null): string {
+  const next = new URLSearchParams(window.location.search);
+  next.delete("from");
+  if (doc) next.set("doc", doc);
+  else {
+    next.delete("doc");
+    next.delete("tab");
+  }
+  const query = next.toString();
+  return `${window.location.pathname}${query ? `?${query}` : ""}`;
+}
+
 interface ResumeWorkspaceProps {
   initialDocuments: StoredResumeDocument[];
   /** The resume to open instead of the landing — one a link named, or the newest for Tailor. Null for the landing. */
@@ -134,11 +160,39 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
 
   const activeDoc = activeDocId !== null ? documents.find((d) => d.id === activeDocId) : undefined;
 
+  // ---- The address keeps up with the screen ----------------------------------------------------
+  /** Opens a resume, or the landing for null, and writes it into the address as a new history entry. */
+  const openId = useCallback((id: string | null) => {
+    setActiveDocId(id);
+    window.history.pushState(null, "", creatorHref(id));
+  }, []);
+
+  // A link that opened a resume without naming it in `doc` (?from=, ?tailor=) writes it in. Only on
+  // arrival in practice: every later opening writes its own address, so this finds nothing to do.
+  useEffect(() => {
+    const opened = paramMatching(new URLSearchParams(window.location.search).get("doc"), OBJECT_ID);
+    if (initialOpenId && activeDocId === initialOpenId && opened !== initialOpenId) window.history.replaceState(null, "", creatorHref(initialOpenId));
+  }, [initialOpenId, activeDocId]);
+
+  // The address changed under the screen (the browser's Back or Forward, the sidebar's link to the
+  // creator): follow it. A resume this visit doesn't hold (one deleted since) leaves the screen as it is.
+  const params = useSearchParams();
+  const urlDoc = paramMatching(params.get("doc"), OBJECT_ID);
+  const [seenUrlDoc, setSeenUrlDoc] = useState(urlDoc);
+  if (urlDoc !== seenUrlDoc) {
+    setSeenUrlDoc(urlDoc);
+    if (urlDoc === null) {
+      if (activeDocId !== null) setActiveDocId(null);
+    } else if (urlDoc !== activeDocId && documents.some((d) => d.id === urlDoc)) {
+      setActiveDocId(urlDoc);
+    }
+  }
+
   // Newest first, as the library lists them — a document just made is the one
   // they are about to work on.
   const open = (doc: ResumeDocument) => {
     setDocuments((prev) => [doc, ...prev]);
-    setActiveDocId(doc.id);
+    openId(doc.id);
   };
 
   /**
@@ -210,7 +264,7 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
           library={library}
           onRetry={onRetryLibrary}
           documents={documents}
-          onOpen={setActiveDocId}
+          onOpen={openId}
           onCreateBlank={createBlankFromLanding}
           onImport={importFromLanding}
           onDelete={deleteFromLanding}
@@ -244,8 +298,15 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
 
 const ResumeScreen: FC = () => {
   const params = useSearchParams();
-  const docParam = paramMatching(params.get("doc"), OBJECT_ID);
-  const fromParam = docParam ? null : paramMatching(params.get("from"), VAULT_ID);
+  // The link the page was arrived on decides what opens, once. Later changes to the address are the
+  // workspace's own (opening, switching, the browser's Back), not new links to follow: following
+  // them here would unmount the editor to look up a resume it already holds.
+  const [arrival] = useState(() => {
+    const doc = paramMatching(params.get("doc"), OBJECT_ID);
+    return { doc, from: doc ? null : paramMatching(params.get("from"), VAULT_ID) };
+  });
+  const docParam = arrival.doc;
+  const fromParam = arrival.from;
   const context = readJobContext(params, "tailor");
   const [contextDismissed, setContextDismissed] = useState(false);
   // A link to a document wins over ?tailor (see the header).
