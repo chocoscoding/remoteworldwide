@@ -30,3 +30,6 @@ export type { LabeledSelectProps, LabeledSelectOption } from "./LabeledSelect";
 
 export { default as CollapsibleGroup } from "./CollapsibleGroup";
 export type { CollapsibleGroupProps } from "./CollapsibleGroup";
+
+export { default as Collapse } from "./Collapse";
+export type { CollapseProps } from "./Collapse";

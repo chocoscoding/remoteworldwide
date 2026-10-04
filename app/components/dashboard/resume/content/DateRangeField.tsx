@@ -60,13 +60,24 @@ function rangeOf(draft: Draft): DateRange {
   };
 }
 
-const DateSelect: FC<SelectHTMLAttributes<HTMLSelectElement> & { isActive: boolean; children: ReactNode }> = ({ isActive, className, value, children, ...rest }) => (
-  <span className="relative inline-flex min-w-0">
+// A dropdown takes the width it is given, not its widest option's ("Present",
+// "Month"), so the four share one row. 13px and slim side padding are what let
+// "Month" and "2026" fit a 314px card, the narrowest the editor's Content
+// column gets on a laptop.
+const DateSelect: FC<SelectHTMLAttributes<HTMLSelectElement> & { isActive: boolean; wrapClassName?: string; children: ReactNode }> = ({
+  isActive,
+  className,
+  wrapClassName,
+  value,
+  children,
+  ...rest
+}) => (
+  <span className={cn("relative flex min-w-0 flex-1", wrapClassName)}>
     <select
       value={value}
       className={cn(
         FIELD_CLASS,
-        "w-full min-w-0 cursor-pointer appearance-none rounded-sm pr-7",
+        "w-full min-w-0 cursor-pointer appearance-none pl-2 pr-[22px] text-[13px]",
         isActive ? FIELD_TONE.active : FIELD_TONE.idle,
         // The unpicked option reads as a placeholder, like an empty text field's.
         value === "" && "text-black/45",
@@ -75,7 +86,7 @@ const DateSelect: FC<SelectHTMLAttributes<HTMLSelectElement> & { isActive: boole
       {...rest}>
       {children}
     </select>
-    <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-black/45" />
+    <ChevronDown aria-hidden className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-black/45" />
   </span>
 );
 
@@ -123,12 +134,13 @@ const DateRangeField: FC<DateRangeFieldProps> = ({ value, onChange, label = "Dat
   const waitingForYear = (draft.startMonth !== "" && !draft.startYear) || (draft.endMonth !== "" && draft.endMonth !== "present" && !draft.endYear);
 
   return (
-    <div role="group" aria-label={label} className={cn("flex min-w-0 flex-col gap-1.5", className)}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span aria-hidden className="w-8 flex-none text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
-            From
-          </span>
+    <div role="group" aria-label={label} className={cn("flex min-w-0 flex-col gap-1.5 [container-type:inline-size]", className)}>
+      {/* One row, "Jan · 2024 to Present" (owner, 2026-10-04), on a laptop as on a tablet: from
+          304px wide (the 314px card fits) it is a five-column grid, the month a little wider than
+          the year as "Month" is wider than "2026", and "Present" takes the end year's column too.
+          Narrower (a phone) the end wraps under the start, "to" leading it. */}
+      <div className="flex w-full max-w-[440px] flex-col gap-1.5 [@container(min-width:304px)]:grid [@container(min-width:304px)]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_auto_minmax(0,1.15fr)_minmax(0,1fr)] [@container(min-width:304px)]:items-center [@container(min-width:304px)]:gap-x-1">
+        <div className="flex min-w-0 items-center gap-1.5 [@container(min-width:304px)]:contents">
           <DateSelect aria-label="Start month" value={draft.startMonth} onChange={(e) => pick({ startMonth: e.target.value })} isActive={isActive}>
             <option value="" className={OPTION}>
               Month
@@ -151,12 +163,17 @@ const DateRangeField: FC<DateRangeFieldProps> = ({ value, onChange, label = "Dat
           </DateSelect>
         </div>
 
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span aria-hidden className="w-8 flex-none text-[11px] font-semibold uppercase tracking-[0.08em] text-black/45">
-            To
+        <div className="flex min-w-0 items-center gap-1.5 [@container(min-width:304px)]:contents">
+          <span aria-hidden className="flex-none px-0.5 text-sm text-black/45">
+            to
           </span>
           {/* An end before the start is not on offer: those months and years are greyed out. */}
-          <DateSelect aria-label="End month, or Present" value={draft.endMonth} onChange={(e) => pick({ endMonth: e.target.value })} isActive={isActive}>
+          <DateSelect
+            aria-label="End month, or Present"
+            value={draft.endMonth}
+            onChange={(e) => pick({ endMonth: e.target.value })}
+            isActive={isActive}
+            wrapClassName={draft.endMonth === "present" ? "[@container(min-width:304px)]:col-span-2" : undefined}>
             <option value="" className={OPTION}>
               Month
             </option>
