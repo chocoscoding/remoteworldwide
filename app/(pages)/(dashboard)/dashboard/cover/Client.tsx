@@ -40,7 +40,23 @@
 //    live word count, and the tone's own paragraph target.
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
-import { ArrowUpRight, Check, ChevronDown, ChevronLeft, Copy, Download, FileSignature, FileWarning, Link2, Loader2, Printer, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  Copy,
+  Download,
+  FileSignature,
+  FileWarning,
+  Link2,
+  Loader2,
+  Printer,
+  RefreshCw,
+  Send,
+  Sparkles,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import TimeAgo from "timeago-react";
@@ -54,7 +70,14 @@ import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
-import { coverToDocx, coverToMarkdown, letterheadHtml, sanitizeLetterHtml, textToLetterHtml, type Letterhead } from "@/app/lib/export/cover";
+import {
+  coverToDocx,
+  coverToMarkdown,
+  letterheadHtml,
+  sanitizeLetterHtml,
+  textToLetterHtml,
+  type Letterhead,
+} from "@/app/lib/export/cover";
 import { LETTER_PAGE_MARGIN, LETTER_PAGE_SIZE, LETTER_PRINT_CSS } from "@/app/lib/export/print-css";
 import {
   DEFAULT_LETTER_DESIGN,
@@ -75,11 +98,9 @@ import RichTextEditor from "@/app/components/dashboard/ui/RichTextEditor";
 import { LetterSkeleton, ToolbarSelect } from "@/app/components/dashboard/cover/LetterParts";
 import SplitButton from "@/app/components/dashboard/ui/SplitButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
-import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import SeeAllInDocuments from "@/app/components/dashboard/ui/SeeAllInDocuments";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
-import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
-import { backToJobHref, readJobContext } from "@/app/lib/dashboard/contextParams";
+import { readJobContext } from "@/app/lib/dashboard/contextParams";
 import { parseFieldSpec, toPickedJob, type PickedJob } from "@/app/lib/jobs/fields";
 import type { SavedJobItem } from "@/app/lib/jobs/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -89,7 +110,6 @@ import { importResumeContent, listResumeDocuments, resumeContentToText } from "@
 import { mimeForFileName } from "@/app/lib/resume/mime";
 import {
   COVER_BILLING_HREF,
-  COVER_CREDITS,
   COVER_REVISE_CREDITS,
   MAX_REVISE_INSTRUCTION_CHARS,
   RECENT_LETTERS,
@@ -198,9 +218,15 @@ const RecentLetters: FC<{ letters: LetterView[] }> = ({ letters }) => (
         const forJob = Boolean(letter.content.company.trim() && letter.content.role.trim());
         return (
           <li key={letter.id} className={cn(i > 0 && "border-t border-black/[0.07]")}>
-            <Link href={`/dashboard/cover?letter=${encodeURIComponent(letter.id)}`} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#fafaf6]">
+            <Link
+              href={`/dashboard/cover?letter=${encodeURIComponent(letter.id)}`}
+              className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#fafaf6]">
               <span className="grid h-8 w-8 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
-                {forJob ? <Link2 className="h-3.5 w-3.5 text-primary" aria-hidden /> : <FileSignature className="h-3.5 w-3.5 text-primary" aria-hidden />}
+                {forJob ? (
+                  <Link2 className="h-3.5 w-3.5 text-primary" aria-hidden />
+                ) : (
+                  <FileSignature className="h-3.5 w-3.5 text-primary" aria-hidden />
+                )}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-primary">{letter.label}</span>
@@ -343,7 +369,10 @@ const CoverScreen: FC = () => {
     if (ready) return { fileName: ready.fileName, resumeId: ready.resumeId };
     const written = (library.data ?? []).find((doc) => resumeContentToText(doc.content) !== "");
     if (written) {
-      return { fileName: written.label, resumeId: () => importResumeContent(written.content, written.label).then((row) => imported(row.resumeId)) };
+      return {
+        fileName: written.label,
+        resumeId: () => importResumeContent(written.content, written.label).then((row) => imported(row.resumeId)),
+      };
     }
     const file = docs
       .filter((doc) => doc.kind === "resume" && !doc.archived && mimeForFileName(fileNameOf(doc)) !== null)
@@ -480,7 +509,12 @@ const CoverScreen: FC = () => {
   // a refusal is said once and not retried; anything else tries again on the
   // next keystroke. `blankSaved` is what the library took, so anything typed
   // while that request was in flight still counts as unsaved.
-  const [blankSaved, setBlankSaved] = useState<{ id: string; edited: NonNullable<typeof edited>; design: LetterDesign; updatedAt: Date } | null>(null);
+  const [blankSaved, setBlankSaved] = useState<{
+    id: string;
+    edited: NonNullable<typeof edited>;
+    design: LetterDesign;
+    updatedAt: Date;
+  } | null>(null);
   const blankSaving = useRef<string | null>(null);
   const blankToasted = useRef<string | null>(null);
   const docKeyNow = useRef(docKey);
@@ -493,7 +527,17 @@ const CoverScreen: FC = () => {
     const key = docKey;
     const sentDesign = design;
     blankSaving.current = key;
-    const content = { company: "", role: "", draftLabel: "", greeting: "", paragraphs: [], signOff: "", wordCount: 0, text: blankEdit.text, html: sanitizeLetterHtml(blankEdit.html) };
+    const content = {
+      company: "",
+      role: "",
+      draftLabel: "",
+      greeting: "",
+      paragraphs: [],
+      signOff: "",
+      wordCount: 0,
+      text: blankEdit.text,
+      html: sanitizeLetterHtml(blankEdit.html),
+    };
     createLetter({ content, design: sentDesign })
       .then((saved) => {
         // Only onto the draft it was typed in: a job picked meanwhile is another letter.
@@ -703,7 +747,13 @@ const CoverScreen: FC = () => {
     setAiStatus(null);
     try {
       // With the library id, the service saves the revision over the letter.
-      const revised = await reviseCoverLetter({ letter: current, instruction, company: linkedJob?.company, role: linkedJob?.role, documentId: letterId });
+      const revised = await reviseCoverLetter({
+        letter: current,
+        instruction,
+        company: linkedJob?.company,
+        role: linkedJob?.role,
+        documentId: letterId,
+      });
       if (revised.documentId === null && revised.saveNotice) toast.warning(revised.saveNotice);
       // A revision whose save failed stays tied to the letter it revised, so the
       // next edit's autosave still lands there.
@@ -808,16 +858,6 @@ const CoverScreen: FC = () => {
       </header>
 
       <main className="px-8 py-7 pb-14 max-w-[760px] mx-auto flex flex-col gap-5">
-        {contextJob && (
-          <JobContextBanner
-            action="Writing a cover letter"
-            role={contextJob.role}
-            company={contextJob.company}
-            backHref={backToJobHref(context)}
-            onDismiss={() => setContextDismissed(true)}
-          />
-        )}
-
         {openingLinked ? (
           <div className="flex min-h-[420px] items-center justify-center">
             <p className="inline-flex items-center gap-2 text-sm text-black/50" role="status">
@@ -833,9 +873,17 @@ const CoverScreen: FC = () => {
              and the price is said beside Write letter, not here (owner,
              2026-10-04, as on the resume creator's front door). */
           <div className="-mt-3 flex flex-col items-center text-center">
-            <Lottie src={`/Lottie/neobrutalism/Edit_Pencil_Note_lottie.json`} autoplay loop speed={0.47} style={{ width: 256, height: 256 }} />
+            <Lottie
+              src={`/Lottie/neobrutalism/Edit_Pencil_Note_lottie.json`}
+              autoplay
+              loop
+              speed={0.47}
+              style={{ width: 256, height: 256 }}
+            />
 
-            <p className="-mt-5 mb-4 max-w-[540px] text-sm leading-relaxed text-black/50">Create a job specific cover letter or just start typing✨</p>
+            <p className="-mt-5 mb-4 max-w-[540px] text-sm leading-relaxed text-black/50">
+              Create a job specific cover letter or just start typing✨
+            </p>
             <div className=" grid w-full max-w-[560px] grid-cols-1 gap-3.5 sm:grid-cols-2">
               <button
                 type="button"
@@ -867,7 +915,10 @@ const CoverScreen: FC = () => {
               <p className="mt-5 max-w-[560px] text-xs leading-relaxed text-black/55">
                 <PlanChip plan="basic" className="mr-1.5 bg-white align-middle" />
                 Free keeps one cover letter. Open yours below to edit or revise it, or{" "}
-                <button type="button" onClick={coverLock.upgrade} className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                <button
+                  type="button"
+                  onClick={coverLock.upgrade}
+                  className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
                   upgrade to Basic
                 </button>{" "}
                 to write more.
@@ -881,20 +932,16 @@ const CoverScreen: FC = () => {
             {/* Linked job — one row, one way to change it. */}
             <DashCard className="p-4">
               <div className="flex flex-wrap items-center gap-3">
-                
                 <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
                   {linkedJob && !isBlankDraft ? (
                     <>
-                      <span className="text-[11px] font-semibold leading-none text-black/45">Written for</span>
+                      <span className="text-[11px] font-semibold leading-none text-black/45">Writing for</span>
                       {/* Opens the job itself. A reopened letter whose job was never saved has no id, so nothing to open. */}
                       {linkedJob.id ? (
                         <Link
                           href={jobHref(linkedJob.id)}
                           title={`Open ${linkedJob.company} · ${linkedJob.role}`}
-                          className={cn(
-                            pillVariants({ variant: "positive" }),
-                            "max-w-full gap-1 br-plain-press hover:underline",
-                          )}>
+                          className={cn(pillVariants({ variant: "positive" }), "max-w-full gap-1 br-plain-press hover:underline")}>
                           <span className="min-w-0 truncate">
                             {linkedJob.company} · {linkedJob.role}
                           </span>
@@ -987,20 +1034,6 @@ const CoverScreen: FC = () => {
                   <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", builtOpen && "rotate-180")} />
                 </button>
               )}
-
-              {/* Tone only means something for a generated letter: on a blank
-                  draft there is nothing to rewrite, so the control is not shown
-                  rather than shown and inert. */}
-              {!isBlankDraft && (
-                <div className="flex items-center gap-2">
-                  {isUnwritten(tone) && (
-                    <Pill variant="outline-dashed" className="flex-none">
-                      {COVER_CREDITS} credits per tone
-                    </Pill>
-                  )}
-                  <SlidingTabs value={tone} options={TONE_OPTIONS} onChange={(next) => void handleToneChange(next as CoverTone)} />
-                </div>
-              )}
             </div>
 
             {/* Expandable disclosure panel — only facts, and only ones this
@@ -1015,34 +1048,34 @@ const CoverScreen: FC = () => {
                   finds it — so a blank draft must not carry a description of a
                   letter that was never written. */}
               {!isBlankDraft && (
-              <DashCard className="p-6">
-                <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-3">What this was written from</p>
-                <div className="flex flex-col divide-y divide-black/8">
-                  <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 first:pt-0">
-                    <p className="text-xs font-bold text-black/40 sm:pt-0.5">Your resume</p>
-                    <p className="text-sm text-primary">{resume?.fileName ?? "—"}</p>
+                <DashCard className="p-6">
+                  <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-3">What this was written from</p>
+                  <div className="flex flex-col divide-y divide-black/8">
+                    <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 first:pt-0">
+                      <p className="text-xs font-bold text-black/40 sm:pt-0.5">Your resume</p>
+                      <p className="text-sm text-primary">{resume?.fileName ?? "—"}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3">
+                      <p className="text-xs font-bold text-black/40 sm:pt-0.5">The posting</p>
+                      <p className="text-sm text-primary">
+                        {linkedJob?.description
+                          ? `${linkedJob.company} — ${linkedJob.role}`
+                          : `${linkedJob?.company ?? "—"} — no description, so the letter is written from your resume alone`}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 last:pb-0">
+                      <p className="text-xs font-bold text-black/40 sm:pt-0.5">Tone</p>
+                      <p className="text-sm text-primary">
+                        {TONE_OPTIONS.find((option) => option.id === tone)?.label} — {paragraphTarget} paragraph
+                        {paragraphTarget === 1 ? "" : "s"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3">
-                    <p className="text-xs font-bold text-black/40 sm:pt-0.5">The posting</p>
-                    <p className="text-sm text-primary">
-                      {linkedJob?.description
-                        ? `${linkedJob.company} — ${linkedJob.role}`
-                        : `${linkedJob?.company ?? "—"} — no description, so the letter is written from your resume alone`}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 last:pb-0">
-                    <p className="text-xs font-bold text-black/40 sm:pt-0.5">Tone</p>
-                    <p className="text-sm text-primary">
-                      {TONE_OPTIONS.find((option) => option.id === tone)?.label} — {paragraphTarget} paragraph
-                      {paragraphTarget === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-4 text-xs leading-relaxed text-black/45">
-                  Every employer, date and number in the letter comes from that resume. If something reads wrong, it is in the resume — fix it
-                  there and rewrite.
-                </p>
-              </DashCard>
+                  <p className="mt-4 text-xs leading-relaxed text-black/45">
+                    Every employer, date and number in the letter comes from that resume. If something reads wrong, it is in the resume —
+                    fix it there and rewrite.
+                  </p>
+                </DashCard>
               )}
             </div>
 
@@ -1058,7 +1091,12 @@ const CoverScreen: FC = () => {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => setTheme(v as LetterThemeId)} />
                   <ToolbarSelect label="Font" value={font} options={LETTER_FONT_OPTIONS} onChange={(v) => setFont(v as LetterFontId)} />
-                  <ToolbarSelect label="Spacing" value={spacing} options={SPACING_OPTIONS} onChange={(v) => setSpacing(v as LetterSpacingId)} />
+                  <ToolbarSelect
+                    label="Spacing"
+                    value={spacing}
+                    options={SPACING_OPTIONS}
+                    onChange={(v) => setSpacing(v as LetterSpacingId)}
+                  />
                   <ToolbarSelect
                     label="Letterhead"
                     value={letterhead}
@@ -1072,7 +1110,9 @@ const CoverScreen: FC = () => {
                   <div className="border-b border-black/10 px-8 pb-5 pt-7">
                     <p className={cn("text-lg font-bold text-primary", FONT_CLASS[font])}>{profile.fullName}</p>
                     {letterhead === "full" && (
-                      <p className="mt-0.5 text-xs text-black/45">{[profile.email, profile.portfolio, profile.location].filter(Boolean).join(" · ")}</p>
+                      <p className="mt-0.5 text-xs text-black/45">
+                        {[profile.email, profile.portfolio, profile.location].filter(Boolean).join(" · ")}
+                      </p>
                     )}
                   </div>
                 ) : undefined
@@ -1117,7 +1157,10 @@ const CoverScreen: FC = () => {
                           ) : (
                             <>
                               not saved — {autosave.status.message}{" "}
-                              <button type="button" onClick={autosave.flush} className="cursor-pointer underline decoration-2 underline-offset-2">
+                              <button
+                                type="button"
+                                onClick={autosave.flush}
+                                className="cursor-pointer underline decoration-2 underline-offset-2">
                                 Try again
                               </button>
                             </>
