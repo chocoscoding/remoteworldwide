@@ -3,10 +3,13 @@
 // The resume creator's front door: a top bar like every dashboard screen's,
 // the ways to start one, and the latest six to pick back up. Every resume
 // made here is also in My documents, and "See all" opens it on Resumes
-// (owner, 2026-10-03). The hero is kept short so the list has the room.
+// (owner, 2026-10-03). The hero is kept short so the list has the room: the
+// ways to start are single rows (icon, title, at most a few words under it),
+// and Build with AI says its price in its dialog, not on the card (owner,
+// 2026-10-04).
 
 import { useRef, useState, type FC, type ReactNode } from "react";
-import { FilePlus2, FileText, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowRight, Bot, FilePlus2, FileText, Loader2, Trash2, Upload } from "lucide-react";
 import TimeAgo from "timeago-react";
 import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
@@ -14,7 +17,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import SeeAllInDocuments, { FRONT_DOOR_RECENT } from "@/app/components/dashboard/ui/SeeAllInDocuments";
-import { BUILD_CREDITS, RESUME_ACCEPT } from "@/app/lib/resume/api";
+import { RESUME_ACCEPT } from "@/app/lib/resume/api";
 import { isStaleCheck, type ResumeDocument } from "./resume-document";
 
 export interface ResumeLandingProps {
@@ -109,7 +112,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
       <div className="mx-auto flex max-w-[680px] flex-col items-center px-6 pb-14 pt-5 text-center">
         {banner && <div className="mb-2 w-full">{banner}</div>}
         <span aria-hidden className="flex items-center justify-center">
-          <Lottie src={`/Lottie/neobrutalism/Edit_Contract_lottie.json`} autoplay loop speed={0.63} style={{ width: 170, height: 170 }} />
+          <Lottie src={`/Lottie/neobrutalism/Edit_Contract_lottie.json`} autoplay loop speed={0.63} style={{ width: 230, height: 230 }} />
         </span>
 
         <h2 className="text-[22px] font-bold text-primary leading-tight">Let&apos;s build the resume that gets you hired</h2>
@@ -124,32 +127,29 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             onClick={() => setNaming((v) => !v)}
             aria-expanded={naming}
             disabled={!onCreateBlank}
-            className="group rounded-2xl bg-[#222325] p-5 text-left text-white cursor-pointer br-shadow-press br-lime disabled:pointer-events-none disabled:opacity-50">
-            <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
+            className="group flex items-center gap-3 rounded-2xl bg-[#222325] px-4 py-3.5 text-left text-white cursor-pointer br-shadow-press br-lime disabled:pointer-events-none disabled:opacity-50">
+            <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-white/10">
               <FilePlus2 className="h-4 w-4 text-[#e1f073]" />
             </span>
-            <span className="mt-3 block text-sm font-bold">Start from scratch</span>
-            <span className="mt-1 block text-xs leading-relaxed text-white/55">A blank page with the default look — name it and go.</span>
+            <span className="text-sm font-bold">Start from scratch</span>
           </button>
 
           <label
             aria-busy={importing}
             className={cn(
-              "group rounded-2xl border-[1.5px] border-black/15 bg-white p-5 text-left transition-[transform,box-shadow,border-color] duration-100 ease-out",
+              "group flex items-center gap-3 rounded-2xl border-[1.5px] border-black/15 bg-white px-4 py-3.5 text-left transition-[transform,box-shadow,border-color] duration-100 ease-out",
               !onImport
                 ? "pointer-events-none opacity-50"
                 : importing
                   ? "cursor-wait opacity-70"
                   : "cursor-pointer br-plain-press",
             )}>
-            <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
+            <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
               {importing ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Upload className="h-4 w-4 text-primary" />}
             </span>
-            <span className="mt-3 block text-sm font-bold text-primary">
-              {importing ? "Reading your resume…" : "Start from a resume you have"}
-            </span>
-            <span className="mt-1 block text-xs leading-relaxed text-black/50">
-              {importing ? "Pulling out your experience, education and skills." : "Upload a PDF, DOCX, TXT or MD — we turn it into an editable draft."}
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-primary">{importing ? "Reading your resume…" : "Start from a resume you have"}</span>
+              <span className="mt-0.5 block text-xs text-black/50">{importing ? "Pulling out your details." : "Upload a PDF, DOCX, TXT or MD"}</span>
             </span>
             <input
               ref={fileRef}
@@ -165,20 +165,19 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             <button
               type="button"
               onClick={onBuild}
-              className="group flex items-center gap-4 rounded-2xl bg-[#e1f073] p-5 text-left text-primary cursor-pointer br-shadow-press disabled:pointer-events-none disabled:opacity-50 sm:col-span-2">
+              className="group flex items-center gap-3 rounded-2xl bg-[#e1f073] px-4 py-3.5 text-left text-primary cursor-pointer br-shadow-press disabled:pointer-events-none disabled:opacity-50 sm:col-span-2">
               <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#222325]">
-                <Sparkles className="h-4 w-4 text-[#e1f073]" />
+                <Bot className="h-4 w-4 text-[#e1f073]" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-bold">Build with AI</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-black/60">
-                  Tell it the role — it writes a tailored resume from your profile or the resume you imported.
-                </span>
+                <span className="mt-0.5 block text-xs text-black/60">Tailored to the role you want</span>
               </span>
+              {/* Locked above the plan: the plan it needs. Otherwise just "go"; the price is said in the dialog. */}
               {buildLocked ? (
                 <PlanChip plan="basic" className="flex-none bg-white" />
               ) : (
-                <span className="flex-none rounded-full bg-[#222325] px-2.5 py-1 text-[11px] font-bold text-white">{BUILD_CREDITS} credits</span>
+                <ArrowRight aria-hidden className="h-4 w-4 flex-none transition-transform duration-150 group-hover:translate-x-0.5" />
               )}
             </button>
           )}
@@ -196,7 +195,7 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                 if (e.key === "Enter") void create();
               }}
               maxLength={80}
-              placeholder="Name it — e.g. Stripe — Senior Designer"
+              placeholder="Name it, e.g. Stripe - Senior Designer"
               className="min-w-0 flex-1 rounded-xl border border-black/12 bg-[#fbfbf7] px-4 py-2.5 text-sm text-primary placeholder:text-black/35 outline-none focus:border-black/30 transition-colors"
             />
             <StickerButton type="button" variant="primary" size="md" disabled={creating} onClick={() => void create()}>

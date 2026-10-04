@@ -827,9 +827,12 @@ const CoverScreen: FC = () => {
         ) : !started ? (
           /* The front door: two ways in, neither assumed. You don't need the
              job to exist anywhere to write a letter. The hero is kept short
-             (owner, 2026-10-03) so the list of letters below has the room. */
+             (owner, 2026-10-03) so the list of letters below has the room:
+             the ways in are single rows, a few words at most under a title,
+             and the price is said beside Write letter, not here (owner,
+             2026-10-04, as on the resume creator's front door). */
           <div className="-mt-3 flex flex-col items-center text-center">
-            <Lottie src={`/Lottie/neobrutalism/Edit_Pencil_Note_lottie.json`} autoplay loop speed={0.47} style={{ width: 190, height: 190 }} />
+            <Lottie src={`/Lottie/neobrutalism/Edit_Pencil_Note_lottie.json`} autoplay loop speed={0.47} style={{ width: 256, height: 256 }} />
 
             <p className="-mt-5 mb-4 max-w-[540px] text-sm leading-relaxed text-black/50">Create a job specific cover letter or just start typing✨</p>
             <div className=" grid w-full max-w-[560px] grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -837,26 +840,23 @@ const CoverScreen: FC = () => {
                 type="button"
                 onClick={handlePickJob}
                 disabled={!resume}
-                className="group rounded-2xl bg-[#222325] p-5 text-left text-white cursor-pointer br-shadow-press br-lime disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none">
-                <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
+                className="group flex items-center gap-3 rounded-2xl bg-[#222325] px-4 py-3.5 text-left text-white cursor-pointer br-shadow-press br-lime disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none">
+                <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-white/10">
                   <Link2 className="h-4 w-4 text-[#e1f073]" />
                 </span>
-                <span className="mt-3 block text-sm font-bold">Create from a job</span>
-                <span className="mt-1 block text-xs leading-relaxed text-white/55">
-                  Pick a Remote Worldwide listing or paste any posting — we write it from your resume. {COVER_CREDITS} credits.
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold">Create from a job</span>
+                  <span className="mt-0.5 block text-xs text-white/55">From a listing or any posting</span>
                 </span>
               </button>
               <button
                 type="button"
                 onClick={startBlank}
-                className="group rounded-2xl bg-white p-5 text-left cursor-pointer br-plain-press">
-                <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
+                className="group flex items-center gap-3 rounded-2xl bg-white px-4 py-3.5 text-left cursor-pointer br-plain-press">
+                <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
                   <FileSignature className="h-4 w-4 text-primary" />
                 </span>
-                <span className="mt-3 block text-sm font-bold text-primary">Write your own</span>
-                <span className="mt-1 block text-xs leading-relaxed text-black/50">
-                  A blank page, no job attached. Free, and nothing is generated.
-                </span>
+                <span className="text-sm font-bold text-primary">Write your own</span>
               </button>
             </div>
 
