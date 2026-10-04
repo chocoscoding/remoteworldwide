@@ -42,8 +42,8 @@
 // save-before-switch (reading the OUTGOING document's live state before that
 // remount happens) has to run from a component that calls `useResumeDesign()`
 // itself — that's `ResumeScreenBody`, not this component, which is why
-// `documents`/`activeDocId` are owned here but the switch/create/back
-// HANDLERS are implemented one level down. The landing's own create/import
+// `documents`/`activeDocId` are owned here, but the stash of the outgoing
+// document is written one level down, as the editor unmounts. The landing's own create/import
 // handlers live HERE instead, because with no document open there's nothing
 // to stash first.
 import { Suspense, useCallback, useEffect, useRef, useState, type FC, type ReactNode } from "react";
@@ -224,13 +224,16 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
   }
 
   return (
-    <ResumeDesignProvider key={activeDoc.id} initialDesign={activeDoc.design} initialSections={activeDoc.sections}>
+    <ResumeDesignProvider
+      key={activeDoc.id}
+      initialDesign={activeDoc.design}
+      initialSections={activeDoc.sections}
+      initialContent={activeDoc.content}
+      initialCheck={activeDoc.check}>
       <ResumeScreenBody
-        documents={documents}
         activeDocId={activeDoc.id}
         activeDoc={activeDoc}
         setDocuments={setDocuments}
-        setActiveDocId={setActiveDocId}
         onSaved={markSaved}
         banner={banner}
         tailorPreset={tailorPreset}

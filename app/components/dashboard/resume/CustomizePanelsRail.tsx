@@ -10,7 +10,7 @@
 import type { FC } from "react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
-import { CUSTOMIZE_PANELS, UndoRedoBar } from "@/app/components/dashboard/resume/customize";
+import { CUSTOMIZE_PANELS } from "@/app/components/dashboard/resume/customize";
 
 export interface CustomizePanelsRailProps {
   flashItem: string | null;
@@ -34,10 +34,6 @@ CustomizePanelsRail: FC<CustomizePanelsRailProps> = ({ flashItem, registerRef })
         </DashCard>
       </div>
     ))}
-
-    <div className="sticky bottom-2 flex justify-center pt-2">
-      <UndoRedoBar />
-    </div>
   </div>
 );
 

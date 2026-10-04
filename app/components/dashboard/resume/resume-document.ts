@@ -6,7 +6,7 @@
 // is uncontrolled internally, so switching the active document is an explicit
 // "read the live design/sections out of the hook, stash them on the outgoing
 // document, then swap" rather than anything reactive — see
-// `ResumeScreenBody.tsx`'s `switchTo`/`createNewResume`.
+// `ResumeScreenBody.tsx`'s unmount stash.
 //
 // Documents are real now: they come from the AI service's library and are
 // autosaved back to it (`useResumeAutosave`). What is NOT saved is the ATS

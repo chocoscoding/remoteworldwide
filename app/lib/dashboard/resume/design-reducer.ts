@@ -1,15 +1,16 @@
-// Design state: a snapshot reducer wrapped in an undo/redo history reducer.
+// Design state: a snapshot reducer. The undo history it runs in is the whole
+// editor's (`history.ts`, wired up in `editor-state.ts`), shared with the
+// content, so one Undo covers a typed word, a colour and an AI rewrite alike.
 //
 // -- Why snapshots, not patches -------------------------------------------
 // `template/apply` becomes ONE undoable step that restores all prior
 // customisation on undo (real FlowCV behaviour, free). `sections` shares the
 // history with `design` because reordering a section is a design decision.
-// Content edits stay out of this reducer entirely.
 //
 // -- Undo granularity is COMMIT-based, not time-debounced ------------------
 // Radix Slider exposes `onValueCommit` alongside `onValueChange`:
-//   onValueChange -> dispatch with `transient: true`  -> replaces `present`
-//   onValueCommit -> dispatch with `transient: false` -> pushes onto `past`
+//   onValueChange -> dispatch with `transient: true`  -> folds into one run
+//   onValueCommit -> dispatch with `transient: false` -> closes the run
 // A 12-step drag is therefore exactly one undo entry by construction. No
 // timers and no `Date.now()` — `react-hooks/purity` forbids both here. Controls
 // with no commit event (hex field, colour wheel) debounce at the COMPONENT
@@ -163,11 +164,15 @@ export type DesignAction =
   | { type: "history/redo" };
 
 /**
- * `transient` only exists on the handful of drag-driven actions, so it is read
- * through an `in` narrowing rather than being bolted onto every variant.
+ * The run a drag-driven action belongs to — one per control, so a drag folds
+ * into one undo step — or null for a plain step. `transient` only exists on
+ * the handful of drag-driven actions, so it is read through an `in` narrowing
+ * rather than being bolted onto every variant.
  */
-function isTransient(a: DesignAction): boolean {
-  return "transient" in a && a.transient === true;
+export function transientGroup(a: DesignAction): string | null {
+  if (!("transient" in a) || a.transient !== true) return null;
+  const control = "key" in a ? a.key : "slot" in a ? a.slot : "";
+  return `design:${a.type}:${control}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -460,101 +465,4 @@ export function snapshotReducer(s: DesignSnapshot, a: DesignAction): DesignSnaps
     default:
       return s;
   }
-}
-
-// ---------------------------------------------------------------------------
-// History reducer
-// ---------------------------------------------------------------------------
-
-/** Folds an open transient run (a slider drag) into `past`. */
-function commitPending(s: HistoryState): HistoryState {
-  if (s.pending === null) return s;
-  if (s.pending === s.present) return { ...s, pending: null };
-  return {
-    past: [...s.past, s.pending].slice(-HISTORY_LIMIT),
-    present: s.present,
-    future: [],
-    pending: null,
-  };
-}
-
-export function historyReducer(s: HistoryState, a: DesignAction): HistoryState {
-  if (a.type === "history/undo") {
-    const base = commitPending(s);
-    if (base.past.length === 0) return s;
-    const previous = base.past[base.past.length - 1];
-    return {
-      past: base.past.slice(0, -1),
-      present: previous,
-      future: [base.present, ...base.future].slice(0, HISTORY_LIMIT),
-      pending: null,
-    };
-  }
-
-  if (a.type === "history/redo") {
-    const base = commitPending(s);
-    if (base.future.length === 0) return s;
-    const [next, ...rest] = base.future;
-    return {
-      past: [...base.past, base.present].slice(-HISTORY_LIMIT),
-      present: next,
-      future: rest,
-      pending: null,
-    };
-  }
-
-  const present = snapshotReducer(s.present, a);
-  const transient = isTransient(a);
-
-  if (present === s.present) {
-    // Nothing changed. A COMMIT still has to close out an open drag — the
-    // final commit usually carries the same value the last transient action
-    // already applied, so this branch is the common case at the end of a drag.
-    if (!transient && s.pending !== null) return commitPending(s);
-    return s;
-  }
-
-  if (transient) {
-    return { ...s, present, pending: s.pending ?? s.present };
-  }
-
-  return {
-    past: [...s.past, s.pending ?? s.present].slice(-HISTORY_LIMIT),
-    present,
-    future: [],
-    pending: null,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Init + selectors
-// ---------------------------------------------------------------------------
-
-/**
- * Builds the initial history. Pass nothing for the base "basic corporate"
- * look, a `ResumeTemplateId` to seed from a template, or a fully-formed
- * `ResumeDesign` to restore one.
- */
-export function initHistory(source?: ResumeTemplateId | ResumeDesign): HistoryState {
-  let present: DesignSnapshot;
-  if (source === undefined) {
-    present = { design: DEFAULT_DESIGN, sections: DEFAULT_SECTIONS };
-  } else if (typeof source === "string") {
-    const tpl = lookupTemplate(source);
-    present = {
-      design: { ...deepMerge(DEFAULT_DESIGN, tpl.design), chrome: tpl.chrome },
-      sections: tpl.sections.length ? sectionsFromSeeds(tpl.sections) : DEFAULT_SECTIONS,
-    };
-  } else {
-    present = { design: source, sections: DEFAULT_SECTIONS };
-  }
-  return { past: [], present, future: [], pending: null };
-}
-
-export function canUndo(s: HistoryState): boolean {
-  return s.past.length > 0 || (s.pending !== null && s.pending !== s.present);
-}
-
-export function canRedo(s: HistoryState): boolean {
-  return s.future.length > 0;
 }
