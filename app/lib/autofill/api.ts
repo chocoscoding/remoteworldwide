@@ -56,6 +56,8 @@ export interface AutofillInput {
   applicationId?: string | null;
   /** The ingested resume the answers should speak from. Omitted, the newest one that parsed is used. */
   resumeId?: string | null;
+  /** The posting: context for "why this company" answers, never a fact about the person. */
+  job?: { company?: string | null; role?: string | null } | null;
 }
 
 /**
@@ -73,6 +75,40 @@ export async function draftAnswers(input: AutofillInput): Promise<AutofillAnswer
     questions: questions.map((question) => ({ question })),
     applicationId: input.applicationId || null,
     resumeId: input.resumeId || null,
+    job: input.job?.company || input.job?.role ? { company: input.job.company || null, role: input.job.role || null } : null,
   });
   return data?.answers ?? [];
+}
+
+// ── Reading a pasted form ──────────────────────────────────────────────────
+// The apply wizard's "Paste the whole application form": the text of an
+// employer's application page, select-all and copy, in; the form's questions
+// out. Free: nothing is drafted. Mirrors `FormQuestions` in
+// remoteworldwideai/src/services/formQuestionService.ts.
+
+/** The longest paste the service takes. A whole page with a long posting sits well inside it. */
+export const FORM_TEXT_MAX = 60_000;
+
+/** The most questions read off one form. */
+export const FORM_QUESTIONS_MAX = 20;
+
+/** The fields left out of the list because the profile covers them, or they are the person's own to answer on the form. */
+export type FormLeftOut = "name" | "email" | "phone" | "links" | "uploads" | "address" | "self-ID";
+
+export interface FormQuestion {
+  /** The form's own wording. */
+  question: string;
+  /** In the saved-answer library already: answering it is free and returns the person's own answer. */
+  answeredBefore: boolean;
+}
+
+export interface FormQuestions {
+  questions: FormQuestion[];
+  leftOut: FormLeftOut[];
+}
+
+/** Reads the questions off a pasted application page. Rejects with the service's own sentence (429 when read too often). */
+export async function findFormQuestions(text: string): Promise<FormQuestions> {
+  const data = await apiPost<FormQuestions>(`${AUTOFILL_PATH}/questions`, { text: text.slice(0, FORM_TEXT_MAX) });
+  return { questions: data?.questions ?? [], leftOut: data?.leftOut ?? [] };
 }

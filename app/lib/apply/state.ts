@@ -29,6 +29,8 @@ export interface ApplyQuestion {
   drafted: { confidence: number; cat: string } | null;
   /** The user typed this answer, so a draft never replaces it. */
   edited: boolean;
+  /** Read off a pasted form already answered in the saved-answer library: answering it is free. */
+  answeredBefore?: boolean;
 }
 
 /** A tool's proposal, waiting for "Use this version" — kept, because it cost a credit. */
@@ -149,6 +151,7 @@ function readQuestions(value: unknown): ApplyQuestion[] {
           ? { confidence: row.drafted.confidence, cat: row.drafted.cat }
           : null,
       edited: row.edited === true,
+      ...(row.answeredBefore === true ? { answeredBefore: true } : {}),
     }),
   );
   return rows.length > 0 ? rows : [EMPTY_QUESTION];
