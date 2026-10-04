@@ -31,9 +31,13 @@ import { PlanChip, usePlanGate } from "@/app/components/dashboard/billing/Upgrad
 const FORMAT_ICON: Record<SessionFormat, LucideIcon> = { behavioural: MessageCircle, portfolio: Presentation, salary: DollarSign };
 
 const DIFFICULTIES: { id: Difficulty; label: string; note: string }[] = [
-  { id: "warm-up", label: "Warm-up", note: "Friendly pacing, no follow-up pressure — good for a first pass at a new format." },
-  { id: "standard", label: "Standard", note: "Matches a typical first or second round." },
-  { id: "tough", label: "Tough", note: "Pushier follow-ups and pointed pressure — closer to a final round or a panel that likes to dig." },
+  { id: "warm-up", label: "Warm-up", note: "Friendly pacing and no follow-ups. Good for a first pass at a new format." },
+  { id: "standard", label: "Standard", note: "A typical first or second round: mostly about the job, a follow-up when an answer is vague." },
+  {
+    id: "tough",
+    label: "Tough",
+    note: "The sharpest questions, half on your resume, and a follow-up on most answers. Closer to a final round or a panel that likes to dig.",
+  },
 ];
 
 /**
@@ -169,6 +173,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
     lengthMinutes: voiceQuestionLength,
     seed: `${track.id}-${formats.join(",")}-${voiceQuestionLength}`,
     likely: likelySet?.questions,
+    difficulty,
   });
   const questionTotal = plan.length;
   const tailoredCount = plan.filter((q) => q.tailored).length;

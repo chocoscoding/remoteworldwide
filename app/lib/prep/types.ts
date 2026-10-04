@@ -157,12 +157,19 @@ export interface UpdatePrepTrackInput {
 // Likely questions — /api/ai/prep/tracks/:trackId/questions
 // ---------------------------------------------------------------------------
 
+/** What a likely question is led by: what the job requires, or what the resume claims. */
+export type QuestionBasis = "posting" | "resume";
+
 export interface LikelyQuestion {
   id: string;
   text: string;
   why: string;
   format: PrepFormat;
   requirement: string | null;
+  /** Null for a set written before questions said what led them. */
+  basis: QuestionBasis | null;
+  /** One a demanding panel would grill with. Tough asks these first. */
+  sharp: boolean;
 }
 
 export interface LikelyQuestionSet {

@@ -20,7 +20,7 @@
 // the screen itself. The setup screen runs the same pick to say what's coming.
 
 import { pickQuestionsForSession } from "@/app/lib/dashboard/prep-engine";
-import { QUESTIONS_FOR_LENGTH, type QuestionBankEntry, type SessionFormat, type SessionLength } from "@/app/lib/dashboard/prep-data";
+import { QUESTIONS_FOR_LENGTH, type Difficulty, type QuestionBankEntry, type SessionFormat, type SessionLength } from "@/app/lib/dashboard/prep-data";
 import type { LikelyQuestion } from "./types";
 
 export interface SessionQuestion {
@@ -88,6 +88,26 @@ export interface PickSessionQuestionsInput {
   seed: string;
   /** The track's stored likely questions; null or empty when it has none (or no track). */
   likely: readonly LikelyQuestion[] | null | undefined;
+  /** How much of the session presses on the resume, and whether the sharpest questions go first. Standard when not given. */
+  difficulty?: Difficulty;
+}
+
+/**
+ * The share of a session's likely questions led by the resume (owner,
+ * 2026-10-04): about 60% from what the job requires and 40% from the resume,
+ * half and half at tough. The rest is led by the posting.
+ */
+const RESUME_SHARE: Record<Difficulty, number> = { "warm-up": 0.4, standard: 0.4, tough: 0.5 };
+
+/**
+ * One format's likely questions in the order this difficulty asks them: tough
+ * the sharp ones first, warm-up the sharp ones last, standard as the track
+ * lists them. Stable, so a set written before questions were marked keeps its order.
+ */
+function byPressure(questions: readonly LikelyQuestion[], difficulty: Difficulty): LikelyQuestion[] {
+  if (difficulty === "standard") return [...questions];
+  const first = difficulty === "tough";
+  return [...questions.filter((q) => q.sharp === first), ...questions.filter((q) => q.sharp !== first)];
 }
 
 /**
@@ -133,7 +153,12 @@ export function pickSessionQuestions(input: PickSessionQuestionsInput): SessionQ
  *  - Alternating between the chosen formats in the order they were picked, as
  *    the bank path does (switching is the point of picking more than one), and
  *    within a format in the order the track lists them — the ones the
- *    Overview shows first are the ones asked first.
+ *    Overview shows first are the ones asked first — except that tough asks
+ *    the sharp ones first and warm-up last (`byPressure`).
+ *  - Led by the posting or the resume in the difficulty's share (`RESUME_SHARE`),
+ *    spread through the session: each slot takes its format's next question
+ *    of the basis the share calls for, else its next of the other. A set
+ *    written before questions said what led them is asked in its own order.
  *  - Too few: the rest is filled from the bank, marked `tailored: false`, and
  *    asked last. A session often ends before its last question (the chosen
  *    length's time limit, a balance that covers fewer minutes, ending early),
@@ -146,15 +171,25 @@ export function pickSessionQuestions(input: PickSessionQuestionsInput): SessionQ
  * With none (no set yet, none in the chosen formats, or no track): the bank
  * path exactly as before.
  */
-function pickRoleQuestions({ formats, lengthMinutes, seed, likely }: PickSessionQuestionsInput): SessionQuestion[] {
+function pickRoleQuestions({ formats, lengthMinutes, seed, likely, difficulty = "standard" }: PickSessionQuestionsInput): SessionQuestion[] {
   const chosen: SessionFormat[] = formats.length > 0 ? formats : ["behavioural"];
   const count = QUESTIONS_FOR_LENGTH[lengthMinutes];
 
-  const usable = usableLikelyQuestions(likely);
-  const queues = chosen.map((format) => usable.filter((q) => q.format === format));
+  const usable = usableLikelyQuestions(likely).filter((q) => !CORE_QUESTION.test(q.text));
+  const queues = chosen.map((format) => byPressure(usable.filter((q) => q.format === format), difficulty));
+  const share = RESUME_SHARE[difficulty];
   const tailored: LikelyQuestion[] = [];
-  for (let i = 0; tailored.length < count && queues.some((queue) => i < queue.length); i++) {
-    for (const queue of queues) if (i < queue.length && tailored.length < count) tailored.push(queue[i]);
+  let fromResume = 0;
+  // The formats in turn, skipping one that has run out, as the bank path alternates them.
+  for (let turn = 0; tailored.length < count && queues.some((queue) => queue.length > 0); turn++) {
+    const queue = queues[turn % queues.length];
+    if (queue.length === 0) continue;
+    // A resume-led question whenever the session has fallen below the share: P P R P R for 40%, P R P R for half.
+    const wantResume = Math.floor((tailored.length + 1) * share) > fromResume;
+    const at = queue.findIndex((q) => (q.basis === "resume") === wantResume);
+    const [picked] = queue.splice(at >= 0 ? at : 0, 1);
+    tailored.push(picked);
+    if (picked.basis === "resume") fromResume += 1;
   }
   if (tailored.length === 0) return pickQuestionsForSession(chosen, lengthMinutes, seed).map(fromBank);
 

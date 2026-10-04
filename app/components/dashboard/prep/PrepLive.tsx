@@ -245,7 +245,10 @@ const MUTED_CAPTION = "You're muted — unmute your mic to answer";
  * `muted`: the candidate's own mute, said over a question too, whose talk-over
  * offer a muted mic cannot take up.
  */
-function captionFor(stage: Stage, { countdown, off, echoLoud, muted }: { countdown: number | null; off: string | null; echoLoud: boolean; muted: boolean }): string {
+function captionFor(
+  stage: Stage,
+  { countdown, off, echoLoud, muted, finishIn }: { countdown: number | null; off: string | null; echoLoud: boolean; muted: boolean; finishIn: number | null }
+): string {
   switch (stage) {
     case "mic-lost":
       return "Your mic stopped — the recording is paused";
@@ -267,7 +270,7 @@ function captionFor(stage: Stage, { countdown, off, echoLoud, muted }: { countdo
     case "voice-blocked":
       return "Your browser blocked the interviewer's voice — press the speaker to hear it";
     case "finished":
-      return "That was the last question";
+      return finishIn !== null ? `That was the last question. Ending the interview in ${finishIn}…` : "That was the last question";
     case "mic-opening":
       return "Opening your mic…";
     case "answering":
@@ -288,6 +291,15 @@ function eyebrowFor(stage: Stage): string {
 }
 
 const creditCount = (n: number) => `${n} credit${n === 1 ? "" : "s"}`;
+
+/**
+ * Seconds a finished engine interview waits, once the interviewer has said its
+ * closing line, before it ends itself (owner, 2026-10-04): there is nothing
+ * left to say, and anything said now is not an answer to anything.
+ */
+const AUTO_FINISH_SECONDS = 10;
+/** The voice bars across the full answer bar: enough of them to stay a dense line at 1100px. */
+const ANSWER_BAR_COUNT = 96;
 
 /** A 402 on start, with the price: the setup screen no longer shows the balance beside it. */
 function creditsRefusal(credits: PrepInsufficientCredits, rule: PrepVoiceConfig["credits"]): string {
@@ -415,6 +427,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
           lengthMinutes: questionPresetFor(Math.min(config.lengthMinutes, config.capMinutes ?? config.lengthMinutes)),
           seed: `${track.id}-${config.formats.join(",")}-${config.lengthMinutes}`,
           likely: likelyQuestions,
+          difficulty: config.difficulty,
         })
   );
   const tailoredSession = questions.some((q) => q.tailored);
@@ -1490,6 +1503,36 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceOn]);
 
+  // The last question has its answer and the interviewer has said its closing
+  // line: the interview ends itself after AUTO_FINISH_SECONDS. The interviewer
+  // speaking again (a reaction to more words) starts the wait over.
+  const autoFinishArmed = engineDone && phase === "active" && !engineLost && !restarting && !(aiSpeaking || capture.agentSpeaking);
+  const [finishIn, setFinishIn] = useState<number | null>(null);
+  const finishNowRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    finishNowRef.current = () => void finishSession("completed", withPendingAnswer());
+  });
+  useEffect(() => {
+    if (!autoFinishArmed) return;
+    const startedAt = Date.now();
+    const tick = () => {
+      const left = Math.max(0, AUTO_FINISH_SECONDS - Math.floor((Date.now() - startedAt) / 1_000));
+      setFinishIn(left);
+      if (left === 0) {
+        clearInterval(timer);
+        finishNowRef.current();
+      }
+    };
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 250);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+      setFinishIn(null);
+    };
+  }, [autoFinishArmed]);
+  const finishCountdown = autoFinishArmed ? finishIn : null;
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -1512,7 +1555,9 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
   /** The engine interviewer's side: it is speaking when either it or this screen's first question is. */
   const agentSpeaking = aiSpeaking || (engine && capture.agentSpeaking);
   const engineHint = engineDone
-    ? "That was the last question. Finish when you're ready."
+    ? finishCountdown !== null
+      ? `That was the last question. Ending the interview in ${finishCountdown}s.`
+      : "That was the last question. The interview ends on its own in a few seconds."
     : agentSpeaking
       ? "Answer when you're ready — talk over them if you want, they'll stop."
       : "Answer out loud. The interviewer moves on when you finish.";
@@ -1588,7 +1633,13 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
                           ? "answering"
                           : "mic-off";
   const showsMuted = selfMuted && dictationOff === null && (stage === "asking" || stage === "mic-off");
-  const orbCaption = captionFor(stage, { countdown: autoSend?.kind === "countdown" ? autoSend.seconds : null, off: dictationOff, echoLoud, muted: showsMuted });
+  const orbCaption = captionFor(stage, {
+    countdown: autoSend?.kind === "countdown" ? autoSend.seconds : null,
+    off: dictationOff,
+    echoLoud,
+    muted: showsMuted,
+    finishIn: finishCountdown,
+  });
   // Something is about to happen on its own: the caption has to be read. And a
   // mute, whose failure is an answer given to nobody: it must not read as a state name.
   const orbCaptionEmphasis = stage === "moving-on" || showsMuted;
@@ -1603,6 +1654,31 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
   /** A mic to mute, or a mute to undo; not on the refusal screen, which has no session. */
   const showMute = !showPrecall && (micUsable || selfMuted);
   /**
+   * The candidate's own mic, at the end of their voice bars (owner, 2026-10-04),
+   * in every kind of session. Muted is red rather than dimmed: a mute left on
+   * costs an answer without a sound, so it must not look like a resting
+   * control. Kept on screen while muted even where the mic has since failed,
+   * so a mute can always be undone. Round and 44px, as the keyboard button
+   * at the other end of the bars is.
+   */
+  const muteButton = showMute ? (
+    <button
+      type="button"
+      onClick={toggleSelfMute}
+      disabled={phase === "saving" || phase === "done" || engineLost || restarting}
+      // A fixed name with aria-pressed carrying the state: a label that also
+      // flips would be read as "Unmute your mic, pressed", which says both.
+      aria-pressed={selfMuted}
+      aria-label="Mute your mic"
+      title={selfMuted ? "Unmute your mic" : "Mute your mic"}
+      className={cn(
+        "grid h-11 w-11 flex-none place-content-center rounded-full border-[1.5px] cursor-pointer transition-colors disabled:opacity-40 disabled:pointer-events-none",
+        selfMuted ? "border-red-400/70 bg-red-500/15 text-red-300 hover:border-red-300" : "border-white/20 text-white hover:border-white/45"
+      )}>
+      {selfMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+    </button>
+  ) : null;
+  /**
    * The candidate's voice, where the instruction sentence used to be. The orb
    * is the interviewer's and no longer pulses with this mic — two meters of
    * one voice, one of them labelled "Your interviewer", was the who-is-talking
@@ -1615,16 +1691,17 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
    */
   const candidateBars = micUsable ? (
     selfMuted ? (
-      <span className="flex h-8 min-w-0 max-w-[420px] flex-1 items-center gap-2 px-1 text-[11px] font-bold text-red-300">
+      <span className="flex h-8 min-w-0 flex-1 items-center gap-2 px-1 text-[11px] font-bold text-red-300">
         <MicOff className="h-3.5 w-3.5 flex-none" aria-hidden />
         <span className="flex-none">Muted</span>
-        <VoiceFrequencyBars getFrequencyData={candidateSpectrum} active={false} className="h-8 flex-1" barClassName="bg-red-300/40" />
+        <VoiceFrequencyBars getFrequencyData={candidateSpectrum} active={false} count={ANSWER_BAR_COUNT} className="h-8 flex-1" barClassName="bg-red-300/40" />
       </span>
     ) : (
       <VoiceFrequencyBars
         getFrequencyData={candidateSpectrum}
         active={micOpen && phase === "active"}
-        className="h-8 max-w-[420px] flex-1 px-1"
+        count={ANSWER_BAR_COUNT}
+        className="h-8 flex-1 px-1"
         barClassName={stage === "asking" ? "bg-white/25" : "bg-white/80"}
       />
     )
@@ -1662,9 +1739,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
   // job to show — a footnote that changes every few seconds is only something to reread.
   const engineFootnote = (
     <p className="mx-auto mt-2 max-w-[1100px] text-center text-[10.5px] leading-snug text-white/50">
-      {engineDone
-        ? "That was the last question. Finish when you're ready."
-        : "Answer out loud — the interviewer moves on when you finish, and you can talk over them."}
+      Answer out loud. The interviewer moves on when you finish, and you can talk over them.
     </p>
   );
 
@@ -1746,27 +1821,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
           {recording ? formatRecordingClock(capture.elapsedMs) : formatClock(elapsedSeconds)}
         </span>
         <div className="flex gap-2 flex-none">
-          {/* The candidate's own mic, in every kind of session. Muted is red
-              rather than dimmed as the interviewer's speaker is when off: a
-              mute left on costs an answer without a sound, so it must not look
-              like a resting control. Kept on screen while muted even where the
-              mic has since failed, so a mute can always be undone. */}
-          {showMute && (
-            <button
-              type="button"
-              onClick={toggleSelfMute}
-              disabled={phase === "saving" || phase === "done" || engineLost || restarting}
-              // A fixed name with aria-pressed carrying the state: a label that also
-              // flips would be read as "Unmute your mic, pressed", which says both.
-              aria-pressed={selfMuted}
-              aria-label="Mute your mic"
-              className={cn(
-                "inline-flex h-8 w-8 items-center justify-center rounded-lg border-[1.5px] cursor-pointer transition-colors disabled:opacity-40 disabled:pointer-events-none",
-                selfMuted ? "border-red-400/70 bg-red-500/15 text-red-300 hover:border-red-300" : "border-white/25 hover:border-white/50"
-              )}>
-              {selfMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-            </button>
-          )}
+          {/* The candidate's own mic is at the end of their voice bars, in the answer bar (`muteButton`). */}
           {/* The engine plays its own voice, and the interview needs it heard. */}
           {!engine && (
             <button
@@ -2036,9 +2091,11 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
             // Nothing to press to move on: the engine does that when an answer ends.
             <>
               <div className="mx-auto flex max-w-[1100px] items-center gap-3">
-                {engineTyping ? (
+                {engineTyping && !engineDone ? (
                   // The candidate's voice where the instruction was, as on the other
-                  // two bars; the instruction is the footnote below.
+                  // two bars; the instruction is the footnote below. Gone once the last
+                  // answer is in: nothing said after it is an answer, and the row is the
+                  // countdown and the finish button.
                   <TypeAnswerPanel
                     onSend={sendTypedToEngine}
                     onTyping={signalEngineTyping}
@@ -2048,9 +2105,10 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
                     className="min-w-0 flex-1"
                   />
                 ) : (
-                  // No live call: bars would meter nothing, so the status stays in words.
-                  <p className="flex-1 text-xs text-white/35">{engineHint}</p>
+                  // No live call, or nothing left to answer: the status stays in words.
+                  <p className={cn("min-w-0 flex-1 text-xs", engineDone ? "text-white/70 tabular-nums" : "text-white/35")}>{engineHint}</p>
                 )}
+                {engineTyping && !engineDone && muteButton}
                 {engineDone && (
                   <button
                     type="button"
@@ -2064,7 +2122,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
                   </button>
                 )}
               </div>
-              {engineTyping && engineFootnote}
+              {engineTyping && !engineDone && engineFootnote}
             </>
           ) : recording ? (
             <>
@@ -2088,6 +2146,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
                   tone="dark"
                   className="min-w-0 flex-1"
                 />
+                {muteButton}
                 {nextButton(phase !== "active")}
               </div>
               {footnote}
@@ -2126,6 +2185,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
                   tone="dark"
                   className="min-w-0 flex-1"
                 />
+                {muteButton}
                 {/* Not a Talk button: the mic opens itself. This is the only way
                     back from a mic another app took, or a recognizer that would
                     not run — which is the other thing the old Talk button did.

@@ -1,6 +1,6 @@
 "use client";
 
-// The live voice spectrum: 36 mirrored bars, the low bands meeting in the middle.
+// The live voice spectrum: mirrored bars (36 unless told), the low bands meeting in the middle.
 //
 // One visualizer for every screen that shows a voice — the coach and Ask about
 // a job (through InlineTalkBar) and the interview's answer bar. It owns its
@@ -12,17 +12,14 @@
 // Still when the room is: barsFrom rests quiet bands at zero (a hairline), and
 // a torn-down mic hands over null, which is all zeros.
 
-import { useEffect, useRef, type FC } from "react";
+import { useEffect, useMemo, useRef, type FC } from "react";
 import { useReducedMotion } from "motion/react";
 import { barsFrom, easeBars, mirrorBars, restingBars } from "@/app/lib/voice/frequencyBars";
 import { cn } from "@/lib/utils";
 
 const BAR_COUNT = 36;
-const HALF = BAR_COUNT / 2;
 /** A silent bar keeps this much height, so the line never vanishes. */
 const MIN_SCALE = 0.1;
-const QUIET: readonly number[] = new Array<number>(BAR_COUNT).fill(0);
-const RESTING: readonly number[] = restingBars(BAR_COUNT);
 
 const scaleOf = (level: number) => `scaleY(${(MIN_SCALE + (1 - MIN_SCALE) * level).toFixed(3)})`;
 
@@ -44,33 +41,38 @@ export interface VoiceFrequencyBarsProps {
   className?: string;
   /** Each bar: colour, opacity. */
   barClassName?: string;
+  /** How many bars, rounded to an even number for the mirror: more for a wider strip, so it stays a dense line. */
+  count?: number;
 }
 
-const VoiceFrequencyBars: FC<VoiceFrequencyBarsProps> = ({ getFrequencyData, active, className, barClassName }) => {
+const VoiceFrequencyBars: FC<VoiceFrequencyBarsProps> = ({ getFrequencyData, active, className, barClassName, count = BAR_COUNT }) => {
   const reduceMotion = useReducedMotion() ?? false;
   const barsRef = useRef<HTMLDivElement>(null);
   const animate = active && !reduceMotion;
+  const half = Math.max(1, Math.round(count / 2));
+  const quiet = useMemo<readonly number[]>(() => new Array<number>(half * 2).fill(0), [half]);
+  const resting = useMemo<readonly number[]>(() => restingBars(half * 2), [half]);
 
   // Frames only while active; the bars are written directly, never through state.
   useEffect(() => {
     const el = barsRef.current;
     if (!el) return;
     if (!animate || typeof requestAnimationFrame !== "function") {
-      paint(el, reduceMotion ? RESTING : QUIET);
+      paint(el, reduceMotion ? resting : quiet);
       return;
     }
-    let levels = new Array<number>(HALF).fill(0);
+    let levels = new Array<number>(half).fill(0);
     let frame = requestAnimationFrame(function tick() {
-      levels = easeBars(levels, barsFrom(getFrequencyData(), HALF));
+      levels = easeBars(levels, barsFrom(getFrequencyData(), half));
       paint(el, mirrorBars(levels));
       frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
-  }, [animate, reduceMotion, getFrequencyData]);
+  }, [animate, reduceMotion, getFrequencyData, half, quiet, resting]);
 
   return (
     <div ref={barsRef} aria-hidden className={cn("flex min-w-0 items-center justify-between gap-px overflow-hidden", className)}>
-      {(reduceMotion ? RESTING : QUIET).map((level, i) => (
+      {(reduceMotion ? resting : quiet).map((level, i) => (
         <span key={i} className={cn("h-full w-[3px] min-w-px rounded-full", barClassName)} style={{ transform: scaleOf(level) }} />
       ))}
     </div>

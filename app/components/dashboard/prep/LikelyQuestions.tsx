@@ -206,7 +206,13 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-primary">{q.text}</p>
             <p className="text-xs text-black/45 mt-0.5">{q.why}</p>
-            {variant === "full" && q.requirement && <p className="text-[11px] text-black/35 mt-1">Probes: {q.requirement}</p>}
+            {variant === "full" && (q.basis || q.requirement) && (
+              <p className="text-[11px] text-black/35 mt-1">
+                {[q.basis === "resume" ? "From your resume" : q.basis === "posting" ? "From the job" : null, q.requirement ? `Probes: ${q.requirement}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
           </div>
           <Chip tone="white">{FORMAT_META[q.format].label}</Chip>
           {variant === "full" && (

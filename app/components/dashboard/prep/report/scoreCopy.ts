@@ -13,7 +13,10 @@ import { formatDuration } from "@/app/lib/voice/format";
 import type { ScoreDisplay } from "@/app/lib/voice/mapSession";
 import { SCORE_RULES, type ScoreEvidence } from "@/app/lib/voice/types";
 
-type ScoreFacts = Pick<PrepSession, "scoreReason" | "scoreEvidence" | "dimensions" | "unscoredDimensions" | "transcript" | "mode" | "tooShort">;
+type ScoreFacts = Pick<
+  PrepSession,
+  "scoreReason" | "scoreEvidence" | "dimensions" | "unscoredDimensions" | "transcript" | "mode" | "tooShort"
+>;
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -22,7 +25,8 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
  * too-short sessions were graded at every dimension's floor, so the report
  * shows why there is no score and nothing from the scorecard.
  */
-export const isLegacyTooShort = (session: Pick<PrepSession, "scoreEvidence" | "tooShort">): boolean => !session.scoreEvidence && session.tooShort;
+export const isLegacyTooShort = (session: Pick<PrepSession, "scoreEvidence" | "tooShort">): boolean =>
+  !session.scoreEvidence && session.tooShort;
 
 /**
  * Why there is no overall score. Every session is scored now, so only a report
@@ -47,14 +51,20 @@ function provisionalReason(session: ScoreFacts): { short: string; long: string }
             short: `scored on ${count(evidence.answers, "answer")}`,
             long: `It rests on ${evidence.answers === 0 ? "no answers" : `only ${count(evidence.answers, "answer")}`}, and a full score needs at least ${SCORE_RULES.minAnswers}.`,
           }
-        : { short: "scored on too few answers", long: `It rests on fewer than ${SCORE_RULES.minAnswers} answers, which a full score needs.` };
+        : {
+            short: "scored on too few answers",
+            long: `It rests on fewer than ${SCORE_RULES.minAnswers} answers, which a full score needs.`,
+          };
     case "little-speech":
       return evidence && evidence.speechMs !== null
         ? {
             short: `scored on ${formatDuration(evidence.speechMs)} of your voice`,
             long: `It rests on only ${formatDuration(evidence.speechMs)} of your voice, and a full score needs ${formatDuration(SCORE_RULES.minSpeechMs)}. Pauses and silence inside an answer don't count towards it.`,
           }
-        : { short: "scored on too little of your voice", long: `It rests on less than ${formatDuration(SCORE_RULES.minSpeechMs)} of your voice, which a full score needs.` };
+        : {
+            short: "scored on too little of your voice",
+            long: `It rests on less than ${formatDuration(SCORE_RULES.minSpeechMs)} of your voice, which a full score needs.`,
+          };
     case "few-words":
       // The rule counts every typed word; the evidence counts the words that
       // carry an answer (fillers aside). Under the rule, both are short of it.
@@ -63,7 +73,10 @@ function provisionalReason(session: ScoreFacts): { short: string; long: string }
             short: `scored on ${count(evidence.contentWords, "word")} of typed answer`,
             long: `Your typed answers came to ${count(evidence.contentWords, "word")} of real answer, and a full score needs at least ${SCORE_RULES.minTypedWords} words.`,
           }
-        : { short: "scored on too few typed words", long: `Your typed answers came to fewer than ${SCORE_RULES.minTypedWords} words, which a full score needs.` };
+        : {
+            short: "scored on too few typed words",
+            long: `Your typed answers came to fewer than ${SCORE_RULES.minTypedWords} words, which a full score needs.`,
+          };
     default:
       return { short: "too short for a full score", long: "The session was too short for a full score." };
   }
@@ -78,7 +91,7 @@ function provisionalReason(session: ScoreFacts): { short: string; long: string }
  */
 export function scoreHeadline(display: ScoreDisplay, session: ScoreFacts): string | null {
   if (display.kind === "scored") return session.scoreEvidence ? `Scored on ${count(session.scoreEvidence.answers, "answer")}` : null;
-  if (display.kind === "provisional") return `Short session · ${provisionalReason(session).short}`;
+  if (display.kind === "provisional") return `Short session `;
   if (isLegacyTooShort(session)) return "Not scored · the session was too short to score";
   const evidence = session.scoreEvidence;
   if (!evidence) return "Not scored · there wasn't enough to judge";
@@ -106,7 +119,9 @@ export function scoreExplanation(display: ScoreDisplay, session: ScoreFacts): st
 export function evidenceSummary(evidence: ScoreEvidence | null | undefined): string | null {
   if (!evidence) return null;
   const answers =
-    evidence.substantiveAnswers < evidence.answers ? `${count(evidence.answers, "answer")} (${evidence.substantiveAnswers} long enough to judge)` : count(evidence.answers, "answer");
+    evidence.substantiveAnswers < evidence.answers
+      ? `${count(evidence.answers, "answer")} (${evidence.substantiveAnswers} long enough to judge)`
+      : count(evidence.answers, "answer");
   const parts = [answers, `${count(evidence.contentWords, "word")} of real answer`];
   if (evidence.speechMs !== null) parts.push(`${formatDuration(evidence.speechMs)} of your voice`);
   return parts.join(" · ");
