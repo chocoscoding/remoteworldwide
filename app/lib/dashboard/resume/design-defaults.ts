@@ -51,6 +51,10 @@ export const DEFAULT_DESIGN: ResumeDesign = {
     bulletGlyph: "dot",
     indentBullets: true,
   },
+  skills: {
+    groupLayout: "line",
+    separator: "comma",
+  },
   headings: {
     style: "full-rule",
     caps: "uppercase",

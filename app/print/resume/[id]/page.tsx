@@ -29,6 +29,7 @@ import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import { hydrateDesign, hydrateSections } from "@/app/lib/dashboard/resume/hydrate-design";
 import { RESUME_PLACEHOLDER_CSS, resumePrintSpec } from "@/app/lib/export/print-css";
 import { loadBuiltResume } from "@/app/lib/print/documents";
+import { reconcileGroups } from "@/app/lib/resume/skills";
 import { PRINT_BOOT_SCRIPT, PRINT_ROOT_ATTRIBUTE, PRINT_SHELL_CSS, printReadyScript, printVariant } from "@/app/lib/print/print-page";
 import { PRINT_TOKEN_HEADER, verifyPrintToken } from "@/app/lib/print/token";
 
@@ -72,7 +73,7 @@ export default async function PrintResumePage({ params }: { params: Promise<{ id
       <style dangerouslySetInnerHTML={{ __html: PRINT_SHELL_CSS + RESUME_PLACEHOLDER_CSS }} />
       <script dangerouslySetInnerHTML={{ __html: PRINT_BOOT_SCRIPT }} />
       <div {...{ [PRINT_ROOT_ATTRIBUTE]: "" }} className={cn(single.className, ALL_FONT_VARS)}>
-        <ResumePaper design={design} sections={sections} content={doc.content} chrome={design.chrome} />
+        <ResumePaper design={design} sections={sections} content={reconcileGroups(doc.content)} chrome={design.chrome} />
       </div>
       <script dangerouslySetInnerHTML={{ __html: ready }} />
     </>

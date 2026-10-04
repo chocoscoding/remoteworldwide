@@ -17,12 +17,12 @@ import {
   AlignVerticalSpaceAround,
   CaseSensitive,
   Columns3,
-  FileText,
   Heading,
   ImageIcon,
   LayoutTemplate,
   Link2,
   ListChecks,
+  ListTree,
   Palette,
   PanelBottom,
   PanelTop,
@@ -30,14 +30,13 @@ import {
   Type,
 } from "lucide-react";
 
-import UndoRedoBar from "./UndoRedoBar";
 import SectionOrderList from "./SectionOrderList";
-import DocumentPanel from "./DocumentPanel";
 import TemplatesPanel from "./TemplatesPanel";
 import LayoutPanel from "./LayoutPanel";
 import FontSizePanel from "./FontSizePanel";
 import SpacingPanel from "./SpacingPanel";
 import EntriesPanel from "./EntriesPanel";
+import SkillsPanel from "./SkillsPanel";
 import HeadingsPanel from "./HeadingsPanel";
 import FontPanel from "./FontPanel";
 import ColorsPanel from "./ColorsPanel";
@@ -58,12 +57,12 @@ export interface CustomizePanelDef {
 }
 
 export const CUSTOMIZE_PANELS: CustomizePanelDef[] = [
-  { id: "document", label: "Document", icon: FileText, Component: DocumentPanel },
   { id: "templates", label: "Templates", icon: LayoutTemplate, Component: TemplatesPanel },
   { id: "layout", label: "Layout", icon: Columns3, Component: LayoutPanel },
   { id: "font-size", label: "Font size", icon: CaseSensitive, Component: FontSizePanel },
   { id: "spacing", label: "Spacing", icon: AlignVerticalSpaceAround, Component: SpacingPanel },
   { id: "entries", label: "Entries", icon: ListChecks, Component: EntriesPanel },
+  { id: "skills", label: "Skills", icon: ListTree, Component: SkillsPanel },
   { id: "headings", label: "Headings", icon: Heading, Component: HeadingsPanel },
   { id: "font", label: "Font", icon: Type, Component: FontPanel },
   { id: "colors", label: "Colors", icon: Palette, Component: ColorsPanel },
@@ -75,14 +74,13 @@ export const CUSTOMIZE_PANELS: CustomizePanelDef[] = [
 ];
 
 export {
-  UndoRedoBar,
   SectionOrderList,
-  DocumentPanel,
   TemplatesPanel,
   LayoutPanel,
   FontSizePanel,
   SpacingPanel,
   EntriesPanel,
+  SkillsPanel,
   HeadingsPanel,
   FontPanel,
   ColorsPanel,

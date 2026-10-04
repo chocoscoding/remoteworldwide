@@ -19,6 +19,7 @@
 import type { ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { resumeContentToText } from "@/app/lib/resume/api";
+import { reconcileGroups } from "@/app/lib/resume/skills";
 import { hydrateDesign, hydrateSections } from "@/app/lib/dashboard/resume/hydrate-design";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { StoredResumeDocument } from "@/app/lib/resume/api";
@@ -162,7 +163,8 @@ export function fromStored(stored: StoredResumeDocument): ResumeDocument {
   return {
     id: stored.id,
     label: stored.label,
-    content: stored.content,
+    // Sub skill groups are put back in step with the skills list, in case something that only knows the list changed it.
+    content: reconcileGroups(stored.content),
     design: hydrateDesign(stored.template, stored.design),
     sections: hydrateSections(stored.template, stored.sections),
     updatedAt: stored.updatedAt,

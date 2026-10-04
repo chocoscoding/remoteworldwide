@@ -170,6 +170,13 @@ export interface ResumeLink {
   url: string;
 }
 
+/** A titled group of skills — "Frontend": React, TypeScript. */
+export interface ResumeSkillGroup {
+  id: string;
+  title: string;
+  skills: string[];
+}
+
 export interface ResumeContent {
   name: string;
   title: string;
@@ -183,7 +190,14 @@ export interface ResumeContent {
   education: ResumeEducationEntry[];
   projects: ResumeProjectEntry[];
   certifications: ResumeCertEntry[];
+  /**
+   * Every skill, as one list — always, whichever way the resume shows them, so
+   * everything that reads skills (the AI tools, the ATS check, the exports'
+   * plain lines) never has to know about groups. See `app/lib/resume/skills.ts`.
+   */
   skills: string[];
+  /** Present when the skills are split into titled groups ("Sub skills"); absent for one plain list ("All"). */
+  skillGroups?: ResumeSkillGroup[];
 }
 
 // ---------------------------------------------------------------------------

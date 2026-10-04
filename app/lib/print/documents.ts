@@ -25,6 +25,7 @@ import { coverToDocxBuffer, type Letterhead } from "@/app/lib/export/cover";
 import { resumeToDocxBuffer } from "@/app/lib/export/resume";
 import { safeFileName } from "@/app/lib/export/save";
 import type { StoredResumeDocument } from "@/app/lib/resume/api";
+import { reconcileGroups } from "@/app/lib/resume/skills";
 import type { Settings } from "@/app/lib/settings/types";
 import { MAX_PDF_BYTES, RenderError, renderPdf } from "./render";
 
@@ -118,7 +119,7 @@ export async function builtResumeFile(userId: string, id: string, format: Docume
   let bytes: ArrayBuffer | Uint8Array;
   if (format === "docx") {
     try {
-      bytes = await resumeToDocxBuffer(doc.content, hydrateDesign(doc.template, doc.design), hydrateSections(doc.template, doc.sections));
+      bytes = await resumeToDocxBuffer(reconcileGroups(doc.content), hydrateDesign(doc.template, doc.design), hydrateSections(doc.template, doc.sections));
     } catch (error) {
       console.error("[print] a resume could not be built as Word", error);
       return refuse(422, "unreadable", "That resume couldn't be turned into a Word file.");

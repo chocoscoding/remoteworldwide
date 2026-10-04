@@ -27,6 +27,8 @@ import { FONT_REGISTRY } from "@/app/lib/dashboard/resume/font-meta";
 import type { DateFormatId, ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { displayDates } from "@/app/lib/resume/dates";
+import { displayUrl } from "@/app/lib/dashboard/resume/link-platforms";
+import { isGrouped, printableGroups, skillLine } from "@/app/lib/resume/skills";
 
 const TWIPS_PER_MM = 56.6929;
 
@@ -166,10 +168,34 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         }
         break;
       }
-      case "skills":
+      case "skills": {
+        if (isGrouped(content)) {
+          // Sub skills: "Title: a, b, c" per group, in the design's separator. Word has no
+          // fill-to-height columns, so the grid layout prints its title over one line of skills.
+          const groups = printableGroups(content.skillGroups);
+          if (groups.length === 0) break;
+          children.push(heading(section.label));
+          const { groupLayout, separator } = design.skills;
+          for (const group of groups) {
+            const line = skillLine(group.skills, separator);
+            if (groupLayout === "grid") {
+              if (group.title) children.push(new Paragraph({ children: [new TextRun({ text: group.title, bold: true })] }));
+              children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun(line)] }));
+            } else {
+              children.push(
+                new Paragraph({
+                  spacing: { after: 40 },
+                  children: [...(group.title ? [new TextRun({ text: `${group.title}: `, bold: true })] : []), new TextRun(line)],
+                }),
+              );
+            }
+          }
+          break;
+        }
         if (content.skills.filter((s) => clean(s)).length === 0) break;
         children.push(heading(section.label), new Paragraph({ children: [new TextRun(content.skills.map(clean).filter(Boolean).join("  ·  "))] }));
         break;
+      }
       case "projects": {
         const entries = content.projects.filter((p) => clean(p.name) || clean(p.detail));
         if (entries.length === 0) break;
@@ -282,6 +308,12 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
         }
         break;
       case "skills":
+        if (isGrouped(content)) {
+          for (const group of printableGroups(content.skillGroups)) {
+            block.push(`${group.title ? `**${group.title}:** ` : ""}${group.skills.join(" · ")}`, "");
+          }
+          break;
+        }
         if (content.skills.some((s) => clean(s))) block.push(content.skills.map(clean).filter(Boolean).join(" · "));
         break;
       case "projects":

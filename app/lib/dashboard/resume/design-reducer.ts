@@ -55,6 +55,8 @@ import type {
   SectionConfig,
   SectionSeed,
   SeparatorMode,
+  SkillGroupLayout,
+  SkillSeparator,
   SubtitlePlace,
   TextAlign,
 } from "./design-types";
@@ -100,6 +102,9 @@ export type DesignAction =
   | { type: "entries/toggleLocation" }
   | { type: "entries/setBulletGlyph"; glyph: BulletGlyph }
   | { type: "entries/toggleIndentBullets" }
+  // Skills
+  | { type: "skills/setGroupLayout"; layout: SkillGroupLayout }
+  | { type: "skills/setSeparator"; separator: SkillSeparator }
   // Headings
   | { type: "headings/setStyle"; id: HeadingStyleId }
   | { type: "headings/setCaps"; caps: CapsMode }
@@ -349,6 +354,12 @@ export function snapshotReducer(s: DesignSnapshot, a: DesignAction): DesignSnaps
       return patch(s, "entries", { bulletGlyph: a.glyph });
     case "entries/toggleIndentBullets":
       return patch(s, "entries", { indentBullets: !s.design.entries.indentBullets });
+
+    // --- Skills -----------------------------------------------------------
+    case "skills/setGroupLayout":
+      return patch(s, "skills", { groupLayout: a.layout });
+    case "skills/setSeparator":
+      return patch(s, "skills", { separator: a.separator });
 
     // --- Headings ---------------------------------------------------------
     case "headings/setStyle":

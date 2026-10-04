@@ -53,6 +53,10 @@ export type PageFormat = "a4" | "letter";
 export type DateFormatId = "short" | "long" | "numeric";
 
 export type BulletGlyph = "dot" | "dash" | "square" | "none";
+/** Grouped skills: each group's title and skills on one line, or the title over columns of skills. */
+export type SkillGroupLayout = "line" | "grid";
+/** What sits between skills on a line, or before each one in a column. */
+export type SkillSeparator = "bullet" | "comma" | "star";
 export type PhotoShape = "circle" | "square" | "rounded";
 export type PhotoPosition = "left" | "right" | "above";
 export type LinkStyle = "icon" | "text" | "both";
@@ -181,6 +185,14 @@ export interface ResumeDesign {
     showLocation: boolean;
     bulletGlyph: BulletGlyph;
     indentBullets: boolean;
+  };
+  /**
+   * How skills split into titled groups print. A single plain list keeps its
+   * pills; these only apply once the Content tab has the skills as sub skills.
+   */
+  skills: {
+    groupLayout: SkillGroupLayout;
+    separator: SkillSeparator;
   };
   headings: {
     style: HeadingStyleId;
