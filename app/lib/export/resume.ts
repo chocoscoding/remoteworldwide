@@ -145,7 +145,8 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         children.push(heading(section.label), new Paragraph({ spacing: { after: 60 }, children: [new TextRun(clean(content.summary))] }));
         break;
       case "experience": {
-        const entries = content.experience.filter((e) => clean(e.role) || clean(e.company) || e.bullets.some((b) => clean(b)));
+        // A role hidden in the editor is not on the page, so not in the file either.
+        const entries = content.experience.filter((e) => !e.hidden && (clean(e.role) || clean(e.company) || e.bullets.some((b) => clean(b))));
         if (entries.length === 0) break;
         children.push(heading(section.label));
         for (const entry of entries) {
@@ -293,7 +294,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
         break;
       case "experience":
         for (const e of content.experience) {
-          if (!clean(e.role) && !clean(e.company)) continue;
+          if (e.hidden || (!clean(e.role) && !clean(e.company))) continue;
           block.push(`### ${[clean(e.role), clean(e.company)].filter(Boolean).join(" — ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
           e.bullets.filter((b) => clean(b)).forEach((b) => block.push(`- ${clean(b)}`));
           block.push("");

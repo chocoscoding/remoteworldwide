@@ -138,6 +138,8 @@ export interface ResumeExperienceEntry {
   company: string;
   dates: string;
   bullets: string[];
+  /** Kept on the document but left off the page and every export (the Content tab's eye toggle). Absent means shown. */
+  hidden?: boolean;
 }
 
 export interface ResumeEducationEntry {

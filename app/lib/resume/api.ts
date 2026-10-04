@@ -147,7 +147,10 @@ export function resumeContentToText(content: ResumeContent): string {
     push(clean(content.summary));
   }
 
-  const experience = content.experience.filter((entry) => clean(entry.role) || clean(entry.company) || entry.bullets.some((b) => clean(b)));
+  // A role hidden in the editor is off the page, so the check reads the resume without it.
+  const experience = content.experience.filter(
+    (entry) => !entry.hidden && (clean(entry.role) || clean(entry.company) || entry.bullets.some((b) => clean(b))),
+  );
   if (experience.length > 0) {
     section("EXPERIENCE");
     for (const entry of experience) {
