@@ -10,7 +10,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import LogoMini from "@/app/components/svg/LogoMini";
-import { daysSinceTouch, isClosedStatus, looksGhosted, statusMeta } from "@/app/components/dashboard/tracker/tracker-meta";
+import { BOARD_SCALE, daysSinceTouch, isClosedStatus, looksGhosted, statusMeta } from "@/app/components/dashboard/tracker/tracker-meta";
 import type { TrackerCard as TrackerCardData, TrackerStatus } from "@/app/lib/dashboard/types";
 import { daysAgoLabel, chipMeta } from "../../../(pages)/(dashboard)/dashboard/tracker/types";
 
@@ -201,13 +201,16 @@ export const SortableTrackerCard: FC<SortableTrackerCardProps> = ({ card, column
       data-tracker-card=""
       onClick={() => onOpen(card.id)}
       className={cn("touch-none cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}>
-      <TrackerCardItem
-        card={card}
-        columnId={columnId}
-        // A closed card has no dialog to open — the way back is the drag.
-        onOptions={isClosedStatus(columnId) ? undefined : () => onOpen(card.id)}
-        onGhost={onGhost ? () => onGhost(card.id) : undefined}
-      />
+      {/* Scaled inside the sortable node, never on it: see BOARD_SCALE. */}
+      <div className={BOARD_SCALE}>
+        <TrackerCardItem
+          card={card}
+          columnId={columnId}
+          // A closed card has no dialog to open — the way back is the drag.
+          onOptions={isClosedStatus(columnId) ? undefined : () => onOpen(card.id)}
+          onGhost={onGhost ? () => onGhost(card.id) : undefined}
+        />
+      </div>
     </div>
   );
 };

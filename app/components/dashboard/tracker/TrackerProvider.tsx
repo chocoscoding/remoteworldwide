@@ -62,6 +62,8 @@ export interface BoardColumn {
 export type AddCardResult = { status: "added"; card: TrackerCard } | { status: "duplicate"; card: TrackerCard };
 
 interface TrackerContextValue {
+  /** The applications haven't arrived yet: the board shows its skeleton, not "Nothing here yet". */
+  loading: boolean;
   columns: TrackerColumn[];
   closed: TrackerCard[];
   /** Stages and outcomes together, in board order. */
@@ -359,6 +361,7 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <TrackerContext.Provider
       value={{
+        loading: applications.isPending,
         columns,
         closed,
         boardColumns,

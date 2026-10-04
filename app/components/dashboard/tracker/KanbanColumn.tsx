@@ -5,7 +5,14 @@ import { Award, ChevronDown } from "lucide-react";
 import { useDndContext, useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
-import { isClosedStatus, statusMeta } from "@/app/components/dashboard/tracker/tracker-meta";
+import { BOARD_SCALE, isClosedStatus, statusMeta } from "@/app/components/dashboard/tracker/tracker-meta";
+
+/**
+ * A column's width: a share of the board, never under 250px on an ordinary
+ * screen; from 1900px it may narrow to 150px so all nine fit (see BOARD_WIDTH).
+ * Shared with the loading skeleton, so the board doesn't move when cards land.
+ */
+export const BOARD_COLUMN_CLASS = "min-w-[250px] min-[1900px]:min-w-[150px] flex-1 flex flex-col min-h-0";
 import type { BoardColumn } from "@/app/components/dashboard/tracker/TrackerProvider";
 import { SortableTrackerCard } from "./TrackerCard";
 
@@ -139,8 +146,8 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
     // Outcome columns match the stages in width — a card is a card, and a
     // narrower one would make a closed application look like a different kind
     // of object. What sets them apart is tone, not size.
-    <div data-column={column.id} className="min-w-[250px] flex-1 flex flex-col min-h-0">
-      <div className="flex flex-none items-center gap-2 mb-3 px-0.5">
+    <div data-column={column.id} className={BOARD_COLUMN_CLASS}>
+      <div className={cn("flex flex-none items-center gap-2 mb-3 px-0.5", BOARD_SCALE)}>
         <span className={cn("h-2 w-2 rounded-full flex-none", meta.dot)} aria-hidden />
         <span
           className={cn("text-sm font-bold whitespace-nowrap", closed ? "text-black/50" : "text-primary")}>
@@ -173,6 +180,7 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
               className={cn(
                 "flex flex-col items-center justify-center text-center gap-2 rounded-xl border border-dashed border-black/15 px-3",
                 closed ? "py-5" : "py-8",
+                BOARD_SCALE,
               )}>
               {!closed && <Award className="h-5 w-5 text-black/25" />}
               <p className="text-[11px] font-medium text-black/40 leading-relaxed">
@@ -199,6 +207,7 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
             tabIndex={hasMore ? 0 : -1}
             className={cn(
               "absolute bottom-1 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-primary br-shadow-press",
+              BOARD_SCALE,
               hasMore ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
             )}>
             +{below} more

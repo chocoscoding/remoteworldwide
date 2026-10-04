@@ -3,6 +3,32 @@ import { CircleSlash, Ghost, LogOut, ThumbsDown } from "lucide-react";
 import type { TrackerCard, TrackerClosedReason, TrackerColumnId, TrackerStatus } from "@/app/lib/dashboard/types";
 
 /**
+ * The board's print on very big screens (owner, 2026-10-04). The owner wants a
+ * wide screen to show a board that is smaller and wider, not bigger: cards at
+ * their normal size (or narrower), all nine columns side by side, space either
+ * side (`BOARD_WIDTH`). So nothing grows until a true 4K-at-100% width, and
+ * then only a touch.
+ *
+ * Applied to what is drawn (card bodies, column headers, the empty state, the
+ * note above the board), never to a dnd-kit node: a sortable card's wrapper
+ * and a column's drop zone stay unscaled, so drag offsets and drop rects stay
+ * in the same pixels as the pointer.
+ */
+export const BOARD_SCALE = "min-[3200px]:[zoom:1.06] min-[3800px]:[zoom:1.12]";
+
+/**
+ * The board's width (owner, 2026-10-04): on a wide screen it never fills the
+ * page. From 1900px it takes 92% of it, centred, and its columns may narrow to
+ * 150px (`BOARD_COLUMN_CLASS`) so all nine sit side by side with room either
+ * side; it never grows past 2560px. Narrower screens keep the full width and
+ * scroll sideways, as before.
+ */
+export const BOARD_WIDTH = "w-full max-w-[2560px] min-[1900px]:w-[92%]";
+
+/** The gap between columns: a touch tighter once the columns can narrow. */
+export const BOARD_GAP = "gap-6 min-[1900px]:gap-5";
+
+/**
  * The tracker's color system, one lookup for every surface that renders a
  * column: header dot, card border, status pill. All literal Tailwind classes
  * (closed union) so the build-time scan finds every one.

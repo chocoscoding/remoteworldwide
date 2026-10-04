@@ -36,6 +36,8 @@ import type { TrackerCard as TrackerCardData } from "@/app/lib/dashboard/types";
 import JobTimelineDialog from "@/app/components/dashboard/tracker/JobTimelineDialog";
 import InsightsDialog from "@/app/components/dashboard/tracker/InsightsDialog";
 import { useTracker } from "@/app/components/dashboard/tracker/TrackerProvider";
+import { BOARD_GAP, BOARD_SCALE, BOARD_WIDTH } from "@/app/components/dashboard/tracker/tracker-meta";
+import { BoardSkeleton, ListSkeleton } from "@/app/components/dashboard/tracker/BoardSkeleton";
 
 // Component imports
 import { TrackerCardItem } from "../../../../components/dashboard/tracker/TrackerCard";
@@ -66,7 +68,7 @@ type TrackerJob = PickedJob<typeof TRACKER_JOB_SPEC>;
 
 const TrackerClient: FC = () => {
   const { collapsed: sidebarCollapsed } = useSidebarCollapse();
-  const { columns, boardColumns, statusOf, setStatus, closeCard, addCard, commitDrop } = useTracker();
+  const { loading, columns, boardColumns, statusOf, setStatus, closeCard, addCard, commitDrop } = useTracker();
   const { pickJob } = useJobPicker();
 
   const [view, setView] = useState<TrackerView>("board");
@@ -247,13 +249,15 @@ const TrackerClient: FC = () => {
       <main
         className={cn(
           "px-8 py-7 mx-auto w-full transition-[max-width] duration-200",
-          sidebarCollapsed ? "max-w-[1520px]" : "max-w-[1320px]",
+          // The board sizes itself (BOARD_WIDTH, owner 2026-10-04): on a big screen every column
+          // shows in 92% of the page, centred. The table and calendar keep a reading width.
+          view === "board" ? "max-w-none" : sidebarCollapsed ? "max-w-[1520px]" : "max-w-[1320px]",
           view === "board" ? "flex flex-1 min-h-0 flex-col pb-6" : "pb-14",
         )}>
         {view === "board" ? (
-          <>
+          <div className={cn("mx-auto flex min-h-0 flex-1 flex-col", BOARD_WIDTH)}>
             {/* RWW-badge note */}
-            <div className="mb-5 flex flex-none items-center gap-2.5 rounded-sm border border-black/20 bg-[#fbfbf7] px-4 py-3">
+            <div className={cn("mb-5 flex flex-none items-center gap-2.5 rounded-sm border border-black/20 bg-[#fbfbf7] px-4 py-3", BOARD_SCALE)}>
               <LogoMini className="h-4 w-4 flex-none" />
               <p className="text-xs font-medium text-black/60">
                 <span className="font-bold text-primary">Applied through Remote Worldwide</span> — status updates itself.
@@ -285,21 +289,29 @@ const TrackerClient: FC = () => {
               {/* items-stretch so every column is the full height of the
                   row and its own card list is what scrolls. The horizontal
                   bar is the system's slim black one. */}
-              <div className="flex flex-1 min-h-0 gap-6 items-stretch overflow-x-auto overflow-y-hidden pb-2 scrollbar-neo">
-                {boardColumns.map((col) => (
-                  <KanbanColumn key={col.id} column={col} onOpen={openTimeline} onGhost={(id) => handleClose(id, "ghosted")} />
-                ))}
-              </div>
+              {loading ? (
+                <BoardSkeleton columns={boardColumns} />
+              ) : (
+                <div className={cn("flex flex-1 min-h-0 items-stretch overflow-x-auto overflow-y-hidden pb-2 scrollbar-neo", BOARD_GAP)}>
+                  {boardColumns.map((col) => (
+                    <KanbanColumn key={col.id} column={col} onOpen={openTimeline} onGhost={(id) => handleClose(id, "ghosted")} />
+                  ))}
+                </div>
+              )}
 
               <DragOverlay>
                 {activeCard ? (
                   <div className="w-[240px] rotate-2 cursor-grabbing">
-                    <TrackerCardItem card={activeCard} columnId={statusOf(activeCard.id) ?? undefined} />
+                    <div className={BOARD_SCALE}>
+                      <TrackerCardItem card={activeCard} columnId={statusOf(activeCard.id) ?? undefined} />
+                    </div>
                   </div>
                 ) : null}
               </DragOverlay>
             </DndContext>
-          </>
+          </div>
+        ) : loading ? (
+          <ListSkeleton />
         ) : view === "table" ? (
           <TrackerTableView columns={boardColumns} onStatus={setStatus} onOpen={openTimeline} />
         ) : (
