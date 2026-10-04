@@ -23,7 +23,7 @@ export const DEFAULT_DESIGN: ResumeDesign = {
   doc: {
     language: "en-us",
     dateFormat: "short",
-    pageFormat: "letter",
+    pageFormat: "a4",
   },
   layout: {
     columns: "one",

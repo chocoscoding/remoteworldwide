@@ -10,7 +10,7 @@ import { AtlasThumb } from "./thumbs";
 const atlas: ResumeTemplateDef = {
   id: "atlas",
   name: "Atlas",
-  blurb: "The FlowCV-standard basic corporate default.",
+  blurb: "A clean single-column layout, the basic corporate default.",
   design: {},
   sections: [
     { kind: "personal", locked: true, column: "main" },

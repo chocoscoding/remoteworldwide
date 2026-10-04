@@ -38,7 +38,6 @@ import type {
   ColumnSlot,
   ColumnsMode,
   DatePosition,
-  DateFormatId,
   DeepPartial,
   EntryStructure,
   FontId,
@@ -49,7 +48,6 @@ import type {
   IconSetId,
   LinkStyle,
   NeutralColorKey,
-  PageFormat,
   PhotoPosition,
   PhotoShape,
   ResumeDesign,
@@ -71,36 +69,11 @@ export interface DesignSnapshot {
   sections: SectionConfig[];
 }
 
-export interface HistoryState {
-  past: DesignSnapshot[];
-  present: DesignSnapshot;
-  future: DesignSnapshot[];
-  /**
-   * The snapshot captured at the START of the current transient run (i.e. the
-   * value the document had when a slider drag began), or null when no drag is
-   * in flight.
-   *
-   * This exists because the naive {past, present, future} version silently
-   * loses the whole interaction: a drag pushes nothing (every action is
-   * transient), and then the commit dispatches the SAME final value, which the
-   * identity guard turns into a no-op — so the drag ends up with zero undo
-   * entries rather than one. Stashing the pre-drag snapshot here and pushing
-   * THAT on commit is what actually delivers "12-step drag = one undo entry".
-   */
-  pending: DesignSnapshot | null;
-}
-
-const HISTORY_LIMIT = 50;
-
 // ---------------------------------------------------------------------------
 // Actions — one per control in the Customize panels
 // ---------------------------------------------------------------------------
 
 export type DesignAction =
-  // Document
-  | { type: "doc/setLanguage"; value: string }
-  | { type: "doc/setDateFormat"; id: DateFormatId }
-  | { type: "doc/setPageFormat"; format: PageFormat }
   // Templates
   | { type: "template/apply"; id: ResumeTemplateId }
   // Layout
@@ -278,14 +251,6 @@ const OFFSET_FIELD: Record<FontSizeOffsetKey, keyof ResumeDesign["fontSize"]> = 
 
 export function snapshotReducer(s: DesignSnapshot, a: DesignAction): DesignSnapshot {
   switch (a.type) {
-    // --- Document ---------------------------------------------------------
-    case "doc/setLanguage":
-      return patch(s, "doc", { language: a.value });
-    case "doc/setDateFormat":
-      return patch(s, "doc", { dateFormat: a.id });
-    case "doc/setPageFormat":
-      return patch(s, "doc", { pageFormat: a.format });
-
     // --- Templates --------------------------------------------------------
     case "template/apply": {
       const tpl = lookupTemplate(a.id);

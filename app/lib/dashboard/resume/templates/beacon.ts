@@ -12,7 +12,7 @@ import { BeaconThumb } from "./thumbs";
 const beacon: ResumeTemplateDef = {
   id: "beacon",
   name: "Beacon",
-  blurb: "A centered photo sits inside a bordered header block, FlowCV's portrait-led look.",
+  blurb: "A centered photo sits inside a bordered header block for a portrait-led look.",
   design: {
     header: { align: "center" },
     photo: { show: true, position: "above", shape: "circle" },

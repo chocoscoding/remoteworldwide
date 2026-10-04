@@ -51,9 +51,11 @@ export function hydrateDesign(template: string | null | undefined, stored: unkno
   if (!isPlainObject(stored)) return base;
   const design = mergeTrusted(base, stored);
   // The date format was saved for months before it did anything, under ids since retired: it is
-  // read by meaning, not by type alone.
+  // read by meaning, not by type alone. Every resume is A4 now, so a saved Letter choice (or the
+  // builder's) is read as A4 too.
   const dateFormat = dateFormatOf(design.doc.dateFormat);
-  return dateFormat === design.doc.dateFormat ? design : { ...design, doc: { ...design.doc, dateFormat } };
+  if (dateFormat === design.doc.dateFormat && design.doc.pageFormat === DEFAULT_DESIGN.doc.pageFormat) return design;
+  return { ...design, doc: { ...design.doc, dateFormat, pageFormat: DEFAULT_DESIGN.doc.pageFormat } };
 }
 
 const SECTION_KINDS: ReadonlySet<string> = new Set<SectionKind>([
