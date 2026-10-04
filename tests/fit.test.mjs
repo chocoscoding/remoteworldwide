@@ -33,7 +33,7 @@ registerHooks({
   },
 });
 
-const { bandsOf, computeFit, recentApplications, roleTokens, searchTermsFor, titleSimilarity, watchSearchTerms } = await import(
+const { bandsOf, computeFit, fitSignals, recentApplications, roleTokens, searchTermsFor, titleSimilarity, watchSearchTerms } = await import(
   "../app/lib/dashboard/fit.ts"
 );
 
@@ -126,5 +126,18 @@ describe("the searches that build the pool", () => {
     assert.equal(history.applied.length, 2, "an application outside the window doesn't count");
     const terms = watchSearchTerms({ targetRoles: ["UX Researcher"] }, history, 8, NOW);
     assert.deepEqual(terms.slice(0, 3), ["UX Researcher", "ux", "Product Designer"]);
+  });
+});
+
+describe("the signals a fit is matched on", () => {
+  it("names each factor with nothing of yours to match on", () => {
+    assert.deepEqual(fitSignals(prefs(["Fullstack Engineer"]), PROFILE, NONE), { role: true, trend: false, seniority: false, timezone: true });
+    assert.deepEqual(fitSignals(prefs([], "senior"), PROFILE, applied(["Backend Engineer", 2])), { role: false, trend: true, seniority: true, timezone: true });
+  });
+
+  it("reads seniority from the level you've been applying at, and location from a timezone or being open to anywhere", () => {
+    assert.equal(fitSignals(prefs([]), PROFILE, applied(["Senior Backend Engineer", 2], ["Senior Fullstack Engineer", 5])).seniority, true);
+    assert.equal(fitSignals({ ...prefs([]), remotePolicy: "region" }, { timezone: "" }, NONE).timezone, false);
+    assert.equal(fitSignals(prefs([]), { timezone: "" }, NONE).timezone, true);
   });
 });

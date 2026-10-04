@@ -71,16 +71,10 @@ const offsetsFor = (regions: readonly string[]): number[] => [
   ...new Set(regions.flatMap((region) => REGION_OFFSETS.filter(([pattern]) => pattern.test(region)).map(([, offset]) => offset))),
 ];
 
-const posted = (postedAt: string, now: number): string | null => {
-  const at = Date.parse(postedAt);
-  if (Number.isNaN(at)) return null;
-  const days = daysSince(at, now);
-  return days === 0 ? "posted today" : days === 1 ? "posted yesterday" : `posted ${days}d ago`;
-};
-
 /** A live listing as the fit engine's input. No salary or skills list: listings don't carry them. */
 export function toWatchTarget(job: PlatformJobSearchItem, now: number = Date.now()): RecommendationTarget {
   const anywhere = job.regions.some((region) => ANYWHERE.test(region));
+  const postedAt = Date.parse(job.postedAt);
   return {
     id: job.id,
     company: job.company,
@@ -88,9 +82,11 @@ export function toWatchTarget(job: PlatformJobSearchItem, now: number = Date.now
     timezoneOffsets: anywhere ? [] : offsetsFor(job.regions),
     anywhere,
     seniority: job.seniority,
-    postedAt: Date.parse(job.postedAt) || undefined,
+    postedAt: postedAt || undefined,
+    // Counted here, once per fetch, so the card can flag an old listing without reading the clock.
+    postedDaysAgo: Number.isNaN(postedAt) ? undefined : daysSince(postedAt, now),
     skills: [],
-    note: [job.seniority, job.regions.join(" / ") || null, posted(job.postedAt, now)].filter(Boolean).join(" · "),
+    note: [job.seniority, job.regions.join(" / ") || null].filter(Boolean).join(" · "),
     href: `/jobs/${encodeURIComponent(job.slug)}`,
   };
 }

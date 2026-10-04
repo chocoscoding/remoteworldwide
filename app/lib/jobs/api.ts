@@ -52,9 +52,12 @@ function withQuery(path: string, params: Record<string, string | number | undefi
 // Remote Worldwide listings
 // ---------------------------------------------------------------------------
 
-/** Active listings, newest first. An empty `q` is the newest listings, which is what the picker opens on. */
-export function searchPlatformJobs(q: string, limit = PLATFORM_SEARCH_LIMIT, signal?: AbortSignal) {
-  return apiGet<PlatformJobSearchItem[]>(withQuery(`${PLATFORM_JOBS_PATH}/search`, { q: q.trim(), limit }), signal);
+/**
+ * Active listings, newest first. An empty `q` is the newest listings, which is what the picker opens on.
+ * `postedWithinDays` keeps only listings posted in that many days, filtered by the backend (1 to 365).
+ */
+export function searchPlatformJobs(q: string, limit = PLATFORM_SEARCH_LIMIT, signal?: AbortSignal, postedWithinDays?: number) {
+  return apiGet<PlatformJobSearchItem[]>(withQuery(`${PLATFORM_JOBS_PATH}/search`, { q: q.trim(), limit, postedWithinDays }), signal);
 }
 
 /** The backend's ceilings on the query (platformJob.validator.ts): past them is a 400, not an answer. */

@@ -1,86 +1,118 @@
 "use client";
 
-import { FC } from "react";
+import { FC, Fragment } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
-import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
-import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
-import { RECOMMENDATION_STAGE_LABELS } from "@/app/lib/recommendations/types";
+import { RECOMMENDATION_STAGES, RECOMMENDATION_STAGE_LABELS } from "@/app/lib/recommendations/types";
 import type { IntroPipelineEntry } from "@/app/lib/dashboard/types";
+import { companyAvatarClass } from "./FitCard";
 
 /**
  * The list view of a recommendation — deliberately just the headline facts.
- * The full story (stage tracker, questions, answers) lives on the entry's own
- * page; stacking whole Q&A forms in the list buried everything below the
- * first card.
+ * The full story (questions, answers, the reviewer's note) lives on the
+ * entry's own page; stacking whole Q&A forms in the list buried everything
+ * below the first card.
  */
 export interface PipelineSummaryCardProps {
   entry: IntroPipelineEntry;
 }
+
+const QUESTIONS_STEP = RECOMMENDATION_STAGES.indexOf("questions");
+const LAST_STEP = RECOMMENDATION_STAGE_LABELS.length - 1;
+
+export const startedLabel = (days: number) => (days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`);
+
+interface Step {
+  label: string;
+  done: boolean;
+  current: boolean;
+}
+
+/**
+ * The three stages in one line. Answering ticks the questions step straight
+ * away ("You answered"), so while the company reads them nothing is lit: the
+ * next move is theirs.
+ */
+function stepsOf(entry: IntroPipelineEntry, answered: boolean): Step[] {
+  return RECOMMENDATION_STAGE_LABELS.map((label, i) => {
+    const answeredHere = i === QUESTIONS_STEP && answered;
+    const done = i < entry.stageIndex || (i === entry.stageIndex && answeredHere);
+    return { label: done && answeredHere ? "You answered" : label, done, current: i === entry.stageIndex && !done };
+  });
+}
+
+const StageLine: FC<{ steps: Step[] }> = ({ steps }) => (
+  <span className="flex items-center gap-2 text-xs">
+    {steps.map((step, i) => (
+      <Fragment key={i}>
+        {/* The rule into a step is ink once that step is reached. */}
+        {i > 0 && <span className={cn("h-0.5 min-w-3 flex-1", step.done || step.current ? "bg-[#222325]" : "bg-black/15")} />}
+        <span
+          className={cn(
+            "grid h-5 w-5 flex-none place-content-center rounded-full text-[10px] font-extrabold",
+            step.done
+              ? "bg-[#222325]"
+              : step.current
+                ? "border-[1.5px] border-[#222325] bg-[#e1f073] text-primary"
+                : "border-[1.5px] border-black/30 text-[#5f6062]",
+          )}>
+          {step.done ? <Check className="h-[11px] w-[11px] text-[#e1f073]" strokeWidth={3.5} aria-hidden /> : i + 1}
+        </span>
+        {/* On a phone only the current stage keeps its name; the others are their number. */}
+        <span
+          className={cn(
+            "whitespace-nowrap",
+            step.done ? "font-semibold text-[#55564f]" : step.current ? "font-extrabold text-primary" : "text-[#5f6062]",
+            !step.current && "max-sm:sr-only",
+          )}>
+          {step.label}
+        </span>
+      </Fragment>
+    ))}
+  </span>
+);
 
 const PipelineSummaryCard: FC<PipelineSummaryCardProps> = ({ entry }) => {
   const questions = entry.questions ?? [];
   const unanswered = questions.filter((q) => !q.answer).length;
   const awaitingYou = unanswered > 0;
   const answered = questions.length > 0 && unanswered === 0;
-  const progress = Math.round((entry.stageIndex / (RECOMMENDATION_STAGE_LABELS.length - 1)) * 100);
+  const interviewing = entry.stageIndex >= LAST_STEP;
+
+  const status = awaitingYou
+    ? `Answer ${unanswered} question${unanswered === 1 ? "" : "s"}`
+    : interviewing
+      ? "Interviewing"
+      : answered
+        ? `Waiting on ${entry.company}`
+        : RECOMMENDATION_STAGE_LABELS[entry.stageIndex];
 
   return (
-    <Link href={`/dashboard/recommend/${entry.id}`} className="group block">
-      <DashCard
-        className={cn(
-          "p-5 transition-[border-color,box-shadow]",
-          // The one accent on this screen: something is waiting on you.
-          awaitingYou
-            ? "br-bold-press br-lime"
-            : "group-hover:border-black/30"
-        )}>
-        <div className="flex items-center gap-3">
-          <Avatar name={entry.company} tone="dark" />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-[15px] font-bold text-primary">{entry.company}</p>
-              {awaitingYou ? (
-                <Pill variant="urgent">Waiting on you</Pill>
-              ) : entry.stageIndex >= RECOMMENDATION_STAGE_LABELS.length - 1 ? (
-                <Pill variant="positive">Interviewing</Pill>
-              ) : (
-                <Pill variant="neutral">{RECOMMENDATION_STAGE_LABELS[entry.stageIndex]}</Pill>
-              )}
-            </div>
-            <p className="mt-0.5 truncate text-xs text-black/55">
-              {entry.role} · {entry.startedAgoDays === 0 ? "today" : `${entry.startedAgoDays} days ago`}
-            </p>
-          </div>
-
-          <div className="flex flex-none items-center gap-2.5 text-right">
-            <div>
-              {awaitingYou ? (
-                <>
-                  <p className="text-xs font-bold text-primary">
-                    Answer {unanswered} question{unanswered === 1 ? "" : "s"}
-                  </p>
-                  {entry.expiresInDays !== undefined && (
-                    <p className={cn("mt-0.5 text-[11px] font-semibold", entry.expiresInDays <= 2 ? "text-[#b23c26]" : "text-black/45")}>
-                      closes in {entry.expiresInDays}d
-                    </p>
-                  )}
-                </>
-              ) : answered ? (
-                <p className="text-xs text-black/55">Waiting on {entry.company}</p>
-              ) : (
-                <p className="text-xs text-black/55">Their questions land here</p>
-              )}
-            </div>
-            <ChevronRight className="h-4 w-4 text-black/30 transition-transform group-hover:translate-x-0.5" />
-          </div>
-        </div>
-
-        <ProgressBar value={progress} height="h-1.5" className="mt-4" fillColor={awaitingYou ? "#cddd54" : "#e1f073"} />
-      </DashCard>
+    <Link
+      href={`/dashboard/recommend/${entry.id}`}
+      className={cn(
+        "flex flex-col gap-3.5 rounded-2xl bg-white p-[18px]",
+        // The one accent in the list: something is waiting on you.
+        awaitingYou ? "br-bold-press br-lime" : "br-plain-press border-black/[0.14] hover:border-[#222325]",
+      )}>
+      <span className="flex items-center gap-3">
+        <Avatar name={entry.company} tone="dark" className={companyAvatarClass(entry.company)} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[15px] font-extrabold text-primary">{entry.company}</span>
+          <span className="truncate text-xs text-[#5f6062]">
+            {entry.role} · {startedLabel(entry.startedAgoDays)}
+          </span>
+        </span>
+        {/* Capped so a long company name in "Waiting on …" can't push the card's own name out on a phone. */}
+        <Pill variant={awaitingYou ? "urgent" : interviewing ? "positive" : "neutral"} className="block max-w-[55%] flex-none truncate font-bold" title={status}>
+          {status}
+        </Pill>
+        <ChevronRight className={cn("h-4 w-4 flex-none", awaitingYou ? "text-primary" : "text-[#5f6062]")} aria-hidden />
+      </span>
+      <StageLine steps={stepsOf(entry, answered)} />
     </Link>
   );
 };

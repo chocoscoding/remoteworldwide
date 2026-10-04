@@ -50,10 +50,10 @@ export const savedJobQuery = (id: string) =>
     staleTime: STALE_TIME.savedJobs,
   });
 
-export const platformJobSearchQuery = (q: string, limit = PLATFORM_SEARCH_LIMIT) =>
+export const platformJobSearchQuery = (q: string, limit = PLATFORM_SEARCH_LIMIT, postedWithinDays?: number) =>
   queryOptions({
-    queryKey: qk.platformJobs.search(q, limit),
-    queryFn: ({ signal }) => searchPlatformJobs(q, limit, signal),
+    queryKey: qk.platformJobs.search(q, limit, postedWithinDays),
+    queryFn: ({ signal }) => searchPlatformJobs(q, limit, signal, postedWithinDays),
     staleTime: STALE_TIME.platformJobs,
   });
 

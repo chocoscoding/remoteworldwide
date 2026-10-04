@@ -69,19 +69,28 @@ export function useRecommendation(id: string, { enabled = true }: { enabled?: bo
 export const WATCH_SEARCHES = 8;
 /** The most one search returns (the backend's own cap). A few thousand listings are live and only dozens are new each week, so each search reaches back. */
 const WATCH_SEARCH_LIMIT = 50;
+/**
+ * How old a listing may be and still be worth watching: three weeks (owner,
+ * 2026-10-04). The backend filters on it, so an older one never reaches the pool.
+ */
+export const WATCH_MAX_AGE_DAYS = 21;
 
 /**
  * The pool of live listings the "worth watching" list is scored from: a
  * search per term (the listing search matches a title or company substring,
  * so "Product Designer" finds "Senior Product Designer"), plus the newest
- * listings so one posted today can make it in. Deduplicated by listing;
+ * listings so one posted today can make it in, none older than
+ * WATCH_MAX_AGE_DAYS. Deduplicated by listing;
  * scoring, the relevance cut and ranking are the caller's, because they read
  * the user's unsaved preference edits too.
  */
 export function useWatchPool(terms: readonly string[]) {
   const searches = [...new Set(terms.map((t) => t.trim()).filter(Boolean))].slice(0, WATCH_SEARCHES);
   return useQueries({
-    queries: [platformJobSearchQuery("", PLATFORM_SEARCH_LIMIT), ...searches.map((q) => platformJobSearchQuery(q, WATCH_SEARCH_LIMIT))],
+    queries: [
+      platformJobSearchQuery("", PLATFORM_SEARCH_LIMIT, WATCH_MAX_AGE_DAYS),
+      ...searches.map((q) => platformJobSearchQuery(q, WATCH_SEARCH_LIMIT, WATCH_MAX_AGE_DAYS)),
+    ],
     combine: combinePool,
   });
 }

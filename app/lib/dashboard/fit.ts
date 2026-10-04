@@ -346,6 +346,21 @@ export function computeFit(target: RecommendationTarget, prefs: FitPrefs, profil
   return { score, tier: scoreTier(score), factors, relevant };
 }
 
+/**
+ * Which of the four factors have something of yours to match on. A factor
+ * without one still scores (seniority and location fall back to a neutral
+ * guess), so every listing drifts to the same middling tier: this is what
+ * the screen names, with the one thing that fills each gap.
+ */
+export function fitSignals(prefs: FitPrefs, profile: FitProfile, history: FitHistory): Record<FitFactorId, boolean> {
+  return {
+    role: prefs.targetRoles.some((r) => r.trim()),
+    trend: history.applied.length > 0,
+    seniority: Boolean(prefs.experienceLevel || trendBand(history)),
+    timezone: prefs.remotePolicy === "anywhere" || profile.timezone.trim().length > 0,
+  };
+}
+
 /** The applications the trend reads: logged in the window, not duplicates, newest first. */
 export function recentApplications<T extends { role: string; company: string; loggedAt: string; duplicateOf: string | null }>(
   applications: readonly T[],

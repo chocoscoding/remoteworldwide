@@ -1,27 +1,26 @@
 import { FC } from "react";
 import Link from "next/link";
-import Avatar from "@/app/components/dashboard/ui/Avatar";
 import type { IntroPipelineEntry } from "@/app/lib/dashboard/types";
 
 /**
  * A recommendation that closed — connected, passed or expired. Deliberately a
- * single muted row, not a card: it carries no action and shouldn't compete with
- * the live pipeline above it. The word "rejected" never appears. The row links
- * to the recommendation's page, where what you told them is still readable.
+ * single dashed row, not a card: it carries no action and shouldn't compete
+ * with the live list above it. The word "rejected" never appears. The row
+ * links to the recommendation's page, where what you told them is still
+ * readable.
  */
 export interface ClosedRecRowProps {
   entry: IntroPipelineEntry;
 }
 
 const ClosedRecRow: FC<ClosedRecRowProps> = ({ entry }) => {
-  const company = <span className="font-semibold text-black/70">{entry.company}</span>;
+  const company = <strong className="font-bold text-[#44453f]">{entry.company}</strong>;
   const hadQuestions = (entry.questions?.length ?? 0) > 0;
   return (
     <Link
       href={`/dashboard/recommend/${entry.id}`}
-      className="flex items-center gap-3 rounded-2xl border border-black/8 bg-white/70 px-4 py-3 transition-colors hover:border-black/20">
-      <Avatar name={entry.company} size="sm" src={null} className={entry.outcome === "connected" ? undefined : "opacity-55"} />
-      <p className="min-w-0 flex-1 text-sm leading-relaxed text-black/55">
+      className="flex items-center gap-3 rounded-[14px] border border-dashed border-black/25 px-4 py-3 text-[13px] text-[#5f6062] transition-colors hover:border-black/50">
+      <span className="min-w-0 flex-1">
         {entry.outcome === "connected" ? (
           <>You and {company} are connected.</>
         ) : entry.outcome === "passed" ? (
@@ -31,8 +30,8 @@ const ClosedRecRow: FC<ClosedRecRowProps> = ({ entry }) => {
         ) : (
           <>{company} closed before sending questions.</>
         )}
-      </p>
-      <span className="flex-none text-[11px] text-black/40">
+      </span>
+      <span className="flex-none text-xs">
         {entry.outcomeAgoDays === undefined ? "" : entry.outcomeAgoDays === 0 ? "today" : `${entry.outcomeAgoDays}d ago`}
       </span>
     </Link>

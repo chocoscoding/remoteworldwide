@@ -134,7 +134,7 @@ export const qk = {
   },
   platformJobs: {
     all: ["platformJobs"] as const,
-    search: (q: string, limit: number) => [...qk.platformJobs.all, "search", q, limit] as const,
+    search: (q: string, limit: number, postedWithinDays?: number) => [...qk.platformJobs.all, "search", q, limit, postedWithinDays ?? null] as const,
   },
   jobImports: {
     all: ["jobImports"] as const,
