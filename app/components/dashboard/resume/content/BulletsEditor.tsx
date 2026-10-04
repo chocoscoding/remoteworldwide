@@ -31,6 +31,8 @@ export interface BulletsEditorProps {
   max?: number;
   /** Characters a row may hold (the textarea's own `maxLength`). Unlimited when absent. */
   maxLength?: number;
+  /** Each row's placeholder; a role's bullet prompt when absent. */
+  placeholder?: string;
 }
 
 /**
@@ -79,7 +81,14 @@ const SortableBullet: FC<{ index: number; children: ReactNode; onDelete: () => v
 // trailing whitespace is required so "-5% churn" keeps its minus sign.
 const LEADING_MARKER = /^\s*[•●◦▪■*\-–—]\s+/;
 
-const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = false, max, maxLength }) => {
+const BulletsEditor: FC<BulletsEditorProps> = ({
+  bullets,
+  onChange,
+  isActive = false,
+  max,
+  maxLength,
+  placeholder = "What you did, and what it changed",
+}) => {
   const rowRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   // Where the caret should land once the rows for the NEXT render exist — a
   // row added by this keystroke has no element to focus until React commits it.
@@ -166,7 +175,7 @@ const BulletsEditor: FC<BulletsEditorProps> = ({ bullets, onChange, isActive = f
                 value={bullet}
                 onChange={(e) => handleChange(i, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(i, e)}
-                placeholder="What you did, and what it changed"
+                placeholder={placeholder}
                 aria-label={`Bullet ${i + 1}`}
                 // `field-sizing` grows the row with its text, so a one-line bullet
                 // is one line tall. Where it is unsupported the row stays at

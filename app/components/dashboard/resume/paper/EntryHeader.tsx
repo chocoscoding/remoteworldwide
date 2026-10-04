@@ -2,16 +2,20 @@ import type { FC } from "react";
 import { cn } from "@/lib/utils";
 import type { BulletGlyph, ResumeDesign } from "@/app/lib/dashboard/resume/design-types";
 import { displayDates } from "@/app/lib/resume/dates";
-import { BulletText } from "./highlight";
+import { BulletText, UnderlinedText, type UnderlineAt } from "./highlight";
 
 export interface EntryHeaderProps {
   /** Role / degree / project or certification name. */
   primary: string;
+  /** Which line `primary` is, where "Fix tone & grammar" may underline it (a degree, a certification's name). */
+  primaryAt?: UnderlineAt;
   /** Company / school / issuer. Pass "" for entry kinds with no counterpart (Projects). */
   secondary: string;
   /** The entry's stored date line; printed in `design.doc.dateFormat` when it reads as a range, as written when not. */
   dates?: string;
   location?: string;
+  /** Print the location on its own line under the title and company (a role), whatever the date position. */
+  locationBelow?: boolean;
   design: ResumeDesign;
 }
 
@@ -24,14 +28,16 @@ export interface EntryHeaderProps {
  * entry kind (Experience's bullets, Education's detail line, Projects' link)
  * is rendered by that section component AFTER this, not here.
  */
-const EntryHeader: FC<EntryHeaderProps> = ({ primary, secondary, dates: storedDates, location, design }) => {
+const EntryHeader: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, dates: storedDates, location, locationBelow = false, design }) => {
   const { entries } = design;
   const dates = displayDates(storedDates, design.doc.dateFormat);
   const showDates = entries.showDates && Boolean(dates);
   const showLocation = entries.showLocation && Boolean(location);
 
   const primaryEl = (
-    <span className="text-[length:var(--r-fs-entry)] font-bold leading-tight text-[color:var(--r-text)]">{primary}</span>
+    <span className="text-[length:var(--r-fs-entry)] font-bold leading-tight text-[color:var(--r-text)]">
+      {primaryAt ? <UnderlinedText at={primaryAt} text={primary} /> : primary}
+    </span>
   );
   const secondaryEl = secondary ? (
     <span className="text-[length:var(--r-fs-entry)] italic leading-tight text-[color:var(--r-c-subtitle)]">{secondary}</span>
@@ -50,7 +56,19 @@ const EntryHeader: FC<EntryHeaderProps> = ({ primary, secondary, dates: storedDa
       </div>
     );
 
-  if (!showDates && !showLocation) return titleBlock;
+  // A role's location sits under its title and company (owner, 2026-10-04): with the title, not the dates.
+  const below = locationBelow && showLocation;
+  const titled = below ? (
+    <div>
+      {titleBlock}
+      <p className="mt-[1pt] text-[length:var(--r-fs-small)] leading-tight text-[color:var(--r-c-date)]">{location}</p>
+    </div>
+  ) : (
+    titleBlock
+  );
+  const metaLocation = showLocation && !below;
+
+  if (!showDates && !metaLocation) return titled;
 
   // "split": location rides with the title block on the left, dates alone on
   // the far right — the two meta fields deliberately go to OPPOSITE ends,
@@ -74,7 +92,7 @@ const EntryHeader: FC<EntryHeaderProps> = ({ primary, secondary, dates: storedDa
         align === "end" ? "items-end" : "items-start"
       )}>
       {showDates && <span>{dates}</span>}
-      {showLocation && <span>{location}</span>}
+      {metaLocation && <span>{location}</span>}
     </div>
   );
 
@@ -87,7 +105,7 @@ const EntryHeader: FC<EntryHeaderProps> = ({ primary, secondary, dates: storedDa
     return (
       <div className={rowClass}>
         {meta("start")}
-        <div className="min-w-0">{titleBlock}</div>
+        <div className="min-w-0">{titled}</div>
       </div>
     );
   }
@@ -95,7 +113,7 @@ const EntryHeader: FC<EntryHeaderProps> = ({ primary, secondary, dates: storedDa
   // "right" (default)
   return (
     <div className={rowClass}>
-      <div className="min-w-0">{titleBlock}</div>
+      <div className="min-w-0">{titled}</div>
       {meta("end")}
     </div>
   );
@@ -121,6 +139,8 @@ export interface EntryBulletsProps {
   design: ResumeDesign;
   /** The entry these belong to, so a line the editor points at can be highlighted (see `highlight.tsx`). */
   entryId?: string;
+  /** Or the custom section they are the points of. */
+  customId?: string;
 }
 
 /**
@@ -130,7 +150,7 @@ export interface EntryBulletsProps {
  * while it is being typed into, and a marker with nothing beside it is not
  * something a resume should print.
  */
-export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design, entryId }) => {
+export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design, entryId, customId }) => {
   // Each line keeps its index in the stored list, which is what the editor's pointers name.
   const items = allItems.map((text, index) => ({ text, index })).filter((item) => item.text.trim());
   if (items.length === 0) return null;
@@ -142,6 +162,8 @@ export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design, e
       {items.map(({ text, index }) => (
         <li
           key={index}
+          // What the AI tools' pick mode reads a clicked line by (PagePicker): "<entryId or customId>:<index>".
+          data-resume-bullet={entryId || customId ? `${entryId ?? customId}:${index}` : undefined}
           className={cn(
             "relative text-[length:var(--r-fs-base)] leading-[var(--r-lh)] text-[color:var(--r-text)]",
             showGlyph && "flex gap-[6pt]"
@@ -151,7 +173,7 @@ export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design, e
               {BULLET_GLYPH_CHAR[bulletGlyph]}
             </span>
           )}
-          <BulletText entryId={entryId} index={index} text={text} />
+          <BulletText entryId={entryId} customId={customId} index={index} text={text} />
         </li>
       ))}
     </ul>

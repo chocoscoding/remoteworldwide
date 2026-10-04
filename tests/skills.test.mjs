@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-const { flattenGroups, isGrouped, printableGroups, reconcileGroups, skillLine, toFlat, toGrouped, withGroups } = await import(
+const { addSkills, flattenGroups, hasSkill, isGrouped, printableGroups, reconcileGroups, skillLine, toFlat, toGrouped, withGroups } = await import(
   "../app/lib/resume/skills.ts"
 );
 
@@ -59,6 +59,22 @@ describe("keeping the flat list and the groups in step", () => {
   it("returns the same content when nothing was out of step", () => {
     const grouped = withGroups(base, [group("a", "Code", ["React"]), group("b", "Design", ["Figma"])]);
     assert.equal(reconcileGroups(grouped), grouped);
+  });
+});
+
+describe("adding a keyword to Skills", () => {
+  it("adds it to the end of a plain list, once whatever its case", () => {
+    const added = addSkills(base, ["HubSpot", "react"]);
+    assert.deepEqual(added.skills, ["React", "Figma", "HubSpot"]);
+    assert.ok(hasSkill(added, "hubspot"));
+    assert.equal(addSkills(base, ["figma"]), base);
+  });
+
+  it("puts it in the last sub skill group", () => {
+    const grouped = withGroups(base, [group("a", "Code", ["React"]), group("b", "Design", ["Figma"])]);
+    const added = addSkills(grouped, ["HubSpot"]);
+    assert.deepEqual(added.skillGroups, [group("a", "Code", ["React"]), group("b", "Design", ["Figma", "HubSpot"])]);
+    assert.deepEqual(added.skills, ["React", "Figma", "HubSpot"]);
   });
 });
 

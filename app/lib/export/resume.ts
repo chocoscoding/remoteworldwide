@@ -153,6 +153,10 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
           const title: ParagraphChild[] = [new TextRun({ text: clean(entry.role), bold: true })];
           if (clean(entry.company)) title.push(new TextRun({ text: `${clean(entry.role) ? " — " : ""}${clean(entry.company)}` }));
           children.push(entryLine(title, printed(entry.dates)));
+          // The location on its own line under the role, as the page prints it.
+          if (clean(entry.location) && design.entries.showLocation !== false) {
+            children.push(new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: clean(entry.location), color: muted })] }));
+          }
           entry.bullets.filter((b) => clean(b)).forEach((b) => children.push(bullet(clean(b))));
         }
         break;
@@ -172,24 +176,28 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
       }
       case "skills": {
         if (isGrouped(content)) {
-          // Sub skills: "Title: a, b, c" per group, in the design's separator. Word has no
-          // fill-to-height columns, so the grid layout prints its title over one line of skills.
+          // Sub skills: the underlined title, then the skills in the design's separator. Word has
+          // no wrapping grid or pills, so the grid and bubbles layouts print the title over one
+          // line of skills (bubbles, which have no separator of their own, with bullets).
           const groups = printableGroups(content.skillGroups);
           if (groups.length === 0) break;
           children.push(heading(section.label));
           const { groupLayout, separator } = design.skills;
           for (const group of groups) {
-            const line = skillLine(group.skills, separator);
-            if (groupLayout === "grid") {
-              if (group.title) children.push(new Paragraph({ children: [new TextRun({ text: group.title, bold: true })] }));
-              children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun(line)] }));
-            } else {
+            const line = skillLine(group.skills, groupLayout === "bubbles" ? "bullet" : separator);
+            if (groupLayout === "line") {
               children.push(
                 new Paragraph({
                   spacing: { after: 40 },
-                  children: [...(group.title ? [new TextRun({ text: `${group.title}: `, bold: true })] : []), new TextRun(line)],
+                  children: [
+                    ...(group.title ? [new TextRun({ text: group.title, bold: true, underline: {} }), new TextRun({ text: ": ", bold: true })] : []),
+                    new TextRun(line),
+                  ],
                 }),
               );
+            } else {
+              if (group.title) children.push(new Paragraph({ children: [new TextRun({ text: group.title, bold: true, underline: {} })] }));
+              children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun(line)] }));
             }
           }
           break;
@@ -226,7 +234,14 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         }
         break;
       }
-      // "custom" sections have no content model yet, so there is nothing to write.
+      case "custom": {
+        // A section the person named: its points as bullets under the name they gave it.
+        const points = (content.customSections?.find((custom) => custom.id === section.id)?.items ?? []).map(clean).filter(Boolean);
+        if (points.length === 0) break;
+        children.push(heading(section.label));
+        points.forEach((point) => children.push(bullet(point)));
+        break;
+      }
       default:
         break;
     }
@@ -296,6 +311,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
         for (const e of content.experience) {
           if (e.hidden || (!clean(e.role) && !clean(e.company))) continue;
           block.push(`### ${[clean(e.role), clean(e.company)].filter(Boolean).join(" — ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
+          if (clean(e.location)) block.push(clean(e.location));
           e.bullets.filter((b) => clean(b)).forEach((b) => block.push(`- ${clean(b)}`));
           block.push("");
         }
@@ -331,6 +347,11 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
           if (!clean(c.name)) continue;
           const detail = [clean(c.issuer), printed(c.year)].filter(Boolean).join(", ");
           block.push(`- ${clean(c.name)}${detail ? ` — ${detail}` : ""}`);
+        }
+        break;
+      case "custom":
+        for (const point of content.customSections?.find((custom) => custom.id === section.id)?.items ?? []) {
+          if (clean(point)) block.push(`- ${clean(point)}`);
         }
         break;
       default:

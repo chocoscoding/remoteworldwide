@@ -27,7 +27,13 @@ const TrainingSection: FC<TrainingSectionProps> = ({ content, design }) => {
       {content.certifications.map((cert) => (
         <div key={cert.id} className="relative">
           <EntryFrame entryId={cert.id} />
-          <EntryHeader primary={cert.name} secondary={cert.issuer ?? ""} dates={cert.year} design={design} />
+          <EntryHeader
+            primary={cert.name}
+            primaryAt={{ field: "certification", entryId: cert.id }}
+            secondary={cert.issuer ?? ""}
+            dates={cert.year}
+            design={design}
+          />
         </div>
       ))}
     </div>

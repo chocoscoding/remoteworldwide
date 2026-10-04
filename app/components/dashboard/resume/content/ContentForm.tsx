@@ -12,8 +12,11 @@
 // Education, Projects, Certifications) are rows that open one at a time for
 // editing (`EntryListEditor`); a role can be hidden from the resume without
 // being deleted. Projects and Certifications, while empty, wait at the bottom
-// as "Add a section" chips. The sections run in the paper's default order, so
-// the form reads top to bottom the way the page does.
+// as "Add a section" chips. The Summary is optional too: it can be hidden from
+// the resume, or removed, when it waits there as a chip; and "Custom section"
+// adds a section the person names, with points of their own (owner,
+// 2026-10-04). The sections run in the paper's default order, so the form
+// reads top to bottom the way the page does.
 //
 // One section is open at a time: opening another closes the one before, both
 // moving (`Collapse`). The form never highlights the paper — that is for the
@@ -26,8 +29,11 @@
 // Dates are picked from dropdowns, never typed (`DateRangeField`).
 
 import { useState, type Dispatch, type FC, type ReactNode, type SetStateAction } from "react";
-import { ChevronDown, Plus, Sparkles } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Plus, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEFAULT_SECTION_LABELS } from "@/app/lib/dashboard/resume/design-defaults";
+import type { SectionConfig } from "@/app/lib/dashboard/resume/design-types";
+import { useResumeDesign } from "../useResumeDesign";
 import type {
   ResumeCertEntry,
   ResumeContent,
@@ -43,7 +49,12 @@ import SkillsField from "./SkillsField";
 import DateRangeField from "./DateRangeField";
 import Collapse from "../controls/Collapse";
 
-type ContentGroupId = "personal" | "summary" | "links" | "experience" | "education" | "skills" | "projects" | "certifications";
+/** A section of the form: one of the fixed ones, or `custom:<section id>` for a custom section. */
+type ContentGroupId = "personal" | "summary" | "links" | "experience" | "education" | "skills" | "projects" | "certifications" | `custom:${string}`;
+
+/** The small square controls on a section's action row, as on an entry's editing card. */
+const ACTION_BUTTON =
+  "grid h-8 w-8 flex-none cursor-pointer place-content-center rounded-lg text-primary transition-colors hover:bg-[#f0f0ea]";
 
 export interface ContentFormProps {
   content: ResumeContent;
@@ -77,7 +88,7 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 
 const summarizeRole = (item: ResumeExperienceEntry): EntrySummary => ({
   title: joined([item.role, item.company]),
-  meta: joined([item.dates, count(item.bullets.filter((b) => b.trim()).length, "bullet")]),
+  meta: joined([item.dates, item.location, count(item.bullets.filter((b) => b.trim()).length, "bullet")]),
 });
 const summarizeSchool = (item: ResumeEducationEntry): EntrySummary => ({
   title: joined([item.degree, item.school]),
@@ -108,6 +119,91 @@ const ContentForm: FC<ContentFormProps> = ({
   const setField = <K extends keyof ResumeContent>(key: K, value: ResumeContent[K]) => {
     setContent((prev) => ({ ...prev, [key]: value }));
   };
+
+  // ── Optional sections: the Summary and custom sections (owner, 2026-10-04) ─
+  // Their place and visibility are the section list's, so hiding one is the same as hiding it in
+  // Customize, and adding or removing one changes the list and the words in one undo step.
+  const { sections, dispatch } = useResumeDesign();
+  const summarySection = sections.find((item) => item.kind === "summary") ?? null;
+  const customSections = sections.filter((item) => item.kind === "custom");
+  const pointsOf = (id: string) => content.customSections?.find((section) => section.id === id)?.items ?? [];
+
+  const toggleShown = (id: string) =>
+    dispatch({ type: "edit", sections: (prev) => prev.map((item) => (item.id === id ? { ...item, visible: !item.visible } : item)) });
+
+  /** The Summary off the resume, its words with it; it waits as an "Add a section" chip. Undo puts both back. */
+  const removeSummary = () => {
+    setOpen(null);
+    dispatch({ type: "edit", content: (prev) => ({ ...prev, summary: "" }), sections: (prev) => prev.filter((item) => item.kind !== "summary") });
+  };
+
+  /** The Summary back, under the header where it belongs, open to write in. */
+  const addSummary = () => {
+    const summary: SectionConfig = { id: "sec-summary", kind: "summary", label: DEFAULT_SECTION_LABELS.summary, visible: true, column: "main" };
+    dispatch({
+      type: "edit",
+      sections: (prev) => {
+        if (prev.some((item) => item.kind === "summary")) return prev;
+        const at = prev.findIndex((item) => item.kind === "personal") + 1;
+        return [...prev.slice(0, at), summary, ...prev.slice(at)];
+      },
+    });
+    setOpen("summary");
+  };
+
+  /** A new custom section at the end of the page, with one empty point, open to name and fill in. */
+  const addCustomSection = () => {
+    const id = newEntryId("custom");
+    const section: SectionConfig = { id, kind: "custom", label: DEFAULT_SECTION_LABELS.custom, visible: true, column: "main" };
+    dispatch({
+      type: "edit",
+      content: (prev) => ({ ...prev, customSections: [...(prev.customSections ?? []), { id, items: [""] }] }),
+      sections: (prev) => [...prev, section],
+    });
+    setOpen(`custom:${id}`);
+  };
+
+  const removeCustomSection = (id: string) => {
+    setOpen(null);
+    dispatch({
+      type: "edit",
+      content: (prev) => ({ ...prev, customSections: (prev.customSections ?? []).filter((section) => section.id !== id) }),
+      sections: (prev) => prev.filter((item) => item.id !== id),
+    });
+  };
+
+  const renameCustomSection = (id: string, label: string) =>
+    dispatch({ type: "edit", sections: (prev) => prev.map((item) => (item.id === id ? { ...item, label } : item)), typing: true });
+
+  const setPoints = (id: string, items: string[]) =>
+    setContent((prev) => {
+      const list = prev.customSections ?? [];
+      return {
+        ...prev,
+        customSections: list.some((section) => section.id === id)
+          ? list.map((section) => (section.id === id ? { ...section, items } : section))
+          : [...list, { id, items }],
+      };
+    });
+
+  /** An optional section's own controls: hide it from the resume (kept here), or remove it. */
+  const sectionActions = (config: SectionConfig, onRemove: () => void, noun: string) => (
+    <div className="flex items-center justify-end gap-2 border-b border-dashed border-black/35 pb-2.5">
+      {!config.visible && <span className="mr-auto pl-0.5 text-xs font-bold text-[#44453f]">Hidden from this resume</span>}
+      <button
+        type="button"
+        onClick={() => toggleShown(config.id)}
+        aria-pressed={!config.visible}
+        aria-label={config.visible ? `Hide ${noun} from the resume` : `Show ${noun} on the resume`}
+        title={config.visible ? "Hide from the resume" : "Show on the resume"}
+        className={cn(ACTION_BUTTON, !config.visible && "border border-[#222325] bg-[#222325] text-[#e1f073] hover:bg-black")}>
+        {config.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+      </button>
+      <button type="button" onClick={onRemove} aria-label={`Remove ${noun}`} title={`Remove ${noun}`} className={cn(ACTION_BUTTON, "text-[#b23c26]")}>
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
 
   // ── "Add a section" ──────────────────────────────────────────────────────
   // An empty Projects or Certifications waits at the bottom as a chip; adding it
@@ -170,7 +266,7 @@ const ContentForm: FC<ContentFormProps> = ({
     );
   };
 
-  const groups: ReactNode[] = [
+  const groups: (ReactNode | null)[] = [
     section(
       "personal",
       "Personal details",
@@ -190,11 +286,14 @@ const ContentForm: FC<ContentFormProps> = ({
       </div>,
       { first: true },
     ),
+    // Optional (owner, 2026-10-04): hidden it stays here, removed it waits as an "Add a section" chip.
+    summarySection &&
     section(
       "summary",
       "Summary",
-      content.summary.trim() || "Not written yet",
+      summarySection.visible ? content.summary.trim() || "Not written yet" : `Hidden from the resume${content.summary.trim() ? ` · ${content.summary.trim()}` : ""}`,
       <>
+        {sectionActions(summarySection, removeSummary, "the summary")}
         <TextAreaField
           value={content.summary}
           onChange={(v) => setField("summary", v)}
@@ -221,7 +320,7 @@ const ContentForm: FC<ContentFormProps> = ({
           <p className="text-xs font-semibold text-[#6c7a1e]">AI-tailored, accepted</p>
         )}
       </>,
-      { marker: suggestionReason !== null && summarySuggestion === "pending" },
+      { marker: suggestionReason !== null && summarySuggestion === "pending", meta: summarySection.visible ? undefined : "Hidden" },
     ),
     section(
       "links",
@@ -258,6 +357,8 @@ const ContentForm: FC<ContentFormProps> = ({
               <TextField label="Role" value={item.role} onChange={(v) => update({ role: v })} placeholder="Role" />
               <TextField label="Company" value={item.company} onChange={(v) => update({ company: v })} placeholder="Company" />
             </div>
+            {/* Printed on its own line under the role and company (owner, 2026-10-04). */}
+            <TextField label="Location" value={item.location ?? ""} onChange={(v) => update({ location: v })} placeholder="City, Country or Remote (optional)" />
             <div className="flex flex-col gap-[5px]">
               <FieldLabel>Dates</FieldLabel>
               <DateRangeField
@@ -278,7 +379,7 @@ const ContentForm: FC<ContentFormProps> = ({
           content.experience.length === 0
             ? undefined
             : hiddenRoles > 0
-              ? `${shownRoles} shown · ${hiddenRoles} hidden`
+              ? `${hiddenRoles} hidden`
               : count(content.experience.length, "role"),
       },
     ),
@@ -402,12 +503,47 @@ const ContentForm: FC<ContentFormProps> = ({
     );
   }
 
-  const chips = (
-    [
-      ["projects", "Projects", content.projects.length === 0 && open !== "projects"],
-      ["certifications", "Certifications", content.certifications.length === 0 && open !== "certifications"],
-    ] as const
-  ).filter(([, , waiting]) => waiting);
+  // Custom sections, in the page's order: a name and its points, hidden or removed like the Summary.
+  for (const config of customSections) {
+    const points = pointsOf(config.id);
+    const written = points.filter((point) => point.trim());
+    groups.push(
+      section(
+        `custom:${config.id}`,
+        config.label.trim() || "Custom section",
+        config.visible ? listed(written, "No points yet") : "Hidden from the resume",
+        <>
+          {sectionActions(config, () => removeCustomSection(config.id), config.label.trim() || "this section")}
+          <TextField
+            label="Section name"
+            value={config.label}
+            onChange={(v) => renameCustomSection(config.id, v)}
+            placeholder="e.g. Volunteering, Awards, Languages"
+            maxLength={80}
+          />
+          <div className="flex flex-col gap-2">
+            <FieldLabel>Points</FieldLabel>
+            <BulletsEditor
+              bullets={points.length > 0 ? points : [""]}
+              onChange={(items) => setPoints(config.id, items)}
+              placeholder="One point, e.g. Mentored 4 junior developers"
+            />
+          </div>
+        </>,
+        { meta: config.visible ? count(written.length, "point") : "Hidden" },
+      ),
+    );
+  }
+
+  // "Add a section": what is not on this resume yet. A custom section can always be added — a resume may have several.
+  const chips: { key: string; label: string; onAdd: () => void }[] = [
+    ...(summarySection ? [] : [{ key: "summary", label: "Summary", onAdd: addSummary }]),
+    ...(content.projects.length === 0 && open !== "projects" ? [{ key: "projects", label: "Projects", onAdd: () => addSection("projects") }] : []),
+    ...(content.certifications.length === 0 && open !== "certifications"
+      ? [{ key: "certifications", label: "Certifications", onAdd: () => addSection("certifications") }]
+      : []),
+    { key: "custom", label: "Custom section", onAdd: addCustomSection },
+  ];
 
   return (
     <section aria-label="Resume content" className="flex flex-col gap-2">
@@ -419,11 +555,11 @@ const ContentForm: FC<ContentFormProps> = ({
         {chips.length > 0 && (
           <div className="flex min-h-12 flex-wrap items-center gap-2 border-t border-black/[0.16] px-3.5 py-2">
             <span className="text-xs text-[#5f6062]">Add a section</span>
-            {chips.map(([id, label]) => (
+            {chips.map(({ key, label, onAdd }) => (
               <button
-                key={id}
+                key={key}
                 type="button"
-                onClick={() => addSection(id)}
+                onClick={onAdd}
                 className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-full border border-dashed border-black/50 px-3 text-xs font-bold text-primary transition-colors hover:border-[#222325] hover:bg-[#fbfbf7]">
                 <Plus className="h-3 w-3" />
                 {label}

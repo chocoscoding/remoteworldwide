@@ -38,6 +38,13 @@ export interface EditorMarks {
   outcomes: Record<string, string>;
   /** Fix cards set aside with Dismiss, by card id. A step: Undo brings the card back. */
   dismissed: string[];
+  /**
+   * "Add missing keywords" proposals set aside with ✗, folded to lowercase. A step: Undo brings the
+   * proposal back. One ticked in needs no mark — it is in Skills, and Undo takes it out again.
+   */
+  rejectedKeywords: string[];
+  /** "Fix tone & grammar" proposals set aside with ✗, by `toneFixKey`. A step: Undo brings the fix back. */
+  dismissedFixes: string[];
   /** Each AI tool's caption, by tool id. A tool with one has run ("Run again"). */
   captions: Record<string, string>;
   /** What the last "Ask for a rewrite" did, or why it couldn't. */
@@ -64,6 +71,12 @@ export type EditorAction =
   | {
       type: "edit";
       content?: SetStateAction<ResumeContent>;
+      /**
+       * The section list, changed in the same step as the content: a custom section added or
+       * removed with its points, its name typed (`typing` folds that like any field), the Summary
+       * removed with its text.
+       */
+      sections?: (prev: SectionConfig[]) => SectionConfig[];
       marks?: Partial<EditorMarks> | ((prev: EditorMarks) => Partial<EditorMarks>);
       removeCheck?: true;
       typing?: true;
@@ -82,8 +95,8 @@ export type EditorAction =
 /** Runs of typing are told apart from drags by this prefix: only they close on a pause. */
 export const TYPING_GROUP = "type:";
 
-export const quantifyKey = (q: { entryIndex: number; bulletIndex: number; after: string }): string =>
-  `${q.entryIndex}:${q.bulletIndex}:${q.after}`;
+export const quantifyKey = (q: { entryIndex: number; bulletIndex: number; after: string; customId?: string }): string =>
+  `${q.customId ?? q.entryIndex}:${q.bulletIndex}:${q.after}`;
 
 const START_MARKS: EditorMarks = {
   template: "atlas",
@@ -92,6 +105,8 @@ const START_MARKS: EditorMarks = {
   quantified: [],
   outcomes: {},
   dismissed: [],
+  rejectedKeywords: [],
+  dismissedFixes: [],
   captions: {},
   askStatus: null,
 };
@@ -113,10 +128,11 @@ const samePoint = (a: EditorSnapshot, b: EditorSnapshot): boolean =>
 
 function edit(s: EditorSnapshot, a: Extract<EditorAction, { type: "edit" }>): EditorSnapshot {
   const content = a.content === undefined ? s.content : typeof a.content === "function" ? a.content(s.content) : a.content;
+  const sections = a.sections ? a.sections(s.sections) : s.sections;
   const marks = patched(s.marks, typeof a.marks === "function" ? a.marks(s.marks) : a.marks);
   const check = a.removeCheck ? null : s.check;
-  if (content === s.content && marks === s.marks && check === s.check) return s;
-  return { ...s, content, marks, check };
+  if (content === s.content && sections === s.sections && marks === s.marks && check === s.check) return s;
+  return { ...s, content, sections, marks, check };
 }
 
 function learn(s: EditorSnapshot, a: Extract<EditorAction, { type: "learn" }>): EditorSnapshot {
@@ -144,7 +160,8 @@ export function editorReducer(h: EditorHistory, a: EditorAction): EditorHistory 
     case "edit": {
       const next = edit(h.present, a);
       if (!a.typing || next === h.present) return record(h, next);
-      const field = soleLeafPath(h.present.content, next.content);
+      // Read across the words and the section list together, so typing a custom section's name folds too.
+      const field = soleLeafPath({ content: h.present.content, sections: h.present.sections }, { content: next.content, sections: next.sections });
       // A single field changed and nothing else did: part of typing into it.
       const typing = typeof field === "string" && next.marks === h.present.marks && next.check === h.present.check;
       return record(h, next, typing ? `${TYPING_GROUP}${field}` : null);

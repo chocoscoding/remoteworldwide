@@ -54,7 +54,18 @@ export interface ResumeLandingProps {
   banner?: ReactNode;
 }
 
-const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, onOpen, onCreateBlank, onImport, onDelete, onBuild, buildLocked = false, banner }) => {
+const ResumeLanding: FC<ResumeLandingProps> = ({
+  library,
+  onRetry,
+  documents,
+  onOpen,
+  onCreateBlank,
+  onImport,
+  onDelete,
+  onBuild,
+  buildLocked = false,
+  banner,
+}) => {
   const [naming, setNaming] = useState(false);
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
@@ -112,10 +123,10 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
       <div className="mx-auto flex max-w-[680px] flex-col items-center px-6 pb-14 pt-5 text-center">
         {banner && <div className="mb-2 w-full">{banner}</div>}
         <span aria-hidden className="flex items-center justify-center">
-          <Lottie src={`/Lottie/neobrutalism/Edit_Contract_lottie.json`} autoplay loop speed={0.63} style={{ width: 230, height: 230 }} />
+          <Lottie src={`/Lottie/neobrutalism/Edit_Contract_lottie.json`} autoplay loop speed={0.63} style={{ width: 300, height: 300 }} />
         </span>
 
-        <h2 className="text-[22px] font-bold text-primary leading-tight">Let&apos;s build the resume that gets you hired</h2>
+        <h2 className="text-[18px] font-bold text-primary leading-tight">Let&apos;s build the resume that gets you hired</h2>
         {/* <p className="mt-2 max-w-[440px] text-sm leading-relaxed text-black/50">
           Start one from scratch, bring in a resume you already have, or keep polishing one you made here.
         </p> */}
@@ -138,18 +149,18 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
             aria-busy={importing}
             className={cn(
               "group flex items-center gap-3 rounded-2xl border-[1.5px] border-black/15 bg-white px-4 py-3.5 text-left transition-[transform,box-shadow,border-color] duration-100 ease-out",
-              !onImport
-                ? "pointer-events-none opacity-50"
-                : importing
-                  ? "cursor-wait opacity-70"
-                  : "cursor-pointer br-plain-press",
+              !onImport ? "pointer-events-none opacity-50" : importing ? "cursor-wait opacity-70" : "cursor-pointer br-plain-press",
             )}>
             <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
               {importing ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Upload className="h-4 w-4 text-primary" />}
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-bold text-primary">{importing ? "Reading your resume…" : "Start from a resume you have"}</span>
-              <span className="mt-0.5 block text-xs text-black/50">{importing ? "Pulling out your details." : "Upload a PDF, DOCX, TXT or MD"}</span>
+              <span className="block text-sm font-bold text-primary">
+                {importing ? "Reading your resume…" : "Start from a resume you have"}
+              </span>
+              <span className="mt-0.5 block text-xs text-black/50">
+                {importing ? "Pulling out your details." : "Upload a PDF, DOCX, TXT or MD"}
+              </span>
             </span>
             <input
               ref={fileRef}
@@ -215,7 +226,10 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
         {library === "error" && (
           <p className="mt-8 text-xs text-black/55">
             We couldn&apos;t load your resumes.{" "}
-            <button type="button" onClick={onRetry} className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2">
               Try again
             </button>
           </p>
@@ -253,7 +267,13 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                           {d.check ? (
                             <>
                               {d.check.job ? `against ${d.check.job}` : "general"} ·{" "}
-                              {isStaleCheck(d) ? "edited since it was scanned" : <>scanned <TimeAgo datetime={d.check.at} opts={{ minInterval: 10 }} /></>}
+                              {isStaleCheck(d) ? (
+                                "edited since it was scanned"
+                              ) : (
+                                <>
+                                  scanned <TimeAgo datetime={d.check.at} opts={{ minInterval: 10 }} />
+                                </>
+                              )}
                             </>
                           ) : (
                             <>
@@ -267,7 +287,8 @@ const ResumeLanding: FC<ResumeLandingProps> = ({ library, onRetry, documents, on
                           the score that text got, but no longer this resume's. */}
                       {d.check && !confirming && (
                         <span className="flex-none text-right">
-                          <span className={cn("block text-base font-bold tabular-nums", isStaleCheck(d) ? "text-black/30" : "text-primary")}>
+                          <span
+                            className={cn("block text-base font-bold tabular-nums", isStaleCheck(d) ? "text-black/30" : "text-primary")}>
                             {d.check.report.score}
                           </span>
                           <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">ATS</span>

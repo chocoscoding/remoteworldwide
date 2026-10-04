@@ -39,7 +39,10 @@ export interface TailorResult {
 
 export interface RewriteVariant {
   style: string;
+  /** The summary as this take writes it — or, for a role, its bullets one per line. */
   text: string;
+  /** A role's take only: its bullets, one for each of the role's own, in order. */
+  bullets?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -59,12 +62,16 @@ export interface KeywordInjection {
 // ---------------------------------------------------------------------------
 
 export interface QuantifySuggestion {
-  /** Index into `content.experience`. */
+  /** Index into `content.experience`; -1 for a point of a custom section (`customId`). */
   entryIndex: number;
+  /** The line's index: the service's among non-empty lines, the editor's stored one once it lands. */
   bulletIndex: number;
+  /** The role's title, or the custom section's name. */
   role: string;
   before: string;
   after: string;
+  /** A point of this custom section (`content.customSections`) rather than a role's bullet. */
+  customId?: string;
 }
 
 /**
@@ -76,6 +83,16 @@ export interface QuantifySuggestion {
  * deleted the bullet before pressing Apply.
  */
 export function applyQuantify(content: ResumeContent, suggestion: QuantifySuggestion): ResumeContent {
+  if (suggestion.customId) {
+    return {
+      ...content,
+      customSections: content.customSections?.map((section) =>
+        section.id === suggestion.customId
+          ? { ...section, items: section.items.map((item, j) => (j === suggestion.bulletIndex ? suggestion.after : item)) }
+          : section
+      ),
+    };
+  }
   return {
     ...content,
     experience: content.experience.map((entry, i) =>

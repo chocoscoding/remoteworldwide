@@ -94,6 +94,8 @@ const ResumePaper: FC<ResumePaperProps> = ({ design, sections, content, chrome =
   // item such as a bullet's text shrink below that word's width, which `break-word` would not.
   return (
     <div
+      // The page itself, which the AI tools' pick mode reads as "the whole resume" (PagePicker).
+      data-resume-paper
       style={cssVars}
       className={cn(
         "relative w-[var(--r-page-w)] min-h-[var(--r-page-h)] bg-[color:var(--r-page-bg)] px-[var(--r-mx)] py-[var(--r-my)] text-[color:var(--r-text)] [overflow-wrap:anywhere]",

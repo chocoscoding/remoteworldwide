@@ -11,15 +11,53 @@
 // so the price is said once, beside the heading. Pointing at a tool, a take or
 // a proposed bullet frames what it would change on the paper (`onPointAt`).
 
-import type { FC, FocusEvent } from "react";
+import type { FC, FocusEvent, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Check, Hash, Loader2, PenLine, Scissors, SpellCheck2, Tag, Target } from "lucide-react";
+import { Check, Hash, Loader2, PenLine, Scissors, SpellCheck2, Tag, Target, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SUGGESTION_CREDITS, type SuggestionTool } from "@/app/lib/resume/ai";
+import type { SuggestionTool } from "@/app/lib/resume/ai";
 import type { QuantifySuggestion, RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
 
 /** What a control in this column is about, for the preview's frame. */
-export type AiToolPointer = { tool: SuggestionTool } | { quantify: number } | { take: true } | null;
+export type AiToolPointer = { tool: SuggestionTool } | { quantify: number } | { keyword: number } | { fix: string } | { take: true } | null;
+
+/** One "Fix tone & grammar" proposal as its card shows it, and what became of it. */
+export interface ToneFixRow {
+  key: string;
+  /** Where it is: "Summary", a role's title, "Skills"… */
+  label: string;
+  kind: string;
+  before: string;
+  after: string;
+  /** What it would change in `before`, underlined in red here as on the paper. */
+  ranges: [number, number][];
+  state: "pending" | "applied" | "dismissed" | "gone";
+}
+
+/** The red underline the paper draws under what a tone fix would change, the same here. */
+const RED_UNDERLINE = "underline decoration-[#e5484d] decoration-[2.5px] underline-offset-[3px] [text-decoration-skip-ink:none]";
+
+const underlined = (line: string, ranges: [number, number][]) => {
+  const runs: ReactNode[] = [];
+  let from = 0;
+  ranges.forEach(([start, end], i) => {
+    if (start > from) runs.push(line.slice(from, start));
+    runs.push(
+      <span key={i} className={RED_UNDERLINE}>
+        {line.slice(start, end)}
+      </span>,
+    );
+    from = end;
+  });
+  if (from < line.length) runs.push(line.slice(from));
+  return runs;
+};
+
+/** One "Add missing keywords" proposal and what was done about it: still waiting, ticked into Skills, or set aside. */
+export interface KeywordProposalRow {
+  term: string;
+  state: "pending" | "added" | "rejected";
+}
 
 interface AiToolAction {
   id: Exclude<SuggestionTool, "ask">;
@@ -29,7 +67,7 @@ interface AiToolAction {
 }
 
 const MATCH_ROWS: AiToolAction[] = [
-  { id: "keywords", icon: Tag, label: "Add missing keywords", description: "Work in what the posting asks for." },
+  { id: "keywords", icon: Tag, label: "Add missing keywords", description: "See what the posting asks for, then pick what to add." },
 ];
 
 const POLISH_ROWS: AiToolAction[] = [
@@ -48,6 +86,10 @@ export interface AiToolsListProps {
   /** A job Tailor already has from a link. Run tailors to it; the picker is still one click away. */
   tailorFor?: { status: "loading" | "ready" | "failed"; label: string } | null;
   onPickTailorJob?: () => void;
+  /** The job "Add missing keywords" will use without asking ("Role at Company"), or null when it will ask. */
+  keywordsFor?: string | null;
+  /** Picks another job for keywords, and runs it. */
+  onPickKeywordsJob?: () => void;
   /** Rewrite's three takes, once generated; choosing applies to the Summary. */
   rewriteVariants: RewriteVariant[] | null;
   onUseRewrite: (index: number) => void;
@@ -58,6 +100,19 @@ export interface AiToolsListProps {
   onApplyAllQuantify: () => void;
   /** Missing keywords the standing job check found, when there is one — said on the keywords row. */
   keywordsFound?: number | null;
+  /** What "Add missing keywords" proposes, once it has run: each ticked into Skills (✓) or set aside (✗). */
+  keywordProposals?: KeywordProposalRow[] | null;
+  onAcceptKeyword?: (term: string) => void;
+  onRejectKeyword?: (term: string) => void;
+  onAcceptAllKeywords?: () => void;
+  /** Rewrite or Quantify waiting for a pick on the page: its row says so and offers Cancel. */
+  picking?: "rewrite" | "quantify" | "tone" | null;
+  onCancelPick?: () => void;
+  /** What "Fix tone & grammar" proposes, once it has run: each applied (✓) or set aside (✗). */
+  toneFixes?: ToneFixRow[] | null;
+  onApplyFix?: (key: string) => void;
+  onDismissFix?: (key: string) => void;
+  onApplyAllFixes?: () => void;
   /** The page count the preview measures — said on the shorten row when it runs long. */
   pageCount?: number;
   /** What the pointer or focus is on, so the preview can frame it; null when it leaves. */
@@ -86,6 +141,8 @@ const AiToolsList: FC<AiToolsListProps> = ({
   onRun,
   tailorFor = null,
   onPickTailorJob,
+  keywordsFor = null,
+  onPickKeywordsJob,
   rewriteVariants,
   onUseRewrite,
   quantify,
@@ -93,6 +150,16 @@ const AiToolsList: FC<AiToolsListProps> = ({
   onApplyQuantify,
   onApplyAllQuantify,
   keywordsFound = null,
+  keywordProposals = null,
+  onAcceptKeyword,
+  onRejectKeyword,
+  onAcceptAllKeywords,
+  picking = null,
+  onCancelPick,
+  toneFixes = null,
+  onApplyFix,
+  onDismissFix,
+  onApplyAllFixes,
   pageCount = 1,
   onPointAt,
 }) => {
@@ -110,30 +177,179 @@ const AiToolsList: FC<AiToolsListProps> = ({
     const running = aiRunning === action.id;
     const done = aiDone.has(action.id);
     const caption = captions[action.id];
+    const isPicking = picking === action.id;
     return (
-      <div key={action.id} data-tool={action.id} {...pointing(onPointAt, { tool: action.id })} className="flex flex-col gap-2.5 p-3">
+      <div
+        key={action.id}
+        data-tool={action.id}
+        {...pointing(onPointAt, { tool: action.id })}
+        className={cn("flex flex-col gap-2.5 p-3", isPicking && "rounded-xl br-shadow br-lime")}>
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 flex-none place-content-center rounded-[10px] bg-[#f0f0ea]">
+          <div className={cn("grid h-9 w-9 flex-none place-content-center rounded-[10px]", isPicking ? "bg-[#e1f073]" : "bg-[#f0f0ea]")}>
             <action.icon className="h-[17px] w-[17px] text-primary" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold leading-snug text-primary">{action.label}</p>
-            <p className="text-xs leading-snug text-[#5f6062]">{describe(action)}</p>
+            <p className={cn("text-xs leading-snug", isPicking ? "font-semibold text-primary" : "text-[#5f6062]")}>
+              {isPicking
+                ? action.id === "rewrite"
+                  ? "Now click your summary, a role or a section of your own."
+                  : action.id === "quantify"
+                    ? "Now click your resume, a section, a role, or one line."
+                    : "Now click your resume, a section, a role, or one line."
+                : describe(action)}
+            </p>
+            {/* The job keywords will use without asking — the one in context — and the way to another. */}
+            {action.id === "keywords" && keywordsFor && !isPicking && (
+              <p className="mt-0.5 text-xs leading-snug text-[#55564f]">
+                For <strong className="text-primary">{keywordsFor}</strong>
+                {onPickKeywordsJob && (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      onClick={onPickKeywordsJob}
+                      disabled={running}
+                      className="cursor-pointer font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e] disabled:cursor-default disabled:opacity-40">
+                      Change job
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
           </div>
-          <button type="button" onClick={() => onRun(action.id)} disabled={running} className={RUN_BUTTON_CLASS}>
-            {running && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {running ? "Running…" : done ? "Run again" : "Run"}
-          </button>
+          {isPicking ? (
+            <button type="button" onClick={onCancelPick} className={RUN_BUTTON_CLASS}>
+              Cancel
+            </button>
+          ) : (
+            <button type="button" onClick={() => onRun(action.id)} disabled={running} className={RUN_BUTTON_CLASS}>
+              {running && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {running ? "Running…" : done ? "Run again" : "Run"}
+            </button>
+          )}
         </div>
-        {caption && !running && <p className="pl-12 text-xs font-medium leading-snug text-[#6c7a1e]">{caption}</p>}
+        {caption && !running && !isPicking && <p className="pl-12 text-xs font-medium leading-snug text-[#6c7a1e]">{caption}</p>}
+
+        {/* Add missing keywords — what the posting asks for and the resume lacks, ticked in or set aside one by one. */}
+        {action.id === "keywords" && keywordProposals && !running && keywordProposals.some((row) => row.state !== "rejected") && (
+          <div className="flex flex-col gap-1.5 pl-12">
+            <ul className="flex flex-col gap-1.5">
+              {keywordProposals.map((row, i) =>
+                row.state === "rejected" ? null : (
+                  <li
+                    key={row.term}
+                    {...pointing(onPointAt, { keyword: i })}
+                    className="flex min-h-9 items-center gap-2 rounded-[10px] bg-[#f6f6f6] py-1 pl-3 pr-1">
+                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-primary">{row.term}</span>
+                    {row.state === "added" ? (
+                      <span className="inline-flex flex-none items-center gap-1 pr-2 text-xs font-bold text-[#6c7a1e]">
+                        <Check className="h-3 w-3" strokeWidth={3} /> Added
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onAcceptKeyword?.(row.term)}
+                          aria-label={`Add ${row.term} to Skills`}
+                          title="Add to Skills"
+                          className="grid h-7 w-7 flex-none cursor-pointer place-content-center rounded-lg border border-[#222325] bg-[#1f8a4c] text-white transition-colors hover:bg-[#1a7a43]">
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onRejectKeyword?.(row.term)}
+                          aria-label={`Leave ${row.term} out`}
+                          title="Leave it out"
+                          className="grid h-7 w-7 flex-none cursor-pointer place-content-center rounded-lg border border-black/[0.22] bg-white text-[#b23c26] transition-colors hover:border-[#b23c26]">
+                          <X className="h-3.5 w-3.5" strokeWidth={3} />
+                        </button>
+                      </>
+                    )}
+                  </li>
+                ),
+              )}
+            </ul>
+            {keywordProposals.filter((row) => row.state === "pending").length > 1 && (
+              <button
+                type="button"
+                onClick={onAcceptAllKeywords}
+                className="h-9 cursor-pointer rounded-[10px] border border-black/[0.22] text-xs font-bold text-primary transition-colors hover:border-[#222325]">
+                Add all {keywordProposals.filter((row) => row.state === "pending").length}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Fix tone & grammar — each fix with what it changes underlined in red, applied or set aside one by one. */}
+        {action.id === "tone" && toneFixes && !running && !isPicking && toneFixes.some((row) => row.state === "pending" || row.state === "applied") && (
+          <div className="flex flex-col gap-2 pl-12">
+            {toneFixes.map((row) =>
+              row.state !== "pending" && row.state !== "applied" ? null : (
+                <div key={row.key} {...pointing(onPointAt, { fix: row.key })} className="rounded-[10px] bg-[#f6f6f6] p-3">
+                  <div className="flex items-start gap-2">
+                    <p className="min-w-0 flex-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#5f6062]">
+                      {row.label} · {row.kind}
+                    </p>
+                    {row.state === "applied" ? (
+                      <span className="inline-flex flex-none items-center gap-1 text-xs font-bold text-[#6c7a1e]">
+                        <Check className="h-3 w-3" strokeWidth={3} /> Applied
+                      </span>
+                    ) : (
+                      <div className="flex flex-none items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onApplyFix?.(row.key)}
+                          aria-label={`Apply this fix to ${row.label}`}
+                          title="Apply"
+                          className="grid h-7 w-7 cursor-pointer place-content-center rounded-lg border border-[#222325] bg-[#1f8a4c] text-white transition-colors hover:bg-[#1a7a43]">
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDismissFix?.(row.key)}
+                          aria-label={`Leave ${row.label} as it is`}
+                          title="Leave it as it is"
+                          className="grid h-7 w-7 cursor-pointer place-content-center rounded-lg border border-black/[0.22] bg-white text-[#b23c26] transition-colors hover:border-[#b23c26]">
+                          <X className="h-3.5 w-3.5" strokeWidth={3} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <p className={cn("mt-1 text-xs leading-snug", row.state === "applied" ? "text-[#5f6062] line-through" : "text-[#55564f]")}>
+                    {row.state === "applied" ? row.before : underlined(row.before, row.ranges)}
+                  </p>
+                  <p className="mt-0.5 text-xs font-semibold leading-snug text-primary">{row.after}</p>
+                </div>
+              ),
+            )}
+            {toneFixes.filter((row) => row.state === "pending").length > 1 && (
+              <button
+                type="button"
+                onClick={onApplyAllFixes}
+                className="h-9 cursor-pointer rounded-[10px] border border-black/[0.22] text-xs font-bold text-primary transition-colors hover:border-[#222325]">
+                Apply all {toneFixes.filter((row) => row.state === "pending").length}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Rewrite — the three takes, choose one. */}
-        {action.id === "rewrite" && rewriteVariants && !running && (
+        {action.id === "rewrite" && rewriteVariants && !running && !isPicking && (
           <div className="flex flex-col gap-2 pl-12" {...pointing(onPointAt, { take: true })}>
             {rewriteVariants.map((v, i) => (
               <div key={v.style} className="rounded-[10px] bg-[#f6f6f6] p-3">
                 <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#5f6062]">{v.style}</p>
-                <p className="mt-1 text-xs leading-snug text-black/75">{v.text}</p>
+                {/* A role's take is its bullets, line for line; the summary's is one paragraph. */}
+                {v.bullets ? (
+                  <ul className="mt-1 flex list-disc flex-col gap-1 pl-4 text-xs leading-snug text-black/75">
+                    {v.bullets.map((bullet, j) => (
+                      <li key={j}>{bullet}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-xs leading-snug text-black/75">{v.text}</p>
+                )}
                 <button
                   type="button"
                   onClick={() => onUseRewrite(i)}
@@ -146,12 +362,12 @@ const AiToolsList: FC<AiToolsListProps> = ({
         )}
 
         {/* Quantify — per-bullet upgrades, each pointing at its line. */}
-        {action.id === "quantify" && quantify && quantify.length > 0 && !running && (
+        {action.id === "quantify" && quantify && quantify.length > 0 && !running && !isPicking && (
           <div className="flex flex-col gap-2 pl-12">
             {quantify.map((q, i) => {
               const applied = quantifyApplied.has(i);
               return (
-                <div key={`${q.entryIndex}-${q.bulletIndex}`} {...pointing(onPointAt, { quantify: i })} className="rounded-[10px] bg-[#f6f6f6] p-3">
+                <div key={`${q.customId ?? q.entryIndex}-${q.bulletIndex}`} {...pointing(onPointAt, { quantify: i })} className="rounded-[10px] bg-[#f6f6f6] p-3">
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-[#5f6062]">{q.role}</p>
                   <p className="mt-1 text-xs leading-snug text-[#5f6062] line-through">{q.before}</p>
                   <p className="mt-0.5 text-xs font-semibold leading-snug text-primary">{q.after}</p>
@@ -194,9 +410,6 @@ const AiToolsList: FC<AiToolsListProps> = ({
     <section aria-label="AI tools" className="flex flex-col gap-3.5">
       <div className="flex items-baseline justify-between gap-3 px-1">
         <h2 className="text-lg font-extrabold tracking-[-0.01em] text-primary">AI tools</h2>
-        <span className="text-xs font-semibold text-[#5f6062]">
-          {SUGGESTION_CREDITS} credit per run
-        </span>
       </div>
 
       <div className="rounded-2xl border border-black/10 bg-white p-2">

@@ -57,7 +57,7 @@ export interface EntryListEditorProps<T extends { id: string }> {
 }
 
 const ICON_BUTTON =
-  "grid h-8 w-8 flex-none cursor-pointer place-content-center rounded-lg text-primary transition-colors hover:bg-[#f0f0ea] disabled:cursor-default disabled:opacity-40";
+  "grid h-7 w-7 flex-none cursor-pointer place-content-center rounded-lg text-primary transition-colors hover:bg-[#f0f0ea] disabled:cursor-default disabled:opacity-40";
 
 /** One half of the editing card's hide/delete pair. */
 const PAIR_BUTTON = "grid w-10 cursor-pointer place-content-center transition-colors";
@@ -285,14 +285,8 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
                   type="button"
                   onClick={() => setEditingId(item.id)}
                   className="flex min-w-0 flex-1 cursor-pointer flex-col py-0.5 text-left">
-                  <span className={cn("truncate text-[13px] font-bold", hidden ? "text-[#5f6062] line-through" : "text-primary")}>
-                    {name}
-                  </span>
-                  {hidden ? (
-                    <span className="text-xs font-bold text-[#44453f]">Hidden from this resume</span>
-                  ) : (
-                    summary.meta && <span className="truncate text-xs text-[#5f6062]">{summary.meta}</span>
-                  )}
+                  <span className={cn("truncate text-[13px] font-bold", hidden ? "text-[#5f6062]" : "text-primary")}>{name}</span>
+                  {hidden ? null : summary.meta && <span className="truncate text-xs text-[#5f6062]">{summary.meta}</span>}
                 </button>
                 {hideable && eye}
                 <button

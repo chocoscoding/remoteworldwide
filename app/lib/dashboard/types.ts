@@ -137,9 +137,26 @@ export interface ResumeExperienceEntry {
   role: string;
   company: string;
   dates: string;
+  /** Where the role was, printed on its own line under the title and company. Absent when not given. */
+  location?: string;
   bullets: string[];
   /** Kept on the document but left off the page and every export (the Content tab's eye toggle). Absent means shown. */
   hidden?: boolean;
+}
+
+/**
+ * The points of a section the person made up and named ("Volunteering", "Awards"). Its name, place
+ * and visibility are its `SectionConfig` (kind "custom", the same id), like every other section's;
+ * only its points live in the content.
+ */
+export interface ResumeCustomSection {
+  id: string;
+  items: string[];
+  /**
+   * Its name as its heading reads, on what the editor sends the AI tools only (`withSectionTitles`),
+   * so they know what the points are. Never kept: the name is the `SectionConfig`'s label.
+   */
+  title?: string;
 }
 
 export interface ResumeEducationEntry {
@@ -200,6 +217,8 @@ export interface ResumeContent {
   skills: string[];
   /** Present when the skills are split into titled groups ("Sub skills"); absent for one plain list ("All"). */
   skillGroups?: ResumeSkillGroup[];
+  /** The points of each custom section, by its section's id. */
+  customSections?: ResumeCustomSection[];
 }
 
 // ---------------------------------------------------------------------------
@@ -545,8 +564,10 @@ export interface RecommendationTarget {
   seniority?: string | null;
   /** When it was posted, epoch ms — breaks ties toward the fresher listing. */
   postedAt?: number;
+  /** Whole days since it was posted, counted when the listing was mapped. Unset when the date can't be read. */
+  postedDaysAgo?: number;
   skills: string[];
-  /** A one-line summary under the name: seniority, regions, how fresh. */
+  /** A one-line summary under the name: seniority and regions. How fresh it is comes from `postedDaysAgo`. */
   note?: string;
   /** The listing's own page, e.g. `/jobs/{slug}`. */
   href?: string;

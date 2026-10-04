@@ -260,7 +260,12 @@ export function snapshotReducer(s: DesignSnapshot, a: DesignAction): DesignSnaps
     case "template/apply": {
       const tpl = lookupTemplate(a.id);
       const design = { ...deepMerge(DEFAULT_DESIGN, tpl.design), chrome: tpl.chrome };
-      const sections = tpl.sections.length ? sectionsFromSeeds(tpl.sections) : DEFAULT_SECTIONS;
+      const seeded = tpl.sections.length ? sectionsFromSeeds(tpl.sections) : DEFAULT_SECTIONS;
+      // A template lays out the sections every resume has. What only this one has stays: its custom
+      // sections (their points are in the content) at the end, and a Summary it removed stays removed.
+      const custom = s.sections.filter((section) => section.kind === "custom");
+      const keepsSummary = s.sections.some((section) => section.kind === "summary");
+      const sections = [...seeded.filter((section) => keepsSummary || section.kind !== "summary"), ...custom];
       return { design, sections };
     }
 

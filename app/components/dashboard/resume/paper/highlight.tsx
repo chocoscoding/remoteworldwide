@@ -17,13 +17,17 @@ import { createContext, useContext, type FC, type ReactNode } from "react";
 import type { SectionKind } from "@/app/lib/dashboard/resume/design-types";
 
 /** A section of the page a control can point at. "personal" is the header block. */
-export type FocusSection = Exclude<SectionKind, "page-break" | "custom">;
+export type FocusSection = Exclude<SectionKind, "page-break">;
 
 export interface PaperFocus {
   section: FocusSection;
+  /** Frame every section: the whole resume is what is pointed at (an AI tool's pick). */
+  all?: boolean;
   /** Frame this entry (a role, a school…) instead of the whole section. */
   entryId?: string;
-  /** Lines to highlight inside the entry, by their index in the stored bullets. */
+  /** The custom section pointed at ("custom" has many on one page), by its id. */
+  customId?: string;
+  /** Lines to highlight inside the entry or custom section, by their index in the stored lines. */
   bullets?: number[];
   /** Skills to highlight, by their text. */
   skills?: string[];
@@ -36,12 +40,39 @@ export interface PaperMark {
   n: number;
 }
 
+/**
+ * A line of the page by what it is: where "Fix tone & grammar" can propose a fix, and so where a
+ * red underline can sit. An entry's id, never its position, so an underline follows its line.
+ */
+export type UnderlineAt =
+  | { field: "summary" }
+  | { field: "bullet"; entryId: string; index: number }
+  | { field: "skill"; skill: string }
+  | { field: "degree"; entryId: string }
+  | { field: "detail"; entryId: string }
+  | { field: "project"; entryId: string }
+  | { field: "certification"; entryId: string }
+  | { field: "point"; customId: string; index: number };
+
+/**
+ * Words to underline in red in one line (owner, 2026-10-04): what a proposed tone fix would change.
+ * `text` is the line as the fix read it — once the line reads otherwise (applied, edited) the
+ * underline no longer matches it and is not drawn.
+ */
+export interface PaperUnderline {
+  at: UnderlineAt;
+  text: string;
+  /** Character ranges [start, end) of `text`. */
+  ranges: [number, number][];
+}
+
 export interface PaperHighlight {
   focus: PaperFocus | null;
   marks: PaperMark[];
+  underlines?: PaperUnderline[];
 }
 
-const NONE: PaperHighlight = { focus: null, marks: [] };
+const NONE: PaperHighlight = { focus: null, marks: [], underlines: [] };
 
 const PaperHighlightContext = createContext<PaperHighlight>(NONE);
 
@@ -70,10 +101,17 @@ const Frame: FC = () => (
   />
 );
 
-/** Frames a whole section (inside a `relative` section wrapper) when nothing narrower in it was named. */
-export const SectionFrame: FC<{ section: FocusSection }> = ({ section }) => {
+/**
+ * Frames a whole section (inside a `relative` section wrapper) when nothing narrower in it was named.
+ * A custom section is framed by its own id (`customId`), and not while one of its points is.
+ */
+export const SectionFrame: FC<{ section: FocusSection; customId?: string }> = ({ section, customId }) => {
   const { focus } = usePaperHighlight();
-  return focus !== null && focus.section === section && !focus.entryId ? <Frame /> : null;
+  if (focus === null) return null;
+  if (focus.all) return <Frame />;
+  if (focus.section !== section || focus.entryId) return null;
+  if (section === "custom" && (focus.customId !== customId || (focus.bullets ?? []).length > 0)) return null;
+  return <Frame />;
 };
 
 /** Frames one entry (inside its `relative` wrapper) when the editor points at it. */
@@ -89,16 +127,58 @@ const Marked: FC<{ children: ReactNode }> = ({ children }) => (
   </span>
 );
 
+const sameLine = (a: UnderlineAt, b: UnderlineAt): boolean => {
+  if (a.field !== b.field) return false;
+  if (a.field === "summary") return true;
+  if (a.field === "skill") return b.field === "skill" && a.skill === b.skill;
+  if (a.field === "bullet") return b.field === "bullet" && a.entryId === b.entryId && a.index === b.index;
+  if (a.field === "point") return b.field === "point" && a.customId === b.customId && a.index === b.index;
+  return "entryId" in b && a.entryId === b.entryId;
+};
+
+/**
+ * A line with the words a proposed fix would change underlined in red, 2.5px thick (owner,
+ * 2026-10-04). `data-resume-mark`, so the PDF export strips the styling and keeps the words.
+ */
+export const UnderlinedText: FC<{ at: UnderlineAt; text: string }> = ({ at, text }) => {
+  const { underlines = [] } = usePaperHighlight();
+  const line = underlines.find((u) => u.text === text && sameLine(u.at, at));
+  if (!line || line.ranges.length === 0) return <>{text}</>;
+  const runs: ReactNode[] = [];
+  let from = 0;
+  line.ranges.forEach(([start, end], i) => {
+    if (start > from) runs.push(text.slice(from, start));
+    runs.push(
+      <span
+        key={i}
+        data-resume-mark
+        className="underline decoration-[#e5484d] decoration-[2.5px] underline-offset-[3px] [text-decoration-skip-ink:none]">
+        {text.slice(start, end)}
+      </span>,
+    );
+    from = end;
+  });
+  if (from < text.length) runs.push(text.slice(from));
+  return <>{runs}</>;
+};
+
 /**
  * One bullet's text, highlighted when pointed at, with its marker's number in
  * the gutter left of the line (absolute, inside the `relative` list item) so
  * the line itself never rewraps.
  */
-export const BulletText: FC<{ entryId?: string; index: number; text: string }> = ({ entryId, index, text }) => {
+export const BulletText: FC<{ entryId?: string; customId?: string; index: number; text: string }> = ({ entryId, customId, index, text }) => {
   const { focus, marks } = usePaperHighlight();
+  // A custom section's point: highlighted and underlined like a bullet, by its section's id.
+  if (customId !== undefined) {
+    const pointed = focus?.section === "custom" && focus.customId === customId && (focus.bullets ?? []).includes(index);
+    const words = <UnderlinedText at={{ field: "point", customId, index }} text={text} />;
+    return <span>{pointed ? <Marked>{words}</Marked> : words}</span>;
+  }
   if (entryId === undefined) return <span>{text}</span>;
   const mark = marks.find((m) => m.entryId === entryId && m.bulletIndex === index);
   const pointed = focus?.entryId === entryId && (focus.bullets ?? []).includes(index);
+  const words = <UnderlinedText at={{ field: "bullet", entryId, index }} text={text} />;
   return (
     <>
       {mark && (
@@ -109,13 +189,14 @@ export const BulletText: FC<{ entryId?: string; index: number; text: string }> =
           {mark.n}
         </span>
       )}
-      <span>{mark || pointed ? <Marked>{text}</Marked> : text}</span>
+      <span>{mark || pointed ? <Marked>{words}</Marked> : words}</span>
     </>
   );
 };
 
-/** One skill's text, highlighted when pointed at. */
+/** One skill's text, highlighted when pointed at, underlined where a tone fix would change it. */
 export const SkillText: FC<{ skill: string }> = ({ skill }) => {
   const { focus } = usePaperHighlight();
-  return focus?.section === "skills" && focus.skills?.includes(skill) ? <Marked>{skill}</Marked> : <>{skill}</>;
+  const words = <UnderlinedText at={{ field: "skill", skill }} text={skill} />;
+  return focus?.section === "skills" && focus.skills?.includes(skill) ? <Marked>{words}</Marked> : words;
 };

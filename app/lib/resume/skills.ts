@@ -92,6 +92,21 @@ export function reconcileGroups(content: ResumeContent): ResumeContent {
   return { ...content, skillGroups: groups, skills: flat };
 }
 
+/** Whether the resume lists this skill already, whatever its case. */
+export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string): boolean =>
+  content.skills.some((have) => key(have) === key(skill));
+
+/**
+ * The content with these skills added to the end of the list — into the last sub skill group when
+ * the skills are grouped — each only if it is not there already. Returns the same object when
+ * nothing was new.
+ */
+export function addSkills(content: ResumeContent, skills: string[]): ResumeContent {
+  const fresh = flattenGroups([{ id: "", title: "", skills }]).filter((skill) => !hasSkill(content, skill));
+  if (fresh.length === 0) return content;
+  return reconcileGroups({ ...content, skills: [...content.skills, ...fresh] });
+}
+
 /** The groups worth printing: those with a skill in them. */
 export const printableGroups = (groups: ResumeSkillGroup[]): ResumeSkillGroup[] =>
   groups.map((group) => ({ ...group, title: group.title.trim(), skills: group.skills.map((s) => s.trim()).filter(Boolean) })).filter((group) => group.skills.length > 0);

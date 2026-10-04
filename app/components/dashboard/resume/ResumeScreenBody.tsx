@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type FC, type ReactNode, type SetStateAction } from "react";
 import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { Download, Redo2, Sparkle, Undo2, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
@@ -40,6 +41,8 @@ import CustomizeNav from "./CustomizeNav";
 import CustomizePanelsRail from "./CustomizePanelsRail";
 import AiAssistRail from "./AiAssistRail";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
+import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
+import { applyToneFix, pinToneFixes, proposalState, type ToneProposal } from "@/app/lib/resume/tone-fixes";
 import { PlanChip, usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import type { PickedJob } from "@/app/lib/jobs/fields";
@@ -49,15 +52,19 @@ import type { PickedJob } from "@/app/lib/jobs/fields";
 // only make it slower and occasionally fail. Everything that needs judgment —
 // or a credit — now runs in the AI service through `app/lib/resume/ai.ts`.
 import { applyQuantify, type QuantifySuggestion, type RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
-import { reconcileGroups } from "@/app/lib/resume/skills";
+import { addSkills, hasSkill, reconcileGroups } from "@/app/lib/resume/skills";
 import {
   askForRewrite,
-  fixToneAndGrammar,
+  proposeToneFixes,
+  serverBulletIndex,
+  storedBulletIndex,
   injectKeywords,
+  proposeKeywords,
   quantifySuggestions,
   rewriteVariants as buildRewriteVariants,
   shortenToOnePage,
   tailorToJob,
+  withSectionTitles,
 } from "@/app/lib/resume/ai";
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
 import { useCheckResume } from "@/hooks/mutations/useCheckResume";
@@ -94,21 +101,47 @@ const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
         // columns, not 3, so the freed width goes to the center, not to a
         // reserved-but-empty column.
         overview: "grid-cols-[minmax(0,2.4fr)_minmax(360px,1fr)]",
-        content: "grid-cols-[minmax(430px,1.1fr)_minmax(0,2fr)_minmax(360px,1fr)]",
+        content: "grid-cols-[minmax(410px,1.1fr)_minmax(0,2fr)_minmax(335px,1fr)]",
         customize: "grid-cols-[180px_minmax(0,2.2fr)_minmax(450px,1fr)]",
-        ai: "grid-cols-[minmax(300px,1fr)_minmax(0,2.2fr)_minmax(360px,1fr)]",
+        ai: "grid-cols-[minmax(330px,1fr)_minmax(0,2.2fr)_minmax(330px,1fr)]",
       }
     : {
         overview: "grid-cols-[minmax(0,2.4fr)_minmax(340px,1fr)]",
         content: "grid-cols-[minmax(372px,1.1fr)_minmax(0,2fr)_minmax(305px,1fr)]",
         customize: "grid-cols-[188px_minmax(0,2.2fr)_minmax(404px,1fr)]",
-        ai: "grid-cols-[minmax(308px,1fr)_minmax(0,2.2fr)_minmax(340px,1fr)]",
+        ai: "grid-cols-[minmax(338px,1fr)_minmax(0,2.2fr)_minmax(340px,1fr)]",
       };
 
 // The three zoom controls share one quiet recipe — hairline border, full
 // circle, muted ink — so the control sits in the background. Hover is where
 // it comes forward: ink border, a hair of hard shadow, and a real press that
 // travels onto that shadow and drops it.
+/** The AI tools that run on what is picked on the page (owner, 2026-10-04: pick, never guess). */
+type PickTool = "rewrite" | "quantify" | "tone";
+
+/**
+ * What each takes: Rewrite, the summary, a role or a custom section; Quantify, the whole resume,
+ * every role (Work experience), one role or custom section, or one line; Fix tone & grammar, the
+ * whole resume, any written section, a role or one line. Custom sections are never left out
+ * (owner, 2026-10-04).
+ */
+const PICK_KINDS: Record<PickTool, PickKinds> = {
+  rewrite: { sections: ["summary", "custom"], role: true },
+  quantify: { resume: true, sections: ["experience", "custom"], role: true, bullet: true },
+  tone: { resume: true, sections: ["summary", "experience", "education", "skills", "training", "projects", "custom"], role: true, bullet: true },
+};
+
+/** A section's name when the resume has no heading of its own for it. */
+const PICK_SECTION_NAMES: Record<PickSection, string> = {
+  summary: "Summary",
+  experience: "Work experience",
+  education: "Education",
+  skills: "Skills",
+  training: "Certifications",
+  projects: "Projects",
+  custom: "This section",
+};
+
 const ZOOM_BUTTON_CLASS =
   "grid h-6 w-6 place-content-center rounded-full bg-white text-sm font-semibold leading-none text-black/70 transition-[transform,box-shadow,background-color,border-color,color] duration-100 ease-out hover:bg-[#f7f7f7] hover:text-primary br-plain-press cursor-pointer";
 
@@ -153,6 +186,9 @@ export type ResumeJob = PickedJob<typeof RESUME_JOB_SPEC>;
 /** A job Tailor was handed by a link (?tailor=<savedJobId>): its card shows it, and Run uses it without the picker. */
 export type TailorPreset = { status: "loading" | "failed"; label: string } | { status: "ready"; label: string; job: ResumeJob };
 
+/** A picked job as the tools read it: its posting, and whose it is. */
+const postingOf = (job: ResumeJob): CheckPosting => ({ id: job.id, company: job.company, role: job.role, description: job.description });
+
 export interface ResumeScreenBodyProps {
   activeDocId: string;
   activeDoc: ResumeDocument;
@@ -183,6 +219,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     setDocTabState(tab);
     // The control that was pointed at is gone with its tab, and can't say it left.
     setPointFocus(null);
+    setPicking(null);
     const next = new URLSearchParams(window.location.search);
     next.set("tab", tab);
     window.history.replaceState(null, "", `${window.location.pathname}?${next.toString()}`);
@@ -220,6 +257,28 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // undoing a use brings its pick back.
   const [rewriteOptions, setRewriteOptions] = useState<RewriteVariant[] | null>(null);
   const [quantifyList, setQuantifyList] = useState<QuantifySuggestion[] | null>(null);
+  // Rewrite and Quantify work on what the person picks on the page, never a guess (owner,
+  // 2026-10-04): Run puts the screen in pick mode (`PagePicker`), and the tool runs on the click.
+  // What the last run was for: the role whose takes are out (null: the summary), and the role quantified.
+  const [picking, setPicking] = useState<PickTool | null>(null);
+  // "Fix tone & grammar" proposals, pinned to their lines. Whether each is in is read off the
+  // content and the marks, so Undo moves it back; the waiting ones are underlined on the paper.
+  const [toneProposals, setToneProposals] = useState<ToneProposal[] | null>(null);
+  const toneRows = (toneProposals ?? []).map((proposal) => ({ ...proposal, state: proposalState(content, proposal, marks.dismissedFixes) }));
+  // A role (`entryId`) or a custom section (`customId`); `role` is its name for the captions.
+  const [rewriteFor, setRewriteFor] = useState<{ entryId?: string; customId?: string; role: string } | null>(null);
+  const [quantifyFor, setQuantifyFor] = useState<{ entryId?: string; customId?: string } | null>(null);
+  // The job in context for Tailor and Add missing keywords (owner, 2026-10-04: pick a job once).
+  // The last one picked on this screen — for either tool, or a check against a job — else the job a
+  // link opened the screen with, else the standing job check's posting. None: they ask.
+  const [pickedJob, setPickedJob] = useState<CheckPosting | null>(null);
+  const jobInContext: CheckPosting | null =
+    pickedJob ?? (tailorPreset?.status === "ready" ? postingOf(tailorPreset.job) : null) ?? (check?.job ? check.posting : null);
+  const jobLabel = jobInContext ? `${jobInContext.role} at ${jobInContext.company}` : null;
+  // "Add missing keywords" proposals. Whether each is in is read off Skills and the marks, so Undo moves it back.
+  const [keywordProposals, setKeywordProposals] = useState<string[] | null>(null);
+  const keywordRows = (keywordProposals ?? [])
+    .map((term) => ({ term, state: hasSkill(content, term) ? ("added" as const) : marks.rejectedKeywords.includes(term.toLowerCase()) ? ("rejected" as const) : ("pending" as const) }));
   const quantifyApplied = useMemo(
     () => new Set((quantifyList ?? []).flatMap((q, i) => (marks.quantified.includes(quantifyKey(q)) ? [i] : []))),
     [quantifyList, marks.quantified],
@@ -228,7 +287,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // Each tool's caption, and so whether it has run. Two say what was picked from their proposals.
   const aiCaptions: Record<string, string | undefined> = {
     ...marks.captions,
-    ...(usedTake ? { rewrite: `Applied the ${usedTake.style} take to your Summary.` } : {}),
+    ...(usedTake ? { rewrite: `Applied the ${usedTake.style} take to ${rewriteFor ? rewriteFor.role || "that role" : "your Summary"}.` } : {}),
     ...(quantifyList && quantifyList.length > 0 && quantifyApplied.size === quantifyList.length
       ? { quantify: `All ${quantifyList.length} bullets now carry a number.` }
       : {}),
@@ -312,7 +371,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // content as it is now — free, and gone the moment the check is removed.
   const checkSuggestions = useMemo(() => deriveCheckSuggestions(check, content, pageCount), [check, content, pageCount]);
   // The cards as the rail shows them: dismissed ones out, rewrites numbered like their lines on the page.
-  const cards = useMemo(() => railCards(checkSuggestions, marks.outcomes, marks.dismissed), [checkSuggestions, marks.outcomes, marks.dismissed]);
+  const cards = useMemo(
+    () => railCards(checkSuggestions, marks.outcomes, marks.dismissed),
+    [checkSuggestions, marks.outcomes, marks.dismissed],
+  );
   // The name it downloads as is the resume's own, as it stands, company and all (owner, 2026-10-04),
   // without an extension a source file left in it. The download dialog lets it be changed.
   const downloadFileName =
@@ -472,6 +534,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     const sentById = new Map(sent.experience.map((entry) => [entry.id, entry]));
     const resultById = new Map(result.experience.map((entry) => [entry.id, entry]));
     const same = (a: string[], b: string[]) => a.length === b.length && a.every((line, i) => line === b[i]);
+    // Custom sections' points likewise, by section: never the `title` the request carried.
+    const sentCustom = new Map((sent.customSections ?? []).map((section) => [section.id, section.items]));
+    const resultCustom = new Map((result.customSections ?? []).map((section) => [section.id, section.items]));
     return {
       ...now,
       summary: now.summary === sent.summary ? result.summary : now.summary,
@@ -480,8 +545,23 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
         const after = resultById.get(entry.id);
         return before && after && same(entry.bullets, before.bullets) ? { ...entry, bullets: after.bullets } : entry;
       }),
+      ...(now.customSections
+        ? {
+            customSections: now.customSections.map((section) => {
+              const before = sentCustom.get(section.id);
+              const after = resultCustom.get(section.id);
+              return before && after && same(section.items, before) ? { ...section, items: after } : section;
+            }),
+          }
+        : {}),
     };
   };
+
+  /**
+   * The content as the AI tools get it (owner, 2026-10-04: custom sections are never left out):
+   * each custom section with its heading's name, and the hidden ones left out (`withSectionTitles`).
+   */
+  const forAi = (now: ResumeContent): ResumeContent => withSectionTitles(now, sections);
 
   /**
    * A keywords result, applied like `mergeRewrite` (it rewrites the summary and bullets too, since
@@ -510,48 +590,36 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   };
 
   const runAiTool = (id: string) => {
-    if (id === "tailor" && tailorPreset && tailorPreset.status !== "failed") {
-      if (tailorPreset.status === "ready") void handleTailorJob(tailorPreset.job);
-      return;
-    }
+    // A link's job still loading: Run waits for it rather than asking for another.
+    if (id === "tailor" && !jobInContext && tailorPreset?.status === "loading") return;
 
-    // The two tools that need a posting open the picker first; the run happens
-    // on pick. Neither can be answered from the document alone, and the screen
-    // does not keep a job description around — a standing check stores the
-    // job's LABEL, not its text — so the posting is fetched fresh each time
-    // rather than remembered and quietly going stale.
+    // The two tools that need a posting use the job in context (owner, 2026-10-04): the last one
+    // picked here, for Tailor, keywords or a check against a job, else the link's, else the
+    // standing job check's. Only with none at all do they open the picker, and run on the pick.
     if (id === "tailor" || id === "keywords") {
-      void pickJobFor(id);
+      if (jobInContext) void (id === "tailor" ? handleTailorJob(jobInContext) : handleKeywordsJob(jobInContext));
+      else void pickJobFor(id);
       return;
     }
 
-    if (id === "rewrite") {
-      void (async () => {
-        const variants = await runSuggestion("rewrite", () => buildRewriteVariants({ content }));
-        if (!variants) return;
-        setRewriteOptions(variants);
-        landAiTool(id, "3 fresh takes on your Summary — pick one below.");
-      })();
-      return;
-    }
-
-    if (id === "quantify") {
-      void (async () => {
-        const suggestions = await runSuggestion("quantify", () => quantifySuggestions({ content }));
-        if (!suggestions) return;
-        if (suggestions.length === 0) {
-          landAiTool(id, "Every bullet already carries a number. Nothing to do.");
-          return;
-        }
-        // Which are applied is read from the marks by each upgrade's own key, so a fresh list starts unapplied.
-        setQuantifyList(suggestions);
-        landAiTool(id, `${suggestions.length} bullet${suggestions.length === 1 ? "" : "s"} could carry a number — apply below.`);
-      })();
+    // Rewrite, Quantify and Fix tone & grammar run on what is picked on the page: Run only starts
+    // picking (`PagePicker`). Quantify needs a role with bullets to pick, and says so when there is none.
+    if (id === "rewrite" || id === "quantify" || id === "tone") {
+      const hasLines =
+        content.experience.some((entry) => !entry.hidden && entry.bullets.some((bullet) => bullet.trim())) ||
+        (forAi(content).customSections ?? []).some((section) => section.items.some((item) => item.trim()));
+      if (id === "quantify" && !hasLines) {
+        // Nothing ran, so a toast rather than the row's caption, which would mark the tool as run.
+        toast.message("Add a role with a bullet or two first, then pick it to quantify.");
+        return;
+      }
+      setPointFocus(null);
+      setPicking((now) => (now === id ? null : id));
       return;
     }
 
     if (id === "shorten") {
-      const sent = content;
+      const sent = forAi(content);
       void (async () => {
         const result = await runSuggestion("shorten", () => shortenToOnePage({ content: sent }));
         if (!result) return;
@@ -568,19 +636,6 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       return;
     }
 
-    if (id === "tone") {
-      const sent = content;
-      void (async () => {
-        const result = await runSuggestion("tone", () => fixToneAndGrammar({ content: sent }));
-        if (!result) return;
-        if (result.fixes.length === 0) {
-          landAiTool(id, "No issues found. Your resume reads clean.");
-          return;
-        }
-        landAiTool(id, `Fixed: ${result.fixes.join(", ")}.`, (now) => mergeRewrite(now, sent, result.content));
-      })();
-      return;
-    }
   };
 
   /**
@@ -591,25 +646,47 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
    * about the document rather than a model's claim, and an empty `added` is the
    * honest "nothing missing" rather than a model declining to answer.
    */
-  const handleKeywordsJob = async (job: ResumeJob) => {
-    const sent = content;
+  const handleKeywordsJob = async (job: CheckPosting) => {
+    // Proposals, not a rewrite (owner, 2026-10-04): the posting's missing skills and tools are
+    // listed under the tool, and each is ticked into Skills or set aside. The service keeps the
+    // company's name, the job title's words and generic words out of the list — the old run took
+    // the posting's most repeated words and put "chili", "piper" and "events" in Skills.
     const result = await runSuggestion("keywords", () =>
-      injectKeywords({ content: sent, jdText: job.description, company: job.company, role: job.role }),
+      proposeKeywords({ content: forAi(content), jdText: job.description, company: job.company, role: job.role }),
     );
     if (!result) return;
 
-    if (result.added.length === 0) {
+    if (result.terms.length === 0) {
+      setKeywordProposals(null);
       landAiTool("keywords", `Nothing missing. Your resume already covers what ${job.company} asked for.`);
       return;
     }
-    // Folded onto the content as it is NOW, so typing during the round trip is kept (see `mergeKeywords`).
-    landAiTool("keywords", workedIn(result.added), (now) => mergeKeywords(now, sent, result.content));
+    setKeywordProposals(result.terms);
+    landAiTool(
+      "keywords",
+      `${result.terms.length} keyword${result.terms.length === 1 ? "" : "s"} from ${job.role} at ${job.company} — tick the ones to add to Skills.`,
+    );
   };
 
-  /** Tailor lands here from the job picker. */
-  const handleTailorJob = async (job: ResumeJob) => {
+  /** A proposal ticked in: into Skills (the last group, when grouped), one undo step. */
+  const acceptKeyword = (term: string) => dispatch({ type: "edit", content: (prev) => addSkills(prev, [term]) });
+
+  /** A proposal set aside: a step, so Undo brings it back. */
+  const rejectKeyword = (term: string) => {
+    setPointFocus(null);
+    dispatch({ type: "edit", marks: (m) => ({ rejectedKeywords: [...m.rejectedKeywords, term.toLowerCase()] }) });
+  };
+
+  /** Every proposal still waiting, ticked in as one step. */
+  const acceptAllKeywords = () => {
+    const waiting = keywordRows.filter((row) => row.state === "pending").map((row) => row.term);
+    if (waiting.length > 0) dispatch({ type: "edit", content: (prev) => addSkills(prev, waiting) });
+  };
+
+  /** Tailor lands here with the job in context, or from the job picker. */
+  const handleTailorJob = async (job: CheckPosting) => {
     const result = await runSuggestion("tailor", () =>
-      tailorToJob({ content, jdText: job.description, company: job.company, role: job.role }),
+      tailorToJob({ content: forAi(content), jdText: job.description, company: job.company, role: job.role }),
     );
     if (!result) return;
 
@@ -659,25 +736,30 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       dispatch({ type: "learn", check: landed });
       setDocuments((prev) => prev.map((d) => (d.id === docId ? { ...d, check: landed } : d)));
     };
-    const settled = await checker.run({ content, label: activeDoc.label, job: posting }, putCheck);
+    // The page as it prints: custom sections under their own headings, hidden ones left out.
+    const settled = await checker.run({ content: forAi(content), label: activeDoc.label, job: posting }, putCheck);
     if (settled) putCheck(settled);
   };
 
   const checkGeneral = () => void runCheck(null);
 
-  const checkAgainstJob = (job: ResumeJob) =>
-    void runCheck({ id: job.id, company: job.company, role: job.role, description: job.description });
+  const checkAgainstJob = (job: CheckPosting) => void runCheck(job);
 
   /** The same check again — same posting (or none), the text as it is now. */
   const recheck = () => void runCheck(check?.posting ?? null);
 
-  /** Every reason starts from the same pick; cancelling it leaves the document as it was. */
+  /**
+   * Every reason starts from the same pick; cancelling it leaves the document as it was. The job
+   * picked becomes the job in context, which Tailor and keywords use from then on without asking.
+   */
   const pickJobFor = async (use: "tailor" | "keywords" | "scan") => {
     const result = await pickJob(RESUME_JOB_SPEC);
     if (result.status !== "picked") return;
-    if (use === "scan") checkAgainstJob(result.job);
-    else if (use === "keywords") await handleKeywordsJob(result.job);
-    else await handleTailorJob(result.job);
+    const job = postingOf(result.job);
+    setPickedJob(job);
+    if (use === "scan") checkAgainstJob(job);
+    else if (use === "keywords") await handleKeywordsJob(job);
+    else await handleTailorJob(job);
   };
 
   /**
@@ -708,18 +790,42 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     return null;
   };
 
+  /** A role or a custom section a tool last ran on, as the paper frames it; `fallback` when neither. */
+  const focusOfPicked = (picked: { entryId?: string; customId?: string } | null, fallback: PaperFocus): PaperFocus =>
+    picked?.customId
+      ? { section: "custom", customId: picked.customId }
+      : picked?.entryId
+        ? { section: "experience", entryId: picked.entryId }
+        : fallback;
+
   /** What an AI tool, a Rewrite take or a Quantify proposal is about on the page. */
   const focusOfTool = (pointer: AiToolPointer): PaperFocus | null => {
     if (!pointer) return null;
-    if ("take" in pointer) return { section: "summary" };
+    // Pick mode frames what is under the cursor on the page instead (`PagePicker`).
+    if (picking) return null;
+    if ("take" in pointer) return focusOfPicked(rewriteFor, { section: "summary" });
     if ("quantify" in pointer) {
       const proposal = quantifyList?.[pointer.quantify];
+      if (proposal?.customId) return { section: "custom", customId: proposal.customId, bullets: [proposal.bulletIndex] };
       const entry = proposal ? content.experience[proposal.entryIndex] : undefined;
       return proposal && entry ? { section: "experience", entryId: entry.id, bullets: [proposal.bulletIndex] } : null;
     }
-    if (pointer.tool === "tailor" || pointer.tool === "rewrite") return { section: "summary" };
-    if (pointer.tool === "keywords") return { section: "skills" };
-    if (pointer.tool === "quantify") return { section: "experience" };
+    // Nothing to frame until proposals are in (owner, 2026-10-04): then the tool frames Skills while
+    // some still wait, and a proposal points at its own skill once it is ticked in.
+    if ("fix" in pointer) {
+      const proposal = toneProposals?.find((p) => p.key === pointer.fix);
+      return proposal ? focusOfToneProposal(proposal) : null;
+    }
+    if ("keyword" in pointer) {
+      const row = keywordRows[pointer.keyword];
+      return row ? { section: "skills", ...(row.state === "added" ? { skills: [row.term] } : {}) } : null;
+    }
+    if (pointer.tool === "tailor") return { section: "summary" };
+    if (pointer.tool === "keywords") return keywordRows.some((row) => row.state === "pending") ? { section: "skills" } : null;
+    // Rewrite and Quantify guess at nothing (owner, 2026-10-04): their rows frame only what their
+    // last run was for, once there is something out to pick from.
+    if (pointer.tool === "rewrite" && rewriteOptions) return focusOfPicked(rewriteFor, { section: "summary" });
+    if (pointer.tool === "quantify" && quantifyList) return focusOfPicked(quantifyFor, { section: "experience" });
     return null;
   };
 
@@ -728,11 +834,209 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     checker.clearFailure();
   };
 
-  // A take used is a step with its mark, so Undo puts the old Summary back and the takes with it.
+  // A take used is a step with its mark, so Undo puts the old Summary (or role) back and the takes with it.
   const useRewriteVariant = (index: number) => {
     const variant = rewriteOptions?.[index];
     if (!variant) return;
-    dispatch({ type: "edit", content: (prev) => ({ ...prev, summary: variant.text }), marks: { rewriteUsed: variant.text } });
+    const role = rewriteFor;
+    const bullets = variant.bullets;
+    dispatch({
+      type: "edit",
+      content: (prev) =>
+        role?.customId && bullets
+          ? {
+              ...prev,
+              customSections: prev.customSections?.map((section) => (section.id === role.customId ? { ...section, items: bullets } : section)),
+            }
+          : role?.entryId && bullets
+            ? { ...prev, experience: prev.experience.map((entry) => (entry.id === role.entryId ? { ...entry, bullets } : entry)) }
+            : { ...prev, summary: variant.text },
+      marks: { rewriteUsed: variant.text },
+    });
+  };
+
+  /** A section's name as this resume heads it; a custom one by its id. */
+  const sectionName = (section: PickSection, customId?: string): string =>
+    sections.find((item) => (section === "custom" ? item.id === customId : item.kind === section))?.label.trim() || PICK_SECTION_NAMES[section];
+
+  /** What a pick-mode target is on the paper: every section, one section, a role, or one line in it. */
+  const focusOfTarget = (target: PageTarget): PaperFocus =>
+    target.kind === "resume"
+      ? { section: "summary", all: true }
+      : target.kind === "section"
+        ? { section: target.section, ...(target.customId ? { customId: target.customId } : {}) }
+        : target.kind === "role"
+          ? { section: "experience", entryId: target.entryId }
+          : target.kind === "point"
+            ? { section: "custom", customId: target.customId, bullets: [target.index] }
+            : { section: "experience", entryId: target.entryId, bullets: [target.index] };
+
+  /** What the label beside the pick cursor says: what a click will do there, or what to pick. */
+  const pickLabel = (tool: PickTool, target: PageTarget | null): string => {
+    const verb = tool === "rewrite" ? "Rewrite" : tool === "quantify" ? "Quantify" : "Proofread";
+    if (!target) {
+      return tool === "rewrite"
+        ? "Pick your summary, a role or a section of your own"
+        : tool === "quantify"
+          ? "Pick the resume, a section, a role or one line"
+          : "Pick the resume, a section, a role or one line";
+    }
+    if (target.kind === "resume") return `${verb} the whole resume`;
+    if (target.kind === "section") {
+      return target.section === "experience" && tool === "quantify" ? "Quantify every role" : `${verb} ${sectionName(target.section, target.customId)}`;
+    }
+    if (target.kind === "role") return `${verb} this role`;
+    return tool === "quantify" ? `Quantify this ${target.kind === "point" ? "point" : "bullet"}` : `${verb} this line`;
+  };
+
+  /**
+   * The tool runs on what was picked: Rewrite on the summary, a role's bullets or a custom section's
+   * points; Quantify on the whole resume, every role, one role or custom section, or one line; Fix
+   * tone & grammar on the whole resume, a section, a role or one line. Custom sections are never
+   * left out (owner, 2026-10-04), and every run sends them by name (`forAi`).
+   */
+  const runOnTarget = (tool: PickTool, target: PageTarget) => {
+    const entryIndex = target.kind === "role" || target.kind === "bullet" ? content.experience.findIndex((entry) => entry.id === target.entryId) : -1;
+    const entry = entryIndex >= 0 ? content.experience[entryIndex] : null;
+    if ((target.kind === "role" || target.kind === "bullet") && !entry) return;
+    // A custom section, picked whole or by one of its points.
+    const customId = target.kind === "point" ? target.customId : target.kind === "section" && target.section === "custom" ? (target.customId ?? null) : null;
+    const custom = customId ? (content.customSections?.find((section) => section.id === customId) ?? null) : null;
+    if (customId && !custom) return;
+    const name = entry ? entry.role.trim() || entry.company.trim() || "that role" : customId ? sectionName("custom", customId) : "";
+    // The service counts a role's bullets (or a section's points) without the empty ones; the paper names the stored one.
+    const bulletIndex =
+      target.kind === "bullet" && entry
+        ? serverBulletIndex(entry.bullets, target.index)
+        : target.kind === "point" && custom
+          ? serverBulletIndex(custom.items, target.index)
+          : null;
+    if ((target.kind === "bullet" || target.kind === "point") && bulletIndex === -1) return;
+    if (entry && target.kind === "role" && !entry.bullets.some((bullet) => bullet.trim())) {
+      toast.message(`${name.charAt(0).toUpperCase()}${name.slice(1)} has no bullets yet. Add one, then pick it again.`);
+      return;
+    }
+    if (custom && target.kind === "section" && !custom.items.some((item) => item.trim())) {
+      toast.message(`${name} has no points yet. Add one, then pick it again.`);
+      return;
+    }
+    const scope =
+      target.kind === "resume"
+        ? "your resume"
+        : target.kind === "section"
+          ? sectionName(target.section, target.customId)
+          : target.kind === "role"
+            ? name
+            : "that line";
+    const sent = forAi(content);
+
+    if (tool === "rewrite") {
+      void (async () => {
+        const variants = await runSuggestion("rewrite", () =>
+          buildRewriteVariants({ content: sent, entryIndex: entry ? entryIndex : null, customId }),
+        );
+        if (!variants) return;
+        setRewriteOptions(variants);
+        setRewriteFor(entry ? { entryId: entry.id, role: name } : customId ? { customId, role: name } : null);
+        landAiTool("rewrite", `3 fresh takes on ${entry ? `${name}'s bullets` : customId ? `${name}'s points` : "your Summary"}. Pick one below.`);
+      })();
+      return;
+    }
+
+    if (tool === "quantify") {
+      void (async () => {
+        const suggestions = await runSuggestion("quantify", () =>
+          quantifySuggestions({
+            content: sent,
+            entryIndex: entry ? entryIndex : null,
+            customId,
+            bulletIndex,
+            // Work experience picked whole: every role, no custom section.
+            section: target.kind === "section" && target.section === "experience" ? "experience" : null,
+          }),
+        );
+        if (!suggestions) return;
+        setQuantifyFor(entry ? { entryId: entry.id } : customId ? { customId } : null);
+        if (suggestions.length === 0) {
+          setQuantifyList(null);
+          landAiTool(
+            "quantify",
+            target.kind === "bullet" || target.kind === "point"
+              ? "That line already carries a number. Nothing to do."
+              : `Every line in ${scope} already carries a number. Nothing to do.`,
+          );
+          return;
+        }
+        // Back to the editor's numbering of lines, which counts the empty ones the service skipped.
+        // Which are applied is read from the marks by each upgrade's own key, so a fresh list starts unapplied.
+        setQuantifyList(
+          suggestions.map((s) => ({
+            ...s,
+            bulletIndex: storedBulletIndex(
+              s.customId
+                ? (sent.customSections?.find((section) => section.id === s.customId)?.items ?? [])
+                : (sent.experience[s.entryIndex]?.bullets ?? []),
+              s.bulletIndex,
+            ),
+          })),
+        );
+        landAiTool("quantify", `${suggestions.length} line${suggestions.length === 1 ? "" : "s"} in ${scope} could carry a number. Apply below.`);
+      })();
+      return;
+    }
+
+    void (async () => {
+      const result = await runSuggestion("tone", () =>
+        proposeToneFixes({
+          content: sent,
+          section: target.kind === "section" && target.section !== "custom" ? target.section : null,
+          entryIndex: entry ? entryIndex : null,
+          customId,
+          bulletIndex,
+        }),
+      );
+      if (!result) return;
+      const proposals = pinToneFixes(sent, result.fixes);
+      setToneProposals(proposals.length > 0 ? proposals : null);
+      landAiTool(
+        "tone",
+        proposals.length === 0
+          ? `No issues found in ${scope}. It reads clean.`
+          : proposals.length === 1
+            ? `1 fix in ${scope}, underlined in red. Apply it or leave it.`
+            : `${proposals.length} fixes in ${scope}, underlined in red. Apply the ones you want.`,
+      );
+    })();
+  };
+
+  /** A proposal applied: its line corrected, one undo step. */
+  const applyToneProposal = (key: string) => {
+    const proposal = toneProposals?.find((p) => p.key === key);
+    if (proposal) dispatch({ type: "edit", content: (prev) => applyToneFix(prev, proposal) });
+  };
+
+  /** A proposal set aside: a step, so Undo brings it (and its underline) back. */
+  const dismissToneProposal = (key: string) => {
+    setPointFocus(null);
+    dispatch({ type: "edit", marks: (m) => ({ dismissedFixes: [...m.dismissedFixes, key] }) });
+  };
+
+  /** Every waiting proposal applied, as one step. */
+  const applyAllToneProposals = () => {
+    const waiting = toneRows.filter((row) => row.state === "pending");
+    if (waiting.length > 0) dispatch({ type: "edit", content: (prev) => waiting.reduce(applyToneFix, prev) });
+  };
+
+  /** What a proposal is about on the paper: its line. */
+  const focusOfToneProposal = (proposal: ToneProposal): PaperFocus => {
+    const { where } = proposal;
+    if (where.field === "summary") return { section: "summary" };
+    if (where.field === "bullet") return { section: "experience", entryId: where.entryId, bullets: [where.index] };
+    if (where.field === "skill") return { section: "skills", skills: [where.skill] };
+    if (where.field === "project") return { section: "projects", entryId: where.entryId };
+    if (where.field === "certification") return { section: "training", entryId: where.entryId };
+    if (where.field === "point") return { section: "custom", customId: where.customId, bullets: [where.index] };
+    return { section: "education", entryId: where.entryId };
   };
 
   const applyQuantifyAt = (index: number) => {
@@ -860,9 +1164,19 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // The paper's highlight: what is pointed at, and — on AI Tools, as in the design — each fix
   // card's number beside the line it rewrites, while it waits.
   const pinned = useMemo(() => pinnedLines(cards, content, marks.outcomes), [cards, content, marks.outcomes]);
+  // The words a waiting tone fix would change, underlined in red on the AI Tools tab (owner, 2026-10-04).
+  const underlines = useMemo(
+    () =>
+      docTab === "ai"
+        ? (toneProposals ?? [])
+            .filter((proposal) => proposalState(content, proposal, marks.dismissedFixes) === "pending")
+            .map((proposal) => ({ at: proposal.where, text: proposal.before, ranges: proposal.ranges }))
+        : [],
+    [docTab, toneProposals, content, marks.dismissedFixes],
+  );
   const paperHighlight = useMemo(
-    () => ({ focus: pointFocus, marks: docTab === "ai" ? pinned : [] }),
-    [pointFocus, docTab, pinned],
+    () => ({ focus: pointFocus, marks: docTab === "ai" ? pinned : [], underlines }),
+    [pointFocus, docTab, pinned, underlines],
   );
 
   return (
@@ -918,7 +1232,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
               (below), shown on every tab instead of parked in a rail only
               Overview ever showed. */}
           {docTab !== "overview" && (
-            <aside data-resume-undo className="sticky top-[88px] max-h-[calc(100vh-112px)] overflow-y-auto overflow-x-hidden scrollbar-neo p-0.5 pb-1">
+            <aside
+              data-resume-undo
+              className="sticky top-[88px] max-h-[calc(100vh-112px)] overflow-y-auto overflow-x-hidden scrollbar-neo p-0.5 pb-1">
               {docTab === "content" && (
                 <ContentForm
                   content={content}
@@ -937,29 +1253,41 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
               )}
 
               {docTab === "ai" && aiLocked && (
-                  <button
-                    type="button"
-                    onClick={lockedAi}
-                    className="mb-2.5 flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-[1.5px] border-[#222325]/15 bg-[#f4f7d4] px-3 py-2.5 text-left text-xs leading-snug text-black/70 transition-colors hover:border-[#222325]">
-                    <span>AI help in the builder is on Basic and up. Free keeps the builder itself.</span>
-                    <PlanChip plan="basic" className="flex-none bg-white" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={lockedAi}
+                  className="mb-2.5 flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border-[1.5px] border-[#222325]/15 bg-[#f4f7d4] px-3 py-2.5 text-left text-xs leading-snug text-black/70 transition-colors hover:border-[#222325]">
+                  <span>AI help in the builder is on Basic and up. Free keeps the builder itself.</span>
+                  <PlanChip plan="basic" className="flex-none bg-white" />
+                </button>
+              )}
               {docTab === "ai" && (
                 <AiToolsList
                   aiRunning={aiRunning}
                   aiDone={aiDone}
                   captions={aiCaptions}
                   onRun={aiLocked ? lockedAi : runAiTool}
-                  tailorFor={tailorPreset}
+                  tailorFor={jobLabel ? { status: "ready", label: jobLabel } : tailorPreset}
                   onPickTailorJob={() => void pickJobFor("tailor")}
+                  keywordsFor={jobLabel}
+                  onPickKeywordsJob={() => void pickJobFor("keywords")}
                   rewriteVariants={rewriteOptions}
                   onUseRewrite={useRewriteVariant}
                   quantify={quantifyList}
                   quantifyApplied={quantifyApplied}
                   onApplyQuantify={applyQuantifyAt}
                   onApplyAllQuantify={applyAllQuantify}
+                  picking={picking}
+                  onCancelPick={() => setPicking(null)}
+                  toneFixes={toneProposals ? toneRows : null}
+                  onApplyFix={applyToneProposal}
+                  onDismissFix={dismissToneProposal}
+                  onApplyAllFixes={applyAllToneProposals}
                   keywordsFound={cards.find((card) => card.kind === "keywords")?.terms?.length ?? null}
+                  keywordProposals={keywordProposals ? keywordRows : null}
+                  onAcceptKeyword={acceptKeyword}
+                  onRejectKeyword={rejectKeyword}
+                  onAcceptAllKeywords={acceptAllKeywords}
                   pageCount={pageCount}
                   onPointAt={(pointer) => setPointFocus(focusOfTool(pointer))}
                 />
@@ -970,97 +1298,102 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
           {/* CENTER — resume document preview, identical across every tab. The provider hands the
               paper what the controls point at; the PDF export strips what it draws. */}
           <PaperHighlightProvider value={paperHighlight}>
-          <section className="min-w-0">
-            {/* Wraps where the column is narrow (Content, on a laptop): the pills drop under the caption, still on the right. */}
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1 text-xs text-black/45">
-              {/* "[x pages] · [edited x min ago]" (owner, 2026-10-04). A save that didn't land still says so. */}
-              <p aria-live="polite">
-                {pageCount} page{pageCount === 1 ? "" : "s"} · {autosave.status.kind === "saved" && <EditedAgo at={autosave.savedAt} />}
-                {autosave.status.kind === "saving" && "saving…"}
-                {/* Two different failures. One that may pass on its own is
+            <section className="min-w-0">
+              {/* Wraps where the column is narrow (Content, on a laptop): the pills drop under the caption, still on the right. */}
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1 text-xs text-black/45">
+                {/* "[x pages] · [edited x min ago]" (owner, 2026-10-04). A save that didn't land still says so. */}
+                <p aria-live="polite">
+                  {pageCount} page{pageCount === 1 ? "" : "s"} · {autosave.status.kind === "saved" && <EditedAgo at={autosave.savedAt} />}
+                  {autosave.status.kind === "saving" && "saving…"}
+                  {/* Two different failures. One that may pass on its own is
                     retried for them, so the copy says that and nothing about
                     why — the upstream's own sentence already says "try again",
                     and it is us doing the trying. A refusal is theirs to fix,
                     so it gets the server's sentence, which names the field. */}
-                {autosave.status.kind === "error" && (
-                  <span className="font-semibold text-[#b23c26]">
-                    {autosave.status.retrying ? (
-                      "not saved yet. We'll keep trying, and your changes are safe on this page."
-                    ) : (
-                      <>
-                        not saved: {autosave.status.message}{" "}
-                        <button type="button" onClick={autosave.flush} className="cursor-pointer underline decoration-2 underline-offset-2">
-                          Try again
-                        </button>
-                      </>
-                    )}
-                  </span>
-                )}
-              </p>
+                  {autosave.status.kind === "error" && (
+                    <span className="font-semibold text-[#b23c26]">
+                      {autosave.status.retrying ? (
+                        "not saved yet. We'll keep trying, and your changes are safe on this page."
+                      ) : (
+                        <>
+                          not saved: {autosave.status.message}{" "}
+                          <button
+                            type="button"
+                            onClick={autosave.flush}
+                            className="cursor-pointer underline decoration-2 underline-offset-2">
+                            Try again
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </p>
 
-              <div className="ml-auto flex flex-none items-center gap-2">
-                {/* The fix cards' numbers, as the design has it, said once above the page. */}
-                {docTab === "ai" && pinned.length > 0 && (
-                  <span className="mr-1 flex items-center gap-1.5 text-xs font-bold text-primary">
-                    <span className="grid h-[18px] w-[18px] place-content-center rounded-full bg-[#222325] text-[10px] text-white">{pinned.length}</span>
-                    {pinned.length === 1 ? "line has" : "lines have"} a suggested rewrite
-                  </span>
-                )}
-                {/* Undo / redo — the zoom pill's twin, over the preview on every tab. It covers anything
+                <div className="ml-auto flex flex-none items-center gap-2">
+                  {/* The fix cards' numbers, as the design has it, said once above the page. */}
+                  {docTab === "ai" && pinned.length > 0 && (
+                    <span className="mr-1 flex items-center gap-1.5 text-xs font-bold text-primary">
+                      <span className="grid h-[18px] w-[18px] place-content-center rounded-full bg-[#222325] text-[10px] text-white">
+                        {pinned.length}
+                      </span>
+                      {pinned.length === 1 ? "line has" : "lines have"} a suggested rewrite
+                    </span>
+                  )}
+                  {/* Undo / redo — the zoom pill's twin, over the preview on every tab. It covers anything
                   done to this resume from any tab (see `editor-state.ts`); Ctrl/⌘+Z and
                   Ctrl/⌘+Shift+Z (or Ctrl+Y) do the same. */}
-                <div className="flex items-center gap-2 rounded-full bg-white px-2 py-1 shadow-sm transition-[border-color,box-shadow] duration-100 ease-out br-plain">
-                  <button
-                    type="button"
-                    aria-label="Undo"
-                    title="Undo"
-                    onClick={undo}
-                    disabled={!canUndo}
-                    className={cn(ZOOM_BUTTON_CLASS, HISTORY_BUTTON_CLASS)}>
-                    <Undo2 className="h-3.5 w-3.5" strokeWidth={2.25} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Redo"
-                    title="Redo"
-                    onClick={redo}
-                    disabled={!canRedo}
-                    className={cn(ZOOM_BUTTON_CLASS, HISTORY_BUTTON_CLASS)}>
-                    <Redo2 className="h-3.5 w-3.5" strokeWidth={2.25} />
-                  </button>
-                </div>
+                  <div className="flex items-center gap-2 rounded-full bg-white px-2 py-1 shadow-sm transition-[border-color,box-shadow] duration-100 ease-out br-plain">
+                    <button
+                      type="button"
+                      aria-label="Undo"
+                      title="Undo"
+                      onClick={undo}
+                      disabled={!canUndo}
+                      className={cn(ZOOM_BUTTON_CLASS, HISTORY_BUTTON_CLASS)}>
+                      <Undo2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Redo"
+                      title="Redo"
+                      onClick={redo}
+                      disabled={!canRedo}
+                      className={cn(ZOOM_BUTTON_CLASS, HISTORY_BUTTON_CLASS)}>
+                      <Redo2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+                    </button>
+                  </div>
 
-                {/* Zoom — a quiet pill that only comes forward on hover. */}
-                <div className="group/zoom flex items-center gap-2 rounded-full bg-white px-2 py-1 shadow-sm transition-[border-color,box-shadow] duration-100 ease-out br-plain">
-                  <button
-                    type="button"
-                    aria-label="Zoom out"
-                    onClick={() => setZoom(Math.max(45, zoomPercent - 10))}
-                    className={ZOOM_BUTTON_CLASS}>
-                    −
-                  </button>
-                  <span className="min-w-[48px] text-center text-xs font-semibold tabular-nums text-black/70 transition-colors group-hover/zoom:text-primary">
-                    {zoomPercent}%
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Zoom in"
-                    onClick={() => setZoom(Math.min(180, zoomPercent + 10))}
-                    className={ZOOM_BUTTON_CLASS}>
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoom(100)}
-                    className={cn(ZOOM_BUTTON_CLASS, "ml-1 w-auto bg-[#f4f4f0] px-2.5 text-xs font-medium hover:bg-[#e1f073]")}>
-                    Fit
-                  </button>
+                  {/* Zoom — a quiet pill that only comes forward on hover. */}
+                  <div className="group/zoom flex items-center gap-2 rounded-full bg-white px-2 py-1 shadow-sm transition-[border-color,box-shadow] duration-100 ease-out br-plain">
+                    <button
+                      type="button"
+                      aria-label="Zoom out"
+                      onClick={() => setZoom(Math.max(45, zoomPercent - 10))}
+                      className={ZOOM_BUTTON_CLASS}>
+                      −
+                    </button>
+                    <span className="min-w-[48px] text-center text-xs font-semibold tabular-nums text-black/70 transition-colors group-hover/zoom:text-primary">
+                      {zoomPercent}%
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Zoom in"
+                      onClick={() => setZoom(Math.min(180, zoomPercent + 10))}
+                      className={ZOOM_BUTTON_CLASS}>
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoom(100)}
+                      className={cn(ZOOM_BUTTON_CLASS, "ml-1 w-auto bg-[#f4f4f0] px-2.5 text-xs font-medium hover:bg-[#e1f073]")}>
+                      Fit
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div ref={matRef} className="rounded-md bg-[#f0f0ea] p-1 overflow-x-auto overflow-y-hidden">
-              {/*
+              <div ref={matRef} className="rounded-md bg-[#f0f0ea] p-1 overflow-x-auto overflow-y-hidden">
+                {/*
                 Fit-to-width sizer/scaler pair — the one other place in this
                 feature that needs inline `style={}` beyond `ResumePaper`,
                 for the same reason that one does: a continuous, runtime-only
@@ -1072,41 +1405,41 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 affect either div's own box metrics — see the `fit` state
                 comment above.
               */}
-              <div
-                className="mx-auto"
-                style={{
-                  width: fit.width * previewScale,
-                  height: fit.height * previewScale,
-                }}>
                 <div
+                  className="mx-auto"
                   style={{
-                    width: fit.width,
-                    height: fit.height,
-                    transform: previewScale < 1 ? `scale(${previewScale})` : `scale(${previewScale})`,
-                    transformOrigin: "top left",
+                    width: fit.width * previewScale,
+                    height: fit.height * previewScale,
                   }}>
-                  {/* Every page its own A4 sheet, 25px apart on screen at any zoom, like Word (owner, 2026-10-04):
+                  <div
+                    style={{
+                      width: fit.width,
+                      height: fit.height,
+                      transform: previewScale < 1 ? `scale(${previewScale})` : `scale(${previewScale})`,
+                      transformOrigin: "top left",
+                    }}>
+                    {/* Every page its own A4 sheet, 25px apart on screen at any zoom, like Word (owner, 2026-10-04):
                       see PagedResume. The gap is inside the scaled paper, so it's divided by the scale. */}
-                  <div ref={paperWrapRef} className="w-fit">
-                    <PagedResume
-                      design={design}
-                      sections={sections}
-                      content={content}
-                      chrome={design.chrome}
-                      gap={25 / previewScale}
-                      sheetClassName="rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.15)]"
-                      onPageCountChange={setPageCount}
-                    />
+                    <div ref={paperWrapRef} className="w-fit">
+                      <PagedResume
+                        design={design}
+                        sections={sections}
+                        content={content}
+                        chrome={design.chrome}
+                        gap={25 / previewScale}
+                        sheetClassName="rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.15)]"
+                        onPageCountChange={setPageCount}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* The continuous paper the PDF export prints (see `printPaperRef`), out of sight. */}
-            <div ref={printPaperRef} aria-hidden className="pointer-events-none fixed left-[-10000px] top-0">
-              <ResumePaper design={design} sections={sections} content={content} chrome={design.chrome} />
-            </div>
-          </section>
+              {/* The continuous paper the PDF export prints (see `printPaperRef`), out of sight. */}
+              <div ref={printPaperRef} aria-hidden className="pointer-events-none fixed left-[-10000px] top-0">
+                <ResumePaper design={design} sections={sections} content={content} chrome={design.chrome} />
+              </div>
+            </section>
           </PaperHighlightProvider>
 
           {/* RIGHT RAIL */}
@@ -1150,6 +1483,25 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
         fileName={safeFileName(downloadFileName)}
         onDownload={handleDownload}
       />
+
+      {/* Rewrite, Quantify or Fix tone & grammar waiting for a pick on the page. */}
+      {picking && (
+        <PagePicker
+          kinds={PICK_KINDS[picking]}
+          label={(target) => pickLabel(picking, target)}
+          onHover={(target) => setPointFocus(target ? focusOfTarget(target) : null)}
+          onPick={(target) => {
+            const tool = picking;
+            setPicking(null);
+            setPointFocus(null);
+            runOnTarget(tool, target);
+          }}
+          onCancel={() => {
+            setPicking(null);
+            setPointFocus(null);
+          }}
+        />
+      )}
     </div>
   );
 };

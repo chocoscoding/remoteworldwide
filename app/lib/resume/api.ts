@@ -155,7 +155,8 @@ export function resumeContentToText(content: ResumeContent): string {
     section("EXPERIENCE");
     for (const entry of experience) {
       push("", [clean(entry.role), clean(entry.company)].filter(Boolean).join(" — "));
-      if (clean(entry.dates)) push(clean(entry.dates));
+      const meta = [clean(entry.dates), clean(entry.location)].filter(Boolean).join(" · ");
+      if (meta) push(meta);
       for (const bullet of entry.bullets) if (clean(bullet)) push(`- ${clean(bullet)}`);
     }
   }
@@ -189,6 +190,19 @@ export function resumeContentToText(content: ResumeContent): string {
       const issuer = clean(entry.issuer);
       push(`${clean(entry.name)}${issuer ? ` (${issuer})` : ""}${clean(entry.year) ? `, ${clean(entry.year)}` : ""}`);
     }
+  }
+
+  // Custom sections' points, as the AI service's twin writes them: under the name when one was
+  // filled in (`withSectionTitles`), else together under one heading.
+  const custom = (content.customSections ?? []).filter((entry) => entry.items.some((item) => clean(item)));
+  for (const entry of custom.filter((entry) => clean(entry.title))) {
+    section(clean(entry.title).toUpperCase());
+    for (const point of entry.items.map(clean).filter(Boolean)) push(`- ${point}`);
+  }
+  const untitled = custom.filter((entry) => !clean(entry.title)).flatMap((entry) => entry.items.map(clean).filter(Boolean));
+  if (untitled.length > 0) {
+    section("MORE");
+    for (const point of untitled) push(`- ${point}`);
   }
 
   return lines.join("\n").trim();

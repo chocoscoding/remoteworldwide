@@ -9,6 +9,7 @@ import type { SkillGroupLayout, SkillSeparator } from "@/app/lib/dashboard/resum
 const LAYOUT_OPTIONS: SegmentedControlOption<SkillGroupLayout>[] = [
   { id: "line", label: "One line" },
   { id: "grid", label: "Grid" },
+  { id: "bubbles", label: "Bubbles" },
 ];
 
 const SEPARATOR_OPTIONS: SegmentedControlOption<SkillSeparator>[] = [
@@ -18,10 +19,11 @@ const SEPARATOR_OPTIONS: SegmentedControlOption<SkillSeparator>[] = [
 ];
 
 /**
- * How skills split into sub skills print: each group's title with its skills
- * on one line, or the title over columns of skills (a column holds up to 500px
- * of them, then the next one starts). The separator goes between skills on a
- * line, and before (or, for commas, after) each skill in a column.
+ * How skills split into sub skills print: each group's underlined title with
+ * its skills on one line, over rows and columns of them (filled across, as
+ * many columns as fit), or over bubbles. The separator goes between skills on
+ * a line, and before (or, for commas, after) each skill in the grid; bubbles
+ * need none, so it rests while they are chosen.
  *
  * A single plain list keeps its pills, so on a resume whose skills are "All"
  * the choices are kept for later and the panel says where to switch.
@@ -47,6 +49,7 @@ const SkillsPanel: FC = () => {
         label="Separator"
         options={SEPARATOR_OPTIONS}
         value={design.skills.separator}
+        disabled={design.skills.groupLayout === "bubbles"}
         onChange={(separator) => dispatch({ type: "skills/setSeparator", separator })}
       />
     </div>

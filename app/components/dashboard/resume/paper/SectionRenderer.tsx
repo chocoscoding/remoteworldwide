@@ -71,13 +71,23 @@ const SectionRenderer: FC<SectionRendererProps> = ({ items, content, design }) =
         const Body = SECTION_BODY[item.kind];
         // `data-resume-section` lets the PDF export drop a section whose body
         // is only its "No … added yet." placeholder (`data-resume-placeholder`).
-        // `relative` holds the editor's frame when it points at the whole section.
+        // `relative` holds the editor's frame when it points at the whole section. A custom section
+        // also carries its id (`data-resume-custom`), which the AI tools' pick mode reads it by.
         return (
-          <div key={item.id} data-resume-section={item.kind} className="relative">
-            {item.kind !== "custom" && <SectionFrame section={item.kind} />}
+          <div
+            key={item.id}
+            data-resume-section={item.kind}
+            data-resume-custom={item.kind === "custom" ? item.id : undefined}
+            className="relative">
+            <SectionFrame section={item.kind} customId={item.kind === "custom" ? item.id : undefined} />
             <SectionHeading config={item} design={design} />
             <div className="mt-[var(--r-gap-half)]">
-              <Body content={content} design={design} />
+              {/* A custom section's points are kept under its own id; every other body reads its kind's field. */}
+              {item.kind === "custom" ? (
+                <CustomSection content={content} design={design} sectionId={item.id} />
+              ) : (
+                <Body content={content} design={design} />
+              )}
             </div>
           </div>
         );
