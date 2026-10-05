@@ -51,7 +51,7 @@ export default async function Home() {
 
         {/* few jobs list */}
         <JobListSection latestJobs={latestJobs} />
-        <div className="w-full flex items-center justify-center">
+        <div className="w-full flex-col flex items-center justify-center">
           <Link
             href={"/jobs"}
             className="bg-secondary drop-shadow-secondary2 text-primary px-16 py-3 text-lg font-bold rounded-md my-1">
@@ -61,7 +61,7 @@ export default async function Home() {
 
           <Link
             href={"/tools"}
-            className="bg-secondary drop-shadow-secondary2 text-primary px-16 py-3 text-lg font-bold rounded-md my-1">
+            className="hover:underline my-1 *:text-primary/70 text-sm font-bold text-primary/70">
             View all our <b>features</b>
           </Link>
         </div>
