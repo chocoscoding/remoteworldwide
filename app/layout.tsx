@@ -9,12 +9,13 @@ import AuthSessionLogger from "./components/AuthSessionLogger";
 import QueryProvider from "@/app/components/providers/QueryProvider";
 import { ToastContainer, Slide } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Script from "next/script";
 import SiteJsonLd from "./components/SiteJsonLd";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "./lib/seo";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import Downtime from "./components/Downtime";
+import CookieConsent from "./components/consent/CookieConsent";
+import ConsentScripts from "./components/consent/ConsentScripts";
 
 const font = Manrope({
   subsets: ["latin-ext"],
@@ -58,21 +59,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script
-          strategy="afterInteractive"
-          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.GOOGLE_ANALYTICS_TOKEN}`}
-        />
-        <Script
-          strategy="afterInteractive"
-          id="google-analytics">
-          {`
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', '${process.env.GOOGLE_ANALYTICS_TOKEN}');`}
-        </Script>
-        <Script
+        {/* Google Analytics loads from ConsentScripts (in <body>), and only after someone accepts
+            analytics cookies. Hotjar is not used; its old snippet stays here, commented, for reference. */}
+        {/* <Script
           strategy="afterInteractive"
           id="hotjar">
           {`(function(h,o,t,j,a,r){
@@ -83,17 +72,15 @@ export default function RootLayout({
         r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
         a.appendChild(r);
     })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');`}
-        </Script>
+        </Script> */}
       </head>
       <body className={`${font.className} antialiased`}>
+        {/* Cookieless, so they need no consent. */}
         <Analytics />
         <SpeedInsights />
+        <ConsentScripts gaId={process.env.GOOGLE_ANALYTICS_TOKEN || undefined} />
         <SiteJsonLd />
-        <NextTopLoader
-          color="#000000"
-          shadow="0 0 10px #000000,0 0 5px #000000"
-          showSpinner={false}
-        />
+        <NextTopLoader color="#000000" shadow="0 0 10px #000000,0 0 5px #000000" showSpinner={false} />
         {downtimeMessage && <Downtime message={downtimeMessage} />}
         <ToastContainer
           className={"z-50"}
@@ -116,6 +103,7 @@ export default function RootLayout({
               the whole app. */}
           <QueryProvider>{children}</QueryProvider>
         </SessionProvider>
+        <CookieConsent />
       </body>
     </html>
   );

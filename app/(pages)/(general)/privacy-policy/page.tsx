@@ -6,17 +6,19 @@ import { absoluteUrl, SITE_NAME, SITE_URL } from "@/app/lib/seo";
 const COMPANY = "Remote Worldwide";
 const CONTACT_EMAIL = "contact@remoteworldwide.net";
 const JURISDICTION = "Nigeria";
-const LAST_UPDATED = "23 September 2026";
+const LAST_UPDATED = "5 October 2026";
 
-const TITLE = `Privacy Policy — ${SITE_NAME}`;
+// The page title takes the root template ("%s | Remote Worldwide"); social cards don't, so they get the full name.
+const TITLE = "Privacy Policy";
+const SHARE_TITLE = `${TITLE} | ${SITE_NAME}`;
 const DESCRIPTION = `What ${SITE_NAME} collects, why we collect it, who we share it with, and how to get it back or get it deleted.`;
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: absoluteUrl("/privacy-policy") },
-  openGraph: { type: "website", title: TITLE, description: DESCRIPTION, url: absoluteUrl("/privacy-policy"), siteName: SITE_NAME },
-  twitter: { card: "summary", title: TITLE, description: DESCRIPTION },
+  openGraph: { type: "website", title: SHARE_TITLE, description: DESCRIPTION, url: absoluteUrl("/privacy-policy"), siteName: SITE_NAME },
+  twitter: { card: "summary", title: SHARE_TITLE, description: DESCRIPTION },
 };
 
 const Mail = () => (
@@ -93,7 +95,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           post you found it on, and when you consented.
         </p>
         <p>
-          <strong>Usage.</strong> Pages you view and what you click, recorded by the analytics tools listed in{" "}
+          <strong>Usage.</strong> Pages you view, recorded by the analytics tools listed in{" "}
           <a href="#cookies">Cookies and browser storage</a>, plus the technical data any web server receives: IP address, browser, device and
           approximate location.
         </p>
@@ -316,7 +318,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
             ScrapingAnt;
           </li>
           <li>Resend, which delivers our email;</li>
-          <li>Google Analytics, Hotjar and Vercel Analytics, which tell us how the site is used.</li>
+          <li>Google Analytics (only if you accept analytics cookies) and Vercel Analytics, which tell us how the site is used.</li>
         </ul>
         <p>
           We may also disclose data if the law requires it, to protect our rights or someone&rsquo;s safety, or to a buyer if the business is ever
@@ -351,12 +353,18 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
     body: (
       <>
         <p>
-          <strong>Essential cookies</strong> keep you signed in and protect forms against cross-site request forgery. If you follow someone&rsquo;s
-          invite link, a cookie remembers the invite for 30 days so it counts when you sign up.
+          <strong>Essential cookies</strong> keep you signed in, protect forms against cross-site request forgery and remember your cookie choice
+          (<code>rww_consent</code>, for a year). If you follow someone&rsquo;s invite link, a cookie remembers the invite for 30 days so it counts
+          when you sign up. These are always on.
         </p>
         <p>
-          <strong>Analytics.</strong> Google Analytics and Hotjar set cookies and record how pages are used, including clicks and scrolling.
-          Vercel Analytics measures visits and page speed without cookies. They load on every page.
+          <strong>Analytics.</strong> Google Analytics sets cookies and records which pages are visited. It loads only after you accept analytics
+          cookies, and not at all if you reject them or haven&rsquo;t chosen yet. Vercel Analytics measures visits and page speed without cookies,
+          so it runs on every page. We don&rsquo;t use Hotjar.
+        </p>
+        <p>
+          <strong>Your choice.</strong> Change it any time from &ldquo;Cookie settings&rdquo; at the bottom of every page. Turning analytics off
+          removes Google Analytics&rsquo; cookies from your browser.
         </p>
         <p>
           <strong>Browser storage.</strong> To keep the dashboard fast we keep a copy of some of your data, such as your settings, profile and
