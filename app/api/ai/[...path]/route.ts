@@ -59,6 +59,15 @@ async function proxy(req: Request, path: string[]): Promise<Response> {
     );
   }
 
+  // An address nobody has proven opens nothing either: the backend refuses it with the same
+  // 403 on its own routes. `undefined` (an older session) counts as verified.
+  if (session.user.verified === false) {
+    return NextResponse.json(
+      { success: false, error: "Email not verified", message: "Verify your email to continue.", data: { code: "email_unverified" } },
+      { status: 403 },
+    );
+  }
+
   if (!AI_TOKEN) {
     return NextResponse.json(
       { success: false, error: "Not configured", message: "AI features are unavailable right now." },

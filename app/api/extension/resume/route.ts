@@ -19,6 +19,15 @@ const fail = (status: number, message: string) => NextResponse.json({ success: f
 export async function POST(req: Request): Promise<Response> {
   const session = await auth();
   if (!session?.user?.id) return fail(401, "Sign in to continue.");
+  // The same locks as `app/api/extension/document/route.ts`: an account waiting out its deletion,
+  // or one whose address nobody has proven, is sent nothing.
+  if (session.user.deletionDueAt) return fail(423, "Your account is scheduled for deletion. Cancel the deletion to use it again.");
+  if (session.user.verified === false) {
+    return NextResponse.json(
+      { success: false, message: "Verify your email to continue.", data: { code: "email_unverified" } },
+      { status: 403 },
+    );
+  }
 
   let documentId: string;
   try {

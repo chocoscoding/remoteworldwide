@@ -66,6 +66,23 @@ const announcePlanLimit = (error: BackendError): void => {
   if (kind) signalPlanLimit({ kind, message: error.message, requiredPlan: error.requiredPlan });
 };
 
+/** Where an account whose address isn't proven yet is sent (the dashboard layout redirects there too). */
+export const VERIFY_EMAIL_PATH = "/verify-email";
+
+/**
+ * Every signed-in route refuses an unproven address with 403 `email_unverified` (the backend and
+ * the site's own /api/ai and extension routes). In the browser that is not an error to toast but a
+ * screen to be on: the confirm-your-email page, once, however many calls were refused together.
+ * The server leaves it to the dashboard layout, which redirects before any of this runs.
+ */
+let sentToVerify = false;
+const sendToVerifyEmail = (error: BackendError): void => {
+  if (error.status !== 403 || error.code !== "email_unverified" || typeof window === "undefined") return;
+  if (sentToVerify || window.location.pathname === VERIFY_EMAIL_PATH) return;
+  sentToVerify = true;
+  window.location.assign(VERIFY_EMAIL_PATH);
+};
+
 /**
  * Walks a parsed JSON payload turning known date keys into `Date` objects.
  *
@@ -109,6 +126,7 @@ export async function unwrapEnvelope<T>(res: Response): Promise<{ data: T; messa
       typeof reason?.requiredPlan === "string" ? reason.requiredPlan : null,
     );
     announcePlanLimit(error);
+    sendToVerifyEmail(error);
     throw error;
   }
   return { data: revive(json?.data) as T, message: json?.message ?? "" };

@@ -24,6 +24,7 @@
 //   too_large            413  over 4MB — a Vercel response cannot carry more
 //   unreadable           422  a file type or a document that cannot be sent
 //   unavailable          502  the backend or the AI service could not be read
+//   email_unverified     403  the account's address has not been proven
 // and the plain envelope (`data: null`) for 400 / 401 / 423.
 //
 // Identity is the session alone, as in `app/api/ai/[...path]/route.ts`: the
@@ -64,6 +65,8 @@ export async function POST(req: Request): Promise<Response> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return fail(401, "Sign in to continue.");
+  // An unproven address opens nothing, here as on the backend and the /api/ai proxy.
+  if (session?.user?.verified === false) return refuse(403, "email_unverified", "Verify your email to continue.");
 
   let source: string;
   let id: string;
