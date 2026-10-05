@@ -31,6 +31,7 @@ import { JobPickerProvider } from "./jobs/JobPickerProvider";
 import BoardImporter from "./applications/BoardImporter";
 import OnboardingBanner from "./onboarding/OnboardingBanner";
 import { PlanGateProvider } from "./billing/UpgradeModal";
+import SmallScreenGate, { DesktopOnly } from "./SmallScreenGate";
 
 const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; children: ReactNode }> = ({ settings, billing, children }) => (
   <SidebarCollapseProvider>
@@ -62,7 +63,10 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
           than in the tracker screen because Home reads the same board to
           decide which applications are owed a follow-up. */}
       <TrackerProvider>
-      <div className="w-full flex">
+      {/* Desktop-only workspace: below md the gate covers the screen and the shell is display:none
+          (still mounted, so nothing remounts on rotate or resize). Pure CSS, no flash. */}
+      <SmallScreenGate />
+      <div className="w-full hidden md:flex">
         <DashboardSidebar />
         <div className="flex-1 min-w-0">
           {/* Above every screen, never instead of one: setup is guidance, not
@@ -72,11 +76,15 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
           {children}
         </div>
       </div>
-      <LogApplicationDialog />
-      <GiftStore />
-      <RepairStreakPanel />
-      <StreakMilestoneModal />
-      <WeekCardModal />
+      {/* These portal to <body>, past the hidden shell, and some open by themselves (the Monday
+          week card, a streak celebration). Below md they wait unmounted, state kept in their providers. */}
+      <DesktopOnly>
+        <LogApplicationDialog />
+        <GiftStore />
+        <RepairStreakPanel />
+        <StreakMilestoneModal />
+        <WeekCardModal />
+      </DesktopOnly>
       {/* Moves a tracker board kept in this browser into the applications
           table, once. Inside the providers for the query client and toasts. */}
       <BoardImporter />
