@@ -3,7 +3,7 @@
 import type { FC, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft, Home, RotateCcw } from "lucide-react";
 import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,12 @@ export interface ErrorScreenProps {
   digits: [string, string];
   title: string;
   message?: string;
+  /** Replaces the buttons entirely. */
   action?: ReactNode;
+  /** An error boundary's retry: the first button becomes "Try again" instead of "Go back". */
+  onRetry?: () => void;
+  /** Shown small under the buttons, for matching a report to the server logs (an error's digest). */
+  reference?: string;
   fit?: "screen" | "shell";
 }
 
@@ -20,7 +25,7 @@ export const ERROR_BUTTON =
 
 const SHELLS = ["/heroshima", "/dashboard"];
 
-const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, message, action, fit }) => {
+const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, message, action, onRetry, reference, fit }) => {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const shell = SHELLS.find((s) => pathname.startsWith(s));
@@ -50,10 +55,17 @@ const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, messa
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         {action ?? (
           <>
-            <button type="button" onClick={() => router.back()} className={`${ERROR_BUTTON} bg-white text-primary hover:bg-secondary`}>
-              <ArrowLeft className="h-4 w-4" />
-              Go back
-            </button>
+            {onRetry ? (
+              <button type="button" onClick={onRetry} className={`${ERROR_BUTTON} bg-white text-primary hover:bg-secondary`}>
+                <RotateCcw className="h-4 w-4" />
+                Try again
+              </button>
+            ) : (
+              <button type="button" onClick={() => router.back()} className={`${ERROR_BUTTON} bg-white text-primary hover:bg-secondary`}>
+                <ArrowLeft className="h-4 w-4" />
+                Go back
+              </button>
+            )}
             <Link href={home} className={`${ERROR_BUTTON} bg-primary text-white`}>
               <Home className="h-4 w-4" />
               Go home
@@ -61,6 +73,11 @@ const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, messa
           </>
         )}
       </div>
+      {reference && (
+        <p className="mt-6 text-xs text-primary/50">
+          Reference: <span className="select-all font-mono">{reference}</span>
+        </p>
+      )}
     </section>
   );
 };
