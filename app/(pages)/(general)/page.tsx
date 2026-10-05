@@ -57,11 +57,11 @@ export default async function Home() {
             className="bg-secondary drop-shadow-secondary2 text-primary px-16 py-3 text-lg font-bold rounded-md my-1">
             View all jobs
           </Link>
-          <p className="text-sm font-bold text-primary/70 my-2">or</p>
+          <p className="text-sm font-bold text-primary/70 my-1">or</p>
 
           <Link
             href={"/tools"}
-            className="hover:underline my-1 *:text-primary/70 text-sm font-bold text-primary/70">
+            className="hover:underline my-1 text-md font-bold text-black italic">
             View all our <b>features</b>
           </Link>
         </div>
