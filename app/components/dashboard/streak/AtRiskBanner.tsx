@@ -3,8 +3,8 @@
 // The one in-app nudge.
 //
 // §8 asks for a notification at the user's hunt hour plus an at-risk banner
-// after 8pm local. Push and email need a scheduler, which does not exist yet,
-// so this build ships the banner and the `huntHour` model behind it. "Local"
+// after 8pm local. The hunt-hour notification is an email now, sent by the
+// events service (`pushStreakReminder`); this is the in-app half. "Local"
 // is the user's own clock as the server reads it (their settings timezone),
 // and the day ends at the 4am grace hour, not at midnight.
 //

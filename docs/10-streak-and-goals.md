@@ -178,10 +178,12 @@ read the clock once in a lazy `useState` initialiser.
 
 ## 5. Not built yet
 
-- **Push and email notifications.** §8 of the brief asks for a prompt at the
-  user's `hunt_hour`. The `huntHour` model is stored and the in-app at-risk
-  banner works (on the user's own clock), but there is no reminder scheduler,
-  no service worker and no mail provider for it.
+- **Push notifications.** §8 of the brief asks for a prompt at the user's
+  `hunt_hour`. That prompt is an email now: the events service asks the
+  backend hourly (`GET /api/internal/streak/hunt-reminders`) who is at their
+  hunting hour with the day still open and mails them once per local day,
+  under the `pushStreakReminder` switch. There is still no service worker, so
+  no push.
 - **Service gifts.** Redeeming a resume rewrite, a Pro day or a priority intro
   marks the gift used; nothing delivers the service yet.
 - **"Answered a company's questions".** Its gift is paid by the server only;

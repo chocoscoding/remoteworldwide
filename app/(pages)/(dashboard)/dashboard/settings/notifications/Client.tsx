@@ -20,7 +20,11 @@ const EMAIL_ROWS: { key: keyof NotificationsState; label: string; hint: string }
 ];
 
 const PUSH_ROWS: { key: keyof NotificationsState; label: string; hint: string }[] = [
-  { key: "pushStreakReminder", label: "Streak reminder", hint: "A nudge at your usual hunting hour if the day is still open." },
+  {
+    key: "pushStreakReminder",
+    label: "Streak reminder",
+    hint: "An email at your hunting hour on days you haven't logged anything yet. Never on a rest day or while your search is paused.",
+  },
   { key: "pushInterviewReminder", label: "Interview reminders", hint: "The evening before, and an hour ahead." },
 ];
 
@@ -49,7 +53,7 @@ const NotificationsClient: FC = () => {
         ))}
       </SettingsSection>
 
-      <SettingsSection title="Reminders" description="In-app now; push and email once a scheduler exists.">
+      <SettingsSection title="Reminders" description="The streak reminder comes by email. Interview reminders aren't sent yet.">
         <SettingsRow label="Your hunting hour" hint="When you usually job hunt. Reminders land around then, never before." stacked>
           <select
             aria-label="Hunting hour"
@@ -77,8 +81,9 @@ const NotificationsClient: FC = () => {
         <div className="mt-4 flex gap-2.5 rounded-xl border border-black/10 bg-[#fbfbf7] px-3.5 py-3">
           <Info className="mt-0.5 h-4 w-4 flex-none text-black/40" />
           <p className="text-xs leading-relaxed text-black/60">
-            Reminders currently show inside the app only. Email and push need a scheduler that doesn&apos;t exist yet. These
-            switches record the preference for when it does.
+            The streak reminder is an email to the address on your account, at most once a day, while you have a streak
+            going or logged something this week. Interview reminders aren&apos;t sent yet; that switch records your
+            preference for when they are.
           </p>
         </div>
       </SettingsSection>
