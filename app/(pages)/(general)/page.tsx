@@ -13,12 +13,13 @@ const getLatestJobs = async () => {
     return [];
   }
 };
-const getCounts = async () => {
+// Null when the count can't be read: the hero leaves the line out rather than show a made-up number.
+const getCounts = async (): Promise<number | null> => {
   try {
     const latestJobs = await getAllActiveJobsCount();
-    return latestJobs.count;
+    return typeof latestJobs.count === "number" ? latestJobs.count : null;
   } catch {
-    return 10;
+    return null;
   }
 };
 export default async function Home() {

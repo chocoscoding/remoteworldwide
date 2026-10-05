@@ -20,8 +20,9 @@
 // copy of the rule. No imports, so a scratch script can load it under Node's
 // type stripping.
 //
-// The numbers are margins chosen over fixtures.ts's delivery model, not
-// measurements: fixtures.ts is hand-written UI data (118-172 wpm, thinking
+// The numbers are margins chosen over the delivery model of the old voice
+// fixtures (app/lib/voice/fixtures.ts, since deleted; see git history), not
+// measurements: fixtures.ts was hand-written UI data (118-172 wpm, thinking
 // lead-ins up to 4.2 s, pauses mid-answer up to 1.6 s, 3 s of trailing silence
 // read as "the answer is over"), and nothing here has timed real candidates.
 // So every window is set well past it, on the side of waiting: an answer cut

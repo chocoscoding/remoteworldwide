@@ -198,7 +198,7 @@ const DashboardSidebar: FC = () => {
 
       {/* Nav body */}
       <nav
-        className={cn("scrollbar-hover flex-1 overflow-y-auto py-3.5 flex flex-col gap-4  border-red-500 ", collapsed ? "px-1.5" : "px-2")}>
+        className={cn("scrollbar-hover flex-1 overflow-y-auto py-3.5 flex flex-col gap-4", collapsed ? "px-1.5" : "px-2")}>
         {NAV_GROUPS.map((group, groupIdx) => (
           <div key={group.label ?? `group-${groupIdx}`}>
             {group.label && !collapsed && (

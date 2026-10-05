@@ -20,7 +20,15 @@ type PaginationControlNewProps = {
   startIndex: number;
   endIndex: number;
   scrollToTop?: boolean;
+  /**
+   * A real address for each page (`?page=3`), so the links can be crawled and opened in a new tab.
+   * A plain click still navigates on the client through the handlers; without it the links are "#".
+   */
+  hrefFor?: (page: number) => string;
 };
+
+/** A click the browser should handle itself: a new tab or window, or a download. */
+const isModifiedClick = (e: React.MouseEvent) => e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
 
 const PaginationControlNew: FC<PaginationControlNewProps> = ({
   handlePrevious,
@@ -32,7 +40,11 @@ const PaginationControlNew: FC<PaginationControlNewProps> = ({
   startIndex,
   endIndex,
   scrollToTop = false,
+  hrefFor,
 }) => {
+  const hrefOf = (page: number) => (hrefFor ? hrefFor(page) : "#");
+  /** True when a real link should be left to the browser (cmd/ctrl-click on a crawlable href). */
+  const letBrowserHandle = (e: React.MouseEvent) => Boolean(hrefFor) && isModifiedClick(e);
   const scrollTT = () => {
     if (scrollToTop && typeof window !== "undefined") {
       setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 1);
@@ -83,8 +95,9 @@ const PaginationControlNew: FC<PaginationControlNewProps> = ({
             {/* Previous */}
             <PaginationItem>
               <PaginationPrevious
-                href="#"
+                href={hrefOf(Math.max(1, currentPage - 1))}
                 onClick={(e) => {
+                  if (letBrowserHandle(e)) return;
                   e.preventDefault();
                   if (currentPage > 1) {
                     scrollTT();
@@ -105,9 +118,10 @@ const PaginationControlNew: FC<PaginationControlNewProps> = ({
               ) : (
                 <PaginationItem key={item}>
                   <PaginationLink
-                    href="#"
+                    href={hrefOf(item)}
                     isActive={item === currentPage}
                     onClick={(e) => {
+                      if (letBrowserHandle(e)) return;
                       e.preventDefault();
                       if (item !== currentPage) handlePage(item);
                     }}>
@@ -120,8 +134,9 @@ const PaginationControlNew: FC<PaginationControlNewProps> = ({
             {/* Next */}
             <PaginationItem>
               <PaginationNext
-                href="#"
+                href={hrefOf(Math.min(Math.max(totalPages, 1), currentPage + 1))}
                 onClick={(e) => {
+                  if (letBrowserHandle(e)) return;
                   e.preventDefault();
                   if (currentPage < totalPages) {
                     scrollTT();

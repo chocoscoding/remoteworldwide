@@ -46,6 +46,14 @@ const JobsContainerForSearch = () => {
       // setCurrentPage((prevPage) => prevPage + 1);
     }
   };
+  /** The same list at another page, as a link a crawler or a new tab can follow. Page 1 has no `?page`. */
+  const hrefForPage = (page: number) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (page > 1) next.set("page", `${page}`);
+    else next.delete("page");
+    const query = next.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  };
   const handlePageChange = (page: number) => {
     params.delete("page");
     params.append("page", `${page}`);
@@ -127,6 +135,7 @@ const JobsContainerForSearch = () => {
         dataTotal={totalJobs}
         startIndex={startJobIndex}
         endIndex={endJobIndex}
+        hrefFor={hrefForPage}
       />
     </div>
   );

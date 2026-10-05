@@ -2,18 +2,14 @@ import type { FC } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { formatAuthorNames } from "@/app/lib/blog/authors";
+
+export { formatAuthorNames };
 
 export interface StackAuthor {
   name: string;
   slug: string;
   profileImage: string;
-}
-
-// TODO(human): joins author names for display — one name, two names, and
-// three or more (e.g. "Ada", "Ada & Grace", "Ada, Grace & Linus"). Return a
-// single string; the caller handles truncation via CSS.
-export function formatAuthorNames(names: string[]): string {
-  return names.join(", ");
 }
 
 const SIZES = { sm: { avatar: "h-6 w-6", overlap: "-ml-2", px: "24px", text: "text-xs" }, md: { avatar: "h-10 w-10", overlap: "-ml-3", px: "40px", text: "text-sm" } } as const;

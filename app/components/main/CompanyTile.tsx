@@ -7,7 +7,6 @@ import React, { FC } from "react";
 const CompanyTile: FC<{ forCompany?: boolean; companyData: CompanyList }> = ({ forCompany = false, companyData }) => {
   const jobCount = companyData._count.jobs;
   return (
-    //:TODO
     <Link href={forCompany ? `/heroshima/companies/${companyData.slug}` : `/companies/${companyData.slug}`}>
       <div className="flex flex-col gap-3 bg-white p-2 rounded-lg group transition-all ">
         <div className="flex w-full items-center">
