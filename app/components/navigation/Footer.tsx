@@ -6,10 +6,13 @@ import { InstagramIcon } from "@/components/ui/instagram-icon";
 import { FaTelegram } from "react-icons/fa6";
 import { LinkedInIcon } from "@/components/ui/linkedin-icon";
 import { TwitterIcon } from "@/components/ui/twitter-icon";
+import CookieSettingsButton from "@/app/components/consent/CookieSettingsButton";
+import { EXTENSION_URL } from "@/app/lib/extension/url";
 
 // The site's crawlable links now that the navbar carries only "Dashboard" (2026-10-01). Keep the
-// words stable: Google leans on consistent link text when it names sitelinks.
-const links = [
+// words stable: Google leans on consistent link text when it names sitelinks. `external` opens in a
+// new tab (the store listing); a mailto: is a plain link.
+const links: { title: string; href: string; external?: boolean }[] = [
   {
     title: "Jobs",
     href: "/jobs",
@@ -31,6 +34,11 @@ const links = [
     href: "/waitlist",
   },
   {
+    title: "Chrome extension",
+    href: EXTENSION_URL,
+    external: true,
+  },
+  {
     title: "Privacy Policy",
     href: "/privacy-policy",
   },
@@ -38,7 +46,13 @@ const links = [
     title: "Terms",
     href: "/terms",
   },
+  {
+    title: "Contact",
+    href: "mailto:contact@remoteworldwide.net",
+  },
 ];
+
+const LINK_CLASS = "inline-flex min-h-[44px] items-center text-white/65 hover:text-white duration-150";
 
 const FooterSection = () => {
   return (
@@ -56,14 +70,25 @@ const FooterSection = () => {
         </Link>
 
         <div className="my-4 flex flex-wrap justify-center gap-x-6 text-sm">
-          {links.map((link, index) => (
-            <Link
-              key={index}
-              href={link.href}
-              className="inline-flex min-h-[44px] items-center text-white/65 hover:text-white duration-150">
-              <span>{link.title}</span>
-            </Link>
-          ))}
+          {links.map((link) =>
+            link.external || link.href.startsWith("mailto:") ? (
+              <a
+                key={link.title}
+                href={link.href}
+                {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                className={LINK_CLASS}>
+                <span>{link.title}</span>
+              </a>
+            ) : (
+              <Link
+                key={link.title}
+                href={link.href}
+                className={LINK_CLASS}>
+                <span>{link.title}</span>
+              </Link>
+            ),
+          )}
+          <CookieSettingsButton className={`${LINK_CLASS} cursor-pointer`} />
         </div>
         <div className="my-4 flex flex-wrap justify-center gap-1 text-sm [&>a]:grid [&>a]:min-h-[44px] [&>a]:min-w-[44px] [&>a]:place-content-center">
           <Link
@@ -75,7 +100,7 @@ const FooterSection = () => {
             <TwitterIcon size={24} />
           </Link>
           <Link
-            href="#"
+            href="https://www.linkedin.com/company/remoteworldwide"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="LinkedIn"
