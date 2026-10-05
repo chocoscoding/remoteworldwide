@@ -1,4 +1,5 @@
 import type { FC, ReactNode } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CREDIT_ROWS, FEATURE_GROUPS, RECOMMENDED_PLAN, rowIncludes, type FeatureRow, type PricingPlan } from "@/app/lib/pricing/catalogue";
 import { PerCredit, ShortPrice } from "@/app/components/pricing/BillingInterval";
@@ -24,10 +25,12 @@ const Cell: FC<{ row: FeatureRow; plan: PricingPlan }> = ({ row, plan }) => {
 interface Row {
   label: string;
   note?: string;
+  /** The label links here, in a new tab. */
+  href?: string;
   cell: (plan: PricingPlan) => ReactNode;
 }
 
-const featureRow = (row: FeatureRow): Row => ({ label: row.label, note: row.note, cell: (plan) => <Cell row={row} plan={plan} /> });
+const featureRow = (row: FeatureRow): Row => ({ label: row.label, note: row.note, href: row.href, cell: (plan) => <Cell row={row} plan={plan} /> });
 
 const LABEL = "sticky left-0 z-10 bg-white pl-5 pr-4 text-left align-middle md:pl-6";
 const CELL = "px-3 py-4 text-center align-middle";
@@ -122,7 +125,19 @@ const PlanComparison: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
               {group.rows.map((row) => (
                 <tr key={row.label} className={RULED}>
                   <th scope="row" className={cn(LABEL, "py-4 font-normal")}>
-                    <span className="block font-medium text-primary">{row.label}</span>
+                    {row.href ? (
+                      <a
+                        href={row.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary">
+                        {row.label}
+                        <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                        <span className="sr-only">(opens in a new tab)</span>
+                      </a>
+                    ) : (
+                      <span className="block font-medium text-primary">{row.label}</span>
+                    )}
                     {row.note ? <span className="mt-0.5 block text-xs leading-snug text-primary/65">{row.note}</span> : null}
                   </th>
                   {plans.map((plan) => (

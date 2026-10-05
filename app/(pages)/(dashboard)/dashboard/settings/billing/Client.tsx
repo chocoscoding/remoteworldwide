@@ -152,7 +152,7 @@ const BillingClient: FC<{ initialBilling?: BillingInterval }> = ({ initialBillin
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Buy more credits" description="Top-ups never expire. They are spent only after your monthly allowance runs out.">
+      <SettingsSection id="credits" title="Buy more credits" description="Top-ups never expire. They are spent only after your monthly allowance runs out.">
         <div className="grid gap-3 py-1 sm:grid-cols-3">
           {creditPacks.map((pack) => (
             <div key={pack.key} className={cn(CARD, "flex flex-col p-4")}>

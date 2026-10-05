@@ -44,15 +44,9 @@ function statusCopy(installed: boolean, checking: boolean, version: string | nul
     };
   }
   if (checking) return { title: "Checking…", body: "Looking for the extension in this browser." };
-  if (EXTENSION_URL) {
-    return {
-      title: "Not installed",
-      body: "Add it to Chrome and it will follow the choices below from the first form it fills.",
-    };
-  }
   return {
-    title: "Not available yet",
-    body: "There's no extension to install yet. Your choices below are saved to your account, and it will follow them from the first form it fills.",
+    title: "Not installed",
+    body: "Add it to Chrome and it will follow the choices below from the first form it fills.",
   };
 }
 
@@ -62,9 +56,8 @@ const ExtensionDialog: FC<ExtensionDialogProps> = ({ open, onOpenChange }) => {
   const installed = extension.connected;
   const checking = extension.status === "checking";
   const status = statusCopy(installed, checking, extension.version ?? null);
-  // Only once the handshake has settled, and only when there is somewhere to
-  // send people: an unset NEXT_PUBLIC_EXTENSION_URL means it is not published.
-  const offerInstall = !installed && !checking && Boolean(EXTENSION_URL);
+  // Only once the handshake has settled: never "Get it" to someone it is about to find.
+  const offerInstall = !installed && !checking;
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>

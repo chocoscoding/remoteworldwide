@@ -178,15 +178,14 @@ function requestFailureCode(error: unknown, link: boolean): ImportFailureCode {
  * the posting from the careers page itself.
  *
  * It renders for exactly one person: someone who could install it and has not.
- * Nothing at all until `NEXT_PUBLIC_EXTENSION_URL` names a real listing, and
- * nothing for a browser that already answered the presence ping — selling
+ * Nothing for a browser that already answered the presence ping — selling
  * somebody the thing they are running is how a promo loses its credibility.
  * The old copy claimed a 4.9 rating and a Chrome Web Store feature; both were
- * invented, and neither is coming back without a listing to read them off.
+ * invented, and neither comes back without real numbers to read off the listing.
  */
 const ExtensionPromo: FC = () => {
   const { status } = useExtensionPresence();
-  if (!EXTENSION_URL || status !== "absent") return null;
+  if (status !== "absent") return null;
 
   return (
     <div className="mt-3 flex flex-none items-center gap-4 rounded-2xl bg-[#222325] p-4 br-bold br-lime">

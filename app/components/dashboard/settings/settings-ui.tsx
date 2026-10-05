@@ -36,10 +36,12 @@ export interface SettingsSectionProps {
   className?: string;
   /** Red-tinted framing for irreversible actions. */
   danger?: boolean;
+  /** An anchor for links into the page (`/dashboard/settings/billing#credits`); it lands clear of the sticky header. */
+  id?: string;
 }
 
-export const SettingsSection: FC<SettingsSectionProps> = ({ title, description, action, children, className, danger }) => (
-  <section className={cn(CARD, danger && "border-[#c0392b]/25", className)}>
+export const SettingsSection: FC<SettingsSectionProps> = ({ title, description, action, children, className, danger, id }) => (
+  <section id={id} className={cn(CARD, danger && "border-[#c0392b]/25", id && "scroll-mt-24", className)}>
     <div className="flex items-start justify-between gap-4 border-b border-black/10 px-5 py-4">
       <div className="min-w-0">
         <h2 className={cn("text-sm font-bold", danger ? "text-[#b23c26]" : "text-primary")}>{title}</h2>

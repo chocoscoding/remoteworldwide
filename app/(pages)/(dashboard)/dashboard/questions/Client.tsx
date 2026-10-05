@@ -27,7 +27,6 @@ import { apiMessage } from "@/app/lib/api/core";
 import type { AnswerHistoryItem } from "@/app/lib/answers/types";
 import type { ApplicationItem } from "@/app/lib/applications/types";
 import type { QaItem } from "@/app/lib/dashboard/types";
-import { EXTENSION_URL } from "@/app/lib/extension/presence";
 import { useAnswerHistory } from "@/hooks/queries/useAnswersQuery";
 import { useApplications } from "@/hooks/queries/useApplicationsQuery";
 import AnswerRow from "@/app/components/dashboard/questions/AnswerRow";
@@ -197,22 +196,17 @@ const QuestionsClient: FC = () => {
     setter(next);
   }
 
-  // What the chip and the "How this works" bullet are allowed to claim. The
-  // extension answers for itself; an unset NEXT_PUBLIC_EXTENSION_URL means it
-  // isn't published, and then "not installed" would be the wrong story to tell.
+  // What the chip and the "How this works" bullet are allowed to claim: the
+  // extension answers the presence ping for itself.
   const extensionLabel = extension.connected
     ? "Extension · connected"
     : extension.status === "checking"
       ? "Extension · checking…"
-      : EXTENSION_URL
-        ? "Extension · not installed"
-        : "Extension · not available yet";
+      : "Extension · not installed";
 
   const extensionBullet = extension.connected
     ? "• The browser extension fills these answers into forms on company sites"
-    : EXTENSION_URL
-      ? "• A browser extension fills these answers into forms on company sites — add it to Chrome to use it"
-      : "• A browser extension that fills forms on company sites isn't available yet";
+    : "• A browser extension fills these answers into forms on company sites. Add it to Chrome to use it";
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">

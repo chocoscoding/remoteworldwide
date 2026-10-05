@@ -30,14 +30,8 @@
 
 import { useEffect, useState } from "react";
 
-/**
- * The Chrome Web Store listing, published 2026-10-04. In code rather than env
- * so every deploy links the same listing; `NEXT_PUBLIC_EXTENSION_URL` still
- * wins when set (a beta listing, say). Every "Get it" prompt keys off this, and
- * an empty value would hide them all again.
- */
-export const EXTENSION_URL =
-  process.env.NEXT_PUBLIC_EXTENSION_URL || "https://chromewebstore.google.com/detail/remoteworldwide-autofill/beilfbphhehmlihmpfijjciobcnccecn";
+/** The store listing lives in `./url` so server components can read it too; re-exported for the client callers. */
+export { EXTENSION_URL } from "./url";
 
 export type ExtensionStatus = "checking" | "installed" | "absent";
 

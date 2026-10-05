@@ -12,6 +12,8 @@
 // voiceCredits / coach / prepText). Several are env-tunable there; if one is
 // changed in production, change it here too.
 
+import { EXTENSION_URL } from "@/app/lib/extension/url";
+
 export interface PricingPlan {
   key: string;
   name: string;
@@ -194,6 +196,8 @@ export interface FeatureRow {
   plans: "all" | string[];
   /** Text shown instead of a tick for a plan, e.g. "1 resume" on Free. */
   values?: Record<string, string>;
+  /** Where the label links, opened in a new tab (the extension's store listing). */
+  href?: string;
 }
 
 /** The site-wide reward for an invite that turns into a subscriber (backend CREDITS_PER_SUBSCRIBER). */
@@ -239,7 +243,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     rows: [
       { label: "Ask about a job", note: "Answers from the posting and your profile · 1 credit", plans: "all" },
       { label: "Saved application answers", note: "Write an answer once, reuse it anywhere · free", plans: "all" },
-      { label: "Chrome extension", note: "Save and track jobs from the application page", plans: "all" },
+      { label: "Chrome extension", note: "Save and track jobs from the application page", plans: "all", href: EXTENSION_URL },
       { label: "Autofill from your profile", note: "Your details and saved answers · free", plans: "all" },
       { label: "AI answers in the extension", note: "New questions answered from your resume · 1 credit", plans: "all" },
       { label: "Application drafts", note: "Pick an application back up later", plans: "all" },

@@ -31,6 +31,7 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, Loader2, RotateCw, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
 import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import KeyCombo from "@/app/components/dashboard/ui/KeyCombo";
@@ -48,6 +49,7 @@ import {
   findFormQuestions,
   type FormLeftOut,
 } from "@/app/lib/autofill/api";
+import { EXTENSION_URL } from "@/app/lib/extension/url";
 import { qk } from "@/app/lib/query/keys";
 import type { ApplyQuestion } from "@/app/lib/apply/state";
 import { applyLinkOf, hostOf, type StartedJob } from "../job";
@@ -170,6 +172,8 @@ const SubmitStep: FC<SubmitStepProps> = ({
   const [copied, setCopied] = useState<string | null>(null);
 
   const link = applyLinkOf(job);
+  // The dashboard pings the extension once (AnswersProvider); "checking" shows neither line.
+  const extensionStatus = useAnswers().extension.status;
   const asked = rows.filter((row) => row.question.trim());
   const answered: ApplicationAnswer[] = rows
     .filter((row) => row.question.trim() && row.answer.trim())
@@ -543,6 +547,22 @@ const SubmitStep: FC<SubmitStepProps> = ({
                 {duplicate?.status === "saved" && " Tracking moves the saved card to Applied."}
                 {alreadyTracked && " It's already logged as sent this week, so tracking won't add a second card."}
               </p>
+              {/* Nothing while the presence ping is still out: "get it" to someone running it reads wrong. */}
+              {extensionStatus === "absent" && (
+                <p className="mt-2 text-[13px] text-white/75">
+                  Autofill this form in one click with the Chrome extension.{" "}
+                  <a
+                    href={EXTENSION_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="whitespace-nowrap font-bold text-secondary underline-offset-2 hover:underline">
+                    Get it ↗
+                  </a>
+                </p>
+              )}
+              {extensionStatus === "installed" && link && (
+                <p className="mt-2 text-[13px] text-white/75">Open the form and your Chrome extension fills it for you in one click.</p>
+              )}
             </div>
             <div className="flex flex-none flex-wrap items-center gap-2.5">
               {link && (
