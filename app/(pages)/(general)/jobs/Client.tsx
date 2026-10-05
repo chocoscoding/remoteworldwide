@@ -2,12 +2,13 @@
 import SearchBar from "@/app/components/SearchBar";
 import FilterBar from "@/app/components/main/FilterBar";
 import AdSlot from "@/app/components/main/AdSlot";
-import JobsContainerForSearch from "@/app/components/main/JobsContainerForSearch";
+import JobsContainerForSearch, { type InitialJobs } from "@/app/components/main/JobsContainerForSearch";
 import ScrollToTop from "@/app/components/main/ScrollToTop";
 import { cn } from "@/lib/utils";
 
 // `showAds` comes from the server (app/lib/ads.ts): true for Free and signed-out visitors, false for Basic and up.
-const Client = ({ showAds }: { showAds: boolean }) => {
+// `initialJobs` is the list the server already queried (page.tsx), so crawlers get real job links.
+const Client = ({ showAds, initialJobs }: { showAds: boolean; initialJobs?: InitialJobs }) => {
   return (
     <div className="w-full">
       <SearchBar activeSearch />
@@ -28,7 +29,7 @@ const Client = ({ showAds }: { showAds: boolean }) => {
             <hr />
           </div> */}
 
-          <JobsContainerForSearch />
+          <JobsContainerForSearch initial={initialJobs} />
         </section>
         {showAds ? <AdSlot slot="jobs-right" className="hidden md:block !hidden" /> : null}
       </section>

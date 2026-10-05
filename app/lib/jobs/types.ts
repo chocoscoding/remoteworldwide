@@ -280,6 +280,10 @@ export interface JobThreadItem {
   role: string | null;
   entries: JobThreadEntry[];
   answeredQuestionIds: JdQuickQuestionId[];
+  /** The resume answers on this thread are grounded in now: the chosen one, else the newest ready. Null when the user has none. */
+  resumeId: string | null;
+  /** The resume picked for this job (`setJobThreadResume`), or null when none was, and the newest is used. */
+  chosenResumeId: string | null;
 }
 
 export type AskJobInput = { questionId: JdQuickQuestionId } | { question: string };

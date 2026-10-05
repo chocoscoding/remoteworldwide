@@ -1,6 +1,6 @@
 import CompanySection from "@/app/components/main/job/CompanySection";
 import JobsContainer from "@/app/components/main/JobsContainer";
-import NotFound from "@/app/components/NotFound";
+import { notFound } from "next/navigation";
 import { CompanyWithJobsCount } from "@/types/main";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -41,14 +41,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const companySlug = decodeURIComponent((await params).slug);
   const companyData = await fetchCompany(companySlug);
 
-  if (!companyData) {
-    return {
-      title: "Company Not Found",
-      description: "The requested company could not be found.",
-      // The page answers 200 with a "not found" message, so keep it out of the index.
-      robots: { index: false, follow: true },
-    };
-  }
+  // The page answers 404 (./not-found.tsx); this only names the tab.
+  if (!companyData) return { title: "Company Not Found", robots: { index: false, follow: true } };
 
   const jobCount = companyData._count?.jobs;
   const title = `${companyData.name} Remote Jobs | Remote Worldwide`;
@@ -96,7 +90,7 @@ const Page = async ({ params }: { params: Promise<{ slug: string }> }) => {
   const companySlug = decodeURIComponent((await params).slug);
   const companyData = await fetchCompany(companySlug);
 
-  if (!companyData) return <NotFound buttonType="back" title="Company" />;
+  if (!companyData) notFound();
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Companies", path: "/companies" },
     { name: companyData.name, path: `/companies/${encodeURIComponent(companyData.slug)}` },

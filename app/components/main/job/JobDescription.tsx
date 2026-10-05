@@ -7,6 +7,7 @@ import BookmarkStatus from "../BookmarkStatus";
 import { Job } from "@prisma/client";
 import { toast } from "react-toastify";
 import { LinkIcon, type LinkIconHandle } from "@/components/ui/link-icon";
+import { isJobExpired } from "@/app/lib/jobs/jobLifetime";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => <JobDescriptionSkeleton /> });
 
@@ -62,9 +63,10 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
     <div className="bg-white w-full min-h-screen rounded-lg drop-shadow-primary outline outline-2 outline-black overflow-hidden">
       {/* expired job */}
 
-      {data.updatedAt < new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) && (
+      {/* The same rule that drops the page's JobPosting markup and noindexes it. A <p>: the job title is the page's one h1. */}
+      {isJobExpired(data.updatedAt) && (
         <div className="w-full rounded-b-xl bg-red-500 text-white text-center py-2">
-          <h1 className="font-semibold text-sm">This job has expired</h1>
+          <p className="font-semibold text-sm">This job has expired</p>
         </div>
       )}
 

@@ -9,7 +9,7 @@ import TimestampChip from "../delivery/TimestampChip";
 import ClippedQuote from "./ClippedQuote";
 import { flagsFor, reportAnswers, rewriteFor, type ReportAnswer, type SessionQuestionRef } from "./answerNotes";
 import { answerAgain, answerQuestionText, notReached } from "./practiceSets";
-import RewritePopover from "./RewritePopover";
+import RewritePopover, { AiCaution } from "./RewritePopover";
 
 /**
  * Overall's "Question by question": every answer, in order, with what it was
@@ -31,6 +31,7 @@ const QuestionByQuestion: FC<QuestionByQuestionProps> = ({ turns, questions, dim
   const titleId = useId();
   const answers = useMemo(() => reportAnswers(turns, questions), [turns, questions]);
   const missed = useMemo(() => notReached(questions, turns), [questions, turns]);
+  const hasRewrite = answers.some((answer) => rewriteFor(answer, rewrites)?.better);
   // The first answer opens by itself; the reader's own choices after that.
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(answers[0] ? [answers[0].turnId] : []));
   const toggle = (turnId: string) =>
@@ -49,7 +50,9 @@ const QuestionByQuestion: FC<QuestionByQuestionProps> = ({ turns, questions, dim
         <h2 id={titleId} className="text-sm font-extrabold text-[#222325]">
           Question by question
         </h2>
-        <span className="text-xs text-[#5f6062]">
+        {/* One caution for every "How you could have said it" below, not one per answer (owner, 2026-10-05). */}
+        <span className="inline-flex items-center gap-1 self-center text-xs text-[#5f6062]">
+          {hasRewrite && <AiCaution align="end" />}
           {answers.length} answered · {missed.length} not reached
         </span>
       </div>
@@ -132,7 +135,7 @@ const AnswerItem: FC<AnswerItemProps> = ({ answer, question, open, onToggle, fla
                 {flag}
               </span>
             ))}
-            {rewrite && <RewritePopover text={rewrite} />}
+            {rewrite && <RewritePopover text={rewrite} caution={false} />}
             <span aria-hidden className="flex-1" />
             {again && onPractise && (
               <button

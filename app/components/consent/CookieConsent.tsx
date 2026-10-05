@@ -64,7 +64,7 @@ const CookieConsent: FC = () => {
         <section
           role="region"
           aria-labelledby={titleId}
-          className="fixed bottom-4 left-4 right-4 z-40 rounded-xl border-[1.5px] bg-white p-4 text-[#222325] br-shadow sm:right-auto sm:w-[360px]">
+          className="fixed bottom-4 left-4 right-4 z-40 rounded-xl border-[1.5px] bg-white p-4 text-[#222325] br-shadow sm:left-auto sm:w-[360px]">
           <h2 id={titleId} className="sr-only">
             Cookies
           </h2>
@@ -108,7 +108,7 @@ const CookieConsent: FC = () => {
                   Change this any time from &quot;Cookie settings&quot; at the bottom of the site.
                 </DialogPrimitive.Description>
               </div>
-              <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press">
+              <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-secondary text-[#222325] br-shadow-press">
                 <X className="h-3.5 w-3.5" strokeWidth={3} />
                 <span className="sr-only">Close</span>
               </DialogPrimitive.Close>
@@ -122,7 +122,9 @@ const CookieConsent: FC = () => {
                     Keep you signed in, protect forms and remember this choice. The site can&apos;t work without them.
                   </p>
                 </div>
-                <span className="mt-0.5 flex-none rounded-full bg-[#f0f0ea] px-2.5 py-1 text-[11px] font-bold text-black/60">Always on</span>
+                <span className="mt-0.5 flex-none rounded-full bg-[#f0f0ea] px-2.5 py-1 text-[11px] font-bold text-black/60">
+                  Always on
+                </span>
               </div>
               <div className="flex items-start justify-between gap-6 py-4">
                 <div className="min-w-0">
@@ -136,7 +138,11 @@ const CookieConsent: FC = () => {
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-black/10 px-6 py-4">
-              <a href={PRIVACY_HREF} target="_blank" rel="noopener" className="text-xs font-semibold text-black/55 underline underline-offset-2 hover:text-primary">
+              <a
+                href={PRIVACY_HREF}
+                target="_blank"
+                rel="noopener"
+                className="text-xs font-semibold text-black/55 underline underline-offset-2 hover:text-primary">
                 Privacy policy
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>

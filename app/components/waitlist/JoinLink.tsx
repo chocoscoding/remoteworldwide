@@ -6,7 +6,8 @@ import { useLenis } from "lenis/react";
 import { cn } from "@/lib/utils";
 import { goToJoin } from "./joinedStore";
 
-const LOOKS = {
+/** Shared with the tool pages' ToolCta, so a signed-in "Open the tool" button looks the same as "Join". */
+export const JOIN_LOOKS = {
   // The page's main call to action: flat ink, a lime hard shadow only on hover.
   ink: "h-12 rounded-xl bg-primary px-6 text-sm font-bold text-white br-plain-press br-lime focus-visible:ring-primary",
   // On dark panels and as the lime moment of a section: ink outline and hard shadow, pressed on click.
@@ -14,6 +15,7 @@ const LOOKS = {
   // Inline, inside copy.
   text: "min-h-[44px] text-sm font-bold text-primary underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary focus-visible:ring-primary",
 } as const;
+const LOOKS = JOIN_LOOKS;
 
 /**
  * Every "Join the waitlist" on /waitlist. A plain `#join` link underneath, so it still reaches the

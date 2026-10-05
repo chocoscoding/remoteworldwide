@@ -23,20 +23,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle,
-  AudioLines,
   Check,
   ChevronDown,
   Clock,
   CreditCard,
   ExternalLink,
   Loader2,
-  Lock,
   MapPin,
   Mic,
   Repeat2,
   RotateCcw,
   SendHorizontal,
-  Square,
   X,
 } from "lucide-react";
 import { Lottie } from "lottie-react";
@@ -89,6 +86,7 @@ import { useAskJob } from "@/hooks/mutations/useAskJob";
 import { useOpenInterviewPrep, useTrackJob, type NextStepJob } from "@/hooks/mutations/useJobNextSteps";
 import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
 import { refreshJobThread, useJobThread } from "@/hooks/queries/useJobThread";
+import AskResumeBar from "@/app/components/dashboard/jobs/AskResumeBar";
 import { useVoiceConfig } from "@/hooks/queries/useVoiceConfig";
 
 // ---------------------------------------------------------------------------
@@ -105,8 +103,8 @@ const JOB_SPEC_PARSED = parseFieldSpec(JOB_SPEC);
 /** The search param naming the picked saved job. */
 const JOB_PARAM = "job";
 
-/** Live dictation under the composer shows its newest words, on one line. */
-const INTERIM_TAIL_CHARS = 90;
+/** The composer grows with its text up to this height (about five lines), then scrolls. */
+const COMPOSER_MAX_HEIGHT = 124;
 
 /**
  * A saved job read back from ?job=, as the screen's picked job. Null when it no
@@ -260,7 +258,9 @@ const NextSteps: FC<{ steps: JobNextStep[]; job: AnswerJob }> = ({ steps, job })
   const prep = useOpenInterviewPrep();
   const track = useTrackJob();
   const actionJob: NextStepJob | null =
-    job.savedJobId && job.company && job.role ? { savedJobId: job.savedJobId, company: job.company, role: job.role, platform: job.platform } : null;
+    job.savedJobId && job.company && job.role
+      ? { savedJobId: job.savedJobId, company: job.company, role: job.role, platform: job.platform }
+      : null;
   const acting = prep.isPending || track.isPending;
 
   return steps.map((step, i) => {
@@ -292,61 +292,110 @@ const NextSteps: FC<{ steps: JobNextStep[]; job: AnswerJob }> = ({ steps, job })
   });
 };
 
-const AnswerBubble: FC<{ answer: JobAnswer; note: string | null; job: AnswerJob }> = ({ answer, note, job }) => (
-  <div className="flex items-start gap-2.5">
-    <CoachAvatar />
-    <div className="max-w-[85%] flex flex-col gap-3">
-      <div className="rounded-2xl rounded-tl-sm bg-[#f6f6f6] px-4 py-3">
-        <p className="text-sm text-black/80 leading-relaxed">{answer.verdict}</p>
-      </div>
+const TipItem: FC<{ n: number; tip: string }> = ({ n, tip }) => (
+  <li className="flex items-start gap-2 text-sm text-black/75 leading-relaxed">
+    <span className="h-5 w-5 flex-none rounded-full bg-[#f0f0ea] text-[11px] font-bold text-primary flex items-center justify-center mt-0.5">{n}</span>
+    {tip}
+  </li>
+);
 
-      {answer.missing.trim() !== "" && (
-        <div className="flex items-start gap-2 rounded-xl bg-[#fbfbf7] border border-black/8 px-3.5 py-3">
-          <AlertTriangle className="h-4 w-4 flex-none text-black/40 mt-0.5" aria-hidden />
+const AnswerChip: FC<{ open: boolean; controls: string; onClick: () => void; children: ReactNode }> = ({ open, controls, onClick, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-expanded={open}
+    aria-controls={controls}
+    className={cn(
+      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold cursor-pointer transition-colors",
+      open ? "border-[#222325] bg-[#222325] text-[#e1f073]" : "border-black/12 bg-white text-primary hover:bg-[#fbfbf7]",
+    )}>
+    {children}
+    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+  </button>
+);
+
+/**
+ * One answer, in layers (owner, 2026-10-05: the stacked version was "information overload"): the verdict
+ * with the gap folded into it, the first step, and the other steps and the resume evidence behind chips.
+ * Nothing is dropped; the rest is one click away.
+ */
+const AnswerBubble: FC<{ answer: JobAnswer; note: string | null; job: AnswerJob }> = ({ answer, note, job }) => {
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const stepsId = useId();
+  const evidenceId = useId();
+  const gap = answer.missing.trim();
+  const [firstTip, ...moreTips] = answer.tips;
+
+  return (
+    <div className="flex items-start gap-2.5">
+      <CoachAvatar />
+      <div className="max-w-[85%] flex flex-col gap-3">
+        <div className="rounded-2xl rounded-tl-sm bg-[#f6f6f6] px-4 py-3">
+          <p className="text-sm text-black/80 leading-relaxed">{answer.verdict}</p>
+          {gap !== "" && (
+            <p className="mt-2.5 flex items-start gap-2 border-t border-black/8 pt-2.5 text-[13px] text-black/60 leading-relaxed">
+              <span aria-hidden className="mt-[7px] h-[7px] w-[7px] flex-none rounded-full bg-secondary2" />
+              <span>
+                <span className="font-bold text-primary">Gap:</span> {gap}
+              </span>
+            </p>
+          )}
+        </div>
+
+        {firstTip && (
           <div>
-            <p className="text-[10.5px] font-bold text-black/45 uppercase tracking-[0.08em] mb-1">What&apos;s missing</p>
-            <p className="text-sm text-black/65 leading-relaxed">{answer.missing}</p>
+            <p className="text-[10.5px] font-bold text-black/45 uppercase tracking-[0.08em] mb-1.5">Start here</p>
+            <ol className="flex flex-col gap-1.5">
+              <TipItem n={1} tip={firstTip} />
+            </ol>
           </div>
-        </div>
-      )}
+        )}
 
-      {answer.tips.length > 0 && (
-        <div>
-          <p className="text-[10.5px] font-bold text-black/45 uppercase tracking-[0.08em] mb-1.5">What I&apos;d do</p>
-          <ol className="flex flex-col gap-1.5">
-            {answer.tips.map((tip, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-black/75 leading-relaxed">
-                <span className="h-5 w-5 flex-none rounded-full bg-[#f0f0ea] text-[11px] font-bold text-primary flex items-center justify-center mt-0.5">
-                  {i + 1}
-                </span>
-                {tip}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
+        {(moreTips.length > 0 || answer.evidence.length > 0) && (
+          <div className="flex flex-col gap-2.5">
+            <div className="flex flex-wrap gap-2">
+              {moreTips.length > 0 && (
+                <AnswerChip open={stepsOpen} controls={stepsId} onClick={() => setStepsOpen((value) => !value)}>
+                  {moreTips.length === 1 ? "1 more step" : `${moreTips.length} more steps`}
+                </AnswerChip>
+              )}
+              {answer.evidence.length > 0 && (
+                <AnswerChip open={evidenceOpen} controls={evidenceId} onClick={() => setEvidenceOpen((value) => !value)}>
+                  From your resume · {answer.evidence.length}
+                </AnswerChip>
+              )}
+            </div>
 
-      {answer.evidence.length > 0 && (
-        <div>
-          <p className="text-[10.5px] font-bold text-black/45 uppercase tracking-[0.08em] mb-1.5">From your resume</p>
-          <ul className="flex flex-col gap-2">
-            {answer.evidence.map((item, i) => (
-              <li key={i} className="border-l-2 border-secondary pl-3 text-sm text-black/70 leading-relaxed">
-                {item.text}
-                {item.role && <span className="block text-[11px] font-medium text-black/40 mt-0.5">{item.role}</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+            {moreTips.length > 0 && (
+              <ol id={stepsId} className={cn(stepsOpen ? "flex" : "hidden", "flex-col gap-1.5")}>
+                {moreTips.map((tip, i) => (
+                  <TipItem key={i} n={i + 2} tip={tip} />
+                ))}
+              </ol>
+            )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <NextSteps steps={answer.nextSteps?.length ? answer.nextSteps : DEFAULT_NEXT_STEPS} job={job} />
-        {note && <span className="text-[11px] font-medium text-black/40">{note}</span>}
+            {answer.evidence.length > 0 && (
+              <ul id={evidenceId} className={cn(evidenceOpen ? "flex" : "hidden", "flex-col gap-2")}>
+                {answer.evidence.map((item, i) => (
+                  <li key={i} className="border-l-2 border-secondary pl-3 text-sm text-black/70 leading-relaxed">
+                    {item.text}
+                    {item.role && <span className="block text-[11px] font-medium text-black/40 mt-0.5">{item.role}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <NextSteps steps={answer.nextSteps?.length ? answer.nextSteps : DEFAULT_NEXT_STEPS} job={job} />
+          {note && <span className="text-[11px] font-medium text-black/40">{note}</span>}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Announced through the transcript's status region rather than here: a region
 // inserted along with its text is often not read, and this one disappears the
@@ -354,7 +403,7 @@ const AnswerBubble: FC<{ answer: JobAnswer; note: string | null; job: AnswerJob 
 const ThinkingBubble: FC = () => (
   <div className="flex items-start gap-2.5">
     <CoachAvatar />
-    <div className="inline-flex items-center gap-2 rounded-2xl rounded-tl-sm bg-[#f6f6f6] px-4 py-3 text-sm text-black/55">
+    <div className="inline-flex items-center gap-2 rounded-2xl rounded-tl-sm bg-secondary px-4 py-3 text-sm text-black/55">
       <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
       Thinking…
     </div>
@@ -443,9 +492,10 @@ const JobCard: FC<{ job: AskedJob }> = ({ job }) => {
   // open; the classes decide that, so the server render and hydration agree.
   const [open, setOpen] = useState(false);
   const detailsId = useId();
-  // "What they want" folds away at every size, and opens into its own ink box (owner, 2026-09-30).
-  const [wantsOpen, setWantsOpen] = useState(false);
-  const wantsId = useId();
+  // The full description folds away at every size; "What they want" is always shown in its ink box
+  // (owner, 2026-10-05; until then it was the requirements that folded).
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const descriptionId = useId();
 
   return (
     // Stacked above the chat (md to lg) the card takes at most 40% of the screen and scrolls inside;
@@ -486,18 +536,10 @@ const JobCard: FC<{ job: AskedJob }> = ({ job }) => {
 
         {job.requirements.length > 0 && (
           <div className="mt-5">
-            <button
-              type="button"
-              onClick={() => setWantsOpen((value) => !value)}
-              aria-expanded={wantsOpen}
-              aria-controls={wantsId}
-              className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/45 cursor-pointer transition-colors hover:text-primary">
-              <span>
-                What they want <span className="font-semibold normal-case tracking-normal text-black/35">· {job.requirements.length}</span>
-              </span>
-              <ChevronDown className={cn("h-4 w-4 flex-none transition-transform", wantsOpen && "rotate-180")} aria-hidden />
-            </button>
-            <ul id={wantsId} className={cn(wantsOpen ? "flex" : "hidden", "mt-2 flex-col gap-2 rounded-md bg-[#222325] p-4")}>
+            <p className="py-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/45">
+              What they want <span className="font-semibold normal-case tracking-normal text-black/35">· {job.requirements.length}</span>
+            </p>
+            <ul className="mt-2 flex flex-col gap-2 rounded-md bg-[#222325] p-4">
               {job.requirements.map((item, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm text-white/85 leading-relaxed">
                   <span aria-hidden className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[#e1f073]" />
@@ -521,8 +563,25 @@ const JobCard: FC<{ job: AskedJob }> = ({ job }) => {
           </div>
         )}
 
-        <p className="mt-6 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-2">Full description</p>
-        <p className="text-sm text-black/70 leading-relaxed whitespace-pre-line break-words">{job.description}</p>
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => setDescriptionOpen((value) => !value)}
+            aria-expanded={descriptionOpen}
+            aria-controls={descriptionId}
+            className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/45 cursor-pointer transition-colors hover:text-primary">
+            Full description
+            <ChevronDown className={cn("h-4 w-4 flex-none transition-transform", descriptionOpen && "rotate-180")} aria-hidden />
+          </button>
+          <p
+            id={descriptionId}
+            className={cn(
+              descriptionOpen ? "block" : "hidden",
+              "mt-2 text-sm text-black/70 leading-relaxed whitespace-pre-line break-words",
+            )}>
+            {job.description}
+          </p>
+        </div>
       </div>
     </DashCard>
   );
@@ -698,7 +757,25 @@ const JdqaScreen: FC = () => {
   const talkLabel = talkActive ? "End voice call" : talkReason ? `Talk about this job. ${talkReason}` : "Talk about this job";
   const talkCaption =
     talk.state !== "live" ? "" : talk.agentCaption ? `Answer: ${talk.agentCaption}` : talk.userCaption ? `You: ${talk.userCaption}` : "";
-  const composerRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  // Words not final yet are shown in the box itself, after what is already there (owner,
+  // 2026-10-05; they used to sit in a line under it). The box is read-only while they show,
+  // so a keystroke can't fold them into the saved text and have them land twice.
+  const showingInterim = listening && interim.trim() !== "";
+  const shownComposerValue = showingInterim
+    ? (composerValue ? `${composerValue.trimEnd()} ${interim.trim()}` : interim.trim()).slice(0, MAX_JOB_QUESTION_CHARS)
+    : composerValue;
+
+  // Fits the box to its text, from two lines up to the cap, and keeps the newest dictated words in view.
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const border = el.offsetHeight - el.clientHeight;
+    el.style.height = `${Math.min(el.scrollHeight + border, COMPOSER_MAX_HEIGHT)}px`;
+    el.style.overflowY = el.scrollHeight + border > COMPOSER_MAX_HEIGHT ? "auto" : "hidden";
+    if (listening) el.scrollTop = el.scrollHeight;
+  }, [shownComposerValue, listening]);
   const talkButtonRef = useRef<HTMLButtonElement>(null);
   const typeFocusRef = useRef(false);
 
@@ -989,7 +1066,7 @@ const JdqaScreen: FC = () => {
               <div className="p-5 border-b border-black/8">
                 <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <p className="text-sm font-bold text-primary">Quick questions</p>
-                  <p className="text-[11px] font-medium text-black/45">1 credit per new answer · repeats are free</p>
+                  {threadItem && <AskResumeBar thread={threadItem} disabled={busy || talkActive} />}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {QUICK_QUESTIONS.map((q) => {
@@ -1031,7 +1108,7 @@ const JdqaScreen: FC = () => {
 
               {/* Composer */}
               <form
-                className="p-4 border-t border-black/8 flex items-center gap-2.5"
+                className="p-4 border-t border-black/8 flex items-end gap-2.5"
                 onSubmit={(e) => {
                   e.preventDefault();
                   submitComposer();
@@ -1048,16 +1125,25 @@ const JdqaScreen: FC = () => {
                     )}
                   />
                 )}
-                <input
+                <textarea
                   ref={composerRef}
-                  value={composerValue}
+                  rows={2}
+                  value={shownComposerValue}
                   onChange={(e) => setComposerValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter sends, as the one-line box did; Shift+Enter starts a new line.
+                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      submitComposer();
+                    }
+                  }}
+                  readOnly={showingInterim}
                   maxLength={MAX_JOB_QUESTION_CHARS}
                   disabled={talkActive}
                   aria-label="Ask anything about this role"
                   placeholder={talkActive ? "End the call to type" : listening ? "Listening…" : "Ask anything about this role…"}
                   className={cn(
-                    "flex-1 rounded-full border border-black/12 bg-[#f6f6f6] px-4 py-2.5 text-sm text-primary placeholder:text-black/40 focus:outline-none focus:border-primary/40 disabled:cursor-not-allowed",
+                    "flex-1 resize-none overflow-hidden rounded-2xl border border-black/12 bg-[#f6f6f6] px-4 py-2.5 text-sm leading-5 text-primary placeholder:text-black/40 focus:outline-none focus:border-primary/40 disabled:cursor-not-allowed",
                     showTalk && "hidden",
                   )}
                 />
@@ -1088,29 +1174,7 @@ const JdqaScreen: FC = () => {
                   )}>
                   {micStatus === "requesting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
                 </button>
-                {talkOn && (
-                  // A disabled button gets no hover, so its reason rides on the wrapper's tooltip.
-                  <span className="inline-flex flex-none" title={talkReason ?? talkLabel}>
-                    <StickerButton
-                      ref={talkButtonRef}
-                      variant={talkActive ? "primary" : "secondary"}
-                      size="sm"
-                      onClick={handleTalk}
-                      disabled={talk.state === "ending" || (!talkActive && (!ready || busy || outOfMinutes))}
-                      aria-label={talkLabel}
-                      className={talkActive ? undefined : "border-[#222325] br-plain-press"}>
-                      {talkActive ? (
-                        <Square className="h-3 w-3 fill-current" aria-hidden />
-                      ) : voiceLock.locked ? (
-                        // Kept on screen below Basic: pressing it opens the upgrade popup.
-                        <Lock className="h-3 w-3" aria-hidden />
-                      ) : (
-                        <AudioLines className="h-3.5 w-3.5" aria-hidden />
-                      )}
-                      {talkActive ? "End" : "Talk"}
-                    </StickerButton>
-                  </span>
-                )}
+
                 <button
                   type="submit"
                   aria-label="Send question"
@@ -1119,14 +1183,6 @@ const JdqaScreen: FC = () => {
                   <SendHorizontal className="h-4 w-4" />
                 </button>
               </form>
-              {/* Words not final yet, while dictating. The input's placeholder
-                  can show them only while the box is empty, and after the first
-                  pause it never is. */}
-              {listening && interim && (
-                <p data-interim className="-mt-2 truncate px-6 pb-3 text-[11px] font-medium italic text-black/55">
-                  {interim.length > INTERIM_TAIL_CHARS ? `…${interim.slice(-INTERIM_TAIL_CHARS).trimStart()}` : interim}
-                </p>
-              )}
               {talkCaption && (
                 <p data-caption className="-mt-2 truncate px-6 pb-3 text-[11px] font-medium italic text-black/55">
                   {talkCaption}

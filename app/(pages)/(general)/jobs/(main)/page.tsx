@@ -6,6 +6,8 @@ import { getFilters } from "@/libs/query";
 import { showsAds } from "@/app/lib/ads";
 import type { Metadata } from "next";
 import { absoluteUrl } from "@/app/lib/seo";
+import { searchJobs } from "@/app/lib/jobs/searchJobs";
+import type { InitialJobs } from "@/app/components/main/JobsContainerForSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -24,16 +26,30 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
 };
 
-export default async function CategoriesPage() {
-  const [{ data: filters }, ads] = await Promise.all([getFilters(), showsAds()]);
+/** The first page of results for this URL, queried here so the HTML carries the job links. Undefined on a failure: the list then fetches as before. */
+async function firstJobs(params: Record<string, string | string[] | undefined>): Promise<InitialJobs | undefined> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, v);
+  }
+  try {
+    const { data, count } = await searchJobs(query);
+    return { query: query.toString(), data, count };
+  } catch {
+    return undefined;
+  }
+}
+
+export default async function CategoriesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const [{ data: filters }, ads, initialJobs] = await Promise.all([getFilters(), showsAds(), searchParams.then(firstJobs)]);
 
   return (
     <main className="p-3 md:p-6 w-full max-w-[1300px] m-auto min-h-screen">
-      <h1 className="text-2xl md:text-3xl font-bold text-center">Explore latest and exciting jobs now</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-center">Remote jobs you can do from anywhere</h1>
       <br />
       <Suspense>
         <FilterProvider filterData={filters}>
-          <Client showAds={ads} />
+          <Client showAds={ads} initialJobs={initialJobs} />
         </FilterProvider>
       </Suspense>
     </main>

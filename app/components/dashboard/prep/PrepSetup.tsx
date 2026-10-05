@@ -238,7 +238,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
           </>
         ) : (
           <>
-            <b className="font-bold text-primary">All {questionTotal} questions are written for this job</b>, from its posting&apos;s
+            <b className="font-bold text-primary">Most {questionTotal} questions are written for this job</b>, from its posting&apos;s
             requirements
             {likelySet.grounding.resume ? " and your resume" : ""}.
           </>
@@ -479,20 +479,18 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
           with recorded interviews off (the AI service's
           VOICE_INTERVIEWS_ENABLED) nothing is recorded or kept, and the one
           service that does hear the audio — the browser's own speech
-          recognition, Google's in Chrome — went unnamed. */}
-      <DashCard className="p-5 flex gap-3 items-start bg-[#fbfbf7]">
-        <Info className="h-4 w-4 text-black/40 flex-none mt-0.5" />
-        <p className="text-xs text-black/60 leading-relaxed">
-          {configLoading ? (
-            "Checking how this session will handle your voice…"
-          ) : voiceOffered ? null : (
-            <>
-              This session isn&apos;t recorded, and nothing you say is saved. Where your browser can, its own speech recognition turns what
-              you say into text as you go (in Chrome, that&apos;s Google&apos;s speech service).
-            </>
-          )}
-        </p>
-      </DashCard>
+          recognition, Google's in Chrome — went unnamed.
+          A recorded session has nothing to say here, so the card only shows
+          for one that isn't (owner, 2026-10-05: an empty card was left). */}
+      {!configLoading && !voiceOffered && (
+        <DashCard className="p-5 flex gap-3 items-start bg-[#fbfbf7]">
+          <Info className="h-4 w-4 text-black/40 flex-none mt-0.5" />
+          <p className="text-xs text-black/60 leading-relaxed">
+            This session isn&apos;t recorded, and nothing you say is saved. Where your browser can, its own speech recognition turns what you
+            say into text as you go (in Chrome, that&apos;s Google&apos;s speech service).
+          </p>
+        </DashCard>
+      )}
 
       <div className="bg-[#222325] text-white rounded-2xl p-6 flex items-center gap-5 flex-wrap">
         <div className="flex-1 min-w-[220px]">

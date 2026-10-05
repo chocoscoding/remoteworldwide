@@ -5,11 +5,15 @@ import { MetadataRoute } from "next";
 import { SITE_URL } from "@/app/lib/seo";
 import { BLOG_CATEGORIES } from "@/app/lib/blog/categories";
 import { getSitemapEntries } from "@/app/lib/blog/data";
+import { liveJobsSince } from "@/app/lib/jobs/jobLifetime";
+import { TOOLS, toolPath } from "@/app/lib/tools/catalogue";
 
 const fetchJobMetaData_Jobs = async () => {
   try {
+    // Live jobs only: an expired posting's page is noindexed, and a sitemap that lists
+    // noindexed pages teaches Google to trust it less.
     return await prisma.job.findMany({
-      where: { isActive: true },
+      where: { isActive: true, updatedAt: { gte: liveJobsSince() } },
       select: { slug: true, updatedAt: true },
     });
   } catch {
@@ -46,6 +50,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/jobs", changeFrequency: "daily", priority: 0.9, lastModified: now },
     { url: "/companies", changeFrequency: "weekly", priority: 0.6, lastModified: now },
     { url: "/pricing", changeFrequency: "monthly", priority: 0.7, lastModified: now },
+    { url: "/tools", changeFrequency: "monthly", priority: 0.8, lastModified: now },
+    ...TOOLS.map((tool) => ({ url: toolPath(tool), changeFrequency: "monthly" as const, priority: 0.8, lastModified: now })),
     { url: "/waitlist", changeFrequency: "monthly", priority: 0.6, lastModified: now },
     { url: "/terms", changeFrequency: "yearly", priority: 0.2, lastModified: now },
     { url: "/privacy-policy", changeFrequency: "yearly", priority: 0.2, lastModified: now },

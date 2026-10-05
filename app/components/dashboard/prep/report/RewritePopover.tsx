@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
  * (`Rewrite.better`), behind a lime chip. Opens on hover for a pointer and on
  * click or Enter for everyone else, and copies the text. Since 2026-10-04 it is
  * a real answer built from the candidate's resume, profile and the posting, with
- * a grey caution icon beside the chip saying so (owner: "this is what AI thinks
+ * a grey caution icon saying so, beside the chip or, in Question by question, once
+ * in the card's header (`caution={false}` on each chip) (owner: "this is what AI thinks
  * is good ... that does not mean you are entirely wrong"). A blank an older
  * report left for the candidate's own figure ("$[number]") is still boxed, so it
  * reads as theirs to fill in rather than as a claim.
@@ -21,6 +22,8 @@ export interface RewritePopoverProps {
   text: string;
   /** The chip's label; the mockup's wording by default. */
   label?: string;
+  /** False when the list shows one AiCaution for all its chips (Question by question's header). */
+  caution?: boolean;
   className?: string;
 }
 
@@ -47,7 +50,7 @@ export const AI_ANSWER_DISCLAIMER =
   "This is what the AI thinks a strong answer looks like, built from your resume, your profile and what this job asks for. It doesn't mean your answer was wrong. Yours doesn't need to match it word for word, as long as it means the same thing.";
 
 /** A grey caution icon that explains, on hover or focus, where the stronger version comes from. */
-const AiCaution: FC = () => {
+export const AiCaution: FC<{ align?: "start" | "end" }> = ({ align = "start" }) => {
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -65,7 +68,7 @@ const AiCaution: FC = () => {
       </PopoverTrigger>
       <PopoverContent
         side="top"
-        align="start"
+        align={align}
         sideOffset={6}
         onOpenAutoFocus={(event) => event.preventDefault()}
         className="w-[min(300px,calc(100vw-32px))] rounded-lg border-0 bg-[#222325] px-3 py-2 text-xs leading-relaxed text-white">
@@ -75,7 +78,7 @@ const AiCaution: FC = () => {
   );
 };
 
-const RewritePopover: FC<RewritePopoverProps> = ({ text, label = "How you could have said it", className }) => {
+const RewritePopover: FC<RewritePopoverProps> = ({ text, label = "How you could have said it", caution = true, className }) => {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const keepOpen = () => {
@@ -129,7 +132,7 @@ const RewritePopover: FC<RewritePopoverProps> = ({ text, label = "How you could 
           <p className="text-[13px] leading-relaxed">{withBlanks(text)}</p>
         </PopoverContent>
       </Popover>
-      <AiCaution />
+      {caution && <AiCaution />}
     </span>
   );
 };

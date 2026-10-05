@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import JobTile from "./JobTile";
 import { AlertCircle } from "lucide-react";
 import JobTileSkeleton from "./JobTileSkeleton";
@@ -8,11 +8,16 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PaginationControlNew from "./PaginationControlNew";
 // import PaginationControl from "./PaginationControl";
 
-const JobsContainerForSearch = () => {
+/** The page the server already rendered: its query string and what GET /api/jobs would answer for it. */
+export type InitialJobs = { query: string; data: JobTileType[]; count: number };
+
+const JobsContainerForSearch = ({ initial }: { initial?: InitialJobs }) => {
   const jobsPerPage = 50;
-  const [totalJobs, setTotalJobs] = useState<number>(0);
+  const [totalJobs, setTotalJobs] = useState<number>(initial?.count ?? 0);
   const totalPages = Math.ceil(totalJobs / jobsPerPage);
-  const [jobs, setJobs] = useState<JobTileType[]>([]);
+  const [jobs, setJobs] = useState<JobTileType[]>(initial?.data ?? []);
+  // Set until the filters first change, so the list never refetches what the server just sent.
+  const served = useRef(initial?.query);
   const searchParams = useSearchParams();
   const params = new URLSearchParams(searchParams.toString());
   const router = useRouter();
@@ -25,7 +30,7 @@ const JobsContainerForSearch = () => {
   }, [searchParams]);
 
   // Loading and error state
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
 
   // Handlers for pagination buttons
@@ -79,6 +84,8 @@ const JobsContainerForSearch = () => {
     }
   };
   useEffect(() => {
+    if (served.current !== undefined && served.current === searchParams.toString()) return;
+    served.current = undefined;
     const timeout = setTimeout(() => {
       getJobs();
     }, 500);

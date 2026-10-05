@@ -7,7 +7,6 @@ import { FaTelegram } from "react-icons/fa6";
 import { LinkedInIcon } from "@/components/ui/linkedin-icon";
 import { TwitterIcon } from "@/components/ui/twitter-icon";
 import CookieSettingsButton from "@/app/components/consent/CookieSettingsButton";
-import { EXTENSION_URL } from "@/app/lib/extension/url";
 
 // The site's crawlable links now that the navbar carries only "Dashboard" (2026-10-01). Keep the
 // words stable: Google leans on consistent link text when it names sitelinks. `external` opens in a
@@ -16,6 +15,10 @@ const links: { title: string; href: string; external?: boolean }[] = [
   {
     title: "Jobs",
     href: "/jobs",
+  },
+  {
+    title: "AI tools",
+    href: "/tools",
   },
   {
     title: "Companies",
@@ -34,9 +37,9 @@ const links: { title: string; href: string; external?: boolean }[] = [
     href: "/waitlist",
   },
   {
+    // Our own page about it (which links to the store), so the link builds the site's structure.
     title: "Chrome extension",
-    href: EXTENSION_URL,
-    external: true,
+    href: "/tools/chrome-extension",
   },
   {
     title: "Privacy Policy",

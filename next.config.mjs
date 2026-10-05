@@ -55,6 +55,11 @@ const CSP_REPORT_ONLY = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The job share card reads its Manrope cuts with readFile at runtime, which the tracer
+  // can't follow, so name them or the deployed route has no fonts.
+  outputFileTracingIncludes: {
+    "/api/og/job": ["./assets/fonts/**/*"],
+  },
   // A rewrite clones the request body and caps the clone at 10MB by default —
   // then TRUNCATES rather than erroring, so a 10MB upload arrives as a broken
   // multipart with no clue why. This ceiling is the document limit plus room

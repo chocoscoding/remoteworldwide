@@ -52,6 +52,12 @@ export const metadata: Metadata = {
     images: [absoluteUrl("/api/og/job")],
   },
   keywords: ["job", "remote", "remote work", "remote worldwide", "work", "remote jobs", "tech jobs", "worldwide jobs"],
+  // Search Console / Bing Webmaster ownership tags, from env so no token lives in the repo.
+  // Unset prints nothing (a DNS record verifies just as well).
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
+    ...(process.env.BING_SITE_VERIFICATION ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } } : {}),
+  },
 };
 
 // Server-only, so the banner costs nothing until there is an incident. Setting

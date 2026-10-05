@@ -45,7 +45,7 @@ const QUICK_IDS: ReadonlySet<string> = new Set(JD_QUICK_QUESTION_IDS);
 export const JD_QUICK_QUESTIONS: ReadonlyArray<{ id: JdQuickQuestionId; label: string }> = [
   { id: "fit", label: "Am I a fit?" },
   { id: "really-asking", label: "What are they really asking for?" },
-  { id: "salary", label: "Salary sanity check" },
+  { id: "salary", label: "Salary check" },
   { id: "questions-to-ask", label: "Questions to ask them" },
 ];
 
@@ -76,6 +76,15 @@ export function openJobThread(savedJobId: string) {
  */
 export function getJobThread(threadId: string, signal?: AbortSignal) {
   return apiGet<JobThreadItem>(threadPath(threadId), signal);
+}
+
+/**
+ * Picks the resume this job's answers use: an ingested (`ai_resumes`) id, never a vault
+ * document's. Free. Answers about another resume stay on the thread; a quick question asked
+ * again is answered for this one.
+ */
+export function setJobThreadResume(threadId: string, resumeId: string) {
+  return apiPost<JobThreadItem>(`${threadPath(threadId)}/resume`, { resumeId });
 }
 
 /**

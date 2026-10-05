@@ -1,4 +1,4 @@
-import NotFound from "@/app/components/NotFound";
+import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { checkBookmarkForUser } from "@/libs/query";
 import { prisma } from "@/prisma";
@@ -7,6 +7,7 @@ import { Job } from "@prisma/client";
 import OneJobClient from "./Client";
 import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 import { jobPostingJsonLd } from "@/app/lib/jobs/jobPostingJsonLd";
+import { isJobLive } from "@/app/lib/jobs/jobLifetime";
 
 export const revalidate = 43200; // 3600 * 12
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
@@ -34,11 +35,14 @@ const fetchJobMetaData = async (slug: string): Promise<any | null> => {
       select: {
         slug: true,
         title: true,
+        isActive: true,
+        updatedAt: true,
         region: true,
         seniority: true,
         company: {
           select: {
             name: true,
+            logo: true,
           },
         },
       },
@@ -53,24 +57,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const jobSlug = decodeURIComponent((await params).id);
   const JOB = await fetchJobMetaData(jobSlug);
 
-  if (!JOB) {
-    return {
-      title: "Job Not Found",
-      description: "The job you are looking for does not exist.",
-      // The page answers 200 with a "not found" message, so keep it out of the index.
-      robots: { index: false, follow: true },
-      openGraph: {
-        title: "Job Not Found - Find more remote roles jobs on RemoteWorldWide",
-        images: `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job`,
-      },
-    };
-  }
+  // The page answers 404 (./not-found.tsx); this only names the tab.
+  if (!JOB) return { title: "Job Not Found", robots: { index: false, follow: true } };
 
   // fetch data
   const regionLabel = JOB.region?.length ? JOB.region.join(", ") : "Anywhere in the world";
   const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(JOB.title)}&type=${encodeURIComponent(
     regionLabel,
-  )}&company=${encodeURIComponent(JOB.company.name)}`;
+  )}&company=${encodeURIComponent(JOB.company.name)}${JOB.company.logo ? `&logo=${encodeURIComponent(JOB.company.logo)}` : ""}`;
 
   const keywordText = JOB.slug.split("-").slice(0, -1);
   const title = `${JOB.title} at ${JOB.company.name} (Remote) | Remote Worldwide`;
@@ -82,11 +76,22 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     alternates: {
       canonical: absoluteUrl(`/jobs/${JOB.slug}`),
     },
+    // An unpublished or expired posting stays up for people who follow an old link, but
+    // leaves the index (and Google's job results) the same day its markup goes.
+    ...(isJobLive(JOB) ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
       images: imageUrl,
       title,
       description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
       url: absoluteUrl(`/jobs/${JOB.slug}`),
+    },
+    // Without a twitter block here, the root layout's is inherited whole, image included,
+    // so X, Slack and Discord (they read twitter:image) showed the bare /api/og/job logo card.
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
+      images: [imageUrl],
     },
     keywords: ["Remoteworldwide", ...keywordText],
   };
@@ -96,7 +101,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const jobSlug = decodeURIComponent((await params).id);
   const JOB = await fetchJob(jobSlug);
 
-  if (!JOB) return <NotFound buttonType="back" title="Job" />;
+  if (!JOB) notFound();
   const userSession = await auth();
 
   const { company: companyDetails, ..._jobDetails } = JOB!;
@@ -119,7 +124,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   return (
     <>
-      {JOB.isActive ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(jobPostingJsonLd(JOB)) }} /> : null}
+      {isJobLive(JOB) ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(jobPostingJsonLd(JOB)) }} /> : null}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbs) }} />
       <OneJobClient Job={JOB} hasUserBookmarked={hasUserBookmarked} />
     </>
