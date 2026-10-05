@@ -10,15 +10,12 @@ import type {
   AtsKeyword,
   AtsMetric,
   AtsResumeRow,
-  BoardRow,
   ChecklistItem,
   CoachMessage,
   CoachPlanItem,
   CoachSession,
   CoverLetterContent,
-  FeedItem,
   JdContent,
-  PodGoal,
   QaItem,
   ResumeContent,
   TrackerCard,
@@ -260,78 +257,6 @@ export const APPS: Application[] = [
         a: "Usage data showed 60% of users abandoned a multi-step form at step 3; I collapsed it to a single screen and drop-off fell to 9%.",
       },
     ],
-  },
-];
-
-// ---------------------------------------------------------------------------
-// FEED — pod activity feed
-// ---------------------------------------------------------------------------
-
-export const FEED: FeedItem[] = [
-  { id: "1", text: "Someone in your pod landed an interview", time: "2h ago", n: 3, hot: true },
-  { id: "2", text: "Chidi applied to 3 new roles today", time: "4h ago", n: 3 },
-  { id: "3", text: "Funmi hit a 20-day application streak", time: "yesterday", n: 20 },
-  { id: "4", text: "Priya got a referral into a Series B startup", time: "2 days ago", n: 1 },
-];
-
-// ---------------------------------------------------------------------------
-// BOARD — pod leaderboard (7 rows, Amara is rank 2)
-// ---------------------------------------------------------------------------
-
-export const BOARD: BoardRow[] = [
-  { rank: 1, name: "Priya Sharma", streak: 15, apps: 14 },
-  { rank: 2, name: "You", streak: 12, apps: 11, me: true },
-  { rank: 3, name: "Chidi Nwosu", streak: 9, apps: 10 },
-  { rank: 4, name: "Funmi Adeyemi", streak: 20, apps: 8 },
-  { rank: 5, name: "Marcus Lee", streak: 6, apps: 7 },
-  { rank: 6, name: "Ines Costa", streak: 4, apps: 6 },
-  { rank: 7, name: "Daniel Osei", streak: 2, apps: 4 },
-];
-
-// ---------------------------------------------------------------------------
-// POD_GOALS — pod-wide goals with member voting (Your pod screen)
-// ---------------------------------------------------------------------------
-
-export const POD_GOALS: PodGoal[] = [
-  {
-    id: "goal-land-job",
-    kind: "job-win",
-    label: "Someone in the pod lands a job",
-    detail: "Every pod carries this by default — it can't be voted out.",
-    target: 1,
-    current: 0,
-    unit: "offer this quarter",
-    protected: true,
-    votes: [],
-    status: "active",
-  },
-  {
-    id: "goal-daily-apps",
-    kind: "applications",
-    label: "10 applications a day, together",
-    target: 10,
-    current: 6,
-    unit: "applications today",
-    protected: false,
-    votes: [],
-    status: "active",
-  },
-  {
-    id: "goal-warm-referrals",
-    kind: "referrals",
-    label: "Land 3 warm referrals this week",
-    target: 3,
-    current: 0,
-    unit: "referrals this week",
-    protected: false,
-    proposedBy: "Funmi Adeyemi",
-    votes: [
-      { memberName: "Priya Sharma", choice: "for" },
-      { memberName: "Chidi Nwosu", choice: "for" },
-      { memberName: "Ines Costa", choice: "for" },
-    ],
-    status: "voting-add",
-    proposedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
 

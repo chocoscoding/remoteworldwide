@@ -2,10 +2,8 @@
 
 // The live pod. Everything here comes from /api/pod/overview — no mock data.
 //
-// It renders less than /dashboard/pod/demo does, and that is the point: the
-// demo is a fully-populated walkthrough, this shows what a real pod actually
-// has. Panels that would be empty for a new pod say so rather than being
-// filled with plausible numbers.
+// It shows what a real pod actually has: panels that would be empty for a new
+// pod say so rather than being filled with plausible numbers.
 
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -139,7 +137,9 @@ const PodClient: FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
-      <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
+      {/* Wraps on a phone: the title row, then the actions under it, so nothing is pushed off
+          screen. From md up it is the one 64px bar every dashboard screen has. */}
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-black/10 bg-white/85 px-4 py-3 backdrop-blur-sm md:h-16 md:flex-nowrap md:px-8 md:py-0">
         <div className="flex min-w-0 items-center gap-3">
           <h1 className="whitespace-nowrap text-[17px] font-bold text-primary">Your pod</h1>
           {/* The pod's own name, where the matching blurb used to be. `criteria` still explains how
@@ -173,26 +173,32 @@ const PodClient: FC = () => {
         </div>
         {/* Every action here acts on a pod, so out of one the bar holds only
             the bell rather than offering things that would have nowhere to land. */}
-        <div className="flex flex-none items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:flex-none md:flex-nowrap">
           {inPod && (
             <>
+              {/* Below sm, Invite and Mute are icons with their names for screen readers. */}
               <StickerButton
                 variant="outline"
                 size="md"
                 onClick={() => setInviteOpen(true)}
                 disabled={seatsLeft === 0}
-                title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}>
+                aria-label="Invite"
+                title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}
+                className="px-2.5 sm:px-4">
                 <UserPlus className="h-4 w-4" />
-                Invite
+                <span className="hidden sm:inline">Invite</span>
               </StickerButton>
               <StickerButton
                 variant="outline"
                 size="md"
                 onClick={toggleMute}
                 disabled={busy}
-                title={muted ? "You'll still hear about your own membership" : "Silence this pod's activity"}>
+                aria-label="Mute"
+                aria-pressed={muted}
+                title={muted ? "You'll still hear about your own membership" : "Silence this pod's activity"}
+                className="px-2.5 sm:px-4">
                 {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-                {muted ? "Muted" : "Mute"}
+                <span className="hidden sm:inline">{muted ? "Muted" : "Mute"}</span>
               </StickerButton>
               {/* An interview or offer off the tracker, to this pod and beyond. */}
               <StickerButton variant="outline" size="md" onClick={() => setShareWinOpen(true)}>
@@ -217,7 +223,7 @@ const PodClient: FC = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1180px] px-8 py-7 pb-14">
+      <main className="mx-auto max-w-[1180px] px-4 py-7 pb-14 md:px-8">
         {!inPod || !pod ? (
           <PodEmptyState
             capacity={capacity}
@@ -250,8 +256,10 @@ const PodClient: FC = () => {
               <DashCard className="p-6">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[15px] font-bold text-primary">Today&apos;s goals</p>
-                    <p className="text-xs text-black/60">What the pod is working toward — do your part where the work lives.</p>
+                    <p className="text-[15px] font-bold text-primary">Pod goals</p>
+                    <p className="text-xs text-black/60">
+                      Application goals reset each day. The others stay until the pod finishes them.
+                    </p>
                   </div>
                   <StickerButton variant="outline" size="sm" onClick={() => setManageOpen(true)}>
                     <Settings2 className="h-3.5 w-3.5" />

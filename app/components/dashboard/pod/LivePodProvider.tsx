@@ -2,15 +2,13 @@
 
 // The pod context, backed by the API.
 //
-// It supplies the exact shape `PodProvider` does, and it is mounted *inside*
-// the shell on /dashboard/pod. `useContext` resolves to the nearest provider,
-// so `usePod()` reads live data on that route and the mock everywhere else —
-// including /dashboard/pod/demo, which simply doesn't mount this. That is what
-// lets InvitePodDialog, JoinPodDialog and ManageGoalsDialog work, unchanged, in
-// both trees.
+// It supplies the shared `PodCtx` shape (`./PodProvider`) and is mounted by
+// /dashboard/pod alone, so `usePod()` in InvitePodDialog, JoinPodDialog,
+// ManageGoalsDialog and the rest reads live data there. Nowhere else in the
+// dashboard provides the context.
 //
-// The mock's context is re-exported through `usePod`, so nothing imports from
-// here except the live page.
+// The dialogs read it through `usePod`, so nothing imports from here except the
+// live page.
 
 import { createContext, useContext, type FC, type ReactNode } from "react";
 import { usePodQuery } from "@/hooks/queries/usePodQuery";

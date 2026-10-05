@@ -10,7 +10,7 @@
 // now: the backend's append-only `activity_events` log records each action in
 // the same request that writes its artifact, and derives the streak from it
 // (remoteworldwidebackend/src/types/streak.ts). This module keeps the action
-// registry the dashboard renders from, the habits, dedupe and pod quorum.
+// registry the dashboard renders from, the habits and dedupe.
 
 import { addDays, fromDayKey } from "./streak";
 import type { StreakDay, TrackerColumnId } from "./types";
@@ -264,31 +264,3 @@ export function medianOf(values: number[]): number {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
 }
-
-
-// ---------------------------------------------------------------------------
-// Pod streaks (P2)
-// ---------------------------------------------------------------------------
-
-/**
- * Share of active members who must log for the pod's day to count.
- *
- * Not 100%: one person's bad day shouldn't cost six other people their streak,
- * and a threshold nobody can hold is a threshold everybody stops trying for.
- * 60% means the pod carries you sometimes and you carry it sometimes, which is
- * the entire point of a pod.
- */
-export const POD_QUORUM = 0.6;
-
-/** How many members must log today for the pod day to count. */
-export function podQuorumCount(activeMembers: number): number {
-  return Math.ceil(activeMembers * POD_QUORUM);
-}
-
-/** Whether the pod's day is logged. */
-export function podDayLogged(loggedMembers: number, activeMembers: number): boolean {
-  return activeMembers > 0 && loggedMembers >= podQuorumCount(activeMembers);
-}
-
-/** One nudge per member per day — a nudge you can spam is harassment. */
-export const NUDGE_LIMIT_PER_MEMBER_PER_DAY = 1;

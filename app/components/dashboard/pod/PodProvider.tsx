@@ -1,21 +1,15 @@
 "use client";
 
-// Pod state, lifted out of the pod page so the rest of the dashboard can
-// reach it: the win-log modal auto-shares a landed job here, the tracker's
-// timeline dialog can push a milestone here, and the pod screen renders
-// whatever has accumulated. Page-local state made that impossible — the
-// whole point of "add this to your pod" is that it works from anywhere.
+// The pod context's shape, shared by the pod screen's dialogs.
+//
+// `LivePodProvider` (mounted by /dashboard/pod) is the only provider: it backs
+// this context with the API, so InvitePodDialog, JoinPodDialog, ManageGoalsDialog
+// and the rest read `usePod()` without knowing where the data comes from. Pod
+// posts made from elsewhere in the dashboard (a landed job, a tracker step) go
+// to the API directly through the pod mutations instead.
 
-import { createContext, useContext, useState, type FC, type ReactNode } from "react";
-import { toast } from "sonner";
-import { BOARD, FEED, POD_GOALS } from "@/app/lib/dashboard/mock-data";
-import {
-  POD_CAPACITY,
-  extractInviteCode,
-  generateInviteCode,
-  inviteUrl,
-  type JoinResult,
-} from "@/app/lib/dashboard/pod-invite";
+import { createContext, useContext } from "react";
+import type { JoinResult } from "@/app/lib/dashboard/pod-invite";
 import type { PodGoal, PodGoalKind } from "@/app/lib/dashboard/types";
 import type { WinRecord } from "@/app/lib/dashboard/win";
 
@@ -94,200 +88,12 @@ export interface PodContextValue {
   recordJobWin: (win: WinRecord) => void;
 }
 
-// Exported so LivePodProvider can supply the same context on /dashboard/pod.
-// `useContext` takes the nearest provider, so the dialogs read live data there
-// and the mock everywhere else without knowing either exists.
+// Supplied by LivePodProvider on /dashboard/pod, the only place the pod's
+// dialogs render.
 export const PodCtx = createContext<PodContextValue | null>(null);
-
-let seq = 0;
-const nextId = () => `pod-shared-${(seq += 1)}`;
-
-/**
- * A seeded code that always answers "that pod is full" — the capacity rule is
- * the whole point of the invite, so the state it produces has to be reachable
- * in the mock rather than only in theory. Spelled from the code alphabet, so
- * it passes the format check and fails on the rule being demonstrated.
- */
-export const FULL_POD_CODE = "PACKEDPACKEDPACKEDPACKEDPACKED";
-
-const PodProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [inPod, setInPod] = useState(true);
-  // Stable for the life of the session: an invite you copied a minute ago must
-  // still work. A real pod carries its code in the record.
-  const [inviteCode] = useState(generateInviteCode);
-  const [podName, setPodName] = useState("Night Shift");
-  const [muted, setMuted] = useState(false);
-  // The mock's founder owns their pod, so the owner-only affordances are
-  // reachable in the walkthrough rather than only against a real backend.
-  const [isOwner, setIsOwner] = useState(true);
-
-  const [moving, setMoving] = useState<PodMovingItem[]>(() =>
-    FEED.map((f) => ({ id: f.id, text: f.text, time: f.time, fires: f.n, firedByMe: false, hot: f.hot }))
-  );
-  const [goals, setGoals] = useState<PodGoal[]>(POD_GOALS);
-
-  const voteMajority = Math.floor(BOARD.length / 2) + 1;
-
-  // BOARD carries you as a row; out of the pod, the pod is everyone else.
-  const memberCount = inPod ? BOARD.length : BOARD.filter((row) => !row.me).length;
-  const seatsLeft = Math.max(0, POD_CAPACITY - memberCount);
-
-  function joinByMatching() {
-    setInPod(true);
-    toast.success("You're in a pod", { description: "Product Designers, 3–5 yrs, GMT±2 — matched on how you're searching." });
-  }
-
-  function joinWithCode(input: string): JoinResult {
-    if (inPod) return "already-in-pod";
-    const code = extractInviteCode(input);
-    if (!code) return "invalid";
-    if (code === FULL_POD_CODE) return "full";
-    setInPod(true);
-    // You joined someone else's pod, so it is not yours.
-    setIsOwner(false);
-    return "joined";
-  }
-
-  function createPod(name: string) {
-    setInPod(true);
-    setIsOwner(true);
-    setPodName(name);
-    toast.success(`${name} is open`, { description: "Invite someone — a pod of one is just a to-do list." });
-  }
-
-  function renamePod(name: string) {
-    setPodName(name);
-  }
-
-  function toggleMute() {
-    setMuted((value) => {
-      toast.success(value ? "Pod unmuted" : "Pod muted", {
-        description: value ? "You'll hear about your pod again." : "You'll still hear about your own membership.",
-      });
-      return !value;
-    });
-  }
-
-  function leavePod() {
-    setInPod(false);
-    toast("You left the pod", { description: "Your streak and board are untouched. Rejoin any time." });
-  }
-
-  function shareToPod(text: string, opts?: { hot?: boolean }) {
-    setMoving((prev) => [{ id: nextId(), text, time: "Just now", fires: 0, firedByMe: false, hot: opts?.hot, mine: true }, ...prev]);
-  }
-
-  function toggleFire(id: string) {
-    setMoving((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, firedByMe: !item.firedByMe, fires: item.fires + (item.firedByMe ? -1 : 1) }
-          : item
-      )
-    );
-  }
-
-  function suggestGoal(input: SuggestedGoal) {
-    setGoals((prev) => [
-      ...prev,
-      {
-        id: `goal-custom-${prev.length}`,
-        kind: input.kind,
-        label: input.label,
-        target: input.target,
-        current: 0,
-        unit: input.unit,
-        protected: false,
-        proposedBy: "You",
-        votes: [],
-        status: "voting-add",
-        proposedAt: new Date().toISOString(),
-      },
-    ]);
-    toast.success("Put to a pod vote", { description: "Majority wins — the window runs for 7 days." });
-  }
-
-  function suggestRemoval(goalId: string) {
-    setGoals((prev) =>
-      prev.map((g) =>
-        g.id === goalId ? { ...g, status: "voting-remove", proposedBy: "You", votes: [], proposedAt: new Date().toISOString() } : g
-      )
-    );
-  }
-
-  /**
-   * Casts "You"'s vote. A "for" majority resolves immediately (activates an
-   * add, deletes a removal target); "against" votes only accumulate — a
-   * proposal that never wins expires on its own 7-day window. Reads `goals`
-   * from the closure so the toast never lives inside a setState updater.
-   */
-  function castVote(goalId: string, choice: "for" | "against") {
-    const goal = goals.find((g) => g.id === goalId);
-    if (!goal || goal.votes.some((v) => v.memberName === "You")) return;
-
-    const votes = [...goal.votes, { memberName: "You" as const, choice }];
-    const forCount = votes.filter((v) => v.choice === "for").length;
-
-    if (forCount >= voteMajority) {
-      if (goal.status === "voting-add") {
-        setGoals((prev) => prev.map((g) => (g.id === goalId ? { ...g, status: "active", votes } : g)));
-        toast.success(`"${goal.label}" is now a pod goal.`);
-      } else {
-        setGoals((prev) => prev.filter((g) => g.id !== goalId));
-        toast.success(`"${goal.label}" was voted out.`);
-      }
-      return;
-    }
-
-    setGoals((prev) => prev.map((g) => (g.id === goalId ? { ...g, votes } : g)));
-  }
-
-  function recordJobWin(win: WinRecord) {
-    shareToPod(`You landed ${win.facts.role} at ${win.facts.company} 🎉`, { hot: true });
-    setGoals((prev) =>
-      prev.map((g) => (g.kind === "job-win" && g.status === "active" ? { ...g, current: Math.min(g.target, g.current + 1) } : g))
-    );
-    toast.success("Your pod knows", { description: "Your win is on What's moving and counts toward the pod's goal." });
-  }
-
-  return (
-    <PodCtx.Provider
-      value={{
-        inPod,
-        capacity: POD_CAPACITY,
-        memberCount,
-        seatsLeft,
-        inviteCode,
-        podName,
-        isOwner,
-        soleMember: memberCount <= 1,
-        muted,
-        invitePath: (origin: string) => inviteUrl(inviteCode, origin),
-        joinByMatching,
-        createPod,
-        renamePod,
-        toggleMute,
-        joinWithCode,
-        leavePod,
-        moving,
-        shareToPod,
-        toggleFire,
-        goals,
-        voteMajority,
-        suggestGoal,
-        suggestRemoval,
-        castVote,
-        recordJobWin,
-      }}>
-      {children}
-    </PodCtx.Provider>
-  );
-};
-
-export default PodProvider;
 
 export function usePod(): PodContextValue {
   const ctx = useContext(PodCtx);
-  if (!ctx) throw new Error("usePod must be used inside a PodProvider");
+  if (!ctx) throw new Error("usePod must be used inside LivePodProvider");
   return ctx;
 }

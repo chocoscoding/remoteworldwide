@@ -157,8 +157,8 @@ const NEXT_STEP_HINT: Record<TrackerColumnId, string> = {
  * card+column from the call site so reopening on another job (or after a
  * status change) offers a fresh share.
  *
- * Posts to the pod API directly: `usePod()` here reads the shell's mock pod
- * (the live one is mounted only on /dashboard/pod), which would post nowhere.
+ * Posts to the pod API directly: the pod context (`usePod()`) is mounted only
+ * on /dashboard/pod, so there is none to reach from the tracker.
  * "On your pod" shows only once the server stored it; the toast, and the
  * refusal when there is no pod, come from useSharePost. The feed prints no
  * author for the others, so the post carries the profile's first name.

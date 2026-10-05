@@ -18,7 +18,6 @@ import { ActivityProvider } from "./activity/ActivityProvider";
 import { AnswersProvider } from "./answers/AnswersProvider";
 import { DocumentsProvider } from "./documents/DocumentsProvider";
 import { NetworkProvider } from "./network/NetworkProvider";
-import PodProvider from "./pod/PodProvider";
 import WinProvider from "./win/WinProvider";
 import { SettingsProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/SettingsProvider";
 import { BillingProvider } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
@@ -48,9 +47,9 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
       <NetworkProvider>
       <AnswersProvider>
       <DocumentsProvider>
-      {/* PodProvider before WinProvider: logging a win pushes onto the pod
-          feed and its goals, so the win flow reads pod context. */}
-      <PodProvider>
+      {/* No pod provider here: the pod's context is LivePodProvider, mounted by
+          /dashboard/pod alone. A landed job or a tracker step posts to the pod
+          API directly. */}
       {/* JobPickerProvider wraps WinProvider and TrackerProvider because both
           open the picker from inside themselves: the win log asks which job
           won, the tracker's add flow asks which job to add. Any lower and
@@ -85,7 +84,6 @@ const DashboardShell: FC<{ settings: Settings; billing: BillingOverview; childre
       </TrackerProvider>
       </WinProvider>
       </JobPickerProvider>
-      </PodProvider>
       </DocumentsProvider>
       </AnswersProvider>
       </NetworkProvider>

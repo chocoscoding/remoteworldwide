@@ -38,16 +38,18 @@ const PodLocked: FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
-      <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-black/10 bg-white/85 px-4 py-3 backdrop-blur-sm md:h-16 md:flex-nowrap md:px-8 md:py-0">
         <div className="flex min-w-0 items-center gap-3">
           <h1 className="whitespace-nowrap text-[17px] font-bold text-primary">Your pod</h1>
           <PlanChip plan="basic" />
         </div>
-        <NotificationBell />
+        <div className="flex flex-wrap items-center gap-2">
+          <NotificationBell />
+        </div>
       </header>
 
-      <main className="mx-auto max-w-[1180px] px-8 py-7 pb-14">
-        <DashCard className="mx-auto mt-12 max-w-md px-10 pb-10 pt-4 text-center" data-pod-locked>
+      <main className="mx-auto max-w-[1180px] px-4 py-7 pb-14 md:px-8">
+        <DashCard className="mx-auto mt-12 max-w-md px-6 pb-10 pt-4 text-center sm:px-10" data-pod-locked>
           <EmptyStateLottie src={LOTTIE} size={180} />
           <p className="text-lg font-bold text-primary">Pods come with Basic</p>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-black/50">

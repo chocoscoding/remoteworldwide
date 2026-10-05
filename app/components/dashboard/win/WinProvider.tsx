@@ -12,8 +12,7 @@
 //
 // The pod post goes to the API directly (useRecordJobWin), not through
 // `usePod()`: this provider sits in the shell, above the pod screen's
-// LivePodProvider, so the context it can reach is the walkthrough's mock —
-// which would post nowhere and toast that the pod knows.
+// LivePodProvider, so there is no pod context it could reach.
 //
 // The pod is on Basic and up (owner, 2026-10-01). Below it the win is still
 // logged and celebrated, and the streak still retires; only the pod post is
