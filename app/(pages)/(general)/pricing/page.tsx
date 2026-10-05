@@ -23,12 +23,13 @@ import {
 // The catalogue is cached for an hour inside fetchCatalogue; the page follows it.
 export const revalidate = 3600;
 
-const TITLE = "Pricing - Remote Worldwide";
+// The page title takes the root template ("%s | Remote Worldwide"); social cards get the full name.
+const TITLE = "Pricing | Remote Worldwide";
 const DESCRIPTION =
   "Simple monthly or yearly plans for Remote Worldwide's AI job-search toolkit: resume tailoring, ATS scans, cover letters and voice mock interviews. Cancel anytime.";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: "Pricing",
   description: DESCRIPTION,
   alternates: { canonical: "/pricing" },
   openGraph: { type: "website", url: absoluteUrl("/pricing"), title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },

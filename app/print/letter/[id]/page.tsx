@@ -34,7 +34,8 @@ import { PRINT_TOKEN_HEADER, verifyPrintToken } from "@/app/lib/print/token";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Cover letter",
+  // Absolute: the print title becomes the PDF's own title, so the site name stays off it.
+  title: { absolute: "Cover letter" },
   robots: { index: false, follow: false, nocache: true },
   referrer: "no-referrer",
 };

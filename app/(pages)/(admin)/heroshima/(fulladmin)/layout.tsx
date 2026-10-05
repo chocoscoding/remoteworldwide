@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { notFound } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "ADMIN - Worldwide Remote",
+  title: "Admin",
   description: "Admin of worldwide remote jobs",
 };
 

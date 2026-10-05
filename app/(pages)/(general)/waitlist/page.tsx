@@ -21,12 +21,13 @@ import CheckChip from "@/app/components/marketing/CheckChip";
 import Eyebrow from "@/app/components/marketing/Eyebrow";
 import FaqList from "@/app/components/pricing/FaqList";
 
-const TITLE = "Join the waitlist - Remote Worldwide";
+// The page title takes the root template ("%s | Remote Worldwide"); social cards get the full name.
+const TITLE = "Join the waitlist | Remote Worldwide";
 const DESCRIPTION =
   "Get early access to Remote Worldwide's AI job-search toolkit: tailor your resume to every posting, rehearse interviews out loud and track every application.";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: "Join the waitlist",
   description: DESCRIPTION,
   alternates: { canonical: "/waitlist" },
   openGraph: {

@@ -23,7 +23,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const title = `${category.name} — ${SITE_NAME} Blog`;
   const description = `${category.tagline} Practical ${category.name.toLowerCase()} guides for people applying to remote roles.`;
   return {
-    title,
+    // Already carries the site name, so it skips the root template rather than doubling it.
+    title: { absolute: title },
     description,
     alternates: { canonical: absoluteUrl(`/blogs/category/${category.slug}`) },
     robots: page > 1 ? { index: false, follow: true } : undefined,

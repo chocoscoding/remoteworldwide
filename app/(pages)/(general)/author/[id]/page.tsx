@@ -17,7 +17,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const description = author.about ? `${author.about.slice(0, 155)}${author.about.length > 155 ? "…" : ""}` : `${count} ${count === 1 ? "post" : "posts"} by ${author.name} on remote work and careers.`;
   const url = absoluteUrl(`/author/${author.slug}`);
   return {
-    title,
+    // Already carries the site name, so it skips the root template rather than doubling it.
+    title: { absolute: title },
     description,
     alternates: { canonical: url },
     openGraph: { type: "profile", title, description, url, siteName: SITE_NAME, images: [{ url: author.profileImage, width: 1200, height: 630, alt: author.name }] },

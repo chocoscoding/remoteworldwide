@@ -9,15 +9,17 @@ const JURISDICTION = "the Federal Republic of Nigeria";
 const COURTS = "the courts of Lagos State, Nigeria";
 const LAST_UPDATED = "8 September 2026";
 
-const TITLE = `Terms and Conditions — ${SITE_NAME}`;
+// The page title takes the root template ("%s | Remote Worldwide"); social cards don't, so they get the full name.
+const TITLE = "Terms and Conditions";
+const SHARE_TITLE = `${TITLE} | ${SITE_NAME}`;
 const DESCRIPTION = `The terms you agree to when you use ${SITE_NAME}: the job board, the career tools, and the emails we send.`;
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: absoluteUrl("/terms") },
-  openGraph: { type: "website", title: TITLE, description: DESCRIPTION, url: absoluteUrl("/terms"), siteName: SITE_NAME },
-  twitter: { card: "summary", title: TITLE, description: DESCRIPTION },
+  openGraph: { type: "website", title: SHARE_TITLE, description: DESCRIPTION, url: absoluteUrl("/terms"), siteName: SITE_NAME },
+  twitter: { card: "summary", title: SHARE_TITLE, description: DESCRIPTION },
 };
 
 const Mail = () => (

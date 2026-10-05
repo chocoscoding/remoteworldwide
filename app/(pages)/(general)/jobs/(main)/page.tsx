@@ -16,7 +16,8 @@ const DESCRIPTION =
   "Browse vetted remote jobs you can do from anywhere: engineering, design, marketing, sales and more. Filter by role, seniority and region, and apply in minutes.";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  // Already carries the site name, so it skips the root template rather than doubling it.
+  title: { absolute: TITLE },
   description: DESCRIPTION,
   alternates: { canonical: "/jobs" },
   openGraph: { type: "website", url: absoluteUrl("/jobs"), title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },

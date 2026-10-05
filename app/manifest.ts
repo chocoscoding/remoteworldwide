@@ -1,0 +1,18 @@
+import type { MetadataRoute } from "next";
+
+// The web app manifest, built from the icons already in /public.
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "Remote Worldwide",
+    short_name: "Remote Worldwide",
+    description: "Get worldwide remote jobs and get hired in no time!",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#ffffff",
+    theme_color: "#222325",
+    icons: [
+      { src: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
+      { src: "/android-chrome-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+  };
+}

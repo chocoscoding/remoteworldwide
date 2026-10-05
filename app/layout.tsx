@@ -23,9 +23,17 @@ const font = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Remote Worldwide",
+  // A page's own title gets the site name after it; one without keeps the plain name.
+  title: { default: "Remote Worldwide", template: "%s | Remote Worldwide" },
   description: "Get worldwide remote jobs and get hired in no time! - With Remote Worldwide",
-  icons: "/favicon.ico",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   metadataBase: new URL(SITE_URL),
   // No canonical here: every page without its own inherited "/", which told Google
   // those pages were copies of the homepage. The homepage sets "/" itself.

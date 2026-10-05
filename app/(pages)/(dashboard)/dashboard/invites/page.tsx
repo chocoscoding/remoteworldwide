@@ -2,6 +2,8 @@ import InvitesClient from "./Client";
 import { getInvites } from "@/libs/invites";
 import { absoluteUrl } from "@/app/lib/seo";
 
+export const metadata = { title: "Invite friends", robots: { index: false, follow: false } };
+
 // Auth is already gated in app/(pages)/(dashboard)/dashboard/layout.tsx.
 //
 // The page is the paginator: the list is read straight off the URL so a page

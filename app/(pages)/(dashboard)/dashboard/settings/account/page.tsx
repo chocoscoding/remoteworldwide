@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import AccountClient from "./Client";
 
+export const metadata = { title: "Account settings", robots: { index: false, follow: false } };
+
 // Auth is gated in app/(pages)/(dashboard)/dashboard/layout.tsx.
 export default async function SettingsAccountPage() {
   // Read here rather than in the client: the session is already resolved server-side, and the alternative

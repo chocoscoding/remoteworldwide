@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { safeNext } from "@/app/lib/next-url";
 
+export const metadata = { title: "Log in" };
+
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const next = safeNext((await searchParams).next);
   const authenticated = await auth();

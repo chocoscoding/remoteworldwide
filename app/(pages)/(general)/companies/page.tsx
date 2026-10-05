@@ -5,7 +5,8 @@ import { Metadata } from "next";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Companies – Remote companies hiring now | Remote Worldwide",
+  // Already carries the site name, so it skips the root template rather than doubling it.
+  title: { absolute: "Companies – Remote companies hiring now | Remote Worldwide" },
   description:
     "Explore companies hiring for remote positions worldwide. Discover remote job opportunities from top companies across various industries and locations.",
   alternates: { canonical: "/companies" },

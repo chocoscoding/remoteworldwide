@@ -76,7 +76,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const title = `${JOB.title} at ${JOB.company.name} (Remote) | Remote Worldwide`;
   const description = `${JOB.company.name} is hiring a remote ${JOB.title}.${JOB.seniority ? ` Seniority: ${JOB.seniority}.` : ""} Location: ${regionLabel}. Read the full job description and apply on Remote Worldwide.`;
   return {
-    title,
+    // Already carries the site name, so it skips the root template rather than doubling it.
+    title: { absolute: title },
     description,
     alternates: {
       canonical: absoluteUrl(`/jobs/${JOB.slug}`),

@@ -5,7 +5,7 @@ import { sttLabAvailable } from "@/app/lib/stt-lab";
 import SttLabClient from "./Client";
 
 export const metadata: Metadata = {
-  title: "STT lab - ADMIN - Worldwide Remote",
+  title: "STT lab - Admin",
 };
 
 // ADMIN role is enforced by the (fulladmin) layout, which calls notFound() for

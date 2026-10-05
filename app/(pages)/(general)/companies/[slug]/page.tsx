@@ -65,7 +65,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }${jobCount ? `&jobs=${jobCount}` : ""}`;
 
   return {
-    title,
+    // Already carries the site name, so it skips the root template rather than doubling it.
+    title: { absolute: title },
     description,
     alternates: { canonical: absoluteUrl(`/companies/${encodeURIComponent(companyData.slug)}`) },
     openGraph: {

@@ -20,7 +20,8 @@ const DESCRIPTION = "Practical guides on resumes, interviews and the remote job 
 export async function generateMetadata({ searchParams }: Search): Promise<Metadata> {
   const page = Math.max(1, Number.parseInt((await searchParams).page ?? "1", 10) || 1);
   return {
-    title: TITLE,
+    // Already carries the site name, so it skips the root template rather than doubling it.
+    title: { absolute: TITLE },
     description: DESCRIPTION,
     alternates: { canonical: absoluteUrl("/blogs") },
     robots: page > 1 ? { index: false, follow: true } : undefined,
