@@ -275,7 +275,7 @@ const QuestionsClient: FC = () => {
             <p className="mb-2 text-sm font-bold text-primary">How this library is used</p>
             <p className="mb-3 text-sm leading-relaxed text-black/60">
               Whenever we draft answers for an application, everything saved here comes first, word for word. Only a question you
-              haven&apos;t answered gets a drafted answer — it&apos;s added here marked &ldquo;AI answered&rdquo; so you can check it, and
+              haven&apos;t answered gets a drafted answer. It&apos;s added here marked &ldquo;AI answered&rdquo; so you can check it, and
               editing it makes it yours.
             </p>
             <ul className="flex flex-col gap-1.5 text-xs text-black/55">
@@ -284,7 +284,7 @@ const QuestionsClient: FC = () => {
                 • Swaps <code className="rounded bg-[#f0f0ea] px-1 font-mono text-[11px]">{"{company}"}</code> for whoever you&apos;re
                 applying to
               </li>
-              <li>• Never guesses demographic questions — only an answer you&apos;ve saved is used</li>
+              <li>• Never guesses demographic questions. Only an answer you&apos;ve saved is used</li>
               <li>{extensionBullet}</li>
             </ul>
           </DashCard>
@@ -360,7 +360,7 @@ const QuestionsClient: FC = () => {
               <DashEmptyState
                 lottieSrc="/Lottie/neobrutalism/Copy_Clipboard_lottie.json"
                 title="No saved answers yet"
-                body="Answer a question once — salary, notice period, why you're moving — and it's reused on every application after."
+                body="Answer a question once (salary, notice period, why you're moving) and it's reused on every application after."
                 ctaLabel="Add an answer"
                 onCta={() => setAddOpen(true)}
               />
@@ -424,7 +424,7 @@ const QuestionsClient: FC = () => {
               <DashEmptyState
                 lottieSrc="/Lottie/neobrutalism/Copy_Clipboard_lottie.json"
                 title="No application answers yet"
-                body="When we fill answers for one of your applications, they're kept here under it — exactly what was sent, and when."
+                body="When we fill answers for one of your applications, they're kept here under it: exactly what was sent, and when."
               />
             ) : filteredApps.length === 0 ? (
               <DashEmptyState

@@ -265,7 +265,7 @@ const AtsResults: FC<AtsResultsProps> = ({
                   <p className="max-w-md text-[15px] leading-relaxed text-black/70">
                     {job
                       ? `How ${resume.name} matches this posting, against ${report.verdicts.length} ${report.verdicts.length === 1 ? "requirement" : "requirements"} read from the description.`
-                      : `How ${resume.name} reads on its own — structure, parseability, impact language and length. Add a job to score the match itself.`}
+                      : `How ${resume.name} reads on its own: structure, parseability, impact language and length. Add a job to score the match itself.`}
                   </p>
                   {lift > 0 && (
                     <p className="mt-2 max-w-md text-xs leading-relaxed text-black/45">
@@ -305,7 +305,7 @@ const AtsResults: FC<AtsResultsProps> = ({
                   {unmet.length === 1 ? "One gap to close" : `${unmet.length} gaps to close`}
                 </p>
                 <p className="mt-0.5 text-xs text-black/45">
-                  Read from the posting, heaviest first. Ticking one projects what closing it is worth — scan again to score it for real.
+                  Read from the posting, heaviest first. Ticking one projects what closing it is worth. Scan again to score it for real.
                 </p>
               </div>
               {unmet.map((verdict) => {
@@ -396,7 +396,7 @@ const AtsResults: FC<AtsResultsProps> = ({
                     ))}
                   </div>
                   <p className="border-t border-black/8 pt-3.5 text-xs leading-relaxed text-black/50">
-                    Solid means the scan found it in your resume. Dashed means it didn&apos;t — only add what&apos;s honestly true of
+                    Solid means the scan found it in your resume. Dashed means it didn&apos;t. Only add what&apos;s honestly true of
                     your work.
                   </p>
                 </div>
@@ -443,7 +443,7 @@ const AtsExplanation: FC<{ report: ScanReport; status: ScanStatus; unexplained: 
         {report.rewrites.length > 0 && (
           <div className="mt-5 border-t border-black/8 pt-4">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-black/35">
-              Suggested rewrites — your words, sharpened
+              Suggested rewrites: your words, sharpened
             </p>
             <div className="flex flex-col gap-3">
               {report.rewrites.map((rewrite) => (
@@ -487,7 +487,7 @@ const AtsExplanation: FC<{ report: ScanReport; status: ScanStatus; unexplained: 
 const PENDING_COPY: Partial<Record<ScanStatus, { title: string; detail: string }>> = {
   preparing: {
     title: "Reading your resume",
-    detail: "First scan of this file — we're parsing it so the scorer can work line by line. This only happens once.",
+    detail: "First scan of this file. We're parsing it so the scorer can work line by line. This only happens once.",
   },
   scoring: { title: "Scoring", detail: "Matching your resume against what the posting asks for." },
 };

@@ -145,7 +145,7 @@ const PickStep: FC<{ source: Source; onSource: (source: Source) => void; existin
       location: row.location ?? "",
       applicationId: row.id,
       savedJobId: row.savedJobId,
-      from: `Linked to your tracker: ${row.company} — ${row.role}`,
+      from: `Linked to your tracker: ${row.role} at ${row.company}`,
     });
   }
 
@@ -178,7 +178,7 @@ const PickStep: FC<{ source: Source; onSource: (source: Source) => void; existin
           key={row.id}
           mark={companyMark(row.company)}
           logo={row.companyLogo}
-          title={`${row.company} — ${row.role}`}
+          title={`${row.role} at ${row.company}`}
           sub={STATUS_LABEL[row.status] ?? ""}
           onClick={() => pickApplication(row)}
         />
@@ -195,7 +195,7 @@ const PickStep: FC<{ source: Source; onSource: (source: Source) => void; existin
         key={job.id}
         mark={companyMark(job.company ?? "?")}
         logo={job.companyLogo}
-        title={[job.company, job.role].filter(Boolean).join(" — ")}
+        title={[job.role, job.company].filter(Boolean).join(" at ")}
         sub={job.location ?? (job.description ? "Posting saved" : "")}
         onClick={() => onPick(savedJobSeed(job))}
       />
@@ -384,7 +384,7 @@ const TrackerNote: FC<{ preview: TrackerPreview }> = ({ preview }) => {
       case "move":
         return `Moves it from ${statusMeta(preview.from).label} to Interviewing on your tracker.`;
       case "closed":
-        return `It's marked ${statusMeta(preview.status).label} on your tracker, and stays that way — move it back there if they're interviewing you after all.`;
+        return `It's marked ${statusMeta(preview.status).label} on your tracker, and stays that way. Move it back there if they're interviewing you after all.`;
       case "unknown":
         return "Moves it to Interviewing on your tracker, unless it's already there, further along or closed.";
       default:
@@ -446,7 +446,7 @@ const DetailsStep: FC<{
           <BackLink onBack={onBack} />
           <DialogTitle className="text-lg font-bold text-primary">You already prep for this job</DialogTitle>
           <DialogDescription className="mt-1.5 text-sm text-black/55">
-            {[seed.company, seed.role].filter(Boolean).join(" — ")} has a prep track. Its rounds, questions and sessions are there.
+            {[seed.role, seed.company].filter(Boolean).join(" at ")} has a prep track. Its rounds, questions and sessions are there.
           </DialogDescription>
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-black/8 px-6 py-4">
@@ -567,7 +567,7 @@ const DetailsStep: FC<{
               onChange={(e) => setPosting(e.target.value)}
               maxLength={PREP_TRACK_LIMITS.jobDescriptionMax}
               rows={5}
-              placeholder="Paste the posting. Likely questions are written from it and your resume — you can add it later too."
+              placeholder="Paste the posting. Likely questions are written from it and your resume. You can add it later too."
               className="w-full resize-y rounded-lg border border-black/15 bg-[#fbfbf7] px-3 py-2 text-sm text-primary outline-none transition-colors focus:border-[#222325] placeholder:text-black/35"
             />
           </label>

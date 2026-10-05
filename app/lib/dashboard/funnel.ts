@@ -119,7 +119,7 @@ const pct = (n: number) => `${Math.round(n * 100)}%`;
  */
 export function diagnose(funnel: Funnel): string {
   const applied = funnel.stages.find((s) => s.id === "applied")?.reached ?? 0;
-  if (applied < 5) return "Not enough applications yet to see a pattern. Keep going — the shape shows up around ten.";
+  if (applied < 5) return "Not enough applications yet to see a pattern. Keep going, the shape shows up around ten.";
 
   const replied = funnel.stages.find((s) => s.id === "conversation")?.reached ?? 0;
   const interviewed = funnel.stages.find((s) => s.id === "interviewing")?.reached ?? 0;
@@ -130,7 +130,7 @@ export function diagnose(funnel: Funnel): string {
   if (replyRate < 0.15) {
     return `Only ${pct(replyRate)} of your applications get a reply${
       ghosted > 0 ? ` and ${ghosted} went silent entirely` : ""
-    }. That's a targeting and resume problem, not an interview one — it's the highest-value thing to fix.`;
+    }. That's a targeting and resume problem, not an interview one, and it's the highest-value thing to fix.`;
   }
 
   if (interviewed >= 3 && offered === 0) {
@@ -147,5 +147,5 @@ export function diagnose(funnel: Funnel): string {
 
   return `${pct(replyRate)} of your applications get a reply and ${pct(
     interviewed / applied,
-  )} reach an interview. That's a working funnel — volume is what moves it now.`;
+  )} reach an interview. That's a working funnel. Volume is what moves it now.`;
 }

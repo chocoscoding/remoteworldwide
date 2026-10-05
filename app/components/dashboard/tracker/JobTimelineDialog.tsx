@@ -144,11 +144,11 @@ const NextStep: FC<{ card: TrackerCard; columnId: TrackerColumnId; onStatus: (ca
 };
 
 const NEXT_STEP_HINT: Record<TrackerColumnId, string> = {
-  saved: "It's ready when you are — applying moves it along.",
+  saved: "It's ready when you are. Applying moves it along.",
   applied: "A week of silence is normal. A short nudge isn't pushy.",
   conversation: "A warm voice inside the company moves this faster than waiting.",
   interviewing: "A practice round before the real one is the highest-leverage hour here.",
-  offer: "Congratulations — log it and let your pod see.",
+  offer: "Congratulations! Log it and let your pod see.",
 };
 
 /**
@@ -176,7 +176,7 @@ const SharePodRow: FC<{ card: TrackerCard; columnId: TrackerColumnId }> = ({ car
   const milestone =
     columnId === "saved"
       ? `${who ? `${who} saved` : "Saved"} a role at ${card.company}`
-      : `${who ? `${who}: ` : ""}${card.company} — now ${COLUMN_LABELS[columnId]}`;
+      : `${who ? `${who}: ` : ""}${card.company}, now ${COLUMN_LABELS[columnId]}`;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 px-6 py-3">

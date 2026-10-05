@@ -68,7 +68,7 @@ const StreakPanel: FC<StreakPanelProps> = ({ open, onOpenChange }) => {
             <DialogDescription className="text-sm text-white/55 mb-5">
               {loggedToday
                 ? "Today is logged. Come back tomorrow to keep it going."
-                : "Today is still open — log one application to keep the streak."}
+                : "Today is still open. Log one application to keep the streak."}
             </DialogDescription>
 
             {/* Progress to the next rung */}

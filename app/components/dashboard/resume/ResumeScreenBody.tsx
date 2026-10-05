@@ -426,7 +426,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       return;
     }
     const paper = printPaperRef.current?.firstElementChild;
-    if (!(paper instanceof HTMLElement)) throw new Error("The resume preview isn't ready yet — try again in a moment.");
+    if (!(paper instanceof HTMLElement)) throw new Error("The resume preview isn't ready yet. Try again in a moment.");
     // The editor's "No … added yet." prompts are for the editor: a section
     // that holds only one is left out of the PDF, as are the empty-name hint
     // and the on-screen page-break label (the break itself stays).
@@ -625,7 +625,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
         const result = await runSuggestion("shorten", () => shortenToOnePage({ content: sent }));
         if (!result) return;
         if (result.removedWords === 0) {
-          landAiTool(id, "Already fits one page — nothing worth cutting.");
+          landAiTool(id, "Already fits one page. Nothing worth cutting.");
           return;
         }
         const dropped =
@@ -665,7 +665,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     setKeywordProposals(result.terms);
     landAiTool(
       "keywords",
-      `${result.terms.length} keyword${result.terms.length === 1 ? "" : "s"} from ${job.role} at ${job.company} — tick the ones to add to Skills.`,
+      `${result.terms.length} keyword${result.terms.length === 1 ? "" : "s"} from ${job.role} at ${job.company}. Tick the ones to add to Skills.`,
     );
   };
 

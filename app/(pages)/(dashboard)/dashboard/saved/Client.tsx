@@ -264,7 +264,7 @@ const SavedJobsClient: FC = () => {
             <DashEmptyState
               icon={Plus}
               title="No saved jobs yet"
-              body="Save a Remote Worldwide listing, a link or a pasted posting, and it lands here — ready for your resume, cover letter, ATS score and referrals."
+              body="Save a Remote Worldwide listing, a link or a pasted posting, and it lands here, ready for your resume, cover letter, ATS score and referrals."
               ctaLabel="Add a job"
               onCta={() => void addJob()}
             />
@@ -273,7 +273,7 @@ const SavedJobsClient: FC = () => {
           <>
             <p className="mb-3 text-xs text-black/55">
               {atCap
-                ? `Your ${SAVED_JOBS_SHOWN} most recently used${q ? " matches" : ""} — search to find the rest.`
+                ? `Your ${SAVED_JOBS_SHOWN} most recently used${q ? " matches" : ""}. Search to find the rest.`
                 : `${list.length} saved job${list.length === 1 ? "" : "s"}${q ? " match" : ""}, most recently used first.`}
             </p>
             <DashCard className="overflow-hidden p-0">

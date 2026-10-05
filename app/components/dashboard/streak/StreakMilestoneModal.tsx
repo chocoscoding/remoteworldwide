@@ -162,7 +162,7 @@ const StreakMilestoneModal: FC = () => {
             const next = nextMilestone(celebrating.days);
             return (
               <p className="mt-3 text-[11px] font-semibold text-black/45">
-                Next: {next.label} at {next.days} days — {next.days - celebrating.days} to go.
+                Next: {next.label} at {next.days} days, {next.days - celebrating.days} to go.
               </p>
             );
           })()}

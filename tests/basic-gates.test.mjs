@@ -137,7 +137,7 @@ describe("a stale page refused anyway", () => {
     assert.match(voice, /if \(error\.code === "plan_required"\) signalPlanLimit\(/);
     assert.match(voice, /if \(error instanceof BackendError && error\.code === "plan_required"\) return \{ kind: "plan" \};/);
     assert.ok(TALK_PROBLEM_KINDS.includes("plan"));
-    assert.equal(problemCopy({ kind: "plan" }), "Talking it through is on Basic and up — type instead");
+    assert.equal(problemCopy({ kind: "plan" }), "Talking it through is on Basic and up. Type instead");
     assert.equal(problemAction({ kind: "plan" }), null);
   });
 });

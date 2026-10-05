@@ -236,7 +236,7 @@ const ORB_STATE_BY_STAGE: Record<Stage, OrbState> = {
 };
 
 /** The candidate muted themselves: said under the orb until they unmute, since nothing they say meanwhile is heard or recorded. */
-const MUTED_CAPTION = "You're muted — unmute your mic to answer";
+const MUTED_CAPTION = "You're muted. Unmute your mic to answer";
 
 /**
  * The one line under the orb. `countdown` is the no-caption send; `off` says
@@ -251,7 +251,7 @@ function captionFor(
 ): string {
   switch (stage) {
     case "mic-lost":
-      return "Your mic stopped — the recording is paused";
+      return "Your mic stopped, so the recording is paused";
     case "interviewer-lost":
       return "The interviewer disconnected";
     case "connecting":
@@ -259,16 +259,16 @@ function captionFor(
     case "saving":
       return "Saving your session…";
     case "moving-on":
-      return countdown !== null ? `Moving on in ${countdown}…` : "Moving on — keep talking to carry on";
+      return countdown !== null ? `Moving on in ${countdown}…` : "Moving on. Keep talking to carry on";
     case "asking":
       if (muted) return MUTED_CAPTION;
       // On speakers turned up the voice is too loud in the mic for a normal
       // one to be told apart from it; promising a plain talk-over was untrue there.
-      return echoLoud ? "To cut in, speak up — or use headphones" : "Talk over them if you want — they'll stop";
+      return echoLoud ? "To cut in, speak up or use headphones" : "Talk over them if you want, they'll stop";
     case "thinking":
       return "Thinking of a follow-up…";
     case "voice-blocked":
-      return "Your browser blocked the interviewer's voice — press the speaker to hear it";
+      return "Your browser blocked the interviewer's voice. Press the speaker to hear it";
     case "finished":
       return finishIn !== null ? `That was the last question. Ending the interview in ${finishIn}…` : "That was the last question";
     case "mic-opening":
@@ -303,7 +303,7 @@ const ANSWER_BAR_COUNT = 96;
 
 /** A 402 on start, with the price: the setup screen no longer shows the balance beside it. */
 function creditsRefusal(credits: PrepInsufficientCredits, rule: PrepVoiceConfig["credits"]): string {
-  return `You have ${creditCount(credits.balance)} — a voice session needs at least ${credits.required}. ${creditCount(rule.base)} cover up to ${rule.includedMinutes} minutes, then +${rule.perExtraMinute} for each extra minute started, charged once your report is ready.`;
+  return `You have ${creditCount(credits.balance)}, and a voice session needs at least ${credits.required}. ${creditCount(rule.base)} cover up to ${rule.includedMinutes} minutes, then +${rule.perExtraMinute} for each extra minute started, charged once your report is ready.`;
 }
 
 function pad(n: number): string {
@@ -1546,7 +1546,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
    */
   const problemHint =
     micStatus === "denied"
-      ? "Mic blocked — type your answer instead."
+      ? "Mic blocked. Type your answer instead."
       : micStatus === "unsupported" || !dictationSupported
         ? "Dictation isn't available in this browser. You can still type your answers here."
         : micStatus === "unavailable"
@@ -1559,7 +1559,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
       ? `That was the last question. Ending the interview in ${finishCountdown}s.`
       : "That was the last question. The interview ends on its own in a few seconds."
     : agentSpeaking
-      ? "Answer when you're ready — talk over them if you want, they'll stop."
+      ? "Answer when you're ready. Talk over them if you want, they'll stop."
       : "Answer out loud. The interviewer moves on when you finish.";
 
   const rule = voiceConfig.data?.credits;
@@ -1591,11 +1591,11 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
     recording || micOpen || requesting
       ? null
       : micStatus === "denied"
-        ? "Your mic is blocked — type your answer"
+        ? "Your mic is blocked. Type your answer"
         : micStatus === "unsupported" || !dictationSupported
-          ? "This browser can't turn speech into text — type your answer"
+          ? "This browser can't turn speech into text. Type your answer"
           : micStatus === "unavailable"
-            ? "Your mic stopped — try it again, or type your answer"
+            ? "Your mic stopped. Try it again, or type your answer"
             : null;
 
   // What is happening, once — see Stage. Derived from the session this screen
@@ -1731,7 +1731,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
   // the Next button points to it instead, so it is read where it applies.
   const footnote = micUsable ? (
     <p id={helpId} className="mx-auto mt-2 max-w-[1100px] text-center text-[10.5px] leading-snug text-white/50">
-      When you&apos;ve finished and gone quiet, we move on — or press {lastQuestion ? "Finish" : "Next"}.
+      When you&apos;ve finished and gone quiet, we move on, or press {lastQuestion ? "Finish" : "Next"}.
     </p>
   ) : null;
   // The engine bar's rule, in the same place and size. Steady on purpose: engineHint

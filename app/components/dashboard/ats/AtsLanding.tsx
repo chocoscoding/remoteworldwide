@@ -145,7 +145,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
                 <ScanSearch className="h-4 w-4 text-[#e1f073]" />
               </span>
               <span className="mt-3 block text-sm font-bold">General score</span>
-              <span className="mt-1 block text-xs leading-relaxed text-white/55">How it reads for your niche — no job needed.</span>
+              <span className="mt-1 block text-xs leading-relaxed text-white/55">How it reads for your niche. No job needed.</span>
             </button>
             <button
               type="button"
@@ -156,7 +156,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
               </span>
               <span className="mt-3 block text-sm font-bold text-primary">{job ? "Against this job" : "Against a job"}</span>
               <span className="mt-1 block text-xs leading-relaxed text-black/50">
-                {job ? `${job.role} at ${job.company} — we score the match.` : "Pick a listing or paste any posting — we score the match."}
+                {job ? `${job.role} at ${job.company}. We score the match.` : "Pick a listing or paste any posting, and we score the match."}
               </span>
             </button>
           </div>

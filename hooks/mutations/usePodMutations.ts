@@ -52,13 +52,13 @@ export const useMatchPod = () =>
     () => apiPost<PodOverview>("/api/pod/match"),
     // The server decides how it matched and says so in `criteria`, so the toast quotes it rather
     // than repeating a claim the matcher may not have been able to honour.
-    (data) => toast.success("You're in a pod", { description: data.pod?.criteria ?? "Say hello — a pod notices a new name." }),
+    (data) => toast.success("You're in a pod", { description: data.pod?.criteria ?? "Say hello. A pod notices a new name." }),
   );
 
 export const useCreatePod = () =>
   usePodAction<string>(
     (name) => apiPost<PodOverview>("/api/pod/create", { name }),
-    (data) => toast.success(`${data.pod?.name ?? "Your pod"} is open`, { description: "Invite someone — a pod of one is just a to-do list." }),
+    (data) => toast.success(`${data.pod?.name ?? "Your pod"} is open`, { description: "Invite someone. A pod of one is just a to-do list." }),
   );
 
 export const useRenamePod = () => usePodAction<string>((name) => apiPatch<PodOverview>("/api/pod/name", { name }));
@@ -75,7 +75,7 @@ export const useToggleMute = () =>
 export const useJoinPod = () =>
   usePodAction<string>(
     (code) => apiPost<PodOverview>("/api/pod/join", { code }),
-    () => toast.success("You're in", { description: "Say hello on What's moving — a pod notices a new name." }),
+    () => toast.success("You're in", { description: "Say hello on What's moving. A pod notices a new name." }),
   );
 
 export const useLeavePod = () =>
@@ -87,13 +87,13 @@ export const useLeavePod = () =>
 export const useSharePost = () =>
   usePodAction<{ text: string; hot?: boolean }>(
     (body) => apiPost<PodOverview>("/api/pod/posts", body),
-    () => toast.success("Shared with your pod", { description: "It's on What's moving — they'll see it." }),
+    () => toast.success("Shared with your pod", { description: "It's on What's moving, where they'll see it." }),
   );
 
 export const useSuggestGoal = () =>
   usePodAction<SuggestGoalBody>(
     (body) => apiPost<PodOverview>("/api/pod/goals", body),
-    () => toast.success("Suggested", { description: "Your pod votes on it — a majority makes it live." }),
+    () => toast.success("Suggested", { description: "Your pod votes on it. A majority makes it live." }),
   );
 
 export const useSuggestRemoval = () =>
@@ -138,7 +138,7 @@ export function useRecordJobWin() {
     onSuccess: (data) => {
       if (!data) return;
       queryClient.setQueryData(qk.pod.overview(), data);
-      toast.success("On your pod's board", { description: "Your win is on What's moving — they'll see it." });
+      toast.success("On your pod's board", { description: "Your win is on What's moving, where they'll see it." });
     },
     onError: (error) => toast.error("Your pod didn't get the news", { description: apiMessage(error) }),
   });

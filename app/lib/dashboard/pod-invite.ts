@@ -87,7 +87,7 @@ export type JoinResult = "joined" | "invalid" | "full" | "already-in-pod" | "pod
 
 /** What each refusal means, in the one sentence every surface shows. */
 export const JOIN_REFUSAL: Record<Exclude<JoinResult, "joined">, string> = {
-  invalid: `That doesn't look like an invite. A code is ${INVITE_CODE_LENGTH} characters — paste the whole thing, or the link you were sent.`,
+  invalid: `That doesn't look like an invite. A code is ${INVITE_CODE_LENGTH} characters. Paste the whole thing, or the link you were sent.`,
   full: "That pod is full. Ask whoever invited you, or get matched with one that has room.",
   "already-in-pod": "You're already in a pod. Leave it first, then this will work.",
   // A pod that went quiet is closed during the weekly rotation and its members moved on, which

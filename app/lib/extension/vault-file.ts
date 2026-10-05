@@ -31,7 +31,7 @@ export const MAX_STREAM_BYTES = 4 * 1024 * 1024;
 /** Bounds the read of the object store, which is not this app's to wait on. */
 const FETCH_TIMEOUT_MS = 20_000;
 
-export const TOO_LARGE_MESSAGE = "That file is larger than 4MB, so it can't be sent through here — attach it to the form yourself.";
+export const TOO_LARGE_MESSAGE = "That file is larger than 4MB, so it can't be sent through here. Attach it to the form yourself.";
 
 export type VaultFileCode = "not_found" | "wrong_kind" | "too_large" | "unreadable" | "unavailable";
 
@@ -72,7 +72,7 @@ export async function streamVaultFile(documentId: string, { kinds }: { kinds: re
 
   const fileName = doc.ext ? `${doc.name}.${doc.ext}` : doc.name;
   const mimeType = mimeForFileName(fileName);
-  if (!mimeType) return refuse(422, "unreadable", `${RESUME_TYPES_HINT} — this one can't be read.`);
+  if (!mimeType) return refuse(422, "unreadable", `${RESUME_TYPES_HINT}. This one can't be read.`);
 
   // A signed URL, minted per call and never stored. The backend is the only
   // place ownership is checked, and it answers 404 for someone else's row.
@@ -99,7 +99,7 @@ export async function streamVaultFile(documentId: string, { kinds }: { kinds: re
     // The type was already decided from the name; this only catches a store
     // serving something else entirely under a .pdf name.
     if (declaredType && !isReadableMime(declaredType) && !declaredType.startsWith("application/octet-stream")) {
-      return refuse(422, "unreadable", `${RESUME_TYPES_HINT} — this one can't be read.`);
+      return refuse(422, "unreadable", `${RESUME_TYPES_HINT}. This one can't be read.`);
     }
 
     bytes = await res.arrayBuffer();

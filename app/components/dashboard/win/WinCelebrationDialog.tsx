@@ -177,8 +177,8 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
     toast.success(`Opened ${target.label}`, {
       description:
         target.id === "linkedin"
-          ? "Image saved and caption copied — LinkedIn takes only the link, so paste the caption and attach the image."
-          : "Image saved and caption copied — attach the image in the composer; your caption is already there.",
+          ? "Image saved and caption copied. LinkedIn takes only the link, so paste the caption and attach the image."
+          : "Image saved and caption copied. Attach the image in the composer; your caption is already there.",
     });
   }
 
@@ -202,7 +202,7 @@ const WinCelebrationDialog: FC<WinCelebrationDialogProps> = ({ win, ownerName, o
             <div>
               <DialogPrimitive.Title className="text-lg font-bold text-primary">You did it. Now tell people.</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-0.5 text-xs text-black/60">
-                Your card carries the whole road — saved, applied, interviewed, offer.
+                Your card carries the whole road: saved, applied, interviewed, offer.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close className="z-20 inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press">

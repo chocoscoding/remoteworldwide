@@ -58,5 +58,5 @@ export const ORB_STATE_LABEL: Record<keyof typeof ORB_COLORS, string> = {
   listening: "Listening",
   thinking: "Thinking…",
   speaking: "Interviewer speaking",
-  error: "Connection lost — tap to reconnect",
+  error: "Connection lost. Tap to reconnect",
 };

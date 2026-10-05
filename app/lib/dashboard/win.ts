@@ -164,7 +164,7 @@ export function trackedLink(link: string, utmSource: string | undefined, medium:
 export function winCaption(win: WinRecord, toggles: WinCardToggles, link: string, utmSource?: string): string {
   const where = toggles.hideCompany ? win.facts.role : `${win.facts.role} at ${win.facts.company}`;
   return (
-    `I got the job \u{1F389} ${where} — ${win.stats.applications} applications, ` +
+    `I got the job \u{1F389} ${where}: ${win.stats.applications} applications, ` +
     `${win.stats.interviewLoops} interview loops and a ${win.stats.streak}-day streak, tracked end to end. ` +
     `If you're searching, this is where I did it: ${trackedLink(link, utmSource, "wincard")}`
   );

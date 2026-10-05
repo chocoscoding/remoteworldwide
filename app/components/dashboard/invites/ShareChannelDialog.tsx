@@ -43,7 +43,7 @@ export const SHARE_CHANNELS: ShareChannel[] = [
     icon: MessageCircle,
     tile: "bg-[#25d366]",
     mode: "prefilled",
-    note: "WhatsApp takes the whole thing. Pick a chat and it is already typed out — you only press send.",
+    note: "WhatsApp takes the whole thing. Pick a chat and it is already typed out, so you only press send.",
     cta: "Open WhatsApp",
   },
   {
@@ -52,7 +52,7 @@ export const SHARE_CHANNELS: ShareChannel[] = [
     icon: Instagram,
     tile: "bg-[#c13584]",
     mode: "manual",
-    note: "Instagram has no web composer, so nothing can be prefilled. We copy the message and link — paste them into a DM, a story sticker, or your bio.",
+    note: "Instagram has no web composer, so nothing can be prefilled. We copy the message and link. Paste them into a DM, a story sticker, or your bio.",
     cta: "Copy & open Instagram",
   },
   {
@@ -67,7 +67,7 @@ export const SHARE_CHANNELS: ShareChannel[] = [
 ];
 
 export const DEFAULT_SHARE_MESSAGE =
-  "I have been using Remote Worldwide to find remote work — real reviewers put you in front of companies instead of your CV landing in a pile. Worth a look:";
+  "I have been using Remote Worldwide to find remote work. Real reviewers put you in front of companies instead of your CV landing in a pile. Worth a look:";
 
 /** Where the button actually sends you, per network. */
 function destinationFor(channel: ShareChannel, message: string, url: string): string {

@@ -156,7 +156,7 @@ const ImportSummary: FC<{ result: ContactImportResult }> = ({ result }) => {
         <>
           <span className="font-semibold text-primary">{parts.join(" · ")}.</span>
           {result.skipped > 0 && !result.limitReached && " Skipped rows had no name or repeated an earlier row."}
-          {result.limitReached && " You've reached the 30,000-contact limit, so some rows were left out — remove people you don't need and import again."}
+          {result.limitReached && " You've reached the 30,000-contact limit, so some rows were left out. Remove people you don't need and import again."}
         </>
       )}
     </div>
@@ -201,7 +201,7 @@ const AddByHand: FC = () => {
       <SectionIcon icon={UserPlus} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-primary">Someone you know</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-black/55">Add a person by hand — a former colleague, a friend at a company you&apos;re eyeing.</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-black/55">Add a person by hand: a former colleague, a friend at a company you&apos;re eyeing.</p>
         {open ? (
           <form onSubmit={submit} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <input className={cn(INPUT, "sm:col-span-2")} placeholder="Name (required)" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required aria-label="Name" />

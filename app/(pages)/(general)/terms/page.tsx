@@ -58,7 +58,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           a contract. You can sign in with Google or GitHub, or with an email address and password.
         </p>
         <p>
-          Keep your sign-in details private — anything done through your account is treated as done by you. Tell us at <Mail /> if you think
+          Keep your sign-in details private: anything done through your account is treated as done by you. Tell us at <Mail /> if you think
           someone else has access. Give us accurate information and keep it current; we may suspend an account we believe is fake,
           impersonating someone, or shared across people.
         </p>
@@ -105,7 +105,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           and job-specific answers. Several of them produce output using artificial intelligence.
         </p>
         <p>
-          AI output can be wrong, outdated, biased or nonsensical, and scores are our own estimate — no employer or applicant tracking system
+          AI output can be wrong, outdated, biased or nonsensical, and scores are our own estimate; no employer or applicant tracking system
           uses our scoring. Treat everything these tools produce as a draft: read it, correct it, and take responsibility for it before you
           send it to anyone. Do not rely on it as legal, financial, immigration or professional advice.
         </p>
@@ -124,8 +124,8 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         <p>
           Your resumes, documents, notes, application records and anything else you upload or write remain yours. You give us a limited,
           worldwide, royalty-free licence to host, store, copy, process and display that content for one purpose only: running the service
-          for you — for example, storing a file so you can download it later, or sending your text to a processor so a tool can return a
-          result.
+          for you (for example, storing a file so you can download it later, or sending your text to a processor so a tool can return a
+          result).
         </p>
         <p>
           That licence ends when you delete the content or your account, other than copies kept in routine backups for a limited period or
@@ -136,7 +136,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           share it. We do not routinely review what you store, but we may remove content that breaks these terms or the law.
         </p>
         <p>
-          If you post publicly — a comment, a blog contribution, or anything else visible to others — you also let us publish, display and
+          If you post publicly (a comment, a blog contribution, or anything else visible to others), you also let us publish, display and
           distribute it as part of the site, with attribution where appropriate.
         </p>
       </>
@@ -149,7 +149,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
       <>
         <p>
           Some guides and checklists are free in exchange for your email address. When you claim one, you get the file and you agree to
-          receive related emails from us — new jobs, guides and product updates. Every one of those emails has an unsubscribe link, and
+          receive related emails from us: new jobs, guides and product updates. Every one of those emails has an unsubscribe link, and
           unsubscribing does not affect your account or anything you already downloaded.
         </p>
         <p>
@@ -194,7 +194,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
     title: "Third-party services and links",
     body: (
       <p>
-        We rely on third parties to run the service — sign-in providers, hosting, file storage, email and AI processing — and the site links
+        We rely on third parties to run the service (sign-in providers, hosting, file storage, email and AI processing), and the site links
         out to employers and other websites. Those services have their own terms and privacy practices. We do not control them and we are
         not responsible for their content, their availability, or what happens once you leave our site.
       </p>
@@ -207,7 +207,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
       <p>
         We provide the service as it is and as it is available. We may add, change, limit or withdraw features, and there may be downtime for
         maintenance or reasons outside our control. Some features are labelled beta or experimental; expect them to be rough and to change.
-        We do not promise uninterrupted or error-free access, and we do not guarantee that data you store here is permanently retained —
+        We do not promise uninterrupted or error-free access, and we do not guarantee that data you store here is permanently retained, so
         keep your own copies of anything important.
       </p>
     ),
@@ -222,8 +222,8 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         </p>
         <p>
           We may suspend or close an account, or restrict access, if you break these terms, if we are required to by law, or to protect the
-          service and its users. Where it is reasonable to do so, we will tell you why. Sections that by their nature should survive — your
-          content licence for material already published, intellectual property, disclaimers, liability, indemnity and governing law —
+          service and its users. Where it is reasonable to do so, we will tell you why. Sections that by their nature should survive (your
+          content licence for material already published, intellectual property, disclaimers, liability, indemnity and governing law)
           continue to apply after your account ends.
         </p>
       </>
@@ -247,7 +247,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
       <>
         <p>
           To the fullest extent the law allows, we are not liable for lost profits, lost opportunities, lost or corrupted data, or any
-          indirect, incidental, special or consequential loss arising from your use of the service — including anything that happens between
+          indirect, incidental, special or consequential loss arising from your use of the service, including anything that happens between
           you and an employer, and any decision you make on the basis of tool output.
         </p>
         <p>
@@ -276,7 +276,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
     title: "Governing law",
     body: (
       <p>
-        These terms are governed by the laws of {JURISDICTION}, and {COURTS} have exclusive jurisdiction over any dispute — except that
+        These terms are governed by the laws of {JURISDICTION}, and {COURTS} have exclusive jurisdiction over any dispute, except that
         either of us may seek urgent injunctive relief in any competent court. If any part of these terms is found unenforceable, the rest
         continues to apply. Our not enforcing a term on one occasion is not a waiver of it.
       </p>
@@ -288,7 +288,7 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
     body: (
       <p>
         We may update these terms as the service changes or the law requires. The date at the top always shows the current version. For
-        changes that materially affect your rights we will give reasonable notice — a notice on the site or an email to your account
+        changes that materially affect your rights we will give reasonable notice: a notice on the site or an email to your account
         address. Continuing to use the service after a change means you accept the updated terms.
       </p>
     ),
@@ -319,7 +319,7 @@ const Page = () => (
           Terms and Conditions
         </h1>
         <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-primary/70 md:text-lg">
-          The rules for using {SITE_NAME} — the job board, the career tools and the emails we send. Written to be read, not to be endured.
+          The rules for using {SITE_NAME}: the job board, the career tools and the emails we send. Written to be read, not to be endured.
         </p>
         <p className="mt-4 text-sm font-semibold text-primary/55">Last updated {LAST_UPDATED}</p>
       </div>

@@ -164,7 +164,7 @@ export const TrackerCardItem: FC<TrackerCardItemProps> = ({ card, columnId, onOp
           }}
           className="mt-2.5 flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-black/25 px-2 py-1.5 text-[11px] font-semibold text-black/45 transition-colors hover:border-[#222325] hover:text-primary">
           <Ghost className="h-3 w-3 flex-none" />
-          <span className="truncate">Silent {silentDays} days — ghosted?</span>
+          <span className="truncate">Silent {silentDays} days. Ghosted?</span>
         </button>
       )}
     </div>

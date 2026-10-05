@@ -125,7 +125,7 @@ export default function SignupForm({
 
       const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) {
-        toast.error("Account created — please sign in");
+        toast.error("Account created. Please sign in");
         if (onSwitchToLogin) {
           onSwitchToLogin();
         } else {

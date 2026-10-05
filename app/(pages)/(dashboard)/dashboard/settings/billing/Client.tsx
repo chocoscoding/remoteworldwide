@@ -59,7 +59,7 @@ const BillingClient: FC<{ initialBilling?: BillingInterval }> = ({ initialBillin
           onFree
             ? `You're on Free: ${monthlyCredits || "a few"} credits a month, topped back up at the start of each month. Pick a plan below for more.`
             : plan
-              ? `${plan.name} — ${money(periodPrice(plan, interval), plan.currency)} a ${interval === "year" ? "year" : plan.interval}. Credits refill every month and don't roll over.`
+              ? `${plan.name}: ${money(periodPrice(plan, interval), plan.currency)} a ${interval === "year" ? "year" : plan.interval}. Credits refill every month and don't roll over.`
               : "Your plan is active."
         }
         action={
@@ -113,7 +113,7 @@ const BillingClient: FC<{ initialBilling?: BillingInterval }> = ({ initialBillin
 
         {pendingPlanKey ? (
           <div className={cn(CARD, "mt-4 bg-[#fbfbf7] px-4 py-3 text-xs leading-relaxed text-black/60")}>
-            {planLabel(plans.find((p) => p.key === pendingPlanKey)?.name ?? pendingPlanKey, pendingInterval)} is reserved for you. Card payments aren&apos;t connected yet — we&apos;ll be
+            {planLabel(plans.find((p) => p.key === pendingPlanKey)?.name ?? pendingPlanKey, pendingInterval)} is reserved for you. Card payments aren&apos;t connected yet. We&apos;ll be
             in touch to finish it, and your credits land the moment it clears.
           </div>
         ) : null}

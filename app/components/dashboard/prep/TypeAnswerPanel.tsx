@@ -182,7 +182,7 @@ const TypeAnswerPanel: FC<TypeAnswerPanelProps> = ({
           <DialogContent className="max-w-[420px] gap-0 rounded-[20px] border-2 border-[#222325] bg-white p-6">
             <DialogTitle className="text-base font-bold text-primary">Type this answer instead?</DialogTitle>
             <DialogDescription className="mt-2 text-sm leading-relaxed text-black/60">
-              You can keep going in the same conversation — the interviewer will read what you type and reply out loud.
+              You can keep going in the same conversation. The interviewer will read what you type and reply out loud.
               <br />
               <br />
               What you type <strong className="font-bold text-primary">won&apos;t be scored for delivery</strong>. Pace, filler words

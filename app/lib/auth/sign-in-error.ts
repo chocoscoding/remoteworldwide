@@ -21,10 +21,10 @@ export const signInErrorMessage = (code: string | undefined): string => {
   if (!code) return WRONG_CREDENTIALS;
 
   const provider = PROVIDER_NAMES[code];
-  if (provider) return `This account signs in with ${provider} — use the ${provider} button above`;
+  if (provider) return `This account signs in with ${provider}. Use the ${provider} button above`;
 
   // Both linked, which the code cannot name individually.
-  if (code === "oauth") return "This account signs in with Google or GitHub — use the buttons above";
+  if (code === "oauth") return "This account signs in with Google or GitHub. Use the buttons above";
 
   return WRONG_CREDENTIALS;
 };

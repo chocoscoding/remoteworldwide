@@ -111,11 +111,11 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                   <DashTooltip label="What these categories mean">
                     <span className="block text-xs font-semibold normal-case tracking-normal text-primary">Screening</span>
                     <span className="mt-0.5 block text-xs font-normal normal-case leading-relaxed tracking-normal text-black/55">
-                      The role and logistics questions almost every employer asks — notice period, salary, work authorisation.
+                      The role and logistics questions almost every employer asks: notice period, salary, work authorisation.
                     </span>
                     <span className="mt-2.5 block text-xs font-semibold normal-case tracking-normal text-primary">Demographics</span>
                     <span className="mt-0.5 block text-xs font-normal normal-case leading-relaxed tracking-normal text-black/55">
-                      Optional diversity questions — gender, ethnicity, veteran status. Never required, and never guessed: only an answer
+                      Optional diversity questions (gender, ethnicity, veteran status). Never required, and never guessed: only an answer
                       you save here is ever used.
                     </span>
                   </DashTooltip>

@@ -194,7 +194,7 @@ const OnboardingClient: FC<{ next: string | null }> = ({ next }) => {
           <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border-[1.5px] border-primary bg-secondary px-4 py-3.5 md:px-5" role="status">
             <PartyPopper className="h-5 w-5 flex-none text-primary" aria-hidden />
             <p className="min-w-0 flex-1 text-sm font-semibold text-primary">
-              {dirty ? "That's everything — save your profile to finish." : "You're all set. The extension has everything it needs."}
+              {dirty ? "That's everything. Save your profile to finish." : "You're all set. The extension has everything it needs."}
             </p>
             {!dirty && (
               <Link href={target} className={cn(BUTTON_PRIMARY, "py-2")}>

@@ -79,7 +79,7 @@ const PasswordStrength: FC<PasswordStrengthProps> = ({ password, open, id }) => 
           />
         </span>
         <span className={cn("flex-none text-[11px] font-semibold", meter ? meter.text : "text-black/30")}>
-          {STRENGTH_LABEL[strength.level] || "—"}
+          {STRENGTH_LABEL[strength.level] || "-"}
         </span>
       </div>
 

@@ -189,19 +189,19 @@ const VaultClient: FC = () => {
                         )}
                       </span>
                     ))}
-                    {" — "}anything here can also just be dropped onto this page.
+                    {". "}Anything here can also just be dropped onto this page.
                   </p>
                 ) : (
                   <p className="mt-2.5 text-xs text-white/55">Everything an application might ask for is on hand.</p>
                 )}
                 {masterResume ? (
                   <p className="mt-1.5 text-xs text-white/55">
-                    Master resume: <span className="font-semibold text-white/80">{masterResume.name}</span> — what reviewers read when they
+                    Master resume: <span className="font-semibold text-white/80">{masterResume.name}</span>, what reviewers read when they
                     consider you.
                   </p>
                 ) : uploadedResumes > 0 ? (
                   <p className="mt-1.5 text-xs text-white/55">
-                    <span className="font-semibold text-secondary">No master resume yet</span> — pick one below with “Make master” so
+                    <span className="font-semibold text-secondary">No master resume yet</span>. Pick one below with “Make master” so
                     reviewers can consider you for recommendations.
                   </p>
                 ) : null}
@@ -293,7 +293,7 @@ const VaultClient: FC = () => {
                 title={emptyTitle}
                 body={
                   tab === "archived"
-                    ? "Archive a document and it moves here — out of your pickers, never deleted."
+                    ? "Archive a document and it moves here: out of your pickers, never deleted."
                     : "Import from your computer, or drop files anywhere on this page."
                 }
                 ctaLabel={tab === "archived" ? "Show all documents" : "Import files"}

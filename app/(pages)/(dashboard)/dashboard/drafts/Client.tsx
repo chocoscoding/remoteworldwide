@@ -116,7 +116,7 @@ const DraftsClient: FC = () => {
               <DashEmptyState
                 icon={Send}
                 title="Nothing applied from a draft yet"
-                body="When you apply — through the extension, the apply wizard, the tracker or Mark as applied here — a draft's answers join your application answers, and it's listed here for 30 days."
+                body="When you apply (through the extension, the apply wizard, the tracker or Mark as applied here), a draft's answers join your application answers, and it's listed here for 30 days."
               />
             )
           ) : (

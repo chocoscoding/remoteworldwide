@@ -82,7 +82,7 @@ const WeekCardDialog: FC<WeekCardDialogProps> = ({ report, onClose }) => {
                 {report.partial ? "Your week so far" : "That was your week"}
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-0.5 text-xs text-black/60">
-                {range}, in one card. Share it — the people rooting for you will want to see it.
+                {range}, in one card. Share it. The people rooting for you will want to see it.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md border border-black/15 bg-white text-primary transition-colors hover:border-primary">

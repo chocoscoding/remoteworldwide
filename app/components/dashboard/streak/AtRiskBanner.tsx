@@ -34,7 +34,7 @@ const AtRiskBanner: FC = () => {
       <AlertTriangle className="h-4 w-4 flex-none text-primary" />
       <p className="min-w-0 flex-1 text-sm font-bold text-primary">
         Your {current}-day streak ends tonight. One application keeps it
-        {freezes > 0 ? " — and if today gets away from you, a freeze has it covered." : "."}
+        {freezes > 0 ? ", and if today gets away from you, a freeze has it covered." : "."}
       </p>
       <StickerButton variant="primary" size="sm" onClick={openLog}>
         Log one

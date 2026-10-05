@@ -276,7 +276,7 @@ const PrepHub: FC<PrepHubProps> = ({
         <div className="flex-1 min-w-[240px]">
           <div className="flex items-center gap-2">
             <h2 className="text-[19px] font-bold leading-tight">
-              {track.company} — {track.role}
+              {track.role} at {track.company}
             </h2>
             {saved && (
               <button
@@ -403,7 +403,7 @@ const PrepHub: FC<PrepHubProps> = ({
                   bare
                   icon={CalendarDays}
                   title="No rounds yet"
-                  body="Add the first conversation once it's booked — a recruiter screen, a portfolio review — and when it is."
+                  body="Add the first conversation once it's booked (a recruiter screen, a portfolio review) and when it is."
                   ctaLabel={saved ? "Add the first round" : undefined}
                   onCta={saved ? () => setRoundEditor({ index: 0 }) : undefined}
                 />
@@ -417,7 +417,7 @@ const PrepHub: FC<PrepHubProps> = ({
                   {round.notes ? (
                     <p className="text-sm text-black/65 leading-relaxed whitespace-pre-line">{round.notes}</p>
                   ) : (
-                    <p className="text-xs text-black/40">No notes yet — who you&apos;re meeting, what they asked you to prepare.</p>
+                    <p className="text-xs text-black/40">No notes yet: who you&apos;re meeting, what they asked you to prepare.</p>
                   )}
                 </div>
               )}
@@ -579,7 +579,7 @@ const PrepHub: FC<PrepHubProps> = ({
                     <ScoreRing
                       value={s.score ?? 0}
                       size={34}
-                      label={<span className="text-[10.5px] font-bold text-primary tabular-nums">{s.score ?? "—"}</span>}
+                      label={<span className="text-[10.5px] font-bold text-primary tabular-nums">{s.score ?? "-"}</span>}
                     />
                   )}
                   <button
@@ -636,7 +636,7 @@ const PrepHub: FC<PrepHubProps> = ({
         <p className="text-xs text-black/40 flex items-center gap-1.5">
           <CheckCircle2 className="h-3.5 w-3.5" />
           This track is closed
-          {track.outcome === "rejected" ? " — didn't move forward." : track.outcome === "offer" ? " — with an offer." : "."}
+          {track.outcome === "rejected" ? ". It didn't move forward." : track.outcome === "offer" ? ", with an offer." : "."}
         </p>
       )}
 
@@ -698,7 +698,7 @@ const AddActionField: FC<{ onAdd: (title: string) => Promise<AddTasksResult> }> 
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={TASK_LIMITS.titleMax}
-            placeholder="Add an action — it goes on your plan too"
+            placeholder="Add an action. It goes on your plan too"
             aria-label="New action for this track"
             className="flex-1 min-w-0 bg-transparent outline-none text-sm font-semibold text-primary placeholder:text-black/35 placeholder:font-medium"
           />

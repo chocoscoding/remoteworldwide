@@ -70,7 +70,7 @@ const SuggestGoalDialog: FC<SuggestGoalDialogProps> = ({ open, onOpenChange, onS
               </div>
               <DialogTitle className="text-[17px] font-bold text-primary leading-none">Suggest a goal</DialogTitle>
             </div>
-            <p className="text-xs text-black/45 mb-5 pl-[52px]">Goes to a pod vote — majority wins.</p>
+            <p className="text-xs text-black/45 mb-5 pl-[52px]">Goes to a pod vote. Majority wins.</p>
 
             <div className="flex flex-col gap-4">
               {/* The kind decides which dashboard surface the goal points at —

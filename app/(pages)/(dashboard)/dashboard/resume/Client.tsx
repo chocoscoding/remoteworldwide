@@ -383,7 +383,7 @@ const ResumeScreen: FC = () => {
     if (!namedError) return;
     toast.error(
       namedError instanceof BackendError && namedError.status === 404
-        ? "That resume couldn't be found — it may have been deleted."
+        ? "That resume couldn't be found. It may have been deleted."
         : apiMessage(namedError),
     );
   }, [namedError]);
@@ -392,7 +392,7 @@ const ResumeScreen: FC = () => {
     if (!copyError) return;
     toast.error(
       copyError instanceof BackendError && copyError.status === 404
-        ? "That file couldn't be found in My documents — it may have been deleted."
+        ? "That file couldn't be found in My documents. It may have been deleted."
         : apiMessage(copyError),
     );
   }, [copyError]);

@@ -60,11 +60,11 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Can I change or cancel my plan?",
-    a: "Whenever you like. Pay monthly, or yearly for less, and nothing is locked in — cancel and your plan runs to the end of the period you've paid for.",
+    a: "Whenever you like. Pay monthly, or yearly for less, and nothing is locked in. Cancel and your plan runs to the end of the period you've paid for.",
   },
   {
     q: "Do yearly plans get a year of credits at once?",
-    a: "No — a yearly plan is paid once a year, and its credits refill every month, exactly like a monthly plan. Unused monthly credits don't roll over; top-up packs never expire.",
+    a: "No. A yearly plan is paid once a year, and its credits refill every month, exactly like a monthly plan. Unused monthly credits don't roll over; top-up packs never expire.",
   },
   {
     q: "What happens if I run out of credits?",
@@ -76,7 +76,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Can I earn credits instead of buying them?",
-    a: `Yes — share your invite link. Each time someone who signed up through it subscribes, you get ${CREDITS_PER_INVITE} credits.`,
+    a: `Yes. Share your invite link. Each time someone who signed up through it subscribes, you get ${CREDITS_PER_INVITE} credits.`,
   },
   {
     q: "Is the job board still free?",
@@ -196,7 +196,7 @@ export default async function PricingPage() {
 
           <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-[20px] border border-primary/10 bg-white px-6 py-4 sm:flex-row sm:items-center">
             <p className="text-sm text-primary/75">
-              <span className="font-bold text-primary">Just browsing?</span> The job board is free, always — search and apply to vetted remote roles without a plan.
+              <span className="font-bold text-primary">Just browsing?</span> The job board is free, always. Search and apply to vetted remote roles without a plan.
             </p>
             <Link href="/jobs" className="group inline-flex min-h-[44px] flex-none items-center gap-1.5 text-sm font-bold underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary">
               Browse remote jobs
@@ -334,7 +334,7 @@ export default async function PricingPage() {
               <h2 className="text-balance text-3xl font-bold tracking-tight md:text-5xl">
                 Not ready to pick? <span className="text-secondary">Save your spot.</span>
               </h2>
-              <p className="mx-auto mt-4 max-w-[520px] text-white/75">Joining the waitlist is free. We&apos;ll email you when your spot opens — then choose a plan, or don&apos;t.</p>
+              <p className="mx-auto mt-4 max-w-[520px] text-white/75">Joining the waitlist is free. We&apos;ll email you when your spot opens. Then choose a plan, or don&apos;t.</p>
               <Link
                 href="/waitlist"
                 className="group mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-secondary px-7 text-sm font-bold text-primary transition-colors duration-150 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary">

@@ -77,7 +77,7 @@ const NotificationsClient: FC = () => {
         <div className="mt-4 flex gap-2.5 rounded-xl border border-black/10 bg-[#fbfbf7] px-3.5 py-3">
           <Info className="mt-0.5 h-4 w-4 flex-none text-black/40" />
           <p className="text-xs leading-relaxed text-black/60">
-            Reminders currently show inside the app only. Email and push need a scheduler that doesn&apos;t exist yet — these
+            Reminders currently show inside the app only. Email and push need a scheduler that doesn&apos;t exist yet. These
             switches record the preference for when it does.
           </p>
         </div>

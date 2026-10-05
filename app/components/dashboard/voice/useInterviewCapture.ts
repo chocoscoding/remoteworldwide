@@ -864,7 +864,7 @@ export function createCaptureEngine(env: EngineEnv): CaptureEngine {
     warned = true;
     const reason = capReason ?? "length";
     const why = reason === "credits" ? "your credit limit" : "the session limit";
-    set({ warning: { reason, stopsAtMs: capMs, message: `1 minute left — recording stops at ${formatClock(capMs)}, ${why}.` } });
+    set({ warning: { reason, stopsAtMs: capMs, message: `1 minute left. Recording stops at ${formatClock(capMs)}, ${why}.` } });
   }
 
   function reachCap() {

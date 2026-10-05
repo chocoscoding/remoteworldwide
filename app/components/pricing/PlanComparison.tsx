@@ -10,7 +10,7 @@ const Included: FC<{ value: boolean | null }> = ({ value }) =>
     <CheckChip size="sm" label="Included" />
   ) : (
     <span className="text-primary/40">
-      <span aria-hidden>—</span>
+      <span aria-hidden>-</span>
       {value === false ? <span className="sr-only">Not included</span> : null}
     </span>
   );

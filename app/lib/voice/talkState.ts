@@ -154,21 +154,21 @@ const localTime = (iso: string): string | null => {
 export function problemCopy(problem: TalkProblem, formatTime: (iso: string) => string | null = localTime): string {
   switch (problem.kind) {
     case "mic":
-      return "Mic blocked — type instead";
+      return "Mic blocked. Type instead";
     case "conflict":
       return problem.conflict ? `You're already in a voice call (${VOICE_FEATURE_LABEL[problem.conflict.feature]})` : "You're already in a voice call";
     case "session":
       return "This session can't take a voice call right now";
     case "minutes": {
       const time = problem.retryAt ? formatTime(problem.retryAt) : null;
-      return time ? `You've used today's voice minutes — back at ${time}` : "You've used today's voice minutes";
+      return time ? `You've used today's voice minutes. Back at ${time}` : "You've used today's voice minutes";
     }
     case "rate":
-      return "Too many calls started — try again in a few minutes";
+      return "Too many calls started. Try again in a few minutes";
     case "plan":
-      return "Talking it through is on Basic and up — type instead";
+      return "Talking it through is on Basic and up. Type instead";
     case "unavailable":
-      return problem.browser ? "Voice calls don't work in this browser yet — type instead" : "Voice isn't available right now";
+      return problem.browser ? "Voice calls don't work in this browser yet. Type instead" : "Voice isn't available right now";
     case "dropped":
       return "The call dropped";
   }

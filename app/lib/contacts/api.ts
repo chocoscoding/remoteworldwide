@@ -55,7 +55,7 @@ export const lookupContacts = (people: ContactLookupPerson[]) => apiPost<(Contac
 export function importLinkedInConnections(file: File) {
   // Checked here as well as on the server so the common mistake never spends
   // megabytes of someone's upload to be told no.
-  if (file.size > MAX_CONTACTS_CSV_BYTES) throw new Error("That file is larger than 10MB — upload Connections.csv on its own, not the whole archive");
+  if (file.size > MAX_CONTACTS_CSV_BYTES) throw new Error("That file is larger than 10MB. Upload Connections.csv on its own, not the whole archive");
   const body = new FormData();
   body.append("file", file);
   return apiPost<ContactImportResult>(`${CONTACTS_PATH}/import`, body);

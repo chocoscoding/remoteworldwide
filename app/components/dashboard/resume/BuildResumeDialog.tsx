@@ -81,7 +81,7 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
         fromResumeId: useSource && source ? source.resumeId : null,
       });
       if (!built.document) {
-        setFailure({ message: "Your resume was built but couldn't be saved — please try again.", credits: false });
+        setFailure({ message: "Your resume was built but couldn't be saved. Please try again.", credits: false });
         return;
       }
       onBuilt(built.document);
@@ -104,7 +104,7 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
             <DialogTitle className="text-[17px] font-bold text-primary leading-none">Build a resume with AI</DialogTitle>
           </div>
           <p className="text-xs text-black/50 mb-5 pl-[52px]">
-            Written from {source && useSource ? "your imported resume" : "your profile"} — nothing it doesn&apos;t already know about you.
+            Written from {source && useSource ? "your imported resume" : "your profile"}, nothing it doesn&apos;t already know about you.
           </p>
 
           <label className="flex flex-col gap-1.5 mb-4">
@@ -191,7 +191,7 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
         </div>
 
         <div className="flex items-center justify-between gap-2.5 border-t border-black/8 px-6 py-4">
-          <p className="text-xs text-black/50">{building ? "Writing your resume — this can take up to half a minute." : `${BUILD_CREDITS} credits, only if it builds.`}</p>
+          <p className="text-xs text-black/50">{building ? "Writing your resume. This can take up to half a minute." : `${BUILD_CREDITS} credits, only if it builds.`}</p>
           <div className="flex flex-none items-center gap-2.5">
             <StickerButton type="button" variant="outline" size="md" disabled={building} onClick={() => close(false)}>
               Cancel

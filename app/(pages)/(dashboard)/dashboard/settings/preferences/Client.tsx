@@ -61,7 +61,7 @@ const PreferencesClient: FC = () => {
   return (
     <>
       <SettingsSection title="What you're looking for" description="Drives your recommendations, referral matches and resume scoring." action={<SectionSave section="preferences" />}>
-        <SettingsRow label="Target roles" hint="Add every title you'd genuinely take — near-misses cost you matches." stacked>
+        <SettingsRow label="Target roles" hint="Add every title you'd genuinely take. Near-misses cost you matches." stacked>
           <form onSubmit={addRole} className="mb-3 flex gap-2">
             <input
               className={cn(INPUT, "flex-1")}
@@ -78,7 +78,7 @@ const PreferencesClient: FC = () => {
           <TagList
             tags={preferences.targetRoles}
             onRemove={(t) => setPreferences({ targetRoles: preferences.targetRoles.filter((r) => r !== t) })}
-            emptyNote="No target roles yet — recommendations need at least one."
+            emptyNote="No target roles yet. Recommendations need at least one."
           />
         </SettingsRow>
 
@@ -156,7 +156,7 @@ const PreferencesClient: FC = () => {
           label="Pause the search"
           hint={
             pausedDaysLeft !== null
-              ? `Paused — ${pausedDaysLeft} day${pausedDaysLeft === 1 ? "" : "s"} left. Your streak is held, not lost.`
+              ? `Paused, ${pausedDaysLeft} day${pausedDaysLeft === 1 ? "" : "s"} left. Your streak is held, not lost.`
               : "Holds your streak, goals and reminders. Nothing resets."
           }>
           {pausedDaysLeft !== null ? (

@@ -36,7 +36,7 @@ const JoinPodDialog: FC<JoinPodDialogProps> = ({ open, onOpenChange }) => {
     setError(null);
     setValue("");
     onOpenChange(false);
-    toast.success("You're in", { description: "Say hello on What's moving — a pod notices a new name." });
+    toast.success("You're in", { description: "Say hello on What's moving. A pod notices a new name." });
   }
 
   return (

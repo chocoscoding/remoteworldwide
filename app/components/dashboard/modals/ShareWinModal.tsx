@@ -168,7 +168,7 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
   // Per-platform attribution on the link; the preview shows it clean.
   const caption = (utmSource?: string) =>
     style
-      ? `${style.headline} \u{1F389} ${where}. I'm tracking my remote job search on Remote Worldwide — if you're searching too: ${trackedLink(inviteLink.url, utmSource, "winshare")}`
+      ? `${style.headline} \u{1F389} ${where}. I'm tracking my remote job search on Remote Worldwide. If you're searching too: ${trackedLink(inviteLink.url, utmSource, "winshare")}`
       : "";
 
   const mark = (channel: Channel, outcome: Outcome) => setOutcomes((prev) => ({ ...prev, [channel]: outcome }));
@@ -187,7 +187,7 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
     // them), it carries "A pod member" instead, never the name.
     const saved = queryClient.getQueryData<Settings>(qk.settings.me())?.privacy ?? privacy;
     const author = podPostAuthor(name, saved.showProfileToPod !== false);
-    const text = author ? `${author} ${style.podVerb} — ${where} \u{1F389}` : `${style.title} — ${where} \u{1F389}`;
+    const text = author ? `${author} ${style.podVerb}: ${where} \u{1F389}` : `${style.title}: ${where} \u{1F389}`;
     // The toast comes from useSharePost, on the server's answer — as does the
     // refusal, if the pod turns out to be gone.
     sharePost.mutate({ text, hot: true }, { onSuccess: () => mark("pod", "posted") });
@@ -231,13 +231,13 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
       "X",
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(caption("x"))}`,
       null,
-      "Your post is written — press Post on X to share it.",
+      "Your post is written. Press Post on X to share it.",
     );
   }
 
   async function shareNative() {
     try {
-      await navigator.share({ title: name ? `${name} — ${style?.title ?? "a win"}` : (style?.title ?? "A win"), text: caption("share") });
+      await navigator.share({ title: name ? `${name}: ${style?.title ?? "a win"}` : (style?.title ?? "A win"), text: caption("share") });
       mark("native", "shared");
       toast.success("Shared");
     } catch (error) {
@@ -343,7 +343,7 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
                     className="mt-3 w-full cursor-pointer rounded-lg border border-black/12 bg-white px-3 py-2 text-xs font-semibold text-primary outline-none focus:border-[#222325]">
                     {wins.map((w) => (
                       <option key={w.id} value={w.id}>
-                        {TIER_STYLES[w.tier].title} — {w.role} at {w.company}
+                        {TIER_STYLES[w.tier].title}: {w.role} at {w.company}
                       </option>
                     ))}
                   </select>
@@ -405,7 +405,7 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
                       <p className="truncate text-sm font-semibold text-primary">Post to {pod.name}</p>
                       <p className="truncate text-[11px] text-black/55">
                         {others.length === 0
-                          ? "Just you so far — it'll be there when they join."
+                          ? "Just you so far. It'll be there when they join."
                           : `${others.length} ${others.length === 1 ? "person sees" : "people see"} it on What's moving.`}
                       </p>
                     </div>
@@ -421,7 +421,7 @@ const ShareWinModal: FC<ShareWinModalProps> = ({ open, onOpenChange, application
                   </div>
                 ) : (
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-black/60">No pod yet — a pod is where a win gets cheered.</p>
+                    <p className="text-xs text-black/60">No pod yet. A pod is where a win gets cheered.</p>
                     <Link
                       href="/dashboard/pod"
                       onClick={() => onOpenChange(false)}

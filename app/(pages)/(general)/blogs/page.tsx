@@ -121,7 +121,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
             </span>
           </h1>
           <p className="mt-6 max-w-[54ch] text-lg leading-relaxed text-primary/70 md:text-xl">
-            Practical guides on resumes, interviews and the remote job search — written by people who actually hire, built around the tools that get you the
+            Practical guides on resumes, interviews and the remote job search, written by people who actually hire, built around the tools that get you the
             offer.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

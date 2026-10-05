@@ -141,7 +141,7 @@ const SessionsClient: FC = () => {
           mySessions.map((session) => renderRow(session))
         ) : (
           <p className="px-6 py-8 text-sm leading-relaxed text-black/55">
-            No registered sessions yet — sessions created before this feature appear after your next sign-in.
+            No registered sessions yet. Sessions created before this feature appear after your next sign-in.
           </p>
         )}
       </SettingsSection>

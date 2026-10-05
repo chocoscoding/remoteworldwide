@@ -158,11 +158,11 @@ const TrackerClient: FC = () => {
   function handleAddJob(job: TrackerJob) {
     const result = addCard(job);
     if (result.status === "duplicate") {
-      toast("Already on your board", { description: `${job.company} — ${job.role}` });
+      toast("Already on your board", { description: `${job.role} at ${job.company}` });
       setOpenCardId(result.card.id);
       return;
     }
-    toast.success("Added to Saved", { description: `${job.company} — ${job.role}` });
+    toast.success("Added to Saved", { description: `${job.role} at ${job.company}` });
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -260,7 +260,7 @@ const TrackerClient: FC = () => {
             <div className={cn("mb-5 flex flex-none items-center gap-2.5 rounded-sm border border-black/20 bg-[#fbfbf7] px-4 py-3", BOARD_SCALE)}>
               <LogoMini className="h-4 w-4 flex-none" />
               <p className="text-xs font-medium text-black/60">
-                <span className="font-bold text-primary">Applied through Remote Worldwide</span> — status updates itself.
+                <span className="font-bold text-primary">Applied through Remote Worldwide</span>: status updates itself.
               </p>
             </div>
 

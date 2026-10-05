@@ -194,10 +194,10 @@ export const TrackerProvider: FC<{ children: ReactNode }> = ({ children }) => {
    * once per application forever, so dragging back and forth can't farm it.
    */
   function creditStageChange(cardId: string, company: string, to: TrackerColumnId) {
-    if (to === "interviewing") awardStrongEvent("reached-interview", cardId, `Reached interview — ${company}`);
+    if (to === "interviewing") awardStrongEvent("reached-interview", cardId, `Reached interview: ${company}`);
     if (to === "offer") {
       recordAction("status-change", cardId, `${company} → ${COLUMN_LABELS[to]}`);
-      awardStrongEvent("reached-offer", cardId, `Offer reached — ${company}`);
+      awardStrongEvent("reached-offer", cardId, `Offer reached: ${company}`);
       offerWinToast(company);
     }
   }

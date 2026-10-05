@@ -110,7 +110,7 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
             <p className="mt-2 text-xs text-white/65 tabular-nums">
               {shortfall > 0
                 ? `${plan.monthlyCredits} included, plus about ${shortfall} from top-up packs.`
-                : `${total} of ${plan.monthlyCredits} credits — ${plan.monthlyCredits - total} to spare.`}
+                : `${total} of ${plan.monthlyCredits} credits, ${plan.monthlyCredits - total} to spare.`}
             </p>
           </div>
         ) : (

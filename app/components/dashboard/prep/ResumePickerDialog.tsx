@@ -131,7 +131,7 @@ const ResumePickerDialog: FC<ResumePickerDialogProps> = ({ open, onOpenChange, c
               <p className={SECTION}>Also on file</p>
               <ul>
                 {choices.parsed.map((parsed) =>
-                  row({ kind: "parsed", resumeId: parsed.resumeId }, parsed.resumeId, parsed.fileName, "Used in Apply or checked in the editor — not in My documents")
+                  row({ kind: "parsed", resumeId: parsed.resumeId }, parsed.resumeId, parsed.fileName, "Used in Apply or checked in the editor, not in My documents")
                 )}
               </ul>
             </>
@@ -139,7 +139,7 @@ const ResumePickerDialog: FC<ResumePickerDialogProps> = ({ open, onOpenChange, c
 
           {nothing && (
             <p className="px-6 py-4 text-sm text-black/55 leading-relaxed">
-              You haven&apos;t added a resume yet. Upload the one you sent {company} — it goes into My documents too.
+              You haven&apos;t added a resume yet. Upload the one you sent {company}. It goes into My documents too.
             </p>
           )}
 

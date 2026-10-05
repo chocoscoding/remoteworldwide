@@ -55,8 +55,8 @@ const InvitePodDialog: FC<InvitePodDialogProps> = ({ open, onOpenChange }) => {
               <DialogPrimitive.Title className="text-[15px] font-bold text-primary">Invite to your pod</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-0.5 text-xs leading-relaxed text-black/55">
                 {seatsLeft > 0
-                  ? `${memberCount} of ${capacity} seats taken — ${seatsLeft} ${seatsLeft === 1 ? "person" : "people"} can still join.`
-                  : `This pod is full — ${capacity} of ${capacity} seats taken.`}
+                  ? `${memberCount} of ${capacity} seats taken. ${seatsLeft} ${seatsLeft === 1 ? "person" : "people"} can still join.`
+                  : `This pod is full: ${capacity} of ${capacity} seats taken.`}
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press">

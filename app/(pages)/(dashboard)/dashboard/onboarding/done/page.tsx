@@ -42,7 +42,7 @@ export default async function OnboardingDonePage({ searchParams }: { searchParam
             <Check className="h-7 w-7 text-primary" strokeWidth={3} />
           </span>
           <h1 id="onb-done-title" className="mt-5 text-balance text-2xl font-bold tracking-tight text-primary md:text-3xl">
-            You&apos;re set — go back to the extension
+            You&apos;re set. Go back to the extension
           </h1>
           <p className="mx-auto mt-3 max-w-md text-pretty text-sm leading-relaxed text-primary/65">
             Your profile is complete, so it can fill applications, build a resume for a job and answer questions about you. If its panel is open, it

@@ -111,7 +111,7 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
         title="Your profile"
         done={done}
         doneLabel="Complete"
-        blurb="What the extension types into application forms. Check it reads like you — it's saved to your profile, and you can change it any time in Settings."
+        blurb="What the extension types into application forms. Check it reads like you. It's saved to your profile, and you can change it any time in Settings."
       />
 
       {prefilled && (
@@ -131,7 +131,7 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
               </>
             ) : (
               <>
-                Read <span className="font-semibold">{prefilledFrom ?? "your resume"}</span> — everything it had was already filled in, so nothing changed.
+                Read <span className="font-semibold">{prefilledFrom ?? "your resume"}</span>. Everything it had was already filled in, so nothing changed.
               </>
             )}
           </p>

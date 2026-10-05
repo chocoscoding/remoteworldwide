@@ -68,7 +68,7 @@ const NewResumeDialog: FC<NewResumeDialogProps> = ({ open, onOpenChange, current
                 if (e.key === "Enter") handleCreate();
               }}
               maxLength={80}
-              placeholder="e.g. Stripe — Senior Designer"
+              placeholder="e.g. Stripe - Senior Designer"
               className="rounded-xl border border-black/12 bg-[#fbfbf7] px-4 py-3 text-sm text-primary placeholder:text-black/35 outline-none focus:border-black/30 transition-colors"
             />
           </label>
@@ -92,7 +92,7 @@ const NewResumeDialog: FC<NewResumeDialogProps> = ({ open, onOpenChange, current
                 mode === "duplicate" ? "border-primary ring-1 ring-primary" : "border-black/10 hover:border-black/25"
               )}>
               <p className="text-sm font-bold text-primary">Duplicate &quot;{currentDocLabel}&quot;</p>
-              <p className="text-xs text-black/45 mt-0.5">Copies its content — starts with the default design, not its customization.</p>
+              <p className="text-xs text-black/45 mt-0.5">Copies its content. Starts with the default design, not its customization.</p>
             </button>
           </div>
         </div>

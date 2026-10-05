@@ -61,7 +61,7 @@ const OnboardingChecklist: FC<OnboardingChecklistProps> = ({ items, onJump, clas
                 </span>
                 <span className="min-w-0 flex-1 break-words text-xs font-medium leading-snug text-white/60">
                   {item.label}
-                  <span className="sr-only"> — done</span>
+                  <span className="sr-only">, done</span>
                 </span>
               </li>
             ) : (

@@ -69,7 +69,7 @@ const LeavePodDialog: FC<LeavePodDialogProps> = ({ open, onOpenChange }) => {
               <p className="text-[13px] leading-relaxed text-black/65">
                 {isOwner
                   ? `${name} passes to whoever has been there longest, and the other ${others === 1 ? "member keeps" : `${others} members keep`} everything as it is.`
-                  : "Your streak and your board are yours — they stay with you."}
+                  : "Your streak and your board are yours. They stay with you."}
               </p>
             )}
 

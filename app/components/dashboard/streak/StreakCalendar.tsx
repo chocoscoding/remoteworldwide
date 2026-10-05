@@ -129,7 +129,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
                     animate={reduceMotion ? undefined : { opacity: muted ? 0.3 : 1, scale: 1 }}
                     transition={{ duration: 0.2, delay: reduceMotion ? 0 : (wi * 7 + di) * 0.006, ease: "easeOut" }}
                     whileHover={reduceMotion ? undefined : { scale: 1.14, zIndex: 1 }}
-                    title={`${shortDateLabel(cell.key)} — ${fullDay ? "Full day" : visual.label}${cell.day?.count ? ` (${cell.day.count})` : ""}`}
+                    title={`${shortDateLabel(cell.key)}: ${fullDay ? "Full day" : visual.label}${cell.day?.count ? ` (${cell.day.count})` : ""}`}
                     className={cn(
                       "relative aspect-square rounded-md border-[1.5px] flex items-center justify-center text-[11px] font-bold cursor-default select-none",
                       visual.cell,

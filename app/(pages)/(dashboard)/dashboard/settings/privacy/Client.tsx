@@ -16,17 +16,17 @@ const ROWS: { key: keyof PrivacyState; label: string; hint: string }[] = [
   {
     key: "showProfileToPod",
     label: "Show my profile to my pod",
-    hint: "Pod mates see your name, photo, streak and this week's application count on the leaderboard. Off, you show as “A pod member” — still on the board, just not by name.",
+    hint: "Pod mates see your name, photo, streak and this week's application count on the leaderboard. Off, you show as “A pod member”: still on the board, just not by name.",
   },
   {
     key: "shareOutcomesAnonymously",
     label: "Share outcomes anonymously",
-    hint: "For benchmarks built from job seekers' reply rates, stripped of anything identifying. None exists yet — when one does, this choice decides whether you're in it.",
+    hint: "For benchmarks built from job seekers' reply rates, stripped of anything identifying. None exists yet. When one does, this choice decides whether you're in it.",
   },
   {
     key: "allowResumeIndexing",
     label: "Allow resume indexing",
-    hint: "For partner job boards matching resumes to their listings. No partner board exists yet — when one does, yours goes only if this is on. Off by default.",
+    hint: "For partner job boards matching resumes to their listings. No partner board exists yet. When one does, yours goes only if this is on. Off by default.",
   },
   {
     key: "allowAiCoaching",
@@ -56,7 +56,7 @@ const PrivacyClient: FC = () => {
       <SettingsSection title="Your data" description="Everything we hold about you, on request.">
         <SettingsRow
           label="Export your data"
-          hint="Everything we hold: profile, applications, saved jobs and answers, documents, coach and interview history, credits — as one JSON file. Files themselves aren't included, only their details.">
+          hint="Everything we hold: profile, applications, saved jobs and answers, documents, coach and interview history, credits, as one JSON file. Files themselves aren't included, only their details.">
           <button type="button" className={BUTTON_OUTLINE} disabled={exportData.isPending} onClick={() => exportData.mutate()}>
             <Download className="h-3.5 w-3.5" />
             {exportData.isPending ? "Gathering…" : "Download my data"}

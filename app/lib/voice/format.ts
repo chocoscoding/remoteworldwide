@@ -68,7 +68,7 @@ const MINUS = "−";
 
 /** "+1.2", "−3.8", "0.0". For values that sit either side of the user's own median. */
 export function formatSigned(value: number, digits = 1): string {
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   const fixed = Math.abs(value).toFixed(digits);
   // A value that rounds to zero carries no sign: "−0.0" says more than it means.
   if (Number(fixed) === 0) return fixed;
@@ -135,7 +135,7 @@ const round1 = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
  * written as given rather than dropped.
  */
 export function formatMeasureValue(value: number, unitName: string): string {
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   switch (unitName) {
     case "wpm":
       return `${Math.round(value)} wpm`;
@@ -158,7 +158,7 @@ export function formatMeasureValue(value: number, unitName: string): string {
  * would be ambiguous (seconds, and decibels, which are signed).
  */
 function formatBaseline(value: number, unitName: string): string {
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   switch (unitName) {
     case "wpm":
       return String(Math.round(value));

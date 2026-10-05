@@ -199,7 +199,7 @@ const Results: FC<ResultsProps> = ({ search, company, askedIds, draftingId, onDr
         <DashEmptyState
           icon={SearchX}
           title={`Nothing public turned up for ${company}`}
-          body="Small or very new companies often have few public profiles. This search cost nothing — try again later, or check the company's own site."
+          body="Small or very new companies often have few public profiles. This search cost nothing. Try again later, or check the company's own site."
         />
       )}
 

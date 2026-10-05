@@ -37,7 +37,7 @@ const StreakPill: FC<StreakPillProps> = ({ className }) => {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`${current}-day streak — open streak details`}
+        aria-label={`${current}-day streak. Open streak details`}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold whitespace-nowrap cursor-pointer",
           tier.chip,

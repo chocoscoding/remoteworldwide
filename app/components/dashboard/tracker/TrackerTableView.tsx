@@ -143,10 +143,10 @@ export const TrackerTableView: FC<TrackerTableViewProps> = ({ columns, onStatus,
                     <StatusMenu value={columnId} onChange={(to) => onStatus(card.id, to)} />
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "—"}</span>
+                    <span className="text-xs text-black/55 whitespace-nowrap">{daysAgoLabel(card.daysAgo) ?? "-"}</span>
                   </td>
                   <td className="px-4 py-3 max-w-[240px]">
-                    {card.statusChip ? <StatusChipBadge chip={card.statusChip} /> : <span className="text-xs text-black/30">—</span>}
+                    {card.statusChip ? <StatusChipBadge chip={card.statusChip} /> : <span className="text-xs text-black/30">-</span>}
                   </td>
                 </tr>
               ))}

@@ -82,7 +82,7 @@ export function useCheckResume() {
       // the check must be compared against later. Reading it after the import
       // would stamp the check with whatever the user typed while it ran.
       const text = resumeContentToText(content);
-      const jobLabel = job ? `${job.company} — ${job.role}` : null;
+      const jobLabel = job ? `${job.role} at ${job.company}` : null;
 
       setFailure(null);
       setStatus("preparing");

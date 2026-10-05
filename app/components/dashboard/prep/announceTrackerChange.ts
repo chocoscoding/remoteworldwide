@@ -26,7 +26,7 @@ export function announceTrackerChange(
   openTracker: () => void,
   { quietWhenTracked = false }: { quietWhenTracked?: boolean } = {},
 ): void {
-  const job = `${company} — ${role}`;
+  const job = `${role} at ${company}`;
   const viewTracker = { label: "View tracker", onClick: openTracker };
   if (alreadyTracked) {
     if (!quietWhenTracked) toast("You already have a prep track for this job", { description: `Opened it: ${job}` });

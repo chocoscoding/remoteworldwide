@@ -43,7 +43,7 @@ const AccountClient: FC<{ verified: boolean; accountEmail: string | null }> = ({
       <SettingsSection title="Sign-in" description="How you get into Remote Worldwide.">
         <SettingsRow
           label="Email"
-          hint={verified ? "Confirmed. Used for sign-in and every notification." : "Not confirmed yet — check your inbox for the link."}
+          hint={verified ? "Confirmed. Used for sign-in and every notification." : "Not confirmed yet. Check your inbox for the link."}
           stacked
           htmlFor="a-email">
           <div className="flex flex-wrap gap-2">
@@ -100,7 +100,7 @@ const AccountClient: FC<{ verified: boolean; accountEmail: string | null }> = ({
               hint={
                 provider.connected
                   ? onlyWayIn
-                    ? "Connected. This is the only way you sign in — connect another before removing it."
+                    ? "Connected. This is the only way you sign in, so connect another before removing it."
                     : "Connected."
                   : `Not connected. You'll be sent to ${provider.name} and back.`
               }>
@@ -144,7 +144,7 @@ const AccountClient: FC<{ verified: boolean; accountEmail: string | null }> = ({
         <div className="mb-3.5 flex gap-2.5 rounded-xl border border-[#c0392b]/25 bg-[#fdeae6] px-3.5 py-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-none text-[#b23c26]" />
           <p className="text-xs leading-relaxed text-[#8f3120]">
-            Your account is locked straight away and every device is signed out. Nothing is deleted for seven days — sign in
+            Your account is locked straight away and every device is signed out. Nothing is deleted for seven days. Sign in
             before then and choose <b className="font-bold">Cancel deletion</b> to keep it. After that it goes for good: your
             pod loses your history, referral introductions in flight are withdrawn, and unused credits are forfeited. Export
             your data first if you want to keep it.

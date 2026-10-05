@@ -213,7 +213,7 @@ const DashboardSidebar: FC = () => {
                   <Link
                     key={item.id}
                     href={item.href}
-                    title={note ? (collapsed ? `${item.label} — ${note}` : note) : collapsed ? item.label : undefined}
+                    title={note ? (collapsed ? `${item.label}: ${note}` : note) : collapsed ? item.label : undefined}
                     className={cn(
                       "flex items-center rounded-lg text-sm cursor-pointer transition-colors",
                       collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-3 py-2.5",

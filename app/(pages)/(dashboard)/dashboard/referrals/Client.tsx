@@ -391,7 +391,7 @@ const ReferralsScreen: FC = () => {
                         {moreKnown && "+"}
                       </span>
                     </h3>
-                    <span className="text-xs text-black/55">From your contacts — the warmest way in</span>
+                    <span className="text-xs text-black/55">From your contacts, the warmest way in</span>
                   </div>
                   <DashCard className="overflow-hidden p-0 br-bold br-lime">
                     <div className="flex flex-col divide-y divide-black/8">

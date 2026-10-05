@@ -94,7 +94,7 @@ export const isScanGone = (error: unknown): boolean => error instanceof BackendE
  */
 export function explanationNote(record: Pick<ScanRecord, "explanationStatus">): string | null {
   if (record.explanationStatus === "none") return "Add a job description to get a written breakdown";
-  if (record.explanationStatus === "unavailable") return "The written breakdown for this scan isn't available — your score and matches are unaffected.";
+  if (record.explanationStatus === "unavailable") return "The written breakdown for this scan isn't available. Your score and matches are unaffected.";
   return null;
 }
 

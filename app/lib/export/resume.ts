@@ -151,7 +151,7 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         children.push(heading(section.label));
         for (const entry of entries) {
           const title: ParagraphChild[] = [new TextRun({ text: clean(entry.role), bold: true })];
-          if (clean(entry.company)) title.push(new TextRun({ text: `${clean(entry.role) ? " — " : ""}${clean(entry.company)}` }));
+          if (clean(entry.company)) title.push(new TextRun({ text: `${clean(entry.role) ? ", " : ""}${clean(entry.company)}` }));
           children.push(entryLine(title, printed(entry.dates)));
           // The location on its own line under the role, as the page prints it.
           if (clean(entry.location) && design.entries.showLocation !== false) {
@@ -167,7 +167,7 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         children.push(heading(section.label));
         for (const entry of entries) {
           const title: ParagraphChild[] = [new TextRun({ text: clean(entry.school), bold: true })];
-          if (clean(entry.degree)) title.push(new TextRun({ text: `${clean(entry.school) ? " — " : ""}${clean(entry.degree)}` }));
+          if (clean(entry.degree)) title.push(new TextRun({ text: `${clean(entry.school) ? ", " : ""}${clean(entry.degree)}` }));
           children.push(entryLine(title, printed(entry.dates)));
           const extra = [clean(entry.location), clean(entry.detail)].filter(Boolean).join(" · ");
           if (extra) children.push(new Paragraph({ spacing: { after: 30 }, children: [new TextRun({ text: extra, color: muted })] }));
@@ -228,7 +228,7 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
           children.push(
             new Paragraph({
               spacing: { after: 40 },
-              children: [new TextRun({ text: clean(cert.name), bold: true }), ...(detail ? [new TextRun({ text: ` — ${detail}`, color: muted })] : [])],
+              children: [new TextRun({ text: clean(cert.name), bold: true }), ...(detail ? [new TextRun({ text: `, ${detail}`, color: muted })] : [])],
             }),
           );
         }
@@ -249,7 +249,7 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
 
   return new Document({
     creator: clean(content.name) || "Remote Worldwide",
-    title: `${clean(content.name) || "Resume"}${clean(content.title) ? ` — ${clean(content.title)}` : ""}`,
+    title: `${clean(content.name) || "Resume"}${clean(content.title) ? `, ${clean(content.title)}` : ""}`,
     styles: {
       default: {
         document: {
@@ -310,7 +310,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
       case "experience":
         for (const e of content.experience) {
           if (e.hidden || (!clean(e.role) && !clean(e.company))) continue;
-          block.push(`### ${[clean(e.role), clean(e.company)].filter(Boolean).join(" — ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
+          block.push(`### ${[clean(e.role), clean(e.company)].filter(Boolean).join(", ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
           if (clean(e.location)) block.push(clean(e.location));
           e.bullets.filter((b) => clean(b)).forEach((b) => block.push(`- ${clean(b)}`));
           block.push("");
@@ -319,7 +319,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
       case "education":
         for (const e of content.education) {
           if (!clean(e.school) && !clean(e.degree)) continue;
-          block.push(`### ${[clean(e.school), clean(e.degree)].filter(Boolean).join(" — ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
+          block.push(`### ${[clean(e.school), clean(e.degree)].filter(Boolean).join(", ")}${printed(e.dates) ? ` (${printed(e.dates)})` : ""}`);
           const extra = [clean(e.location), clean(e.detail)].filter(Boolean).join(" · ");
           if (extra) block.push(extra);
           block.push("");
@@ -337,7 +337,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
       case "projects":
         for (const p of content.projects) {
           if (!clean(p.name) && !clean(p.detail)) continue;
-          block.push(`### ${clean(p.name)}${clean(p.link) ? ` — ${clean(p.link)}` : ""}`);
+          block.push(`### ${clean(p.name)}${clean(p.link) ? ` (${clean(p.link)})` : ""}`);
           if (clean(p.detail)) block.push(clean(p.detail));
           block.push("");
         }
@@ -346,7 +346,7 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
         for (const c of content.certifications) {
           if (!clean(c.name)) continue;
           const detail = [clean(c.issuer), printed(c.year)].filter(Boolean).join(", ");
-          block.push(`- ${clean(c.name)}${detail ? ` — ${detail}` : ""}`);
+          block.push(`- ${clean(c.name)}${detail ? `, ${detail}` : ""}`);
         }
         break;
       case "custom":

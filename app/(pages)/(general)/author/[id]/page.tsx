@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const author = await getAuthorProfile((await params).id);
   if (!author) return { title: "Author not found", robots: { index: false } };
   const count = author._count.blogs;
-  const title = `${author.name} — ${SITE_NAME}`;
+  const title = `${author.name} | ${SITE_NAME}`;
   const description = author.about ? `${author.about.slice(0, 155)}${author.about.length > 155 ? "…" : ""}` : `${count} ${count === 1 ? "post" : "posts"} by ${author.name} on remote work and careers.`;
   const url = absoluteUrl(`/author/${author.slug}`);
   return {

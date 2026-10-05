@@ -385,7 +385,7 @@ const DAY_VISUALS: Record<Exclude<StreakDayStatus, "logged">, DayVisual> = {
   rest: { kind: "emoji", glyph: "💤", cell: "bg-[#f0f0ea] text-black/40 border-transparent", label: "Rest day" },
   freeze: { kind: "emoji", glyph: "❄️", cell: "bg-[#e8eef7] text-[#2f5d8a] border-[#2f5d8a]/30", label: "Streak freeze used" },
   missed: { kind: "number", glyph: "", cell: "bg-white text-black/25 border-black/10 border-dashed", label: "Missed" },
-  today: { kind: "number", glyph: "", cell: "bg-white text-[#222325] border-[#222325]", label: "Today — still open" },
+  today: { kind: "number", glyph: "", cell: "bg-white text-[#222325] border-[#222325]", label: "Today, still open" },
   future: { kind: "number", glyph: "", cell: "bg-transparent text-black/20 border-transparent", label: "Upcoming" },
 };
 

@@ -53,7 +53,7 @@ export const IMPORT_POLL_MS = 1_000;
  */
 export const IMPORT_WAIT_MS = 90_000;
 
-export const IMPORT_TIMED_OUT = "Reading that file is taking longer than usual. Try again in a minute — it may be ready by then.";
+export const IMPORT_TIMED_OUT = "Reading that file is taking longer than usual. Try again in a minute, it may be ready by then.";
 
 const IMPORT_FAILED = "That resume could not be read. Please try again.";
 

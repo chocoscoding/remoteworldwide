@@ -44,7 +44,7 @@ export interface FollowUpDue {
 /** How each kind is introduced to the user — the reason, not the instruction. */
 export const FOLLOW_UP_REASON: Record<FollowUpKind, string> = {
   "after-apply": "A week of silence is normal. A short nudge isn't pushy.",
-  "in-play": "You're mid-conversation — going quiet now costs you the momentum.",
+  "in-play": "You're mid-conversation. Going quiet now costs you the momentum.",
   "long-silence": "Two weeks out. One last note, then let it go.",
 };
 
@@ -113,7 +113,7 @@ export function draftFollowUp(due: FollowUpDue, senderFirstName: string): string
     return (
       `Hi,\n\n` +
       `I applied for the ${due.role} role at ${due.company} ${due.daysSilent} days ago and wanted to put my name in front of you once more.\n\n` +
-      `I'm still very interested — happy to send anything that would help, or to answer questions about my work.` +
+      `I'm still very interested and happy to send anything that would help, or to answer questions about my work.` +
       sign
     );
   }
@@ -129,7 +129,7 @@ export function draftFollowUp(due: FollowUpDue, senderFirstName: string): string
 
   return (
     `Hi,\n\n` +
-    `Checking in one last time on the ${due.role} role at ${due.company} — it's been about ${due.daysSilent} days.\n\n` +
+    `Checking in one last time on the ${due.role} role at ${due.company}. It's been about ${due.daysSilent} days.\n\n` +
     `If the search has moved on, no problem at all, and I'd appreciate knowing so I can close it out on my end.` +
     sign
   );

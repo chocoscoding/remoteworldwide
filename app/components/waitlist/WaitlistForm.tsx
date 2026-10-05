@@ -272,7 +272,7 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
         </p>
       ) : (
         <p id={hintId} className={cn("mt-3 text-xs", dark ? "text-white/65" : "text-primary/70")}>
-          Free to join. A confirmation now, then one email when your spot opens — no spam, ever.
+          Free to join. A confirmation now, then one email when your spot opens. No spam, ever.
         </p>
       )}
     </div>

@@ -102,7 +102,7 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks, now, onOpenTrack, onQuickPracti
             <div className={cn(RAISED_DARK, "p-6 w-full")}>
               <p className="text-[10.5px] font-bold tracking-[0.12em] uppercase text-[#e1f073] mb-2.5">Next up · {heroDateLabel(heroTrack, now)}</p>
               <h2 className="text-[22px] font-bold leading-tight mb-1.5">
-                {heroTrack.company} — {heroTrack.role}
+                {heroTrack.role} at {heroTrack.company}
               </h2>
               <p className="text-sm text-white/55 mb-5">
                 {heroTrack.roundLabel} · {heroTrack.location}
@@ -216,7 +216,7 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks, now, onOpenTrack, onQuickPracti
                 <button type="button" onClick={() => onOpenTrack(t.id)} className="min-w-0 flex-1 text-left cursor-pointer">
                   <span className="flex items-center gap-2.5 min-w-0">
                     <span className="text-sm font-bold text-primary truncate group-hover:underline underline-offset-2">
-                      {t.company} — {t.role}
+                      {t.role} at {t.company}
                     </span>
                     <TrackStateChip state={state} />
                   </span>
@@ -232,7 +232,7 @@ const PrepIndex: FC<PrepIndexProps> = ({ tracks, now, onOpenTrack, onQuickPracti
 
                 <ScoreRing value={score} size={34} label={<span className="text-[10.5px] font-bold text-primary tabular-nums">{score}</span>} />
 
-                <button type="button" onClick={() => onOpenTrack(t.id)} aria-label={`Open prep for ${t.company} — ${t.role}`} className={ICON_BUTTON_PRESS}>
+                <button type="button" onClick={() => onOpenTrack(t.id)} aria-label={`Open prep for ${t.role} at ${t.company}`} className={ICON_BUTTON_PRESS}>
                   <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
                 </button>
               </div>

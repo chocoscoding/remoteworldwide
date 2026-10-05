@@ -56,7 +56,7 @@ export function sessionResumeReady(item: Pick<PrepTrackItem, "resumeId" | "defau
 export const SOURCE_LABELS: Record<Exclude<TrackResumeSource["kind"], "none">, string> = {
   own: "Chosen for this track",
   application: "From your application",
-  master: "Default — your master resume",
+  master: "Default: your master resume",
 };
 
 /** What going back to the default would mean, for the picker's "Use the default" row. Null when there is no default. */

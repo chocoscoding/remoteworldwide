@@ -234,7 +234,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
             </b>
             , from its posting. The other {generalCount}{" "}
             {generalCount === 1 ? "is a general practice question" : "are general practice questions"}, asked last
-            {moreIn ? ` — add ${moreIn} to be asked more of this job's own` : ""}.
+            {moreIn ? `. Add ${moreIn} to be asked more of this job's own` : ""}.
           </>
         ) : (
           <>
@@ -301,7 +301,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
           onClick={onBack}
           className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 hover:text-primary cursor-pointer w-fit">
           <ArrowLeft className="h-3.5 w-3.5" />
-          {track.company} — {track.role}
+          {track.role} at {track.company}
         </button>
       </div>
 
@@ -419,7 +419,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
             );
           })}
         </div>
-        <p className="text-xs text-black/45 mt-3">Pick as many as you want — questions alternate between them.</p>
+        <p className="text-xs text-black/45 mt-3">Pick as many as you want. Questions alternate between them.</p>
       </DashCard>
 
       <DashCard className="p-6">
@@ -515,7 +515,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
               : !configLoading && !voiceOffered
                 ? // Recorded interviews are off (the AI service's VOICE_INTERVIEWS_ENABLED),
                   // so the live screen runs unsaved: no report, so no scorecard to promise.
-                  `${questionTotal} questions, answered out loud. Practice only for now — this run won't be saved or scored.`
+                  `${questionTotal} questions, answered out loud. Practice only for now, so this run won't be saved or scored.`
                 : `${questionTotal} questions, spoken answers, a scorecard and delivery coaching at the end.${
                     !voiceOffered
                       ? ""

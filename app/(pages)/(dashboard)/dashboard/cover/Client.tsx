@@ -264,7 +264,7 @@ const NoResumeNote: FC<{ className?: string }> = ({ className }) => (
   <div className={cn("flex items-start gap-2.5 rounded-xl border border-black/12 bg-white px-4 py-3 text-left", className)}>
     <FileWarning className="mt-0.5 h-4 w-4 flex-none text-black/40" />
     <p className="text-xs leading-relaxed text-black/60">
-      We write the letter from your resume — you don&apos;t have one yet.{" "}
+      We write the letter from your resume, and you don&apos;t have one yet.{" "}
       <Link href="/dashboard/resume" className="font-bold text-primary underline decoration-2 underline-offset-2">
         Add a resume
       </Link>{" "}
@@ -443,7 +443,7 @@ const CoverScreen: FC = () => {
     if (!openedError) return;
     toast.error(
       openedError instanceof BackendError && openedError.status === 404
-        ? "That cover letter couldn't be found — it may have been deleted."
+        ? "That cover letter couldn't be found. It may have been deleted."
         : apiMessage(openedError),
     );
   }, [openedError]);
@@ -817,7 +817,7 @@ const CoverScreen: FC = () => {
               "Cover letters"
             ) : (
               <>
-                <span className="text-[13px] font-semibold text-black/45">Cover letter —</span>{" "}
+                <span className="text-[13px] font-semibold text-black/45">Cover letter:</span>{" "}
                 {isBlankDraft ? (
                   "New draft"
                 ) : (
@@ -956,7 +956,7 @@ const CoverScreen: FC = () => {
                       )}
                     </>
                   ) : (
-                    <span className="text-sm text-black/50">Not linked to a job — pick one to have a letter written.</span>
+                    <span className="text-sm text-black/50">Not linked to a job. Pick one to have a letter written.</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-none">
@@ -1024,7 +1024,7 @@ const CoverScreen: FC = () => {
             {/* Disclosure toggle + tone chips */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               {isBlankDraft ? (
-                <span className="text-sm font-semibold text-black/35">Blank draft — not linked to a job</span>
+                <span className="text-sm font-semibold text-black/35">Blank draft, not linked to a job</span>
               ) : (
                 <button
                   type="button"
@@ -1053,26 +1053,26 @@ const CoverScreen: FC = () => {
                   <div className="flex flex-col divide-y divide-black/8">
                     <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 first:pt-0">
                       <p className="text-xs font-bold text-black/40 sm:pt-0.5">Your resume</p>
-                      <p className="text-sm text-primary">{resume?.fileName ?? "—"}</p>
+                      <p className="text-sm text-primary">{resume?.fileName ?? "-"}</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3">
                       <p className="text-xs font-bold text-black/40 sm:pt-0.5">The posting</p>
                       <p className="text-sm text-primary">
                         {linkedJob?.description
-                          ? `${linkedJob.company} — ${linkedJob.role}`
-                          : `${linkedJob?.company ?? "—"} — no description, so the letter is written from your resume alone`}
+                          ? `${linkedJob.role} at ${linkedJob.company}`
+                          : `${linkedJob?.company ?? "-"}: no description, so the letter is written from your resume alone`}
                       </p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-4 gap-y-1 py-3 last:pb-0">
                       <p className="text-xs font-bold text-black/40 sm:pt-0.5">Tone</p>
                       <p className="text-sm text-primary">
-                        {TONE_OPTIONS.find((option) => option.id === tone)?.label} — {paragraphTarget} paragraph
+                        {TONE_OPTIONS.find((option) => option.id === tone)?.label}, {paragraphTarget} paragraph
                         {paragraphTarget === 1 ? "" : "s"}
                       </p>
                     </div>
                   </div>
                   <p className="mt-4 text-xs leading-relaxed text-black/45">
-                    Every employer, date and number in the letter comes from that resume. If something reads wrong, it is in the resume —
+                    Every employer, date and number in the letter comes from that resume. If something reads wrong, it is in the resume, so
                     fix it there and rewrite.
                   </p>
                 </DashCard>
@@ -1153,10 +1153,10 @@ const CoverScreen: FC = () => {
                       {autosave.status.kind === "error" && (
                         <span className="font-semibold text-[#b23c26]">
                           {autosave.status.retrying ? (
-                            "not saved yet — we'll keep trying. Your changes are safe on this page."
+                            "not saved yet, we'll keep trying. Your changes are safe on this page."
                           ) : (
                             <>
-                              not saved — {autosave.status.message}{" "}
+                              not saved: {autosave.status.message}{" "}
                               <button
                                 type="button"
                                 onClick={autosave.flush}

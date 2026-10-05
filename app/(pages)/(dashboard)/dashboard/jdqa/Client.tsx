@@ -1070,7 +1070,7 @@ const JdqaScreen: FC = () => {
                   aria-label={listening ? "Stop dictating" : requesting ? "Cancel dictation" : "Dictate your question"}
                   title={
                     micStatus === "denied"
-                      ? "Mic blocked — type instead"
+                      ? "Mic blocked. Type instead"
                       : !dictationSupported
                         ? "Dictation isn't available in this browser"
                         : listening
@@ -1078,7 +1078,7 @@ const JdqaScreen: FC = () => {
                           : requesting
                             ? "Cancel dictation"
                             : micStatus === "unavailable"
-                              ? "Dictation isn't available right now — type instead"
+                              ? "Dictation isn't available right now. Type instead"
                               : "Dictate"
                   }
                   className={cn(

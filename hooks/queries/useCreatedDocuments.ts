@@ -68,7 +68,7 @@ export function useCreatedDocumentAction() {
     },
     onSuccess: (_, action) => {
       if (action.type === "remove") toast.success(action.kind === "resume" ? "Resume deleted" : "Cover letter deleted");
-      if (action.type === "archive") toast.success(action.archived ? "Archived — it's under Archived now" : "Restored");
+      if (action.type === "archive") toast.success(action.archived ? "Archived. It's under Archived now" : "Restored");
     },
     onError: (error) => toast.error(apiMessage(error)),
     onSettled: (_, __, action) => {

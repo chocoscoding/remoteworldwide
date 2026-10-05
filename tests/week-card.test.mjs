@@ -75,7 +75,7 @@ describe("the week card", () => {
   it("captions only what happened, with the invite link tagged per network", () => {
     assert.equal(
       weekCaption(week(), LINK),
-      `My job search last week: 7 applications, 2 interviews and 1 offer, and a 5-day streak \u{1F525}. Tracking it all on Remote Worldwide — if you're searching too: ${LINK}`,
+      `My job search last week: 7 applications, 2 interviews and 1 offer, and a 5-day streak \u{1F525}. Tracking it all on Remote Worldwide. If you're searching too: ${LINK}`,
     );
     const quiet = weekCaption(week({ partial: true, applied: 1, interviews: 0, offers: 0, streak: 0 }), LINK, "whatsapp");
     assert.match(quiet, /^My job search this week so far: 1 application\. /);

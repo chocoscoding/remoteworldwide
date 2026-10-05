@@ -35,7 +35,7 @@ const PauseSearchDialog: FC<PauseSearchDialogProps> = ({ open, onOpenChange }) =
             <DialogTitle className="text-lg font-bold text-primary">Pause your search</DialogTitle>
           </div>
           <DialogDescription className="text-sm leading-relaxed text-black/55">
-            Your {current}-day streak is held exactly where it is. No prompts, no goals, nothing to keep up with — it&apos;s all
+            Your {current}-day streak is held exactly where it is. No prompts, no goals, nothing to keep up with. It&apos;s all
             here when you come back.
           </DialogDescription>
 

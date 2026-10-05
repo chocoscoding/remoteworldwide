@@ -288,7 +288,7 @@ const AtsScreen: FC = () => {
             <p className="min-w-0 flex-1 text-sm text-black/60">
               {isScanGone(stored.error)
                 ? "That scan isn't available any more."
-                : "That scan couldn't be opened just now — try the link again in a moment."}
+                : "That scan couldn't be opened just now. Try the link again in a moment."}
             </p>
             <button
               type="button"

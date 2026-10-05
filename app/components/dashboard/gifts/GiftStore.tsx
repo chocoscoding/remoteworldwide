@@ -47,7 +47,7 @@ const GiftStore: FC = () => {
               <span className="text-base text-white/55">waiting</span>
             </div>
             <DialogDescription className="mt-2 text-sm text-white/55">
-              Earned by showing up and by real wins. Use them whenever you choose — they don&apos;t expire.
+              Earned by showing up and by real wins. Use them whenever you choose. They don&apos;t expire.
             </DialogDescription>
           </div>
         </div>
@@ -60,8 +60,8 @@ const GiftStore: FC = () => {
               <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-black/20 px-4 py-8 text-center">
                 <Gift className="h-5 w-5 text-black/30" />
                 <p className="text-xs leading-relaxed text-black/55">
-                  Nothing waiting right now. Milestones, full weeks and real wins — interviews, offers, answered
-                  questions — all land here.
+                  Nothing waiting right now. Milestones, full weeks and real wins (interviews, offers, answered
+                  questions) all land here.
                 </p>
               </div>
             ) : (
@@ -105,7 +105,7 @@ const GiftStore: FC = () => {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs text-black/60">
-                      {GIFT_CATALOGUE[g.kind].label} — {g.reason}
+                      {GIFT_CATALOGUE[g.kind].label}: {g.reason}
                     </span>
                     {/* A day of Pro's end is local time: the server's render can't know the zone. */}
                     <span className="block text-[10px] text-black/35" suppressHydrationWarning>

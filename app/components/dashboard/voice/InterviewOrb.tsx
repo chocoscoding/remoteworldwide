@@ -154,7 +154,7 @@ const InterviewOrb: FC<InterviewOrbProps> = ({ adapter, signal, label, controlNo
         // status surface, and labelling it "start or stop" would promise a
         // button that is not there.
         {...(guarded
-          ? { "aria-label": label ? `${label} — start or stop the ${controlNoun}` : `Start or stop the ${controlNoun}` }
+          ? { "aria-label": label ? `${label}. Start or stop the ${controlNoun}` : `Start or stop the ${controlNoun}` }
           : { interactive: false })}
         slotProps={{
           // The caption is rendered below rather than inside, so it can say

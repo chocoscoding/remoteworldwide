@@ -42,7 +42,7 @@ const EvidenceDialog: FC<EvidenceDialogProps> = ({ open, onOpenChange, title, va
       <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
         {evidence.length === 0 ? (
           <p className="text-sm text-black/50 leading-relaxed border-t border-black/10 pt-4">
-            {emptyNote ?? "Nothing flagged here — this one held up across your answers."}
+            {emptyNote ?? "Nothing flagged here. This one held up across your answers."}
           </p>
         ) : (
           <div className="flex flex-col gap-4 border-t border-black/10 pt-4">

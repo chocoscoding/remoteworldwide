@@ -29,7 +29,7 @@ export const TrackLoading: FC<{ bare?: boolean }> = ({ bare }) => {
 };
 
 export const TrackLoadError: FC<{ error: unknown; onRetry: () => void; bare?: boolean }> = ({ error, onRetry, bare }) => {
-  const body = <PrepEmptyState icon={CloudOff} title="Your prep couldn't load" body={`${apiMessage(error)} Nothing is lost — try again in a moment.`} ctaLabel="Try again" onCta={onRetry} />;
+  const body = <PrepEmptyState icon={CloudOff} title="Your prep couldn't load" body={`${apiMessage(error)} Nothing is lost. Try again in a moment.`} ctaLabel="Try again" onCta={onRetry} />;
   return bare ? body : <PrepPageShell>{body}</PrepPageShell>;
 };
 

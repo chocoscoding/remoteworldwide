@@ -112,7 +112,7 @@ const DraftPanel: FC<DraftPanelProps> = ({ contact, job }) => {
             <span className="font-bold text-primary">{job.company}</span>
             {contact.company.trim().toLowerCase() !== job.company.trim().toLowerCase() && (
               <>
-                {" "}— {contact.company ? `${first} isn't at ${job.company}` : `we don't know where ${first} works`}, so this asks who they know rather than for a referral.
+                . {contact.company ? `${first} isn't at ${job.company}` : `We don't know where ${first} works`}, so this asks who they know rather than for a referral.
               </>
             )}
           </p>
@@ -177,7 +177,7 @@ const DraftPanel: FC<DraftPanelProps> = ({ contact, job }) => {
       <p className="mt-3 text-xs text-black/55">
         {asked
           ? "Logged to your activity. Give it a few days before a nudge."
-          : "Send it however you like — marking it asked keeps a record of who you asked, for which job, and what you said."}
+          : "Send it however you like. Marking it asked keeps a record of who you asked, for which job, and what you said."}
       </p>
     </DashCard>
   );

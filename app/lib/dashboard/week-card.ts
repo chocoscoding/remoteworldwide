@@ -68,6 +68,6 @@ export function weekCaption(report: StreakWeekReport, link: string, utmSource?: 
   const when = report.partial ? "this week so far" : "last week";
   return (
     `My job search ${when}: ${listOf(parts)}${streak}. ` +
-    `Tracking it all on Remote Worldwide — if you're searching too: ${trackedLink(link, utmSource, "weekcard")}`
+    `Tracking it all on Remote Worldwide. If you're searching too: ${trackedLink(link, utmSource, "weekcard")}`
   );
 }

@@ -129,7 +129,7 @@ const MatchBlock: FC<{ hasPosting: boolean; loading: boolean; failed: boolean; s
         {scan.degraded && (
           <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-black/50">
             <TriangleAlert className="mt-px h-3 w-3 flex-none" />
-            {scan.degradedReason ?? "Scored on a reduced path — treat the match as approximate."}
+            {scan.degradedReason ?? "Scored on a reduced path, so treat the match as approximate."}
           </p>
         )}
       </div>
@@ -193,7 +193,7 @@ const PayoffPanel: FC<PayoffPanelProps> = ({ result, onClose }) => {
         <div className="flex items-center gap-2.5 border-b-2 border-[#222325] bg-[#e1f073] px-7 py-3">
           <Trophy className="h-4 w-4 flex-none text-primary" />
           <p className="text-sm font-bold text-primary">
-            {pendingMilestone.label} unlocked — a gift is waiting
+            {pendingMilestone.label} unlocked. A gift is waiting
             {pendingMilestone.perk ? ` · ${pendingMilestone.perk}` : ""}
           </p>
         </div>

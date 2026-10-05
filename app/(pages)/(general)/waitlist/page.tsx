@@ -122,7 +122,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: "What will you email me?",
     a: (
       <>
-        A confirmation now, then one email when your spot opens — no spam, ever. More in our{" "}
+        A confirmation now, then one email when your spot opens. No spam, ever. More in our{" "}
         <Link
           href="/privacy-policy"
           className={LINK}>
@@ -136,7 +136,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: "Can I use anything before my invite?",
     a: (
       <>
-        Yes — the{" "}
+        Yes, the{" "}
         <Link
           href="/jobs"
           className={LINK}>

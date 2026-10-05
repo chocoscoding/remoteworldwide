@@ -213,7 +213,7 @@ const PodClient: FC = () => {
                 size="md"
                 onClick={() => (loggedToday ? logDay(1) : openLog())}
                 disabled={busy}
-                title={loggedToday ? "Show the pod what you did today" : "Log an application — the pod sees it on its own"}>
+                title={loggedToday ? "Show the pod what you did today" : "Log an application. The pod sees it on its own"}>
                 <Flame className="h-4 w-4" />
                 Log today
               </StickerButton>

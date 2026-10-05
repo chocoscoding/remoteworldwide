@@ -95,7 +95,7 @@ const ManageGoalsDialog: FC<ManageGoalsDialogProps> = ({ onClose, onSuggest }) =
             <div>
               <DialogPrimitive.Title className="text-lg font-bold text-primary">Pod goals</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-1 text-sm text-black/60">
-                What the pod works toward together. Changes go to a vote — {voteMajority} of 7 wins.
+                What the pod works toward together. Changes go to a vote, and {voteMajority} of 7 wins.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close className="inline-flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md bg-white text-[#222325] br-shadow-press">
@@ -125,7 +125,7 @@ const ManageGoalsDialog: FC<ManageGoalsDialogProps> = ({ onClose, onSuggest }) =
                         </div>
                       </div>
                       {goal.protected ? (
-                        <span title="Every pod carries this — it can't be voted out." className="flex-none text-black/40">
+                        <span title="Every pod carries this. It can't be voted out." className="flex-none text-black/40">
                           <Lock className="h-3.5 w-3.5" />
                         </span>
                       ) : (

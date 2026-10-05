@@ -163,7 +163,7 @@ const ProfileClient: FC = () => {
         <TagList
           tags={profile.skills}
           onRemove={(t) => setProfile({ skills: profile.skills.filter((s) => s !== t) })}
-          emptyNote="No skills yet — add a few so we can match you properly."
+          emptyNote="No skills yet. Add a few so we can match you properly."
         />
       </SettingsSection>
 

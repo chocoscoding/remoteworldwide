@@ -64,8 +64,8 @@ const RepairStreakPanel: FC = () => {
             </div>
             <DialogDescription className="mt-2 text-sm text-white/55">
               {inWindow
-                ? `Life happened — it does. You can have them back for ${hoursLeft} more ${hoursLeft === 1 ? "hour" : "hours"}.`
-                : "That run is done — but none of the work behind it is. Every application still counts."}
+                ? `Life happened, it does. You can have them back for ${hoursLeft} more ${hoursLeft === 1 ? "hour" : "hours"}.`
+                : "That run is done, but none of the work behind it is. Every application still counts."}
             </DialogDescription>
           </div>
 
@@ -91,21 +91,21 @@ const RepairStreakPanel: FC = () => {
                 {hasRestore ? (
                   <StickerButton variant="primary" size="lg" className="w-full" disabled={repairing} onClick={restoreStreak}>
                     <RotateCcw className="h-4 w-4" />
-                    {`Use your Streak restore — all ${brokenStreak} days back`}
+                    {`Use your Streak restore: all ${brokenStreak} days back`}
                   </StickerButton>
                 ) : (
                   <StickerButton variant="primary" size="lg" className="w-full" disabled={repairing} onClick={repairWithCredits}>
                     <RotateCcw className="h-4 w-4" />
-                    {`Repair all ${brokenStreak} days — ${priceCredits} credits`}
+                    {`Repair all ${brokenStreak} days for ${priceCredits} credits`}
                   </StickerButton>
                 )}
 
                 <p className="mt-2 text-center text-xs text-black/50">
                   {hasRestore ? (
-                    "A gift you earned — no charge, ever."
+                    "A gift you earned. No charge, ever."
                   ) : (
                     <>
-                      Or use a restore gift — they come from the big milestones and real wins.{" "}
+                      Or use a restore gift. They come from the big milestones and real wins.{" "}
                       <button type="button" onClick={openGifts} className="cursor-pointer font-semibold text-primary underline decoration-dotted underline-offset-2">
                         See your gifts
                       </button>

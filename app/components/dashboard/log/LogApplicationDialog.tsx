@@ -140,7 +140,7 @@ const LogFlow: FC<{ onClose: () => void; onPhaseChange: (p: Phase) => void }> = 
                 autoFocus
                 value={raw}
                 onChange={(e) => setRaw(e.target.value)}
-                placeholder="https://… or Stripe — Support Engineer"
+                placeholder="https://… or Stripe - Support Engineer"
                 className={cn(FIELD, "pl-8")}
               />
             </div>
@@ -150,7 +150,7 @@ const LogFlow: FC<{ onClose: () => void; onPhaseChange: (p: Phase) => void }> = 
             </StickerButton>
           </div>
           <p className="mt-3 text-xs text-black/40">
-            Applied through our board? Those log themselves — this is for everywhere else.
+            Applied through our board? Those log themselves. This is for everywhere else.
           </p>
         </form>
       ) : (
@@ -180,11 +180,11 @@ const LogFlow: FC<{ onClose: () => void; onPhaseChange: (p: Phase) => void }> = 
             <div className="flex items-start gap-2.5 rounded-md border-[1.5px] border-[#222325] bg-[#e1f073] px-3 py-2.5">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none text-primary" />
               <p className="text-xs font-medium text-primary">
-                You logged {duplicate.company} — {duplicate.role} on {shortDateLabel(duplicate.loggedAt.slice(0, 10))}.{" "}
+                You logged {duplicate.role} at {duplicate.company} on {shortDateLabel(duplicate.loggedAt.slice(0, 10))}.{" "}
                 <Link href="/dashboard/tracker" className="font-bold underline underline-offset-2">
                   Open it
                 </Link>
-                ? Saving again is fine — it just won&apos;t count twice this week.
+                ? Saving again is fine, it just won&apos;t count twice this week.
               </p>
             </div>
           )}

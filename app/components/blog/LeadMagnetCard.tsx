@@ -134,7 +134,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                   <span className="grid h-6 w-6 place-content-center rounded-full bg-secondary">
                     <Check className="h-3.5 w-3.5" />
                   </span>
-                  {download.returning ? "Welcome back — here it is again." : "It's yours."}
+                  {download.returning ? "Welcome back, here it is again." : "It's yours."}
                 </p>
                 <a
                   href={download.url}

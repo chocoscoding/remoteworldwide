@@ -103,7 +103,7 @@ const TAB_OPTIONS: { id: PickerTab; label: string }[] = [
 const PLACEHOLDERS: Partial<Record<JobField, string>> = {
   company: "e.g. Stripe",
   role: "e.g. Senior Product Designer",
-  description: "What the posting says — requirements, responsibilities, anything worth scoring against…",
+  description: "What the posting says: requirements, responsibilities, anything worth scoring against…",
   url: "https://…",
   salary: "e.g. $120k–150k, or leave blank",
   location: "e.g. Remote, Europe",
@@ -151,7 +151,7 @@ const fieldId = (uid: string, field: JobField) => `${uid}-job-${field}`;
 const initials = (company: string | null) => (company ?? "").trim().slice(0, 2).toUpperCase() || "?";
 
 const jobTitle = (job: Pick<SavedJobItem, "company" | "role">) =>
-  `${job.company ?? "Untitled company"} — ${job.role ?? "untitled role"}`;
+  `${job.role ?? "Untitled role"} at ${job.company ?? "untitled company"}`;
 
 /**
  * A 400 on the POST itself is the route's validator refusing the input before
@@ -1082,8 +1082,8 @@ const PickerBody: FC<PickerBodyProps> = ({
                 aria-label="Paste a link or a job posting"
                 placeholder={
                   state.rawHint === "text"
-                    ? "Paste the posting's text — open it, select everything, copy, and paste it here…"
-                    : "Paste a link or the whole posting — we'll fill the fields for you…"
+                    ? "Paste the posting's text. Open it, select everything, copy, and paste it here…"
+                    : "Paste a link or the whole posting, and we'll fill the fields for you…"
                 }
                 className="min-w-0 flex-1 resize-none bg-transparent px-1 py-0.5 text-sm leading-relaxed text-primary outline-none placeholder:text-black/40"
               />
@@ -1115,7 +1115,7 @@ const PickerBody: FC<PickerBodyProps> = ({
             {phase.kind === "filled" && (
               <p role="status" className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-black/12 bg-[#f7fbe4] px-3 py-2 text-xs text-black/70">
                 <Check className="h-3.5 w-3.5 flex-none text-[#6c7a1e]" />
-                {phase.origin === "link" ? "Filled from the link" : "Filled from your paste"} — check the fields, then save.
+                {phase.origin === "link" ? "Filled from the link" : "Filled from your paste"}. Check the fields, then save.
               </p>
             )}
 

@@ -730,7 +730,7 @@ export function importFailureCopy(failure: ImportFailure): FailureCopy {
   const later = failure.retryAt === null ? "later" : `at ${clockTime(failure.retryAt)}`;
   switch (failure.code) {
     case "invalid-url":
-      return { message: "That link can't be opened — use the posting's public URL.", recoveries: [EDIT_LINK] };
+      return { message: "That link can't be opened. Use the posting's public URL.", recoveries: [EDIT_LINK] };
     case "target-blocked":
       return {
         message: `${siteName(failure.link) ?? "That site"} doesn't let us read postings. Paste the text instead.`,
@@ -744,19 +744,19 @@ export function importFailureCopy(failure: ImportFailure): FailureCopy {
       return { message: link ? "We couldn't find a job on that page." : "We couldn't find a job in that text.", recoveries: [FILL_IN] };
     case "limited":
       return link
-        ? { message: `You've read a lot of links this hour — paste the text, or try again ${later}.`, recoveries: [PASTE_TEXT] }
-        : { message: `You've filled a lot of jobs this hour — fill the fields in yourself, or try again ${later}.`, recoveries: [FILL_IN] };
+        ? { message: `You've read a lot of links this hour. Paste the text, or try again ${later}.`, recoveries: [PASTE_TEXT] }
+        : { message: `You've filled a lot of jobs this hour. Fill the fields in yourself, or try again ${later}.`, recoveries: [FILL_IN] };
     case "paused":
       return link
-        ? { message: "Link reading is paused for today — paste the text instead.", recoveries: [PASTE_TEXT] }
-        : { message: "Filling fields is paused for today — fill them in yourself.", recoveries: [FILL_IN] };
+        ? { message: "Link reading is paused for today. Paste the text instead.", recoveries: [PASTE_TEXT] }
+        : { message: "Filling fields is paused for today. Fill them in yourself.", recoveries: [FILL_IN] };
     case "timeout":
       return { message: link ? "That page took too long to load." : "That took too long.", recoveries: [RETRY] };
     case "provider-error":
       return { message: link ? "Something went wrong reading that page." : "Something went wrong reading that.", recoveries: [RETRY] };
     case "too-long":
       return {
-        message: "That's more than one posting's worth of text — paste just the job.",
+        message: "That's more than one posting's worth of text. Paste just the job.",
         recoveries: [{ action: "edit-input", label: "Edit the text" }],
       };
     case "request-failed":

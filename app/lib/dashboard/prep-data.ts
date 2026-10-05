@@ -220,7 +220,7 @@ export const QUESTION_BANK: Record<SessionFormat, QuestionBankEntry[]> = {
     {
       id: "beh-owned-outcome",
       text: "Walk me through a project where you owned the outcome end-to-end.",
-      sub: "Standard opener — almost every panel leads with this",
+      sub: "Standard opener, almost every panel leads with this",
       better:
         "I led the checkout redesign for eight weeks, end to end. I cut the flow from six steps to two, which took first-payment time from four minutes to ninety seconds, and support tickets on setup dropped 31% in the first month.",
       why: "A decision, a number, and an outcome — not just a description of the work.",
@@ -270,7 +270,7 @@ export const QUESTION_BANK: Record<SessionFormat, QuestionBankEntry[]> = {
     {
       id: "port-walkthrough",
       text: "Walk me through one project from problem to shipped result.",
-      sub: "The core portfolio question — expect 10-15 minutes on this alone",
+      sub: "The core portfolio question. Expect 10-15 minutes on this alone",
       better:
         "The problem was a 60% drop-off at step three of a five-step form. I collapsed it to one screen, tested it with eight users first, and drop-off fell to 9% after we shipped — I can walk through the two versions side by side.",
       why: "States the before number, the change, and the after number — the shape a panel is listening for.",
@@ -302,7 +302,7 @@ export const QUESTION_BANK: Record<SessionFormat, QuestionBankEntry[]> = {
     {
       id: "port-critique",
       text: "What would you change about this project if you did it again?",
-      sub: "A self-critique question — vague answers stand out badly here",
+      sub: "A self-critique question. Vague answers stand out badly here",
       better:
         "I'd run the usability test before committing to the single-screen direction, not after — we got lucky that it tested well, and I'd rather not need the luck next time.",
       why: "Specific and slightly uncomfortable — that's what makes it credible.",
@@ -360,7 +360,7 @@ export const QUESTION_BANK: Record<SessionFormat, QuestionBankEntry[]> = {
     {
       id: "sal-close",
       text: "If we made you an offer at the number we discussed today, would you accept on the spot?",
-      sub: "A pressure-close — expect this more in \"tough\" mode",
+      sub: "A pressure-close. Expect this more in \"tough\" mode",
       better:
         "I'd want it in writing to review properly, but if the number and the role match what we've talked through today, I don't expect a long back-and-forth.",
       why: "Signals real interest without committing to something you haven't seen written down.",

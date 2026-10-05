@@ -116,7 +116,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const fileName = doc.ext ? `${doc.name}.${doc.ext}` : doc.name;
   const mimeType = mimeForFileName(fileName);
-  if (!mimeType) return fail(422, `${RESUME_TYPES_HINT} — this one can't be read.`);
+  if (!mimeType) return fail(422, `${RESUME_TYPES_HINT}. This one can't be read.`);
 
   // A signed URL, minted per call and never stored. The backend is the only
   // place ownership is checked, and it answers 404 for someone else's row.
@@ -143,7 +143,7 @@ export async function POST(req: Request): Promise<Response> {
     // The extension already decided the type above; this only catches a store
     // serving something else entirely under a .pdf name.
     if (declaredType && !isReadableMime(declaredType) && !declaredType.startsWith("application/octet-stream")) {
-      return fail(422, `${RESUME_TYPES_HINT} — this one can't be read.`);
+      return fail(422, `${RESUME_TYPES_HINT}. This one can't be read.`);
     }
 
     bytes = await res.arrayBuffer();

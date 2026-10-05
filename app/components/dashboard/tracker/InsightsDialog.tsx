@@ -19,7 +19,7 @@ import { useTracker } from "@/app/components/dashboard/tracker/TrackerProvider";
 import { CLOSED_META, COLUMN_LABELS, COLUMN_META } from "@/app/components/dashboard/tracker/tracker-meta";
 import { buildFunnel, diagnose } from "@/app/lib/dashboard/funnel";
 
-const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)}%`);
+const pct = (n: number | null) => (n === null ? "-" : `${Math.round(n * 100)}%`);
 
 export interface InsightsDialogProps {
   open: boolean;
@@ -118,7 +118,7 @@ const InsightsDialog: FC<InsightsDialogProps> = ({ open, onOpenChange }) => {
               </div>
 
               <p className="mt-3.5 text-[11px] leading-relaxed text-black/40">
-                Counts every application that ever reached a stage, including ones that later closed — so a rejection after three
+                Counts every application that ever reached a stage, including ones that later closed, so a rejection after three
                 interview rounds still counts as having reached Interviewing. The right-hand figure is the share of the previous
                 stage that made it through.
               </p>
@@ -145,7 +145,7 @@ const InsightsDialog: FC<InsightsDialogProps> = ({ open, onOpenChange }) => {
                           it in the same bold type as one from thirty would invite
                           a real decision on noise, so it stays unstated. */}
                       <span className={cn("text-sm font-bold tabular-nums", split.reliable ? "text-primary" : "text-black/30")}>
-                        {split.reliable ? pct(split.rate) : "—"}
+                        {split.reliable ? pct(split.rate) : "-"}
                       </span>
                     </div>
                     <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-black/[0.05]">
@@ -156,7 +156,7 @@ const InsightsDialog: FC<InsightsDialogProps> = ({ open, onOpenChange }) => {
                     </div>
                     <p className="mt-1 text-[11px] text-black/40">
                       {split.reachedInterview} of {split.applied} applications
-                      {!split.reliable && " — too few to compare yet"}
+                      {!split.reliable && ", too few to compare yet"}
                     </p>
                   </div>
                 ))}

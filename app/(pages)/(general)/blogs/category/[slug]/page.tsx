@@ -20,7 +20,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const category = categoryBySlug((await params).slug);
   if (!category) return { title: "Category not found", robots: { index: false } };
   const page = Math.max(1, Number.parseInt((await searchParams).page ?? "1", 10) || 1);
-  const title = `${category.name} — ${SITE_NAME} Blog`;
+  const title = `${category.name} | ${SITE_NAME} Blog`;
   const description = `${category.tagline} Practical ${category.name.toLowerCase()} guides for people applying to remote roles.`;
   return {
     // Already carries the site name, so it skips the root template rather than doubling it.
@@ -53,7 +53,7 @@ const CategoryPage = async ({ params, searchParams }: Props) => {
     {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
-      name: `${category.name} — ${SITE_NAME} Blog`,
+      name: `${category.name} | ${SITE_NAME} Blog`,
       description: category.tagline,
       url: absoluteUrl(`/blogs/category/${category.slug}`),
       isPartOf: { "@type": "WebSite", "@id": `${SITE_URL}/#website` },

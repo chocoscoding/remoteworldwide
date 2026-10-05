@@ -184,7 +184,7 @@ export const KanbanColumn: FC<KanbanColumnProps> = ({ column, onOpen, onGhost })
               )}>
               {!closed && <Award className="h-5 w-5 text-black/25" />}
               <p className="text-[11px] font-medium text-black/40 leading-relaxed">
-                {column.id === "offer" ? "No offers yet — this is where they'll land." : closed ? "None." : "Nothing here yet."}
+                {column.id === "offer" ? "No offers yet. This is where they'll land." : closed ? "None." : "Nothing here yet."}
               </p>
             </div>
           )}

@@ -475,7 +475,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     if (!streak || fresh.length === 0) return;
     for (const notice of fresh) told.current.add(notice.day);
     const left = streak.freezes.free + streak.freezes.held;
-    toast(`Life happened — a freeze covered ${fresh.map((notice) => weekdayName(notice.day)).join(" and ")}.`, {
+    toast(`Life happened. A freeze covered ${fresh.map((notice) => weekdayName(notice.day)).join(" and ")}.`, {
       description: `Your streak never broke. ${left} ${left === 1 ? "freeze" : "freezes"} left.`,
     });
     markSeenNow({ freezes: fresh.map((notice) => notice.day) });
@@ -512,7 +512,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const announce = fresh.filter((g) => !g.usedAt && !g.refId?.startsWith("milestone:"));
     if (announce.length === 0) return;
     toast.success(`\u{1F381} ${announce.map((g) => GIFT_CATALOGUE[g.kind].label).join(" · ")}`, {
-      description: `${announce.map((g) => g.reason).join(" · ")} — waiting in your gifts.`,
+      description: `${announce.map((g) => g.reason).join(" · ")}. Waiting in your gifts.`,
     });
   }, [giftsLoaded, giftItems]);
 

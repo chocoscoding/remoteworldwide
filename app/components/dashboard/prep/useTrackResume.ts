@@ -157,7 +157,7 @@ export function useTrackResume(item: PrepTrackItem | undefined): TrackResume {
     // parser cannot read would otherwise sit in My documents as a resume and
     // fail the moment it was picked.
     if (!mimeForFileName(file.name)) {
-      setError(`${RESUME_TYPES_HINT} — this one can't be read.`);
+      setError(`${RESUME_TYPES_HINT}. This one can't be read.`);
       return false;
     }
     if (file.size > MAX_RESUME_BYTES) {

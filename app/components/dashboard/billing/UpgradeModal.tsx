@@ -112,7 +112,7 @@ export const PlanGateProvider: FC<{ children: ReactNode }> = ({ children }) => {
                     {outOfCredits
                       ? offer
                         ? `Move up to ${offer.name} for a bigger monthly allowance, or top up once.`
-                        : "Top up with a pack — they never expire and are used after your monthly allowance."
+                        : "Top up with a pack. Packs never expire and are used after your monthly allowance."
                       : detail?.message}
                   </DialogPrimitive.Description>
                 </div>
@@ -163,7 +163,7 @@ export const PlanGateProvider: FC<{ children: ReactNode }> = ({ children }) => {
             ) : null}
 
             <p className="mt-5 text-xs text-black/45">
-              Card payments aren&apos;t connected yet — choosing reserves it and we&apos;ll be in touch.{" "}
+              Card payments aren&apos;t connected yet. Choosing reserves it and we&apos;ll be in touch.{" "}
               <Link href="/pricing" onClick={close} className="font-semibold text-primary underline underline-offset-2">
                 Compare plans
               </Link>

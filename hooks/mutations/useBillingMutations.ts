@@ -15,7 +15,7 @@ import { apiMessage } from "@/app/lib/api/core";
 import { qk } from "@/app/lib/query/keys";
 import type { BillingInterval, Checkout, Subscription } from "@/app/lib/settings/types";
 
-const PENDING_NOTE = "Payments are not connected yet — we will be in touch to finish it.";
+const PENDING_NOTE = "Payments are not connected yet. We will be in touch to finish it.";
 
 function useBillingMutation<TData, TVars>(run: (vars: TVars) => Promise<TData>, onDone: (data: TData) => void) {
   const queryClient = useQueryClient();

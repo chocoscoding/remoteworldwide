@@ -152,7 +152,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ used, skipped, onSkip, onUnskip, onCo
         doneLabel="Used"
         blurb={
           skipped
-            ? "Skipped — you're filling your profile in yourself. A resume can be built from it later."
+            ? "Skipped. You're filling your profile in yourself. A resume can be built from it later."
             : "Have one? Pick it, upload it or save one you built, and we'll fill in your profile below wherever it's blank. No resume is needed."
         }
       />
@@ -191,7 +191,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ used, skipped, onSkip, onUnskip, onCo
                   <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> Looking in My documents…
                 </p>
               ) : resumes.length === 0 ? (
-                <p className={cn(HINT, "py-3")}>No resumes in My documents yet — upload one, or save one you built in the editor.</p>
+                <p className={cn(HINT, "py-3")}>No resumes in My documents yet. Upload one, or save one you built in the editor.</p>
               ) : (
                 <>
                   <ul className="flex flex-col gap-2" aria-label="Your resumes">
@@ -305,9 +305,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ used, skipped, onSkip, onUnskip, onCo
 
           {/* The way past: as plain as the ways in, so nobody hunts for a resume they don't have. */}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-primary/10 pt-4">
-            <p className={cn(HINT, "min-w-0 flex-1")}>No resume to hand? Type your profile in — a resume can be built from it later.</p>
+            <p className={cn(HINT, "min-w-0 flex-1")}>No resume to hand? Type your profile in, and a resume can be built from it later.</p>
             <button type="button" className={cn(BUTTON_SECONDARY, "px-3 py-2 text-xs")} disabled={upload.isPending || saveBuilt.isPending} onClick={onSkip}>
-              Skip — I&apos;ll fill it in
+              Skip, I&apos;ll fill it in
               <ArrowDown className="h-3.5 w-3.5" aria-hidden />
             </button>
           </div>

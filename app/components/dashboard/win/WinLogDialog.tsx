@@ -234,7 +234,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
               <DialogPrimitive.Title className="text-lg font-bold text-primary">{STEP_TITLES[step]}</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-0.5 text-xs text-black/60">
                 {step === 0 && "Which application turned into the offer? Your tracker knows most of them."}
-                {step === 1 && "The dates on your card. The tracker filled what it saw — set the rest yourself."}
+                {step === 1 && "The dates on your card. The tracker filled what it saw. Set the rest yourself."}
                 {step === 2 && "Your numbers, pulled for you. Nothing to type."}
                 {step === 3 && "One honest line for the person six weeks behind you."}
               </DialogPrimitive.Description>
@@ -284,7 +284,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                   })}
                   {filtered.length === 0 && (
                     <p className="rounded-xl border border-dashed border-black/20 px-3 py-4 text-center text-xs text-black/55">
-                      {applications.isPending ? "Loading your tracker…" : "Nothing on your board matches — import it or enter it below."}
+                      {applications.isPending ? "Loading your tracker…" : "Nothing on your board matches. Import it or enter it below."}
                     </p>
                   )}
                 </div>
@@ -411,7 +411,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                 </div>
                 <div className="mt-4">
                   <label htmlFor="win-salary" className={LABEL}>
-                    Negotiated up <span className="font-medium normal-case tracking-normal text-black/40">— optional, clear to skip</span>
+                    Negotiated up <span className="font-medium normal-case tracking-normal text-black/40">(optional, clear to skip)</span>
                   </label>
                   <input
                     id="win-salary"
@@ -453,7 +453,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
                     className="flex cursor-pointer items-start gap-2.5 text-left">
                     <NeoCheckbox checked={shareAnonymously} size="sm" interactive />
                     <span className="text-xs leading-snug text-black/70">
-                      Share this anonymously with the community — never with your name.
+                      Share this anonymously with the community, never with your name.
                     </span>
                   </button>
                   <button
@@ -504,7 +504,7 @@ const WinLogDialog: FC<WinLogDialogProps> = ({ streak, onClose, onComplete }) =>
             <p className="flex flex-none items-center gap-1.5 border-t border-black/8 bg-[#fbfbf7] px-6 py-2.5 text-[11px] text-black/50">
               <Trophy className="h-3 w-3 flex-none" />
               {/* The pod is on Basic and up; below it the win is not posted there (WinProvider). */}
-              Logging your win retires your {streak}-day streak at its final count{podLocked ? "" : " and puts the news on your pod's board"} — no
+              Logging your win retires your {streak}-day streak at its final count{podLocked ? "" : " and puts the news on your pod's board"}. No
               buttons, it just happens.
             </p>
           )}

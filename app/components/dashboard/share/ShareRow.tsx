@@ -34,8 +34,8 @@ export interface ShareTarget {
   hint: string;
 }
 
-const PREFILLED = "Image saved and caption copied — attach the image in the composer; your caption is already there.";
-const PASTE = "Image saved and caption copied — paste the caption and attach the image.";
+const PREFILLED = "Image saved and caption copied. Attach the image in the composer; your caption is already there.";
+const PASTE = "Image saved and caption copied. Paste the caption and attach the image.";
 
 export const SHARE_TARGETS: ShareTarget[] = [
   { id: "whatsapp", label: "WhatsApp", icon: FaWhatsapp, tile: "bg-[#25d366]", url: (c) => `https://wa.me/?text=${encodeURIComponent(c)}`, hint: PREFILLED },
@@ -70,7 +70,7 @@ export const SHARE_TARGETS: ShareTarget[] = [
     icon: FaInstagram,
     tile: "bg-[linear-gradient(45deg,#f9ce34,#ee2a7b_50%,#6228d7)]",
     url: null,
-    hint: "Image saved and caption copied — Instagram posts from its app, so add it there (Story size fits best).",
+    hint: "Image saved and caption copied. Instagram posts from its app, so add it there (Story size fits best).",
   },
 ];
 

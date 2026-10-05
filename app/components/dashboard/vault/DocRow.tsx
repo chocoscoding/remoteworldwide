@@ -255,7 +255,7 @@ const DocRow: FC<DocRowProps> = ({ item, renaming, onStartRename, onDoneRename }
       {doc?.master && (
         <span
           className="inline-flex flex-none items-center gap-1 rounded-full bg-[#e1f073] px-2 py-0.5 text-[10px] font-bold text-[#222325]"
-          title="Your master resume — reviewers read this one when they consider you for recommendations.">
+          title="Your master resume. Reviewers read this one when they consider you for recommendations.">
           <Star className="h-2.5 w-2.5" strokeWidth={3} />
           Master
         </span>
@@ -263,7 +263,7 @@ const DocRow: FC<DocRowProps> = ({ item, renaming, onStartRename, onDoneRename }
       {badge && (
         <span
           className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55"
-          title={doc ? undefined : "Made in RemoteWorldwide — edit it any time; changes save to this same document."}>
+          title={doc ? undefined : "Made in RemoteWorldwide. Edit it any time; changes save to this same document."}>
           {badge}
         </span>
       )}

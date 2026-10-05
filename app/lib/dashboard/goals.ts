@@ -67,7 +67,7 @@ export function dailyMath(target: number, restDays: Set<number> | number[]): Dai
       perDay: 0,
       perDayExact: 0,
       dayRange: "no working days",
-      sentence: "Every day is a rest day — no applications scheduled.",
+      sentence: "Every day is a rest day. No applications scheduled.",
     };
   }
 
@@ -98,7 +98,7 @@ export function restDaySentence(restDays: Set<number> | number[]): string | null
   if (rest.length === 0) return null;
   const names = rest.map((d) => DAY_NAMES[d]);
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
-  return `${list} ${names.length === 1 ? "is a rest day" : "are rest days"} — your streak is safe.`;
+  return `${list} ${names.length === 1 ? "is a rest day" : "are rest days"}, so your streak is safe.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,11 +125,11 @@ export function estimateLabel(toGo: number, medianLogSeconds: number): string {
 
   if (minutes < 90) {
     const rounded = Math.max(5, Math.round(minutes / 5) * 5);
-    return `${toGo} to go — about ${rounded} minutes`;
+    return `${toGo} to go, about ${rounded} minutes`;
   }
 
   const hours = seconds / 3600;
   // Half-hour precision below 10 hours, whole hours above.
   const shown = hours < 10 ? Math.round(hours * 2) / 2 : Math.round(hours);
-  return `${toGo} to go — about ${shown} hour${shown === 1 ? "" : "s"}`;
+  return `${toGo} to go, about ${shown} hour${shown === 1 ? "" : "s"}`;
 }

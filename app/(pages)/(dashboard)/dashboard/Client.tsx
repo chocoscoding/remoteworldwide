@@ -73,7 +73,7 @@ function weekRangeLabel(todayKey: string): string {
   const monday = addDays(today, -weekdayIndex(today));
   const sunday = addDays(monday, 6);
   const sameMonth = monday.getMonth() === sunday.getMonth();
-  return `Mon ${monday.getDate()}${sameMonth ? "" : ` ${MONTHS[monday.getMonth()]}`} — Sun ${sunday.getDate()} ${MONTHS[sunday.getMonth()]}`;
+  return `Mon ${monday.getDate()}${sameMonth ? "" : ` ${MONTHS[monday.getMonth()]}`} – Sun ${sunday.getDate()} ${MONTHS[sunday.getMonth()]}`;
 }
 
 // A link dressed as the outline sticker button. The old markup put a <button>
@@ -281,7 +281,7 @@ const HomeClient: FC = () => {
                       type="button"
                       onClick={d.isToday && !isRest ? () => openLog() : undefined}
                       disabled={!d.isToday || isRest}
-                      title={`${d.label} — ${isRest ? "rest day, nothing needed" : isDone ? "logged" : status === "freeze" ? "freeze used" : status === "missed" ? "missed" : d.isToday ? "still open, click to log" : "upcoming"}`}
+                      title={`${d.label}: ${isRest ? "rest day, nothing needed" : isDone ? "logged" : status === "freeze" ? "freeze used" : status === "missed" ? "missed" : d.isToday ? "still open, click to log" : "upcoming"}`}
                       className={cn(
                         "relative h-11 rounded-lg flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-all",
                         // Rest days shrink back and fade out: they aren't days
@@ -695,7 +695,7 @@ const HomeClient: FC = () => {
                         {applications.isPending ? (
                           <span aria-hidden className="h-3 w-5 animate-pulse rounded bg-[#f0f0ea]" />
                         ) : (
-                          <span className="text-xs font-bold text-black/30">—</span>
+                          <span className="text-xs font-bold text-black/30">-</span>
                         )}
                       </div>
                       <div aria-hidden className={cn("h-2 w-full rounded-full bg-[#f0f0ea]", applications.isPending && "animate-pulse")} />

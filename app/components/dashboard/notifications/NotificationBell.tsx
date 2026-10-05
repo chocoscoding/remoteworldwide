@@ -61,7 +61,7 @@ const NotificationBell: FC<NotificationBellProps> = ({ className }) => {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={unread > 0 ? `Notifications — ${unread} unread` : "Notifications"}
+          aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
           className={cn(
             "relative grid h-9 w-9 flex-none place-content-center rounded-lg text-black/55 transition-colors cursor-pointer",
             "hover:bg-[#f3f3ef] hover:text-black/80",
