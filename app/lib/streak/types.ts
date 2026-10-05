@@ -115,12 +115,24 @@ export interface GiftItem {
   refId: string | null;
   at: string;
   usedAt: string | null;
+  /**
+   * When a used service gift delivered what it promised: a day of Pro started, a rewrite built,
+   * a priority intro made. Absent from a backend older than these gifts.
+   */
+  deliveredAt?: string | null;
+  /** What the redemption produced: a day of Pro's end (ISO), "waiting" for a priority intro. */
+  detail?: string | null;
 }
 
 /** `GET /api/streak/gifts`, and every gift or repair write. */
 export interface StreakWithGifts {
   streak: StreakItem;
   gifts: GiftItem[];
+}
+
+/** `POST /api/streak/gifts/redeem`: the new state, and when a day of Pro now ends (ISO) for that gift. */
+export interface RedeemedGift extends StreakWithGifts {
+  boostUntil?: string | null;
 }
 
 export type RepairMethod = "credits" | "gift" | "half";

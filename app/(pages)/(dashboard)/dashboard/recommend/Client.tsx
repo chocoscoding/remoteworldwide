@@ -60,6 +60,7 @@ import {
   type FitProfile,
 } from "@/app/lib/dashboard/fit";
 import type { IntroPipelineEntry } from "@/app/lib/dashboard/types";
+import { holdsPriorityIntro } from "@/app/lib/dashboard/gifts";
 import { toPipelineEntry, toWatchTarget } from "@/app/lib/recommendations/view";
 import { useApplications } from "@/hooks/queries/useApplicationsQuery";
 import { WATCH_SEARCHES, useRecommendationEligibility, useRecommendations, useWarmPaths, useWatchPool } from "@/hooks/queries/useRecommendationsQuery";
@@ -139,10 +140,12 @@ const NoCompaniesRow: FC<{ body: string; side: ReactNode }> = ({ body, side }) =
 );
 
 const RecommendClient: FC = () => {
-  const { goals, pausedDaysLeft, resumeSearch } = useActivity();
+  const { goals, pausedDaysLeft, resumeSearch, gifts } = useActivity();
   const { preferences, profile } = useSettings();
   const lock = usePlanLock(BASIC_GATES.recommendations);
-  const recommendations = useRecommendations({ enabled: !lock.locked });
+  // A redeemed priority intro (a streak gift) opens recommendations on any plan, as the backend does.
+  const locked = lock.locked && !holdsPriorityIntro(gifts);
+  const recommendations = useRecommendations({ enabled: !locked });
   // The application trend: what you've logged in the tracker lately.
   const applications = useApplications();
   const history: FitHistory = useMemo(() => ({ applied: recentApplications(applications.data ?? []) }), [applications.data]);
@@ -161,7 +164,7 @@ const RecommendClient: FC = () => {
   const paused = goals.paused;
 
   // Mapped once per fetch: the day counts are read off the clock here, not on every render.
-  const pipeline = useMemo(() => (lock.locked ? [] : (recommendations.data ?? []).map((item) => toPipelineEntry(item))), [lock.locked, recommendations.data]);
+  const pipeline = useMemo(() => (locked ? [] : (recommendations.data ?? []).map((item) => toPipelineEntry(item))), [locked, recommendations.data]);
 
   // Live cards, recently closed rows, and the >7-day history behind a
   // disclosure — a pass never renders as a card and never says "rejected".
@@ -245,7 +248,7 @@ const RecommendClient: FC = () => {
       </>
     );
 
-    if (lock.locked) {
+    if (locked) {
       return ineligible ? (
         <NoCompaniesRow
           body="Recommendations come with Basic. Anything already made for you is kept."
@@ -308,7 +311,7 @@ const RecommendClient: FC = () => {
         <Pill variant="neutral" className="hidden sm:inline-flex">
           Picked by our reviewers
         </Pill>
-        {lock.locked && <PlanChip plan="basic" className="flex-none" />}
+        {locked && <PlanChip plan="basic" className="flex-none" />}
         <div className="flex-1" />
         {/* Drawn once the server has said where you stand, so it never flips from "available" to "not yet". */}
         {(paused || !eligibility.isPending) && (

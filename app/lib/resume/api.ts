@@ -388,8 +388,15 @@ export interface BuildResumeInput {
   jobId?: string | null;
   /** An INGESTED resume to rewrite from (a row of `GET /api/ai/resume`), not a library document. */
   fromResumeId?: string | null;
+  /** Or a resume made here (a library document) to rewrite from. One source, never both. */
+  fromDocumentId?: string | null;
   /** Omitted: the builder picks one. */
   template?: string | null;
+  /**
+   * Pay with the streak's resume rewrite gift instead of credits and the plan: the AI service takes
+   * the gift before it builds and gives it back if the build fails.
+   */
+  gift?: "rewrite" | null;
 }
 
 /** The builder's answer, as far as this app reads it: the library document it saved, and why it built it that way. */
@@ -398,6 +405,8 @@ export interface BuiltResume {
   rationale: string;
   /** Already in the library — open it rather than creating another. Null only if saving failed after a paid build. */
   document: StoredResumeDocument | null;
+  /** True when a rewrite gift paid for it. */
+  gift?: boolean;
 }
 
 /**
@@ -414,7 +423,9 @@ export const buildResume = (input: BuildResumeInput) =>
       jdText: input.jdText || undefined,
       jobId: input.jobId || undefined,
       fromResumeId: input.fromResumeId || undefined,
+      fromDocumentId: input.fromDocumentId || undefined,
       template: input.template || undefined,
+      gift: input.gift || undefined,
     }),
   );
 

@@ -241,8 +241,18 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-gray-50 p-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-primary">{candidate.name ?? "No name on the account"}</p>
+                <p className="truncate text-sm font-semibold text-primary">
+                  {candidate.name ?? "No name on the account"}
+                  {isMatch(candidate) && candidate.priority && (
+                    <span className="ml-2 inline-block rounded-full bg-[#e1f073] px-2 py-0.5 align-middle text-[10.5px] font-extrabold uppercase tracking-wide text-[#222325]">
+                      Priority
+                    </span>
+                  )}
+                </p>
                 <p className="truncate text-xs text-gray-500">{candidate.email}</p>
+                {!editing && isMatch(candidate) && candidate.priority && (
+                  <p className="mt-0.5 text-xs text-gray-600">They redeemed a priority intro. This recommendation delivers it.</p>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 {(!isMatch(candidate) || candidate.masterResume) && (
@@ -276,6 +286,13 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
               <>
                 <span className="font-semibold">{u.email ?? u.id}</span>
                 {u.name && <span className="ml-2 text-gray-500">{u.name}</span>}
+                {u.priority && (
+                  <span
+                    title="Redeemed a priority referral intro: put them forward first"
+                    className="ml-2 inline-block rounded-full bg-[#e1f073] px-2 py-0.5 align-middle text-[10.5px] font-extrabold uppercase tracking-wide text-[#222325]">
+                    Priority
+                  </span>
+                )}
                 <span className={`mt-0.5 block text-xs ${u.eligible ? "text-green-700" : "text-red-600"}`}>
                   {u.eligible ? "Eligible" : `Missing: ${u.missing.join(", ")}`}
                 </span>

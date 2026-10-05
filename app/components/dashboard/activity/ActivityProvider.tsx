@@ -40,6 +40,7 @@ import {
 } from "@/app/lib/dashboard/activity";
 import { MAX_STREAK_PROMPTS_PER_DAY } from "@/app/lib/dashboard/credits";
 import { GIFT_CATALOGUE, type GiftEvent, type GiftKind } from "@/app/lib/dashboard/gifts";
+import { proUntilLabel } from "@/app/lib/settings/boost";
 import type { StrongEventKind } from "@/app/lib/dashboard/rewards";
 import { DEFAULT_LOG_SECONDS, clampTarget } from "@/app/lib/dashboard/goals";
 import { addDays, dayKey, fromDayKey, milestonesUpTo, nextMilestone, tierFor, weekdayIndex } from "@/app/lib/dashboard/streak";
@@ -118,6 +119,8 @@ const giftEventOf = (gift: GiftItem): GiftEvent => ({
   refId: gift.refId ?? undefined,
   at: gift.at,
   usedAt: gift.usedAt ?? undefined,
+  deliveredAt: gift.deliveredAt ?? undefined,
+  detail: gift.detail ?? undefined,
 });
 
 /** A reached rung as the celebration renders it: the ladder's copy, with the gift the server drew. */
@@ -224,7 +227,10 @@ interface ActivityContextValue extends StreakState {
   gifts: GiftEvent[];
   /** Unused gifts waiting to be redeemed. */
   giftsWaiting: number;
-  /** Redeems the oldest unused gift of `kind`. Returns false when none is held. */
+  /**
+   * Redeems the oldest unused gift of `kind`. Returns false when none is held, and always for
+   * "rewrite", which the resume build it pays for spends (RewriteGiftDialog).
+   */
   redeemGift: (kind: GiftKind) => boolean;
   /**
    * Rare-event gifts are the server's now: reaching interview or offer pays
@@ -587,15 +593,25 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }
 
   function redeemGift(kind: GiftKind): boolean {
+    // A rewrite is spent by the resume build it pays for (the gift store's picker), never here:
+    // the server refuses it on its own, so nothing is used up with nothing delivered.
+    if (kind === "rewrite") return false;
     if (!gifts.some((g) => g.kind === kind && !g.usedAt)) return false;
     redeem.mutate(kind, {
-      onSuccess: () =>
-        toast.success(`${GIFT_CATALOGUE[kind].label} used`, {
-          description:
-            kind === "rewrite" || kind === "pro-day" || kind === "referral-intro"
-              ? "It's noted on your account — we'll be in touch to deliver it."
-              : undefined,
-        }),
+      onSuccess: (data) => {
+        if (kind === "pro-day") {
+          const until = data.boostUntil ? proUntilLabel(data.boostUntil) : null;
+          toast.success(until ? `Pro is on until ${until}` : "Pro is on for 24 hours", {
+            description: "Interview prep, likely questions and every Pro feature are yours till then.",
+          });
+          return;
+        }
+        if (kind === "referral-intro") {
+          toast.success("You're at the top of the list", { description: "We'll tell you when a recommendation goes out." });
+          return;
+        }
+        toast.success(`${GIFT_CATALOGUE[kind].label} used`);
+      },
     });
     return true;
   }

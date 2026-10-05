@@ -109,6 +109,19 @@ export interface RecommendationCandidateMatch extends RecommendationCandidate {
   /** Labels of the requirements still open, in checklist order. Empty when eligible. */
   missing: string[];
   masterResume: { id: string; name: string } | null;
+  /** A priority referral intro (a streak gift) is waiting for them: they sort first. Absent from an older backend. */
+  priority?: boolean;
+}
+
+/**
+ * `GET /api/recommendations/admin/priority-intros`: an account waiting on a priority referral intro
+ * (a streak gift), the longest wait first.
+ */
+export interface PriorityIntroItem extends RecommendationCandidate {
+  /** When the oldest waiting intro was redeemed (ISO). */
+  redeemedAt: string;
+  /** Whether they can be put forward now: the intro stands in for the plan, the profile still counts. */
+  eligible: boolean;
 }
 
 export interface AdminRecommendationItem extends Omit<RecommendationItem, "reviewer"> {

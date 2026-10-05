@@ -8,6 +8,8 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PipelineCard from "@/app/components/dashboard/recommend/PipelineCard";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
+import { holdsPriorityIntro } from "@/app/lib/dashboard/gifts";
 import { BackendError } from "@/app/lib/api/core";
 import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import { toPipelineEntry } from "@/app/lib/recommendations/view";
@@ -47,7 +49,10 @@ const DetailSkeleton: FC = () => (
 
 const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
   const lock = usePlanLock(BASIC_GATES.recommendations);
-  const query = useRecommendation(entryId, { enabled: !lock.locked });
+  const { gifts } = useActivity();
+  // A redeemed priority intro (a streak gift) opens the recommendation it was made with, on any plan.
+  const locked = lock.locked && !holdsPriorityIntro(gifts);
+  const query = useRecommendation(entryId, { enabled: !locked });
   // Mapped once per fetch: the day counts are read off the clock here, not on every render.
   const entry = useMemo(() => (query.data ? toPipelineEntry(query.data) : undefined), [query.data]);
   const warmPathAt = useWarmPaths(entry ? [entry.company] : []);
@@ -73,7 +78,7 @@ const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
       </header>
 
       <main className="mx-auto max-w-[760px] px-8 py-7 pb-14">
-        {lock.locked ? (
+        {locked ? (
           <PlanLockNote
             gate={BASIC_GATES.recommendations}
             title="Recommendations come with Basic"

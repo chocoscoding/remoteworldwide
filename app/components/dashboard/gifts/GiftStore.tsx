@@ -7,20 +7,32 @@
 // here.
 //
 // Also the only surface that shows the gift history — every row has the
-// reason it was earned, so "where did this come from" is always answerable.
+// reason it was earned, so "where did this come from" is always answerable,
+// and what using it did (a day of Pro's end, a rewrite ready, an intro waiting).
+//
+// "Use" on a resume rewrite opens a picker instead (RewriteGiftDialog): the
+// gift is spent by the build it pays for, never on its own.
 
-import { type FC } from "react";
+import { useState, type FC } from "react";
 import { Gift } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
-import { GIFT_CATALOGUE, heldOf, type GiftKind } from "@/app/lib/dashboard/gifts";
+import { GIFT_CATALOGUE, giftStatusLabel, heldOf, type GiftKind } from "@/app/lib/dashboard/gifts";
 import { shortDateLabel } from "@/app/lib/dashboard/streak";
+import { proUntilLabel } from "@/app/lib/settings/boost";
+import RewriteGiftDialog from "./RewriteGiftDialog";
 
 const KINDS = Object.keys(GIFT_CATALOGUE) as GiftKind[];
 
 const GiftStore: FC = () => {
   const { giftsOpen, closeGifts, gifts, giftsWaiting, redeemGift } = useActivity();
+  const [rewriteOpen, setRewriteOpen] = useState(false);
+
+  const use = (kind: GiftKind) => {
+    if (kind === "rewrite") setRewriteOpen(true);
+    else redeemGift(kind);
+  };
 
   return (
     <Dialog open={giftsOpen} onOpenChange={(o) => !o && closeGifts()}>
@@ -71,7 +83,7 @@ const GiftStore: FC = () => {
                         </p>
                         <p className="truncate text-[11px] text-black/45">{spec.detail}</p>
                       </div>
-                      <StickerButton variant="primary" size="sm" onClick={() => redeemGift(kind)}>
+                      <StickerButton variant="primary" size="sm" onClick={() => use(kind)}>
                         Use
                       </StickerButton>
                     </div>
@@ -95,9 +107,9 @@ const GiftStore: FC = () => {
                     <span className="block truncate text-xs text-black/60">
                       {GIFT_CATALOGUE[g.kind].label} — {g.reason}
                     </span>
-                    <span className="block text-[10px] text-black/35">
-                      {shortDateLabel(g.at.slice(0, 10))}
-                      {g.usedAt ? " · used" : " · waiting"}
+                    {/* A day of Pro's end is local time: the server's render can't know the zone. */}
+                    <span className="block text-[10px] text-black/35" suppressHydrationWarning>
+                      {shortDateLabel(g.at.slice(0, 10))} · {giftStatusLabel(g, proUntilLabel)}
                     </span>
                   </span>
                 </div>
@@ -105,6 +117,9 @@ const GiftStore: FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Inside the store's content, so it stacks over it and closing it lands back on "Use". */}
+        <RewriteGiftDialog open={rewriteOpen} onOpenChange={setRewriteOpen} onDone={closeGifts} />
       </DialogContent>
     </Dialog>
   );

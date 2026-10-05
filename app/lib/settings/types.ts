@@ -211,8 +211,13 @@ export const upgradeTierFor = (tier: PlanTier, requiredPlan?: string | null): Pl
 export interface Subscription {
   planKey: string | null;
   pendingPlanKey: string | null;
-  /** The tier the account counts as for plan gates (backend `tierOf`). */
+  /**
+   * The tier the account counts as for plan gates (backend `effectiveTier`): the plan paid for,
+   * raised while a streak gift's day of Pro runs (`boostUntil`). `planKey` stays the plan paid for.
+   */
   tier: PlanTier;
+  /** When a day of Pro from a streak gift ends (ISO), or null when none is running. Absent from an older backend. */
+  boostUntil?: string | null;
   status: SubscriptionStatus;
   interval: BillingInterval;
   /** The billing of the plan waiting on payment, beside `pendingPlanKey`. */

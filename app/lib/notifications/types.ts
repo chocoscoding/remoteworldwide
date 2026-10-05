@@ -10,7 +10,11 @@ export type NotificationKind =
   | "pod.rotated"
   // A reviewer put you in front of a company, or the company sent its questions.
   | "recommendation.created"
-  | "recommendation.questions";
+  | "recommendation.questions"
+  // A streak gift did what it promised: a day of Pro started (/dashboard/prep), a priority intro
+  // is waiting (/dashboard/recommend) or was made (/dashboard/recommend/<id>), a rewrite is ready
+  // (/dashboard/resume).
+  | "gift.redeemed";
 
 export interface NotificationItem {
   id: string;

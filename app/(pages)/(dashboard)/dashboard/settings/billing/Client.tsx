@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import { BillingSwitch } from "@/app/components/pricing/BillingInterval";
 import { yearlyCents, yearlySavingLabel } from "@/app/lib/pricing/catalogue";
+import { boostEndsAt, proUntilLabel } from "@/app/lib/settings/boost";
 import type { BillingInterval, Plan } from "@/app/lib/settings/types";
 import { useBilling } from "../BillingProvider";
 import { BUTTON_OUTLINE, BUTTON_SOLID, CARD, SettingsRow, SettingsSection } from "@/app/components/dashboard/settings/settings-ui";
@@ -26,8 +27,18 @@ const BillingClient: FC<{ initialBilling?: BillingInterval }> = ({ initialBillin
   const { subscription, plan, plans, creditPacks, invoices, busy, buyPlan, buyCredits, cancelPlan } = useBilling();
 
   const { creditBalance, monthlyCredits, pendingPlanKey } = subscription;
+  // A streak gift's day of Pro raises `tier` while it runs, but not the plan paid for, which is
+  // what this screen is about: a Free account on a day of Pro is still on Free here.
+  // Read once per visit: render stays pure, and a day of Pro that ends mid-visit shows until the next one.
+  const [now] = useState(() => Date.now());
+  const boostEnds = boostEndsAt(subscription.boostUntil, now);
+  const paidPlanless =
+    subscription.status !== "active" ||
+    !subscription.planKey ||
+    subscription.planKey === "free" ||
+    (subscription.provider === "waitlist" && subscription.periodEnd !== null && new Date(subscription.periodEnd).getTime() <= now);
   // Free is everyone without an active paid plan; its allowance comes from the Free plan row.
-  const onFree = (subscription.tier ?? "free") === "free";
+  const onFree = (subscription.tier ?? "free") === "free" || (boostEnds !== null && paidPlanless);
   const currentKey = onFree ? "free" : subscription.planKey;
   const interval: BillingInterval = subscription.interval ?? "month";
   const pendingInterval: BillingInterval = subscription.pendingInterval ?? "month";
@@ -58,6 +69,19 @@ const BillingClient: FC<{ initialBilling?: BillingInterval }> = ({ initialBillin
             </button>
           ) : undefined
         }>
+        {boostEnds ? (
+          <div className={cn(CARD, "mb-4 flex items-center gap-2.5 border-[#cddd54] bg-[#f6faea] px-4 py-3")}>
+            <Zap className="h-4 w-4 flex-none text-primary" aria-hidden />
+            <p className="text-xs leading-relaxed text-black/65">
+              {/* Local time: the server's render can't know the zone. */}
+              <span className="font-bold text-primary" suppressHydrationWarning>
+                Pro until {proUntilLabel(boostEnds)}
+              </span>
+              , from your streak gift. Interview prep, likely questions and every Pro feature are on till then.
+            </p>
+          </div>
+        ) : null}
+
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4 border-b border-black/8 pb-4">
           <div>
             <p className="text-[10.5px] font-bold uppercase tracking-[0.09em] text-black/40">Credits left</p>

@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import type { GiftKind } from "@/app/lib/dashboard/gifts";
 import { dismissRepair, markStreakSeen, redeemGift, repairStreak, reportFollowUp, retireStreak } from "@/app/lib/streak/api";
-import type { RepairMethod, StreakItem, StreakWithGifts } from "@/app/lib/streak/types";
+import type { RedeemedGift, RepairMethod, StreakItem, StreakWithGifts } from "@/app/lib/streak/types";
 import { qk } from "@/app/lib/query/keys";
 
 /**
@@ -41,12 +41,21 @@ function storeStreak(queryClient: QueryClient, streak: StreakItem) {
   void queryClient.invalidateQueries({ queryKey: qk.activity.gifts() });
 }
 
-/** Uses the oldest waiting gift of a kind. A refusal (the freeze cap, nothing to backfill) toasts the server's reason. */
+/**
+ * Uses the oldest waiting gift of a kind. A refusal (the freeze cap, nothing to backfill) toasts the server's reason.
+ * Never for "rewrite": that gift is spent by the resume build it pays for (RewriteGiftDialog).
+ */
 export function useRedeemGift() {
   const queryClient = useQueryClient();
-  return useMutation<StreakWithGifts, unknown, GiftKind>({
+  return useMutation<RedeemedGift, unknown, GiftKind>({
     mutationFn: redeemGift,
-    onSuccess: (data) => storeBoth(queryClient, data),
+    onSuccess: (data, kind) => {
+      storeBoth(queryClient, data);
+      // A day of Pro lifts the plan the gates read: the billing overview carries it.
+      if (kind === "pro-day") void queryClient.invalidateQueries({ queryKey: qk.billing.overview() });
+      // A bell notice says what the gift did.
+      void queryClient.invalidateQueries({ queryKey: qk.notifications.all });
+    },
     onError: (error) => toast.error(apiMessage(error), { id: "streak-gift-failed" }),
   });
 }

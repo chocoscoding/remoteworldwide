@@ -21,6 +21,7 @@ import type {
   AdminRecommendationItem,
   AdminRecommendationList,
   CreateRecommendationInput,
+  PriorityIntroItem,
   RecommendationCandidateMatch,
   UpdateRecommendationInput,
 } from "@/app/lib/recommendations/types";
@@ -70,6 +71,21 @@ export const getAdminRecommendation = async (id: string) => {
 export const searchRecommendationCandidates = async (q: string) => {
   await requireAdminAction();
   return admin<RecommendationCandidateMatch[]>(`/candidates?q=${encodeURIComponent(q.trim())}`);
+};
+
+/**
+ * "Priority intros waiting": accounts that redeemed a priority referral intro (a streak gift) no
+ * reviewer has made yet, the longest wait first. Making a recommendation for one delivers it. A
+ * backend from before the gift answers 404, read as nobody waiting.
+ */
+export const listPriorityIntros = async (): Promise<PriorityIntroItem[]> => {
+  await requireAdminAction();
+  try {
+    return await admin<PriorityIntroItem[]>("/priority-intros");
+  } catch (error) {
+    if (error instanceof BackendError && error.status === 404) return [];
+    throw error;
+  }
 };
 
 /**

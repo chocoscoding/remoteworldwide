@@ -26,9 +26,14 @@ export interface GiftSpec {
 export const GIFT_CATALOGUE: Record<GiftKind, GiftSpec> = {
   freeze: { kind: "freeze", label: "Streak freeze", detail: "Covers one unplanned missed day.", icon: Snowflake },
   backfill: { kind: "backfill", label: "Backfill", detail: "Logs a day you forgot to record.", icon: CalendarPlus },
-  rewrite: { kind: "rewrite", label: "Resume rewrite", detail: "A full pass over one saved resume.", icon: Sparkles },
-  "pro-day": { kind: "pro-day", label: "1 day of Pro", detail: "Unlimited tailoring for 24 hours.", icon: Crown },
-  "referral-intro": { kind: "referral-intro", label: "Priority referral intro", detail: "Jump the queue on one warm intro.", icon: Users },
+  rewrite: { kind: "rewrite", label: "Resume rewrite", detail: "One free full AI rewrite of a saved resume.", icon: Sparkles },
+  "pro-day": { kind: "pro-day", label: "1 day of Pro", detail: "Interview prep, likely questions and every Pro feature for 24 hours.", icon: Crown },
+  "referral-intro": {
+    kind: "referral-intro",
+    label: "Priority referral intro",
+    detail: "You go to the top of the list for one recommendation to a company.",
+    icon: Users,
+  },
   restore: { kind: "restore", label: "Streak restore", detail: "Brings a broken streak back whole.", icon: RotateCcw },
 };
 
@@ -64,11 +69,47 @@ export interface GiftEvent {
   refId?: string;
   at: string;
   usedAt?: string;
+  /** A used service gift delivered: the day of Pro started, the rewrite built, the intro made. */
+  deliveredAt?: string;
+  /** What it produced: a day of Pro's end (ISO), "waiting" for a priority intro. */
+  detail?: string;
+}
+
+/** What a priority intro's `detail` reads while it waits for a reviewer. */
+export const INTRO_WAITING = "waiting";
+
+/**
+ * A gift's state for the history list: "waiting" while unused, then what using it did. `when`
+ * formats a day of Pro's end ("Oct 7, 3:45 PM"), so the time zone is the caller's.
+ */
+export function giftStatusLabel(gift: GiftEvent, when: (iso: string) => string): string {
+  if (!gift.usedAt) return "waiting";
+  switch (gift.kind) {
+    case "pro-day": {
+      const ends = gift.detail && !Number.isNaN(Date.parse(gift.detail)) ? gift.detail : null;
+      return ends ? `used, Pro until ${when(ends)}` : "used";
+    }
+    case "rewrite":
+      return gift.deliveredAt ? "used, rewrite ready" : "used";
+    case "referral-intro":
+      return gift.deliveredAt ? "used, recommendation sent" : "used, top of the list";
+    default:
+      return "used";
+  }
 }
 
 /** Unused gifts, oldest first — redemption consumes from the front. */
 export function heldGifts(gifts: GiftEvent[]): GiftEvent[] {
   return gifts.filter((g) => !g.usedAt);
+}
+
+/**
+ * A priority referral intro has been redeemed (waiting for a reviewer, or delivered). The backend
+ * lets such an account read and answer its recommendations on any plan, so the screens that lock
+ * recommendations below Basic stay open for it.
+ */
+export function holdsPriorityIntro(gifts: GiftEvent[]): boolean {
+  return gifts.some((g) => g.kind === "referral-intro" && Boolean(g.usedAt));
 }
 
 /** Held count for one kind. */

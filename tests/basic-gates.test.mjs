@@ -91,7 +91,9 @@ describe("the Basic gates", () => {
     assert.ok(site("app/(pages)/(dashboard)/dashboard/Client.tsx").includes("useTasks(planPeriod, undefined, { enabled: !planLock.locked })"));
     assert.ok(site("app/components/dashboard/plan/AddToPlanButton.tsx").includes("useTasks(period, undefined, { enabled: !lock.locked })"));
     assert.ok(site("app/components/dashboard/modals/ShareWinModal.tsx").includes("usePodOverview({ enabled: open && !podLock.locked })"));
-    assert.ok(site("app/(pages)/(dashboard)/dashboard/recommend/Client.tsx").includes("useRecommendations({ enabled: !lock.locked })"));
+    // Below Basic only for someone holding a redeemed priority intro (a streak gift), which the backend admits.
+    const recommend = site("app/(pages)/(dashboard)/dashboard/recommend/Client.tsx");
+    assert.ok(recommend.includes("const locked = lock.locked && !holdsPriorityIntro(gifts);") && recommend.includes("useRecommendations({ enabled: !locked })"));
     // The pod's first paint is the server's: a refusal there is the locked screen, not an error page.
     const page = site("app/(pages)/(dashboard)/dashboard/pod/page.tsx");
     assert.ok(page.includes('error.code === "plan_required"') && page.includes("<PodLocked />"));
@@ -180,7 +182,8 @@ describe("the backend's refusals (remoteworldwidebackend)", { skip: !existsSync(
       ["routes/pod.routes.ts", "The job-search pod", "pod"],
       ["routes/recommendation.routes.ts", "Being recommended to companies", "recommendations"],
     ]) {
-      assert.ok(backend(file).includes(`requirePlan("basic", "${feature}")`), file);
+      // A third argument is an alternative entitlement (recommendations: a waiting priority intro, a streak gift).
+      assert.ok(backend(file).includes(`requirePlan("basic", "${feature}")`) || backend(file).includes(`requirePlan("basic", "${feature}", `), file);
       assert.equal(sentence(feature), BASIC_GATES[gate].message, file);
     }
   });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
-import { listAdminRecommendations } from "@/libs/recommendations-admin";
+import { listAdminRecommendations, listPriorityIntros } from "@/libs/recommendations-admin";
 import {
   ADMIN_RECOMMENDATION_FILTERS,
   RECOMMENDATION_STAGE_LABELS,
@@ -39,7 +39,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ status?: string;
   const filter: AdminRecommendationFilter = (ADMIN_RECOMMENDATION_FILTERS as readonly string[]).includes(params.status ?? "") ? (params.status as AdminRecommendationFilter) : "open";
   const q = (params.q ?? "").trim();
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
-  const { data: rows, count } = await listAdminRecommendations({ page, status: filter, q });
+  const [{ data: rows, count }, priority] = await Promise.all([listAdminRecommendations({ page, status: filter, q }), listPriorityIntros()]);
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
   const href = (next: { status?: AdminRecommendationFilter; page?: number }) => {
@@ -65,6 +65,33 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ status?: string;
           New recommendation
         </Link>
       </div>
+
+      {/* Streak gifts: each of these people goes to the top of the list for one recommendation.
+          Making one for them delivers it, and they drop off this list. */}
+      {priority.length > 0 && (
+        <section className="mb-6 rounded-md border border-[#cddd54] bg-[#f6faea] p-4">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-bold text-primary">Priority intros waiting ({priority.length})</h2>
+            <p className="text-xs text-gray-600">Redeemed from a streak gift. Put these forward first; they show first in the candidate picker too.</p>
+          </div>
+          <ul className="divide-y divide-[#222325]/10">
+            {priority.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <div className="min-w-0">
+                  <span className="font-semibold text-primary">{p.name ?? p.email ?? "No name on the account"}</span>
+                  {p.email && p.name && <span className="ml-2 select-all text-xs text-gray-600">{p.email}</span>}
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="tabular-nums text-gray-600">Waiting since {day(p.redeemedAt)}</span>
+                  <span className={p.eligible ? "font-semibold text-green-700" : "font-semibold text-red-600"}>
+                    {p.eligible ? "Ready to put forward" : "Profile not complete yet"}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex gap-1.5">

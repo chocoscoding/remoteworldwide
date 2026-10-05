@@ -7,7 +7,7 @@
 
 import { apiGet, apiPost } from "@/app/lib/api/client";
 import type { GiftKind } from "@/app/lib/dashboard/gifts";
-import type { RepairMethod, StreakItem, StreakWithGifts } from "./types";
+import type { RedeemedGift, RepairMethod, StreakItem, StreakWithGifts } from "./types";
 
 export const STREAK_PATH = "/api/streak";
 
@@ -35,7 +35,7 @@ export function getGifts(signal?: AbortSignal) {
 
 /** Uses the oldest waiting gift of `kind`. */
 export function redeemGift(kind: GiftKind) {
-  return apiPost<StreakWithGifts>(`${STREAK_PATH}/gifts/redeem`, { kind });
+  return apiPost<RedeemedGift>(`${STREAK_PATH}/gifts/redeem`, { kind });
 }
 
 /** Buys the current break back: credits (a ledger spend), a restore gift, or the free half-restore. */
