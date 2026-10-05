@@ -14,9 +14,9 @@ import { OfferSwitch } from "./OfferSwitch";
 
 const BTN_DARK = "drop-shadow-primary2-hover transition-all bg-black text-white border-2 border-primary font-bold rounded-sm px-4 h-10 disabled:opacity-50";
 const TONES: { value: CtaTone; label: string }[] = [
-  { value: "INK", label: "Ink — black card, lime shadow" },
-  { value: "LIME", label: "Lime — lime card, black shadow" },
-  { value: "PAPER", label: "Paper — off-white card" },
+  { value: "INK", label: "Ink: black card, lime shadow" },
+  { value: "LIME", label: "Lime: lime card, black shadow" },
+  { value: "PAPER", label: "Paper: off-white card" },
 ];
 
 const CtaForm: FC<{ initial?: Cta }> = ({ initial }) => {
@@ -143,7 +143,7 @@ const CtaForm: FC<{ initial?: Cta }> = ({ initial }) => {
 
         <div className="rounded-md border border-gray-200 p-4">
           <p className="text-sm font-semibold text-primary">Image (optional)</p>
-          <p className={ADMIN_HINT}>Landscape works best — the card crops it to 4:3. Uploads go to Cloudinary under ctas/.</p>
+          <p className={ADMIN_HINT}>Landscape works best. The card crops it to 4:3. Uploads go to Cloudinary under ctas/.</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {imageUrl && <Image src={imageUrl} alt="" width={120} height={90} className="h-[90px] w-[120px] rounded-md border object-cover" />}
             <CldUploadWidget
@@ -191,7 +191,7 @@ const CtaForm: FC<{ initial?: Cta }> = ({ initial }) => {
         <OfferTargeting categories={targetCategories} tags={targetTags} onCategories={setTargetCategories} onTags={setTargetTags} />
 
         <div className="flex flex-col gap-1">
-          <OfferSwitch checked={active} onChange={setActive} label={active ? "On — readers can see this" : "Off — hidden everywhere, even where a post names it"} />
+          <OfferSwitch checked={active} onChange={setActive} label={active ? "On: readers can see this" : "Off: hidden everywhere, even where a post names it"} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">

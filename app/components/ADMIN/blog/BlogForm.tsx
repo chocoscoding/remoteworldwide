@@ -233,8 +233,8 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
   const allAuthors = publisher ? [publisher, ...coauthors] : coauthors;
 
   const offerLabel = (o: OfferRef) => {
-    if (o.kind === "cta") return o.ref === AUTO ? "Auto — the product CTA" : (ctas.find((c) => c.key === o.ref)?.name ?? `CTA "${o.ref}"`);
-    return o.ref === AUTO ? "Auto — the sidebar offer" : (magnets.find((m) => m.slug === o.ref)?.title ?? `Download "${o.ref}"`);
+    if (o.kind === "cta") return o.ref === AUTO ? "Auto: the product CTA" : (ctas.find((c) => c.key === o.ref)?.name ?? `CTA "${o.ref}"`);
+    return o.ref === AUTO ? "Auto: the sidebar offer" : (magnets.find((m) => m.slug === o.ref)?.title ?? `Download "${o.ref}"`);
   };
   const addOffer = (o: OfferRef) => setOffers((prev) => [...prev, o]);
   const removeOffer = (i: number) => setOffers((prev) => prev.filter((_, j) => j !== i));
@@ -400,7 +400,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
               />
             </div>
             <p className={ADMIN_HINT}>
-              {publisher ? "The publisher is always listed first." : "No author profile is linked to your account — the first author you pick becomes the publisher."}
+              {publisher ? "The publisher is always listed first." : "No author profile is linked to your account. The first author you pick becomes the publisher."}
             </p>
           </div>
         </div>
@@ -474,7 +474,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
                   if (e.target.value) addOffer({ kind: "cta", ref: e.target.value });
                 }}>
                 <option value="">+ Add a CTA…</option>
-                <option value={AUTO}>Auto — the product CTA</option>
+                <option value={AUTO}>Auto: the product CTA</option>
                 {ctas.map((c) => (
                   <option key={c.key} value={c.key}>
                     {c.name}
@@ -489,7 +489,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
                   if (e.target.value) addOffer({ kind: "magnet", ref: e.target.value });
                 }}>
                 <option value="">+ Add a download form…</option>
-                <option value={AUTO}>Auto — the sidebar offer</option>
+                <option value={AUTO}>Auto: the sidebar offer</option>
                 {magnets.map((m) => (
                   <option key={m.slug} value={m.slug}>
                     {m.title}
@@ -499,7 +499,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
             </div>
             <p className={ADMIN_HINT}>
               {handPlaced
-                ? `This post has ${markers.cta.length + markers.magnet.length} marker(s) typed in the text — those positions win and this list is ignored.`
+                ? `This post has ${markers.cta.length + markers.magnet.length} marker(s) typed in the text. Those positions win and this list is ignored.`
                 : "Want one at an exact spot? Type [[cta:key]] or [[magnet:slug]] on its own line in the text. Conversions only show in Preview."}
             </p>
           </div>
@@ -511,7 +511,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <option key={n} value={n}>
                   {n}
-                  {n === 1 ? " — the lead" : ""}
+                  {n === 1 ? " - the lead" : ""}
                 </option>
               ))}
             </select>

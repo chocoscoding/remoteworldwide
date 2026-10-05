@@ -74,7 +74,7 @@ const ProfileForm: FC<{ author: Author | null }> = ({ author }) => {
     <div className="w-full p-4" data-profile-form data-mode={editing ? "edit" : "create"}>
       <h1 className="text-2xl font-bold">{editing ? "My author profile" : "Create my author profile"}</h1>
       <p className={ADMIN_HINT}>
-        {editing ? "Linked to your account. Ask an admin to change the link." : "Linked to your account automatically — posts you publish are attributed to it first."}
+        {editing ? "Linked to your account. Ask an admin to change the link." : "Linked to your account automatically. Posts you publish are attributed to it first."}
       </p>
 
       <form onSubmit={submit} className="mt-4 max-w-[720px] space-y-4">

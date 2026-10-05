@@ -70,7 +70,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ status?: string;
         <h1 className="text-2xl font-bold">Coverage requests</h1>
         <p className="text-sm text-gray-500">
           Pages the extension couldn&apos;t read, sent in with &ldquo;Request support&rdquo; or reported when someone added the site by hand with &ldquo;Add this page&rdquo;
-          (marked <span className="font-semibold text-gray-700">Added by user</span>). Only the site and path are kept — never the query string — so a link may need the
+          (marked <span className="font-semibold text-gray-700">Added by user</span>). Only the site and path are kept, never the query string, so a link may need the
           posting found again from there.
         </p>
       </div>
@@ -142,7 +142,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ status?: string;
                       </div>
                     </td>
                     <td className="whitespace-nowrap p-3 text-xs text-gray-700">{KIND_LABELS[r.kind] ?? r.kind}</td>
-                    <td className="max-w-[320px] whitespace-pre-line break-words p-3 text-xs text-gray-700">{r.note ?? <span className="text-gray-400">—</span>}</td>
+                    <td className="max-w-[320px] whitespace-pre-line break-words p-3 text-xs text-gray-700">{r.note ?? <span className="text-gray-400">-</span>}</td>
                     <td className="p-3 text-xs">
                       {r.requester ? (
                         <>

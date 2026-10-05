@@ -24,7 +24,7 @@ const OUTCOME_BADGE: Record<NonNullable<AdminRecommendationItem["outcome"]>, str
   expired: "bg-[#fdeae6] text-[#b23c26]",
 };
 
-const day = (value: string | Date | null) => (value ? new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—");
+const day = (value: string | Date | null) => (value ? new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "-");
 
 /** Where a row stands, in one short phrase: what the reviewer would want to know first. */
 function status(r: AdminRecommendationItem): string {

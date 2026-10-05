@@ -48,7 +48,7 @@ const Page = async () => {
         <div>
           <h1 className="text-2xl font-bold">Conversions</h1>
           <p className="text-sm text-gray-500">
-            Calls-to-action and lead magnets. Posts pick from these — by category and tags, or set per post. Switch one off and it disappears everywhere.
+            Calls-to-action and lead magnets. Posts pick from these, by category and tags, or set per post. Switch one off and it disappears everywhere.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -60,7 +60,7 @@ const Page = async () => {
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-md border border-dashed border-gray-300 p-10 text-center text-gray-500">Nothing yet. Create the first conversion — the blog shows no offers until you do.</div>
+        <div className="rounded-md border border-dashed border-gray-300 p-10 text-center text-gray-500">Nothing yet. Create the first conversion. The blog shows no offers until you do.</div>
       ) : (
         <div className="overflow-x-auto rounded-md border border-gray-200 bg-white">
           <table className="w-full text-sm">

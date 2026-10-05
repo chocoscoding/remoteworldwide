@@ -44,9 +44,9 @@ const BTN_DARK = "drop-shadow-primary2-hover transition-all bg-black text-white 
 const DAY_MS = 86_400_000;
 
 const OUTCOME_LABELS: Record<RecommendationOutcome, string> = {
-  connected: "Connected — they talked",
-  passed: "Passed — the company went another direction",
-  expired: "Expired — no answer in time",
+  connected: "Connected: they talked",
+  passed: "Passed: the company went another direction",
+  expired: "Expired: no answer in time",
 };
 
 /** `YYYY-MM-DD` for a date input, in the admin's own timezone. */
@@ -83,7 +83,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
 
   const [candidate, setCandidate] = useState<RecommendationCandidate | RecommendationCandidateMatch | null>(initial?.candidate ?? null);
   const [platformJobId, setPlatformJobId] = useState<string | null>(initial?.platformJobId ?? null);
-  const [listingLabel, setListingLabel] = useState<string | null>(initial?.platformJobId ? `${initial.company} — ${initial.role}` : null);
+  const [listingLabel, setListingLabel] = useState<string | null>(initial?.platformJobId ? `${initial.role} at ${initial.company}` : null);
   const [company, setCompany] = useState(initial?.company ?? "");
   const [role, setRole] = useState(initial?.role ?? "");
   const [jobUrl, setJobUrl] = useState(initial?.jobUrl ?? "");
@@ -107,7 +107,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
 
   const pickListing = (job: PlatformJobSearchItem) => {
     setPlatformJobId(job.id);
-    setListingLabel(`${job.company} — ${job.role}`);
+    setListingLabel(`${job.role} at ${job.company}`);
     setCompany(job.company);
     setRole(job.role);
     // The backend links our own listing page when the posting link is left empty.
@@ -158,7 +158,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
       return;
     }
     if (!company.trim() || !role.trim()) {
-      toast.error("Say which company and role — or pick a listing.");
+      toast.error("Say which company and role, or pick a listing.");
       return;
     }
     if (jobUrl.trim() && !/^https?:\/\//i.test(jobUrl.trim())) {
@@ -269,7 +269,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
             </div>
             {!editing && isMatch(candidate) && !candidate.eligible && (
               <p className="rounded-md bg-red-50 p-2 text-xs text-red-700">
-                Not eligible yet — reviewers only put forward complete profiles with a master resume, from people who let recruiters find them. Still missing: {candidate.missing.join(", ")}.
+                Not eligible yet. Reviewers only put forward complete profiles with a master resume, from people who let recruiters find them. Still missing: {candidate.missing.join(", ")}.
               </p>
             )}
           </div>
@@ -360,8 +360,8 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
           <p className="text-sm font-semibold text-primary">The company&apos;s questions</p>
           <p className={ADMIN_HINT}>
             {locked
-              ? "The candidate has answered, so these are locked — the answers are to exactly these questions."
-              : "A question or two. Leave empty until the company asks — adding them later moves it to “Their questions” and tells the candidate."}
+              ? "The candidate has answered, so these are locked: the answers are to exactly these questions."
+              : "A question or two. Leave empty until the company asks. Adding them later moves it to “Their questions” and tells the candidate."}
           </p>
         </div>
         {questions.map((q, i) => (
@@ -375,7 +375,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
                 onChange={(e) => setQuestions((prev) => prev.map((row) => (row.key === q.key ? { ...row, question: e.target.value } : row)))}
                 className={`${ADMIN_INPUT} disabled:bg-gray-50`}
                 rows={2}
-                placeholder="Walk us through a system you owned end to end — what broke, and what did you change?"
+                placeholder="Walk us through a system you owned end to end. What broke, and what did you change?"
               />
               {locked && initial?.questions.find((row) => row.id === q.id)?.answer && (
                 <p className="mt-1 whitespace-pre-line rounded-md bg-[#fbfbf7] p-2 text-sm text-gray-700">
@@ -413,7 +413,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
             onChange={(e) => setNote(e.target.value)}
             className={ADMIN_INPUT}
             rows={3}
-            placeholder="Why we put you forward: your design-systems depth is the hook — they're rebuilding their component library."
+            placeholder="Why we put you forward: your design-systems depth is the hook: they're rebuilding their component library."
           />
           <p className={ADMIN_HINT}>Shown on their recommendation, signed with the reviewer name below.</p>
         </div>
@@ -468,7 +468,7 @@ const RecommendationForm: FC<{ initial?: AdminRecommendationItem }> = ({ initial
           <div>
             <label className={ADMIN_LABEL}>Outcome</label>
             <select value={outcome} onChange={(e) => setOutcome(e.target.value as RecommendationOutcome | "")} className={ADMIN_INPUT}>
-              <option value="">Open — still live</option>
+              <option value="">Open: still live</option>
               {RECOMMENDATION_OUTCOMES.map((o) => (
                 <option key={o} value={o}>
                   {OUTCOME_LABELS[o]}

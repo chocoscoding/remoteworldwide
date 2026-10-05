@@ -89,7 +89,7 @@ const LeadMagnetForm: FC<{ initial?: LeadMagnet }> = ({ initial }) => {
           <input value={title} onChange={(e) => setTitle(e.target.value)} className={ADMIN_INPUT} placeholder="The Remote Resume Checklist" required />
         </div>
         <div>
-          <label className={ADMIN_LABEL}>Hook (one sentence — the promise)</label>
+          <label className={ADMIN_LABEL}>Hook (one sentence: the promise)</label>
           <textarea value={hook} onChange={(e) => setHook(e.target.value)} className={ADMIN_INPUT} rows={2} placeholder="27 checks that get a resume past the software and past a hiring manager." required />
         </div>
         <div>
@@ -167,7 +167,7 @@ const LeadMagnetForm: FC<{ initial?: LeadMagnet }> = ({ initial }) => {
         <OfferTargeting categories={targetCategories} tags={targetTags} onCategories={setTargetCategories} onTags={setTargetTags} />
 
         <div className="flex flex-col gap-1">
-          <OfferSwitch checked={active} onChange={setActive} label={active ? "On — readers can see this" : "Off — hidden everywhere, even where a post names it"} />
+          <OfferSwitch checked={active} onChange={setActive} label={active ? "On: readers can see this" : "Off: hidden everywhere, even where a post names it"} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">

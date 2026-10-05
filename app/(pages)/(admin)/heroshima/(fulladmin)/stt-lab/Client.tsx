@@ -107,7 +107,7 @@ export default function SttLabClient() {
           <h1 className="text-3xl font-bold tracking-tight text-primary">STT lab</h1>
           <p className="max-w-3xl text-sm text-gray-600">
             Record a clip and watch AWS streaming and the browser&apos;s Web Speech caption it side by side; stopping scores them both. Paste what you will say
-            first to get a word error rate for each engine. Only the AWS stream spends the lab&apos;s daily minutes — Web Speech runs in this browser and costs
+            first to get a word error rate for each engine. Only the AWS stream spends the lab&apos;s daily minutes. Web Speech runs in this browser and costs
             nothing.
           </p>
         </header>
@@ -197,7 +197,7 @@ export default function SttLabClient() {
                 onChange={(event) => setReference(event.target.value)}
                 maxLength={20_000}
                 rows={9}
-                placeholder="What you will say, word for word — include every um and uh."
+                placeholder="What you will say, word for word. Include every um and uh."
                 className="w-full resize-y rounded-lg border border-primary/15 bg-primary2/50 px-3 py-2 text-sm text-primary placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <p className="text-xs text-gray-500">Sent when the clip stops. Without one there is no WER, only latency and cost.</p>

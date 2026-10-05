@@ -23,7 +23,7 @@ const LinkedAccountSelect: FC<{ value: string; onChange: (userId: string) => voi
         <option value="">{users === null ? "Loading accounts…" : "Not linked"}</option>
         {(users ?? []).map((u) => (
           <option key={u.id} value={u.id}>
-            {u.name ? `${u.name} — ${u.email ?? ""}` : (u.email ?? u.id)}
+            {u.name ? `${u.name} - ${u.email ?? ""}` : (u.email ?? u.id)}
           </option>
         ))}
       </select>

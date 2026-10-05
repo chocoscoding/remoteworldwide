@@ -167,14 +167,14 @@ describe("the words", () => {
   it("dates in UTC, so the server and the browser agree", () => {
     assert.equal(formatDay("2026-10-01T23:30:00.000Z"), "1 Oct 2026");
     assert.equal(formatDay(new Date("2026-10-01T00:10:00.000Z")), "1 Oct 2026");
-    assert.equal(formatDay(null), "—");
-    assert.equal(formatDay("not a date"), "—");
+    assert.equal(formatDay(null), "-");
+    assert.equal(formatDay("not a date"), "-");
   });
 
   it("names the plan they eyed, yearly when it was", () => {
     assert.equal(planLabel({ plan: "pro", billing: "year" }), "Pro · yearly");
     assert.equal(planLabel({ plan: "basic", billing: "month" }), "Basic");
-    assert.equal(planLabel({ plan: null, billing: null }), "—");
+    assert.equal(planLabel({ plan: null, billing: null }), "-");
   });
 
   it("dates the Pro month as far as it goes", () => {

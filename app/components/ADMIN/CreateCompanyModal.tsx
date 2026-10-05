@@ -76,7 +76,7 @@ const CreateCompanyModal: FC<CreateCompanyModalProps> = ({
             <div>
               <DialogPrimitive.Title className="text-lg font-bold text-primary">Create New Company</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-1 text-sm text-black/50">
-                It joins the company list right here once saved — nothing you&apos;ve already filled in on the job is lost.
+                It joins the company list right here once saved. Nothing you&apos;ve already filled in on the job is lost.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close className={CLOSE_BUTTON_CLASS}>

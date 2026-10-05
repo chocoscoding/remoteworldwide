@@ -167,16 +167,16 @@ export const grantSummary = (r: WaitlistGrantResult): { label: string; value: nu
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const formatDay = (value: string | Date | null | undefined): string => {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  return Number.isNaN(date.getTime()) ? "-" : `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 };
 
 const PLAN_NAMES: Record<WaitlistPlan, string> = { free: "Free", basic: "Basic", pro: "Pro", ultra: "Ultra" };
 
 /** The plan they eyed on /pricing: "Pro", "Pro · yearly", or a dash. */
 export const planLabel = (row: Pick<WaitlistAdminItem, "plan" | "billing">): string =>
-  row.plan ? `${PLAN_NAMES[row.plan] ?? row.plan}${row.billing === "year" ? " · yearly" : ""}` : "—";
+  row.plan ? `${PLAN_NAMES[row.plan] ?? row.plan}${row.billing === "year" ? " · yearly" : ""}` : "-";
 
 /** The Pro month's dates, as far as they go, one short line each. Empty while waiting. */
 export function grantTimeline(row: Pick<WaitlistAdminItem, "status" | "grantedAt" | "appliedAt" | "endsAt" | "hasAccount" | "note">): string[] {

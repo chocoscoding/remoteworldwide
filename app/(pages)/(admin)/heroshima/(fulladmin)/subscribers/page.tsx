@@ -19,7 +19,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ page?: string }>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Subscribers</h1>
-          <p className="text-sm text-gray-500">{total} emails captured through lead magnets. No provider is connected yet — export and import when one is.</p>
+          <p className="text-sm text-gray-500">{total} emails captured through lead magnets. No provider is connected yet: export and import when one is.</p>
         </div>
         <a href="/api/subscribers/export" className="flex items-center p-2 bg-primary text-white outline outline-2 outline-primary font-bold rounded-md drop-shadow-primary2-hover transition-all">
           <Download className="w-5 h-5 mr-2" />
@@ -51,7 +51,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ page?: string }>
                     {s.source}
                     {s.firstBlogSlug && <div className="truncate text-gray-400 max-w-[260px]">{s.firstBlogSlug}</div>}
                   </td>
-                  <td className="p-3 text-xs text-gray-600">{Array.from(new Set(s.claims.map((c) => c.leadMagnet.title))).join(", ") || "—"}</td>
+                  <td className="p-3 text-xs text-gray-600">{Array.from(new Set(s.claims.map((c) => c.leadMagnet.title))).join(", ") || "-"}</td>
                   <td className="p-3 text-xs text-gray-600">{s.createdAt.toLocaleDateString("en-GB")}</td>
                 </tr>
               ))}

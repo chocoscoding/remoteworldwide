@@ -53,7 +53,7 @@ const FeaturedPicks: FC<{ posts: PickRow[] }> = ({ posts }) => {
                 </td>
                 <td className="py-2 text-right">
                   <select value={p.featuredRank ?? ""} onChange={(e) => change(p.id, e.target.value)} className="rounded-md border border-gray-300 p-1 text-xs">
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {[1, 2, 3, 4, 5, 6].map((n) => (
                       <option key={n} value={n}>
                         #{n}

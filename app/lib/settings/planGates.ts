@@ -26,6 +26,6 @@ export const BASIC_GATES = {
   recommendations: { plan: "basic", message: "Being recommended to companies is on Basic and up." },
   coverLetters: {
     plan: "basic",
-    message: "Free keeps one cover letter — edit or revise it, delete it to start another, or upgrade to Basic to write more.",
+    message: "Free keeps one cover letter. Edit or revise it, delete it to start another, or upgrade to Basic to write more.",
   },
 } as const satisfies Record<string, PlanGateSpec>;

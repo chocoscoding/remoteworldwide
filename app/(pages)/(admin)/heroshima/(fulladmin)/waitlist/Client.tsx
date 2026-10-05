@@ -225,7 +225,7 @@ const WaitlistTable: FC<WaitlistTableProps> = ({ items, filter, q, waitingTotal 
                       <span className="sr-only">{selectable ? `Select ${r.email}` : `${r.email}: ${r.status}, can't be selected`}</span>
                     </label>
                   </td>
-                  <td className="whitespace-nowrap p-3 font-semibold tabular-nums text-gray-700">{r.position != null ? `#${r.position}` : "—"}</td>
+                  <td className="whitespace-nowrap p-3 font-semibold tabular-nums text-gray-700">{r.position != null ? `#${r.position}` : "-"}</td>
                   <td className="max-w-[320px] break-all p-3 font-semibold text-primary">{r.email}</td>
                   <td className="whitespace-nowrap p-3 text-xs text-gray-700">{planLabel(r)}</td>
                   <td className="whitespace-nowrap p-3 text-xs tabular-nums text-gray-600">{formatDay(r.joinedAt)}</td>
@@ -243,7 +243,7 @@ const WaitlistTable: FC<WaitlistTableProps> = ({ items, filter, q, waitingTotal 
                         </div>
                       ))
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-gray-400">-</span>
                     )}
                   </td>
                 </tr>
