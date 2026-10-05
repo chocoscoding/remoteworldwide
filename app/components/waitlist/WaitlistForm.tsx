@@ -99,6 +99,12 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, plan, billing: plan ? (initialYearly ? "year" : "month") : null, website }),
       });
+      // Over the sign-up limit the answer is plain text, not the JSON envelope.
+      if (res.status === 429) {
+        setStatus("error");
+        setMessage("Too many sign-ups from here just now. Try again in a few minutes.");
+        return;
+      }
       const body = (await res.json().catch(() => ({}))) as {
         data?: { ok?: boolean; position?: number | null; returning?: boolean } | null;
         message?: string;

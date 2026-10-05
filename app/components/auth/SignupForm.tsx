@@ -101,12 +101,23 @@ export default function SignupForm({
     try {
       // Registration is a plain backend endpoint (proxied, no session issued);
       // signing in afterwards goes through Auth.js like every other login.
-      const response = await fetch("/api/users/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, password }),
-      });
-      const payload = await response.json();
+      let response: Response;
+      try {
+        response = await fetch("/api/users/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ firstName, lastName, email, password }),
+        });
+      } catch {
+        toast.error("Couldn't reach the server. Check your connection and try again.");
+        return;
+      }
+      // Over the sign-up limit the answer is plain text, not the JSON envelope.
+      if (response.status === 429) {
+        toast.error("Too many sign-ups from here just now. Try again in a few minutes.");
+        return;
+      }
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
       if (!response.ok) {
         toast.error(payload?.message ?? "Could not create your account");
         return;
