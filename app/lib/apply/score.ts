@@ -15,6 +15,17 @@ export function scoreColor(score: number): string {
   return `hsl(${hue} 85% ${lightness}%)`;
 }
 
+/** The same colour, faint: a ring's unfilled part, so the whole ring reads red, yellow or green rather than grey. */
+export function scoreTrackColor(score: number, alpha = 0.22): string {
+  return scoreColor(score).replace(/\)$/, ` / ${alpha})`);
+}
+
+/**
+ * The scale itself, red through yellow to green round the ring, faint: what a ring shows before
+ * there is a score, so it is never a grey circle.
+ */
+export const SCORE_SCALE_RING = `conic-gradient(${[0, 25, 50, 75, 100].map((at) => `${scoreTrackColor(at, 0.35)} ${at}%`).join(", ")})`;
+
 export type NotePart = { text: string; kind: "plain" | "count" | "total" };
 
 /**

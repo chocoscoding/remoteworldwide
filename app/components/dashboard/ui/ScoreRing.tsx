@@ -35,6 +35,8 @@ export interface ScoreRingProps {
   trackColor?: string;
   /** Overrides the filled arc, lime by default — e.g. red for a meter running low. */
   fillColor?: string;
+  /** Replaces the whole ring (arc and track), e.g. a colour scale shown before there is a score. */
+  ringBackground?: string;
   className?: string;
 }
 
@@ -52,7 +54,7 @@ const MAX_STROKE = 10;
  */
 const CAPTION_MIN_SIZE = 140;
 
-const ScoreRing: FC<ScoreRingProps> = ({ value, size = 164, label, tone = "light", trackColor, fillColor = "#e1f073", className }) => {
+const ScoreRing: FC<ScoreRingProps> = ({ value, size = 164, label, tone = "light", trackColor, fillColor = "#e1f073", ringBackground, className }) => {
   const pct = Math.max(0, Math.min(100, Math.round(value)));
   const track = trackColor ?? (tone === "dark" ? "rgba(255,255,255,.14)" : "#f0f0ea");
 
@@ -67,7 +69,7 @@ const ScoreRing: FC<ScoreRingProps> = ({ value, size = 164, label, tone = "light
   return (
     <div
       className={cn("relative flex-none rounded-full", className)}
-      style={{ height: size, width: size, background: `conic-gradient(${fillColor} 0% ${pct}%, ${track} ${pct}% 100%)` }}>
+      style={{ height: size, width: size, background: ringBackground ?? `conic-gradient(${fillColor} 0% ${pct}%, ${track} ${pct}% 100%)` }}>
       <div
         className={cn("absolute rounded-full flex flex-col items-center justify-center", tone === "dark" ? "bg-[#222325]" : "bg-white")}
         style={{ inset: stroke }}>

@@ -38,7 +38,7 @@ import { ArrowUp, Check, ChevronDown, Hash, Loader2, Scissors, Sparkle, Tag, Tri
 import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
 import { ATS_BILLING_HREF, SCAN_CREDITS, keywordLabel, missingGaps, scanTier, type ScanFailure } from "@/app/lib/ats/api";
-import { scoreColor } from "@/app/lib/apply/score";
+import { SCORE_SCALE_RING, scoreColor, scoreTrackColor } from "@/app/lib/apply/score";
 import { MAX_ASK_INSTRUCTION_CHARS, SUGGESTION_CREDITS, type SuggestionTool } from "@/app/lib/resume/ai";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import Collapse from "./controls/Collapse";
@@ -174,19 +174,28 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
     });
 
   // The score as the apply flow's resume step shows it: a ring with the number
-  // in the hole and no "/ 100", since a ring already says out of what. Empty
-  // until there is a score; greyed, number and all, once the check is stale.
+  // in the hole and no "/ 100", since a ring already says out of what. Never
+  // grey (owner, 2026-10-08): the whole ring is the score's red, yellow or
+  // green, the unfilled part faint; before a score it is the faint scale; a
+  // stale check keeps its colour, faded, number and all.
   const scoreRing = (score: number | null) =>
     score === null ? (
-      <ScoreRing value={0} size={RING_SIZE} tone="dark" label={<span aria-hidden className="h-[3px] w-5 rounded-full bg-white/30" />} />
+      <ScoreRing
+        value={0}
+        size={RING_SIZE}
+        tone="dark"
+        ringBackground={SCORE_SCALE_RING}
+        label={<span aria-hidden className="h-[3px] w-5 rounded-full bg-white/30" />}
+      />
     ) : (
       <div role="img" aria-label={`${score} out of 100`} className="flex-none">
         <ScoreRing
           value={score}
           size={RING_SIZE}
           tone="dark"
-          fillColor={stale ? "#ffffff" : scoreColor(score)}
-          className={cn("transition-opacity", stale && "opacity-40")}
+          fillColor={scoreColor(score)}
+          trackColor={scoreTrackColor(score)}
+          className={cn("transition-opacity", stale && "opacity-50")}
         />
       </div>
     );

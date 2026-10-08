@@ -90,30 +90,37 @@ interface GroupTitleProps {
   typing: boolean;
   /** Opened for typing by a click on the text, so the input takes the cursor. */
   autoFocus: boolean;
+  /** The first sub skill must have a title (owner, 2026-10-08): a red "Required" beside it while it has none. */
+  required: boolean;
   onChange: (title: string) => void;
   onType: () => void;
   onSet: () => void;
   onRemove: () => void;
 }
 
-const GroupTitle: FC<GroupTitleProps> = ({ title, typing, autoFocus, onChange, onType, onSet, onRemove }) =>
+const GroupTitle: FC<GroupTitleProps> = ({ title, typing, autoFocus, required, onChange, onType, onSet, onRemove }) =>
   typing ? (
-    <input
-      type="text"
-      value={title}
-      onChange={(e) => onChange(e.target.value)}
-      onFocus={onType}
-      onKeyDown={(e) => {
-        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-        e.preventDefault();
-        onSet();
-      }}
-      autoFocus={autoFocus}
-      placeholder="Title, e.g. Frontend, then Enter"
-      maxLength={SKILL_GROUP_TITLE_MAX_CHARS}
-      aria-label="Sub skill title"
-      className={cn(FIELD_CLASS, "h-11 min-w-0 py-0", FIELD_TONE.idle)}
-    />
+    // The input takes 80% of the row (owner, 2026-10-08), leaving room for the "Required" label.
+    <div className="flex items-center gap-2.5">
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={onType}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          onSet();
+        }}
+        autoFocus={autoFocus}
+        placeholder="Title, e.g. Frontend, then Enter"
+        maxLength={SKILL_GROUP_TITLE_MAX_CHARS}
+        aria-label="Sub skill title"
+        aria-required={required || undefined}
+        className={cn(FIELD_CLASS, "h-11 w-4/5 min-w-0 py-0", FIELD_TONE.idle)}
+      />
+      {required && !title.trim() && <span className="text-xs font-semibold text-[#b23c26]">Required</span>}
+    </div>
   ) : (
     <div className="flex items-center gap-2">
       <button
@@ -204,6 +211,7 @@ const SkillsField: FC<SkillsFieldProps> = ({ content, setContent }) => {
                 title={group.title}
                 typing={!group.title.trim() || typingTitles.has(group.id)}
                 autoFocus={typingTitles.has(group.id)}
+                required={group.id === content.skillGroups[0]?.id}
                 onChange={(title) => update({ title })}
                 onType={() => setTyping(group.id, true)}
                 onSet={() => {
