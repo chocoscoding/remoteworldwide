@@ -8,6 +8,7 @@ import OneJobClient from "./Client";
 import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 import { jobPostingJsonLd } from "@/app/lib/jobs/jobPostingJsonLd";
 import { isJobLive } from "@/app/lib/jobs/jobLifetime";
+import { jobFacts } from "@/app/lib/jobs/jobFacts";
 
 export const revalidate = 43200; // 3600 * 12
 const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
@@ -117,6 +118,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     }
   }
 
+  // Employment type and salary for the markup, read from the posting's ATS (jobFacts.ts).
+  const live = isJobLive(JOB);
+  const facts = live ? await jobFacts(JOB) : null;
+
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Jobs", path: "/jobs" },
     { name: JOB.title, path: `/jobs/${JOB.slug}` },
@@ -124,7 +129,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   return (
     <>
-      {isJobLive(JOB) ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(jobPostingJsonLd(JOB)) }} /> : null}
+      {live && facts ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(jobPostingJsonLd(JOB, facts)) }} /> : null}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbs) }} />
       <OneJobClient Job={JOB} hasUserBookmarked={hasUserBookmarked} />
     </>
