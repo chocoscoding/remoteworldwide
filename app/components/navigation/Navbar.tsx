@@ -15,6 +15,7 @@ import { loginWithNext, returnTo, signupWithNext } from "@/app/lib/next-url";
 const JOBS = "/jobs";
 const DASHBOARD = "/dashboard";
 const WAITLIST = "/waitlist";
+const TOOLS = "/tools";
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 // 36px rows: compact, as a menu's should be (owner, 2026-10-02: same text size, less height).
 const MENU_ITEM =
@@ -26,6 +27,7 @@ const BAR_LINK =
 const SITE_LINKS = [
   // { href: "/dashboard", label: "Dashboard" },
   { href: "/jobs", label: "Jobs" },
+  { href: "/tools", label: "AI tools" },
   { href: "/companies", label: "Companies" },
   { href: "/blogs", label: "Blog" },
   { href: "/pricing", label: "Pricing" },
@@ -178,6 +180,12 @@ const Navbar = () => {
           <div className="flex items-center gap-0.5 sm:gap-2">
             <Link href={JOBS} aria-current={pathname?.startsWith(JOBS) ? "page" : undefined} className={cn(BAR_LINK, FOCUS)}>
               Jobs
+            </Link>
+
+            {/* In the bar (2026-10-07), so every page's server HTML links the toolkit: header links are
+                what Google leans on most when it picks the sitelinks under the site's result. */}
+            <Link href={TOOLS} aria-current={pathname?.startsWith(TOOLS) ? "page" : undefined} className={cn(BAR_LINK, "whitespace-nowrap", FOCUS)}>
+              AI tools
             </Link>
 
             {/* <Link href={dashboardHref} aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined} className={cn(BAR_LINK, FOCUS)}>
