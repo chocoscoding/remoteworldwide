@@ -13,7 +13,7 @@ const fetchJobMetaData_Jobs = async () => {
     // Live jobs only: an expired posting's page is noindexed, and a sitemap that lists
     // noindexed pages teaches Google to trust it less.
     return await prisma.job.findMany({
-      where: { isActive: true, updatedAt: { gte: liveJobsSince() } },
+      where: { isActive: true, createdAt: { gte: liveJobsSince() } },
       select: { slug: true, updatedAt: true },
     });
   } catch {

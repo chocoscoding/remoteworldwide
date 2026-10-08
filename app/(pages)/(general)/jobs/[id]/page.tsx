@@ -36,7 +36,7 @@ const fetchJobMetaData = async (slug: string): Promise<any | null> => {
         slug: true,
         title: true,
         isActive: true,
-        updatedAt: true,
+        createdAt: true,
         region: true,
         seniority: true,
         company: {

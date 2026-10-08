@@ -24,7 +24,7 @@ export function jobPostingJsonLd(job: JobAndCompany) {
     // Stored as Quill HTML, which is the format Google asks for.
     description: job.description,
     datePosted: new Date(job.createdAt).toISOString(),
-    validThrough: jobExpiresAt(job.updatedAt).toISOString(),
+    validThrough: jobExpiresAt(job.createdAt).toISOString(),
     identifier: { "@type": "PropertyValue", name: SITE_NAME, value: job.id },
     url: absoluteUrl(`/jobs/${job.slug}`),
     hiringOrganization: {

@@ -64,7 +64,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       {/* expired job */}
 
       {/* The same rule that drops the page's JobPosting markup and noindexes it. A <p>: the job title is the page's one h1. */}
-      {isJobExpired(data.updatedAt) && (
+      {isJobExpired(data.createdAt) && (
         <div className="w-full rounded-b-xl bg-red-500 text-white text-center py-2">
           <p className="font-semibold text-sm">This job has expired</p>
         </div>
