@@ -1,9 +1,10 @@
-// Template registry — the 6 gallery templates (Phase B chunk 1).
+// Template registry — the 11 gallery templates (Phase B chunk 1; Graphite,
+// Harbor, Folio, Summit and Pulse added 2026-10-08).
 //
 // Each `templates/<id>.ts` file exports one `ResumeTemplateDef`: identity
 // (name/blurb), a `design` DIFF over `DEFAULT_DESIGN`, a `sections` seed
 // list, its page-shell `chrome`, and a small decorative gallery-card
-// `Thumb`. This module just aggregates the 6 into the two lookup shapes
+// `Thumb`. This module just aggregates the 11 into the two lookup shapes
 // consumers need — `design-reducer.ts`'s `lookupTemplate` (id -> design +
 // sections) and the gallery UI (display order + chrome + thumbnail), owned
 // by a later chunk.
@@ -29,6 +30,11 @@ import quarry from "./quarry";
 import beacon from "./beacon";
 import linen from "./linen";
 import cadence from "./cadence";
+import graphite from "./graphite";
+import harbor from "./harbor";
+import folio from "./folio";
+import summit from "./summit";
+import pulse from "./pulse";
 
 /**
  * What one gallery template contributes. `design` is a diff — templates
@@ -55,7 +61,12 @@ export const TEMPLATE_REGISTRY: Record<ResumeTemplateId, ResumeTemplateDef> = {
   beacon,
   linen,
   cadence,
+  graphite,
+  harbor,
+  folio,
+  summit,
+  pulse,
 };
 
-/** Gallery display order: atlas, meridian, quarry, beacon, linen, cadence. */
+/** Gallery display order: atlas, meridian, quarry, beacon, linen, cadence, graphite, harbor, folio, summit, pulse. */
 export const TEMPLATE_OPTIONS: ResumeTemplateDef[] = Object.values(TEMPLATE_REGISTRY);

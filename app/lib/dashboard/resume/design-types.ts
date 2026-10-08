@@ -96,14 +96,19 @@ export type FontId =
 // ---------------------------------------------------------------------------
 
 /**
- * The 6 gallery templates. The registry that fleshes these out (name, blurb,
+ * The 11 gallery templates. The registry that fleshes these out (name, blurb,
  * design diff, section seed, chrome, live thumbnail) is owned by a later chunk
  * and lives outside this folder; only the id union is fixed here so the
  * reducer and the gallery agree on the keys.
  *
  * Intended chrome per id: atlas -> plain (the base "basic corporate" look),
  * meridian -> band-top, quarry -> sidebar-fill, beacon -> header-block,
- * linen -> rule-frame, cadence -> plain (two-column variant).
+ * linen -> rule-frame, cadence -> plain (two-column variant), graphite -> plain
+ * (split header), harbor -> band-top (one column, photo), folio -> plain
+ * (serif, education first), summit -> header-block (two columns), pulse ->
+ * plain (two columns, icons). The AI service keeps the same list
+ * (`RESUME_TEMPLATES` in remoteworldwideai/src/types): a template it does not
+ * know can't be saved or built.
  */
 export type ResumeTemplateId =
   | "atlas"
@@ -111,7 +116,12 @@ export type ResumeTemplateId =
   | "quarry"
   | "beacon"
   | "linen"
-  | "cadence";
+  | "cadence"
+  | "graphite"
+  | "harbor"
+  | "folio"
+  | "summit"
+  | "pulse";
 
 // ---------------------------------------------------------------------------
 // Accent targets — the 9 "Apply Accent Color" checkboxes
