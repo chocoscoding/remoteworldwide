@@ -17,14 +17,25 @@ const TITLE = "Jobs – Remote jobs open worldwide | Remote Worldwide";
 const DESCRIPTION =
   "Browse vetted remote jobs you can do from anywhere: engineering, design, marketing, sales and more. Filter by role, seniority and region, and apply in minutes.";
 
-export const metadata: Metadata = {
-  // Already carries the site name, so it skips the root template rather than doubling it.
-  title: { absolute: TITLE },
-  description: DESCRIPTION,
-  alternates: { canonical: "/jobs" },
-  openGraph: { type: "website", url: absoluteUrl("/jobs"), title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
-};
+// A plain page of the board (?page=3 and nothing else) is its own page, so its canonical is
+// itself and Google follows the job links on it: folding every page into /jobs hid all but the
+// first 50 jobs. Filtered and searched views still fold into /jobs.
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }): Promise<Metadata> {
+  const params = await searchParams;
+  const keys = Object.keys(params);
+  const page = typeof params.page === "string" ? Number(params.page) : 1;
+  const ownPage = keys.length === 1 && keys[0] === "page" && Number.isInteger(page) && page > 1;
+  const path = ownPage ? `/jobs?page=${page}` : "/jobs";
+  const title = ownPage ? `Jobs, page ${page} – Remote jobs open worldwide | Remote Worldwide` : TITLE;
+  return {
+    // Already carries the site name, so it skips the root template rather than doubling it.
+    title: { absolute: title },
+    description: DESCRIPTION,
+    alternates: { canonical: path },
+    openGraph: { type: "website", url: absoluteUrl(path), title, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
+    twitter: { card: "summary_large_image", title, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
+  };
+}
 
 /** The first page of results for this URL, queried here so the HTML carries the job links. Undefined on a failure: the list then fetches as before. */
 async function firstJobs(params: Record<string, string | string[] | undefined>): Promise<InitialJobs | undefined> {
