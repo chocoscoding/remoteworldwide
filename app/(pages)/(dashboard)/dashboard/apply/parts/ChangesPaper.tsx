@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FC } from "react";
 import { PagedResume } from "@/app/components/dashboard/resume/paper";
-import { DEFAULT_DESIGN, DEFAULT_SECTIONS } from "@/app/lib/dashboard/resume/design-defaults";
+import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { highlightTexts, resumeChanges, type ResumeChanges } from "@/app/lib/apply/changes";
@@ -133,7 +133,7 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className }) => 
         {/* The gap is zoomed with the paper, so it's divided by the zoom to stay 25px on screen. */}
         <PagedResume
           design={DEFAULT_DESIGN}
-          sections={DEFAULT_SECTIONS}
+          sections={withContentSections(DEFAULT_SECTIONS, content)}
           content={content}
           chrome={DEFAULT_DESIGN.chrome}
           gap={25 / fit}

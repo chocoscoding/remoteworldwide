@@ -2,6 +2,7 @@
 // against — plus the default section order and the discrete slider step tables.
 
 import type { ResumeDesign, SectionConfig, SectionKind, SectionSeed } from "./design-types";
+import type { ResumeContent } from "../types";
 
 // ---------------------------------------------------------------------------
 // The base template — "basic corporate"
@@ -154,6 +155,31 @@ export const DEFAULT_SECTIONS: SectionConfig[] = [
   { id: "sec-training", kind: "training", label: DEFAULT_SECTION_LABELS.training, visible: true, column: "side" },
   { id: "sec-projects", kind: "projects", label: DEFAULT_SECTION_LABELS.projects, visible: true, column: "main" },
 ];
+
+/**
+ * The section list with a place for every custom section the content has and the list lacks: a
+ * parsed upload ("Selected achievements") brings its points with the name on them, and no list.
+ * The name moves onto the list; without a place the points would never print.
+ */
+export function withContentSections(
+  sections: SectionConfig[],
+  content: Pick<ResumeContent, "customSections"> | undefined,
+): SectionConfig[] {
+  const missing = (content?.customSections ?? []).filter(
+    (section) => section.items.length > 0 && !sections.some((config) => config.id === section.id),
+  );
+  if (missing.length === 0) return sections;
+  return [
+    ...sections,
+    ...missing.map((section): SectionConfig => ({
+      id: section.id,
+      kind: "custom",
+      label: section.title?.trim() || DEFAULT_SECTION_LABELS.custom,
+      visible: true,
+      column: "main",
+    })),
+  ];
+}
 
 /**
  * Materialises a template's `SectionSeed[]` into `SectionConfig[]`.

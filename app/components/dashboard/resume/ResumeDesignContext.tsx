@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useReducer, type Dispatch, type FC, type ReactNode } from "react";
-import { DEFAULT_DESIGN, DEFAULT_SECTIONS } from "@/app/lib/dashboard/resume/design-defaults";
+import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { editorReducer, startEditor, TYPING_GROUP, type EditorAction, type EditorHistory } from "./editor-state";
@@ -42,8 +42,17 @@ export const ResumeDesignProvider: FC<ResumeDesignProviderProps> = ({ initialDes
   const [state, dispatch] = useReducer(editorReducer, undefined, () =>
     startEditor({
       design: initialDesign ?? DEFAULT_DESIGN,
-      sections: initialSections ?? DEFAULT_SECTIONS,
-      content: initialContent ?? createBlankContent(),
+      // A parsed upload's custom sections ("Selected achievements") get their place on the list here,
+      // and their names move there with them: the content never keeps one.
+      sections: withContentSections(initialSections ?? DEFAULT_SECTIONS, initialContent),
+      content: initialContent
+        ? {
+            ...initialContent,
+            ...(initialContent.customSections
+              ? { customSections: initialContent.customSections.map(({ id, items }) => ({ id, items })) }
+              : {}),
+          }
+        : createBlankContent(),
       check: initialCheck ?? null,
     }),
   );

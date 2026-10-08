@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ResumePaper } from "@/app/components/dashboard/resume/paper";
 import { apiMessage } from "@/app/lib/api/core";
-import { DEFAULT_DESIGN, DEFAULT_SECTIONS } from "@/app/lib/dashboard/resume/design-defaults";
+import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { resumePrintSpec } from "@/app/lib/export/print-css";
@@ -68,14 +68,14 @@ export function useResumeDownload(): {
       setPrinting({ content, title });
       return;
     }
-    void resumeToDocx(content, DEFAULT_DESIGN, DEFAULT_SECTIONS)
+    void resumeToDocx(content, DEFAULT_DESIGN, withContentSections(DEFAULT_SECTIONS, content))
       .then((blob) => saveBlob(blob, `${title}.docx`))
       .catch((error: unknown) => toast.error(apiMessage(error)));
   }
 
   const printer = printing ? (
     <div ref={holder} aria-hidden className={cn("pointer-events-none fixed left-[-10000px] top-0", ALL_FONT_VARS)}>
-      <ResumePaper design={DEFAULT_DESIGN} sections={DEFAULT_SECTIONS} content={printing.content} chrome={DEFAULT_DESIGN.chrome} />
+      <ResumePaper design={DEFAULT_DESIGN} sections={withContentSections(DEFAULT_SECTIONS, printing.content)} content={printing.content} chrome={DEFAULT_DESIGN.chrome} />
     </div>
   ) : null;
 
