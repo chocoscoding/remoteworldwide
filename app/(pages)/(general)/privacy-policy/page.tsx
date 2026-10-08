@@ -338,7 +338,8 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         </p>
         <p>
           <strong>Optional</strong>, each switched in Settings and each with a one-click unsubscribe link: the weekly digest, replies on
-          recommendations, pod activity and product news. The digest and recommendation replies start switched on; the others start off.
+          recommendations, pod activity, product news, and offers and early access (such as a free month or the waitlist closing). The digest,
+          recommendation replies and offers start switched on; the others start off.
         </p>
         <p>
           Downloading a free guide does not sign you up to any email. To have your address removed from our guide sign-up list, write to{" "}

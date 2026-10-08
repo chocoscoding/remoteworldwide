@@ -17,6 +17,7 @@ const EMAIL_ROWS: { key: keyof NotificationsState; label: string; hint: string }
     hint: "When someone joins your pod, lands an interview or hits a streak. Changes to your own membership always reach you.",
   },
   { key: "emailProductNews", label: "Product news", hint: "New features. Rare, and never a sales email." },
+  { key: "emailOffers", label: "Offers and early access", hint: "Free months, early access and deadlines like the waitlist closing. Rare." },
 ];
 
 const PUSH_ROWS: { key: keyof NotificationsState; label: string; hint: string }[] = [

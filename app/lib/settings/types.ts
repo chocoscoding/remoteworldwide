@@ -107,6 +107,7 @@ export interface NotificationSettings {
   emailReplyAlerts: boolean;
   emailPodActivity: boolean;
   emailProductNews: boolean;
+  emailOffers: boolean;
   pushStreakReminder: boolean;
   pushInterviewReminder: boolean;
 }
