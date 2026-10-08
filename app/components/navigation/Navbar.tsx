@@ -11,6 +11,7 @@ import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
 import { cn } from "@/app/lib/utils";
 import { loginWithNext, returnTo, signupWithNext } from "@/app/lib/next-url";
+import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
 
 const JOBS = "/jobs";
 const DASHBOARD = "/dashboard";
@@ -40,6 +41,11 @@ const SITE_LINKS = [
 const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: string | null; role?: string | null }) => {
   const { isOpen2: open, toggleNavbar2: toggle, closeNavbar2: close } = useNavbar();
   const { replace } = useRouter();
+  const { openAuthModal } = useAuthModal();
+  const pathname = usePathname();
+  // Log in and Sign up open the popup over the page (owner, 2026-10-07). The /login and /signup
+  // pages stay for links and for anyone who goes there; on them, the items just switch page.
+  const onAuthPage = pathname === "/login" || pathname === "/signup";
   const wrapper = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
 
@@ -116,7 +122,7 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
                 </Link>
               ) : null}
             </>
-          ) : (
+          ) : onAuthPage ? (
             <>
               <Link href={loginWithNext(here)} onClick={close} className={cn(MENU_ITEM, "font-bold")}>
                 Log in
@@ -124,6 +130,27 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
               <Link href={signupWithNext(here)} onClick={close} className={MENU_ITEM}>
                 Sign up
               </Link>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  openAuthModal("login");
+                }}
+                className={cn(MENU_ITEM, "cursor-pointer font-bold")}>
+                Log in
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  openAuthModal("signup");
+                }}
+                className={cn(MENU_ITEM, "cursor-pointer")}>
+                Sign up
+              </button>
             </>
           )}
           <div className="my-1 border-t border-primary/10" />
