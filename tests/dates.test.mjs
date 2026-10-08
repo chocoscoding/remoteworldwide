@@ -151,13 +151,14 @@ describe("the picker's rules", () => {
     assert.equal(endsBeforeStart({ start: at(2022, 5), end: "present" }), false);
   });
 
-  it("offers years newest first, back to 1950, and keeps a saved year that falls outside", () => {
+  it("offers years from this one back to 1950, and keeps a saved year that falls outside", () => {
     const years = yearOptions();
     const thisYear = new Date().getFullYear();
-    assert.equal(years[0], thisYear + 10);
+    assert.equal(years[0], thisYear);
     assert.equal(years.at(-1), 1950);
     assert.ok(yearOptions([1942]).includes(1942));
     assert.equal(yearOptions([1942]).at(-1), 1942);
+    assert.equal(yearOptions([thisYear + 2])[0], thisYear + 2);
     assert.equal(yearOptions([2001]).length, years.length);
   });
 });

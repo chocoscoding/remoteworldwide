@@ -108,10 +108,14 @@ export function endsBeforeStart(range: DateRange): boolean {
   return start.month !== null && end.month !== null && end.month < start.month;
 }
 
-/** The years a picker offers, newest first, plus any of `keep` (a saved date) that falls outside them. */
+/**
+ * The years a picker offers, newest first and starting at this year (owner, 2026-10-08: no
+ * future years on offer), plus any of `keep` (a saved date, a later year among them) that falls
+ * outside them.
+ */
 export function yearOptions(keep: readonly (number | null | undefined)[] = []): number[] {
   const years: number[] = [];
-  for (let year = THIS_YEAR + 10; year >= EARLIEST_YEAR; year -= 1) years.push(year);
+  for (let year = THIS_YEAR; year >= EARLIEST_YEAR; year -= 1) years.push(year);
   const extra = keep.filter((year): year is number => typeof year === "number" && !years.includes(year));
   return [...years, ...extra].sort((a, b) => b - a);
 }
