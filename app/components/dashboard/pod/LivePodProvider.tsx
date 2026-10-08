@@ -27,7 +27,7 @@ import {
   useToggleFire,
   useToggleMute,
 } from "@/hooks/mutations/usePodMutations";
-import { JOIN_PATH, JOIN_PARAM } from "@/app/lib/dashboard/pod-invite";
+import { inviteUrl } from "@/app/lib/dashboard/pod-invite";
 import type { JoinResult } from "@/app/lib/dashboard/pod-invite";
 import type { PodMember, PodOverview } from "@/app/lib/pod/types";
 import type { PodGoalKind } from "@/app/lib/dashboard/types";
@@ -89,7 +89,8 @@ export const LivePodProvider: FC<{ initial: PodOverview; children: ReactNode }> 
     isOwner: pod?.isOwner ?? false,
     soleMember: pod?.soleMember ?? false,
     muted: pod?.muted ?? false,
-    invitePath: (origin) => `${origin}${JOIN_PATH}?${JOIN_PARAM}=${pod?.inviteCode ?? ""}`,
+    // The public invite page (`/pod/<code>`), which previews as a pod invite wherever it is pasted.
+    invitePath: (origin) => inviteUrl(pod?.inviteCode ?? "", origin),
     goals: data.goals,
     moving: data.moving,
     voteMajority: pod?.voteMajority ?? 1,

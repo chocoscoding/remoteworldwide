@@ -21,9 +21,19 @@ export const INVITE_CODE_LENGTH = 30;
  */
 const ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ0123456789";
 
-/** Where an invite link points. The join happens on the pod screen itself. */
+/**
+ * Where an invite link points: `/pod/<code>`, a public page (owner, 2026-10-08). Public so a link
+ * pasted into a chat previews as a pod invite (its own share image, `/api/og/pod`) rather than
+ * the login page, and so someone signed out is asked to sign in and comes back to the join. A
+ * signed-in visitor goes straight on to `joinHref`.
+ */
+export const INVITE_PATH = "/pod";
+
+/** Where the join happens: the pod screen, with the code in `?join=`. Older links point here directly. */
 export const JOIN_PATH = "/dashboard/pod";
 export const JOIN_PARAM = "join";
+
+const INVITE_PATH_CODE = new RegExp(`^${INVITE_PATH}/([^/]+)/?$`);
 
 export function generateInviteCode(): string {
   const bytes = new Uint8Array(INVITE_CODE_LENGTH);
@@ -51,12 +61,13 @@ export function extractInviteCode(input: string): string | null {
   const raw = input.trim();
   if (!raw) return null;
 
-  // A URL: read the join parameter rather than guessing at the path.
+  // A URL: the invite page's path (`/pod/<code>`), or an older link's join parameter.
   if (/^https?:\/\//i.test(raw)) {
     try {
-      const fromQuery = new URL(raw).searchParams.get(JOIN_PARAM);
-      if (fromQuery) {
-        const code = normalizeInviteCode(fromQuery);
+      const url = new URL(raw);
+      const found = url.searchParams.get(JOIN_PARAM) ?? INVITE_PATH_CODE.exec(url.pathname)?.[1] ?? null;
+      if (found) {
+        const code = normalizeInviteCode(decodeURIComponent(found));
         return isValidInviteCode(code) ? code : null;
       }
     } catch {
@@ -74,8 +85,14 @@ export function formatInviteCode(code: string): string {
   return (code.match(/.{1,6}/g) ?? [code]).join("-");
 }
 
+/** The link people share: the public invite page. */
 export function inviteUrl(code: string, origin: string): string {
-  return `${origin}${JOIN_PATH}?${JOIN_PARAM}=${code}`;
+  return `${origin}${INVITE_PATH}/${code}`;
+}
+
+/** Where the invite page sends someone signed in (and where signing in comes back to): the join itself. */
+export function joinHref(code: string): string {
+  return `${JOIN_PATH}?${JOIN_PARAM}=${code}`;
 }
 
 /**
