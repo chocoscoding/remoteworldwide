@@ -63,6 +63,7 @@ import TimeAgo from "timeago-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
+import DocumentLoading from "@/app/components/dashboard/ui/DocumentLoading";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import Pill, { pillVariants } from "@/app/components/dashboard/ui/Pill";
 import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
@@ -796,6 +797,10 @@ const CoverScreen: FC = () => {
     void queryClient.invalidateQueries({ queryKey: qk.letters.recent() });
     void queryClient.invalidateQueries({ queryKey: qk.letters.library() });
   };
+
+  // A letter named in the address is on its way: say so, centred, rather than show the front door
+  // the person did not ask for (owner, 2026-10-08). A letter that can't be read ends the wait.
+  if (letterPending && !openedQuery.isError) return <DocumentLoading kind="cover letter" />;
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">

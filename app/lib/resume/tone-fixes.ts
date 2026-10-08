@@ -163,9 +163,11 @@ export function applyToneFix(content: ResumeContent, proposal: ToneProposal): Re
         ),
       };
     case "skill": {
-      // Renamed where it stands, in the flat list and in its sub skill group alike.
+      // Renamed where it stands, in the flat list and in its entry alike: a sub skill, or the name of an entry that has none.
       const rename = (skill: string) => (skill === where.skill ? after : skill);
-      const skillGroups = content.skillGroups?.map((group) => ({ ...group, skills: group.skills.map(rename) }));
+      const skillGroups = content.skillGroups?.map((group) =>
+        group.skills.some((skill) => skill.trim()) ? { ...group, skills: group.skills.map(rename) } : { ...group, title: rename(group.title) },
+      );
       return reconcileGroups({ ...content, skills: content.skills.map(rename), ...(skillGroups ? { skillGroups } : {}) });
     }
     case "degree":

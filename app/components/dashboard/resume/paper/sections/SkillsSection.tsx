@@ -2,7 +2,7 @@ import { Fragment, type CSSProperties, type FC } from "react";
 import { cn } from "@/lib/utils";
 import type { ResumeContent, ResumeSkillGroup } from "@/app/lib/dashboard/types";
 import type { ResumeDesign, SkillSeparator } from "@/app/lib/dashboard/resume/design-types";
-import { isGrouped, printableGroups, SKILL_SEPARATOR_GLYPH } from "@/app/lib/resume/skills";
+import { printableSkills, SKILL_SEPARATOR_GLYPH } from "@/app/lib/resume/skills";
 import { SkillText } from "../highlight";
 
 export interface SkillsSectionProps {
@@ -90,7 +90,7 @@ const GroupGrid: FC<{ group: ResumeSkillGroup; separator: SkillSeparator }> = ({
   </div>
 );
 
-/** A pill: the "All" list's, and each skill's in a group's bubbles. */
+/** A skill's bubble, in the bubbles layout. */
 const PILL_CLASS = "rounded-full border border-current/25 bg-current/10 px-[8pt] py-[2pt] text-[length:var(--r-fs-small)] leading-tight";
 
 /** The title, then its skills as bubbles one after another, wrapping onto as many lines as they need. */
@@ -108,43 +108,32 @@ const GroupBubbles: FC<{ group: ResumeSkillGroup }> = ({ group }) => (
 );
 
 /**
- * Skills as one list ("All") print as pills. Split into sub skills, each group
- * prints the way the Customize Skills panel says: on one line, as a grid, or as bubbles.
+ * The Skills entries (app/lib/resume/skills.ts), each printed the way the
+ * Customize Skills panel says: on one line, as a grid, or as bubbles. An entry
+ * with sub skills is its underlined name over them; a run of plain skills is one
+ * list without a name, in the same layout.
  *
- * Pill color deliberately uses `current` (border-current/25, bg-current/10)
+ * Bubble color deliberately uses `current` (border-current/25, bg-current/10)
  * rather than a `--r-*` var: `currentColor` already resolves to whatever text
  * color is ambient at this point in the tree (`--r-text` in the main column,
- * `--r-side-fg` inside a filled sidebar), so the pill adapts to either
+ * `--r-side-fg` inside a filled sidebar), so the bubble adapts to either
  * context automatically instead of needing its own color decision.
  */
 const SkillsSection: FC<SkillsSectionProps> = ({ content, design }) => {
-  if (isGrouped(content)) {
-    const groups = printableGroups(content.skillGroups);
-    if (groups.length === 0) return PLACEHOLDER;
-    const { groupLayout, separator } = design.skills;
-    return (
-      <div className="flex flex-col gap-[var(--r-gap-half)] text-[length:var(--r-fs-small)]">
-        {groups.map((group) =>
-          groupLayout === "grid" ? (
-            <GroupGrid key={group.id} group={group} separator={separator} />
-          ) : groupLayout === "bubbles" ? (
-            <GroupBubbles key={group.id} group={group} />
-          ) : (
-            <GroupLine key={group.id} group={group} separator={separator} />
-          ),
-        )}
-      </div>
-    );
-  }
-
-  if (content.skills.length === 0) return PLACEHOLDER;
+  const groups = printableSkills(content);
+  if (groups.length === 0) return PLACEHOLDER;
+  const { groupLayout, separator } = design.skills;
   return (
-    <div className="flex flex-wrap gap-[6pt]">
-      {content.skills.map((skill) => (
-        <span key={skill} className={PILL_CLASS}>
-          <SkillText skill={skill} />
-        </span>
-      ))}
+    <div className="flex flex-col gap-[var(--r-gap-half)] text-[length:var(--r-fs-small)]">
+      {groups.map((group) =>
+        groupLayout === "grid" ? (
+          <GroupGrid key={group.id} group={group} separator={separator} />
+        ) : groupLayout === "bubbles" ? (
+          <GroupBubbles key={group.id} group={group} />
+        ) : (
+          <GroupLine key={group.id} group={group} separator={separator} />
+        ),
+      )}
     </div>
   );
 };

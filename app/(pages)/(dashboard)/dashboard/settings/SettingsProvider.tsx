@@ -23,7 +23,7 @@
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
 import { useSettingsQuery } from "@/hooks/queries/useSettingsQuery";
 import { useSaveSettingsSection, type SettingsSection } from "@/hooks/mutations/useSettingsMutations";
-import { cleanEducation, experienceToSave } from "@/app/lib/onboarding/profile";
+import { cleanEducation, experienceToSave, skillEntriesToSave, skillsOfEntries } from "@/app/lib/onboarding/profile";
 import type {
   Availability,
   ExperienceBand,
@@ -108,6 +108,11 @@ export const SettingsProvider: FC<{ initial: Settings; children: ReactNode }> = 
     if (section === "profile" && drafts.profile.education)
       patch = { ...patch, education: drafts.profile.education.map((entry) => cleanEducation(entry)).filter((entry): entry is ProfileEducation => entry !== null) };
     if (section === "profile" && drafts.profile.experience) patch = { ...patch, experience: experienceToSave(drafts.profile.experience) };
+    // Skills entries go without the editor's ids, nameless ones dropped, with the flat list they stand for.
+    if (section === "profile" && drafts.profile.skillEntries) {
+      const entries = drafts.profile.skillEntries;
+      patch = { ...patch, skillEntries: skillEntriesToSave(entries), skills: skillsOfEntries(entries.map((entry, i) => ({ id: String(i), ...entry }))) };
+    }
     mutations[section].mutate(patch as never, {
       // Only the saved section's draft clears; edits elsewhere are untouched.
       onSuccess: () => setDrafts((prev) => ({ ...prev, [section]: {} })),

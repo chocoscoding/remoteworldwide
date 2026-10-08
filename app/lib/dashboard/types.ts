@@ -189,11 +189,18 @@ export interface ResumeLink {
   url: string;
 }
 
-/** A titled group of skills — "Frontend": React, TypeScript. */
+/**
+ * One entry of the Skills list (app/lib/resume/skills.ts): a skill ("Python"), or a name over sub
+ * skills ("Soft Skills": Teamwork, Empathy).
+ */
 export interface ResumeSkillGroup {
   id: string;
+  /** The entry's name: the skill itself, or the heading over its sub skills. */
   title: string;
+  /** Its sub skills; empty for a plain skill. */
   skills: string[];
+  /** Kept on the document but left off the page (the eye). Absent means shown. */
+  hidden?: boolean;
 }
 
 export interface ResumeContent {
@@ -215,7 +222,7 @@ export interface ResumeContent {
    * plain lines) never has to know about groups. See `app/lib/resume/skills.ts`.
    */
   skills: string[];
-  /** Present when the skills are split into titled groups ("Sub skills"); absent for one plain list ("All"). */
+  /** The Skills entries the editor shows; absent on a resume saved before entries, which reads one per skill. */
   skillGroups?: ResumeSkillGroup[];
   /** The points of each custom section, by its section's id. */
   customSections?: ResumeCustomSection[];

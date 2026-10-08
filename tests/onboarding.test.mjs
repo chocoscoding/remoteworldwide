@@ -53,6 +53,9 @@ const {
   linksFromResume,
   liveOnboarding,
   prefillFromResume,
+  entriesFromProfile,
+  skillEdit,
+  skillEntriesFromResume,
   skillsFromResume,
   toProfilePatch,
 } = await import("../app/lib/onboarding/profile.ts");
@@ -550,5 +553,83 @@ describe("the checklist's items and their deep links", () => {
     for (const hash of ["", "#", null, undefined, "#resume", "#phone", "#onb-profile", "#onb-education", "#toString", "#__proto__", "#%E0%A4%A", "#education,skills"]) {
       assert.equal(itemFromHash(hash), null, String(hash));
     }
+  });
+});
+
+// Skills as the resume editor's entries (owner, 2026-10-08): the form edits entries, and the flat
+// list the checklist counts and the profile keeps is always worked out from them.
+describe("skill entries", () => {
+  const entry = (id, title, skills = [], extra = {}) => ({ id, title, skills, ...extra });
+
+  it("reads a profile saved before entries as one entry per skill", () => {
+    const form = formFromProfile({ skills: ["Figma", "UX"] });
+    assert.deepEqual(form.skillEntries, [entry("skl-figma", "Figma"), entry("skl-ux", "UX")]);
+    assert.deepEqual(form.skills, ["Figma", "UX"]);
+  });
+
+  it("reads saved entries, put back in step with a flat list changed elsewhere", () => {
+    const form = formFromProfile({
+      skills: ["Teamwork", "Python", "Rust"],
+      skillEntries: [
+        { title: "Soft Skills", skills: ["Teamwork", "Empathy"], hidden: false },
+        { title: "Python", skills: [], hidden: false },
+        { title: "Fortran", skills: [], hidden: true },
+      ],
+    });
+    assert.deepEqual(form.skillEntries, [
+      entry("saved-skl-0", "Soft Skills", ["Teamwork"]),
+      entry("saved-skl-1", "Python"),
+      entry("saved-skl-2", "Fortran", [], { hidden: true }),
+      entry("skl-rust", "Rust"),
+    ]);
+  });
+
+  it("keeps the flat list in step with every edit", () => {
+    const edit = skillEdit([entry("a", "Soft Skills", ["Teamwork", "teamwork", "Empathy"]), entry("b", "Go"), entry("c", "")]);
+    assert.deepEqual(edit.skills, ["Teamwork", "Empathy", "Go"]);
+    assert.equal(formSatisfies("skills", { ...emptyForm(), ...edit }), true);
+  });
+
+  it("fills from the parser's entries, a category over its sub skills", () => {
+    const { patch, filled } = prefillFromResume(
+      emptyForm(),
+      resume({ skills: ["Teamwork", "Empathy", "Go"], skillGroups: [entry("g1", "Soft Skills", ["Teamwork", "Empathy"]), entry("g2", "Go")] }),
+    );
+    assert.deepEqual(patch.skills, ["Teamwork", "Empathy", "Go"]);
+    assert.deepEqual(patch.skillEntries, [entry("resume-skills-0", "Soft Skills", ["Teamwork", "Empathy"]), entry("resume-skills-1", "Go")]);
+    assert.equal(filled.filter((field) => field === "skills").length, 1);
+    assert.equal(filled.includes("skillEntries"), false);
+  });
+
+  it("fills one entry per skill from a resume with only a flat list", () => {
+    const { entries, skills } = skillEntriesFromResume({ skills: ["Figma", "figma", "UX"] });
+    assert.deepEqual(skills, ["Figma", "UX"]);
+    assert.deepEqual(entries, [entry("resume-skills-0", "Figma"), entry("resume-skills-1", "UX")]);
+  });
+
+  it("leaves out whole entries past the profile's 60 skills, and names their skills", () => {
+    const big = entry("g1", "Many", Array.from({ length: 58 }, (_, i) => `Skill ${i}`));
+    const { skills, entries, leftOut } = skillEntriesFromResume({ skills: [], skillGroups: [big, entry("g2", "More", ["A", "B", "C"]), entry("g3", "Z")] });
+    assert.equal(skills.length, 58);
+    assert.deepEqual(entries.map((e) => e.title), ["Many"]);
+    assert.deepEqual(leftOut, ["A", "B", "C", "Z"]);
+  });
+
+  it("saves the entries without editor ids, blank ones dropped, with the flat list they stand for", () => {
+    const patch = toProfilePatch(skillEdit([entry("a", " Soft Skills ", [" Teamwork ", "", "Empathy"]), entry("b", "Go", [], { hidden: true }), entry("c", "")]));
+    assert.deepEqual(patch, {
+      skillEntries: [
+        { title: "Soft Skills", skills: ["Teamwork", "Empathy"], hidden: false },
+        { title: "Go", skills: [], hidden: true },
+      ],
+      skills: ["Teamwork", "Empathy"],
+    });
+  });
+});
+
+describe("skill entries in Settings", () => {
+  it("keeps an unsaved entry's editor id, so the one being edited stays open, and keys saved ones by position", () => {
+    const entries = entriesFromProfile(["Go"], [{ title: "Go", skills: [], hidden: false }, { id: "skl-new", title: "", skills: [] }]);
+    assert.deepEqual(entries.map((entry) => entry.id), ["saved-skl-0", "skl-new"]);
   });
 });

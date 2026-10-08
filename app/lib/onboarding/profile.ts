@@ -4,8 +4,8 @@
 //
 // Pure on purpose — `tests/onboarding.test.mjs` runs it under plain
 // `node --test`, and the moment this grows a runtime import Node cannot load,
-// that file stops loading. Its one runtime import, `app/lib/resume/dates.ts`,
-// is pure for the same reason.
+// that file stops loading. Its runtime imports, `app/lib/resume/dates.ts` and
+// `app/lib/resume/skills.ts`, are pure for the same reason.
 //
 // The one rule the whole mapping keeps: a resume only ever fills a BLANK
 // field. What someone typed, or already saved, is theirs; the resume is a
@@ -15,9 +15,10 @@
 // whole rather than merged, so a curated skills list never grows thirty parser
 // guesses on the end of it.
 
-import type { ResumeContent, ResumeLink } from "@/app/lib/dashboard/types";
-import type { Onboarding, OnboardingItem, OnboardingItemId, ProfileEducation, ProfileExperience, ProfileSettings } from "@/app/lib/settings/types";
+import type { ResumeContent, ResumeLink, ResumeSkillGroup } from "@/app/lib/dashboard/types";
+import type { Onboarding, OnboardingItem, OnboardingItemId, ProfileEducation, ProfileExperience, ProfileSettings, ProfileSkillEntry } from "@/app/lib/settings/types";
 import { normalizeDates } from "@/app/lib/resume/dates";
+import { flattenGroups, reconcileGroups, SKILL_GROUP_TITLE_MAX_CHARS } from "@/app/lib/resume/skills";
 
 /**
  * The backend validator's ceilings (remoteworldwidebackend
@@ -69,7 +70,10 @@ export interface ProfileForm {
   linkedin: string;
   github: string;
   portfolio: string;
+  /** The flat list the checklist counts and the profile keeps: always `skillEntries` worked out (`skillsOfEntries`). */
   skills: string[];
+  /** The skills as the resume editor's entries (`SkillEntriesEditor`): what the form edits. */
+  skillEntries: ResumeSkillGroup[];
   education: EducationRow[];
   experience: ExperienceRow[];
 }
@@ -88,6 +92,7 @@ export const FIELD_LABELS: Record<ProfileField, string> = {
   github: "GitHub",
   portfolio: "Portfolio",
   skills: "Skills",
+  skillEntries: "Skills",
   education: "Education",
   experience: "Experience",
 };
@@ -313,10 +318,41 @@ export function cleanExperience(entry: Partial<ProfileExperience> | null | undef
 export const roleCount = (rows: readonly Pick<ProfileExperience, "company" | "title">[]): number =>
   rows.filter((row) => !blank(row.company) || !blank(row.title)).length;
 
+/** The flat list the entries stand for, as the profile keeps it: shown entries' sub skills, else their names, cleaned. */
+export const skillsOfEntries = (entries: readonly ResumeSkillGroup[]): string[] => cleanSkills(flattenGroups([...entries]));
+
+/** The entries as a save sends them: no editor ids, cleaned, nameless and empty ones dropped, at most 60. */
+export const skillEntriesToSave = (entries: readonly Pick<ResumeSkillGroup, "title" | "skills" | "hidden">[]): ProfileSkillEntry[] =>
+  entries
+    .map((entry) => ({ title: line(entry.title, SKILL_GROUP_TITLE_MAX_CHARS), skills: cleanSkills(entry.skills), hidden: entry.hidden === true }))
+    .filter((entry) => entry.title || entry.skills.length > 0)
+    .slice(0, PROFILE_LIMITS.skills);
+
+/** An edit to the entries, with the flat list kept in step: what the form dispatches. */
+export const skillEdit = (entries: ResumeSkillGroup[]): Pick<ProfileForm, "skills" | "skillEntries"> => ({ skillEntries: entries, skills: skillsOfEntries(entries) });
+
+/**
+ * The profile's entries for the editor, put back in step with its flat list: the extension and
+ * older saves change `skills` alone. Saved entries are keyed by position; an unsaved edit's keep
+ * the editor's ids (Settings holds them in its draft), so the entry being edited stays open. A
+ * profile saved before entries has one entry per skill.
+ */
+export function entriesFromProfile(skills: string[], saved: readonly Partial<ProfileSkillEntry>[]): ResumeSkillGroup[] {
+  const entries: ResumeSkillGroup[] = saved.map((entry, index) => ({
+    id: typeof entry?.id === "string" && entry.id ? entry.id : `saved-skl-${index}`,
+    title: typeof entry?.title === "string" ? entry.title : "",
+    skills: Array.isArray(entry?.skills) ? entry.skills.filter((skill): skill is string => typeof skill === "string") : [],
+    ...(entry?.hidden === true ? { hidden: true } : {}),
+  }));
+  return reconcileGroups({ skills, ...(entries.length > 0 ? { skillGroups: entries } : {}) }).skillGroups ?? [];
+}
+
 /** The saved profile as the form starts from it. Defensive: a cached profile may predate `education` or `experience`. */
 export function formFromProfile(profile: Partial<ProfileSettings> | null | undefined): ProfileForm {
   const text = (value: unknown) => (typeof value === "string" ? value : "");
   const skills: unknown[] = Array.isArray(profile?.skills) ? profile.skills : [];
+  const flat = skills.filter((skill): skill is string => typeof skill === "string");
+  const savedEntries: Partial<ProfileSkillEntry>[] = Array.isArray(profile?.skillEntries) ? profile.skillEntries : [];
   const education: Partial<ProfileEducation>[] = Array.isArray(profile?.education) ? profile.education : [];
   const experience: Partial<ProfileExperience>[] = Array.isArray(profile?.experience) ? profile.experience : [];
   return {
@@ -329,7 +365,8 @@ export function formFromProfile(profile: Partial<ProfileSettings> | null | undef
     linkedin: text(profile?.linkedin),
     github: text(profile?.github),
     portfolio: text(profile?.portfolio),
-    skills: skills.filter((skill): skill is string => typeof skill === "string"),
+    skills: flat,
+    skillEntries: entriesFromProfile(flat, savedEntries),
     // Keyed by position: the saved list has no ids and only changes on a save,
     // which is also when these rows are rebuilt.
     education: education.map((entry, index) => ({
@@ -437,7 +474,37 @@ export interface Prefill {
 }
 
 /** Keys for the rows a prefill adds: a stamp the caller took in its event handler, so two imports never share keys. */
-export type RowId = (index: number, list: "education" | "experience") => string;
+export type RowId = (index: number, list: "education" | "experience" | "skills") => string;
+
+/**
+ * A parsed resume's skills as the form's entries, and the flat list they stand for. The parser's
+ * entries when it sent them ("Soft Skills" over its sub skills); else the flat list cleaned up
+ * (`skillsFromResume`), one entry per skill. Either way the flat list keeps at most the profile's
+ * 60: entries past that are left out, and so are their skills, which the notice names.
+ */
+export function skillEntriesFromResume(
+  content: Pick<ResumeContent, "skills" | "skillGroups">,
+  rowId: RowId = (index, list) => `resume-${list}-${index}`,
+): ResumeSkills & { entries: ResumeSkillGroup[] } {
+  const groups = Array.isArray(content.skillGroups) ? content.skillGroups : [];
+  if (groups.length === 0) {
+    const flat = skillsFromResume(Array.isArray(content.skills) ? content.skills : []);
+    return { ...flat, entries: flat.skills.map((skill, index) => ({ id: rowId(index, "skills"), title: skill, skills: [] })) };
+  }
+  const entries: ResumeSkillGroup[] = [];
+  const leftOut: string[] = [];
+  for (const group of groups) {
+    if (group?.hidden) continue;
+    const title = line(group?.title, SKILL_GROUP_TITLE_MAX_CHARS);
+    const subs = cleanSkills(Array.isArray(group?.skills) ? group.skills : []);
+    if (!title && subs.length === 0) continue;
+    const entry = { id: rowId(entries.length, "skills"), title, skills: subs };
+    // Counted before the cap `skillsOfEntries` puts on the list, or an entry that overflows it would slip in cut short.
+    if (leftOut.length === 0 && flattenGroups([...entries, entry]).length <= PROFILE_LIMITS.skills) entries.push(entry);
+    else leftOut.push(...(subs.length > 0 ? subs : [title]));
+  }
+  return { skills: skillsOfEntries(entries), leftOut, entries };
+}
 
 /**
  * What a parsed resume adds to the form: every blank field it has a value for,
@@ -451,7 +518,7 @@ export function prefillFromResume(form: ProfileForm, content: ResumeContent, row
     patch[field] = value;
     filled.push(field);
   };
-  const scalar = (field: Exclude<ProfileField, "skills" | "education" | "experience">, value: string) =>
+  const scalar = (field: Exclude<ProfileField, "skills" | "skillEntries" | "education" | "experience">, value: string) =>
     offer(field, value, blank(form[field]) && !blank(value));
 
   const links = linksFromResume(content);
@@ -462,8 +529,9 @@ export function prefillFromResume(form: ProfileForm, content: ResumeContent, row
   scalar("email", line(content.email, PROFILE_LIMITS.email));
   scalar("phone", line(content.phone, PROFILE_LIMITS.phone));
 
-  const skills = skillsFromResume(Array.isArray(content.skills) ? content.skills : []);
+  const skills = skillEntriesFromResume(content, rowId);
   offer("skills", skills.skills, cleanSkills(form.skills).length === 0 && skills.skills.length > 0);
+  if ("skills" in patch) patch.skillEntries = skills.entries;
 
   const education = educationFromResume(content);
   offer(
@@ -532,7 +600,11 @@ export function toProfilePatch(draft: Partial<ProfileForm>): Partial<ProfileSett
   if (draft.linkedin !== undefined) patch.linkedin = line(draft.linkedin, PROFILE_LIMITS.link);
   if (draft.github !== undefined) patch.github = line(draft.github, PROFILE_LIMITS.link);
   if (draft.portfolio !== undefined) patch.portfolio = line(draft.portfolio, PROFILE_LIMITS.link);
-  if (draft.skills !== undefined) patch.skills = cleanSkills(draft.skills);
+  if (draft.skillEntries !== undefined) {
+    // The entries decide the flat list (the backend works it out the same way when they are sent).
+    patch.skillEntries = skillEntriesToSave(draft.skillEntries);
+    patch.skills = skillsOfEntries(draft.skillEntries);
+  } else if (draft.skills !== undefined) patch.skills = cleanSkills(draft.skills);
   if (draft.education !== undefined) {
     patch.education = draft.education
       .map((row) => cleanEducation(row))

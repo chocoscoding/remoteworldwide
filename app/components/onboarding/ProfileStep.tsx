@@ -12,8 +12,9 @@
 //
 // Presentational: the page owns the form's state (saved profile + unsaved
 // edits, `app/lib/onboarding/profile.ts`) and the save. The controls are the
-// resume editor's own — its field tone, `SkillsEditor`, the Education card
-// list — so the two places a person types their history look like one tool.
+// resume editor's own — its field tone, its Skills entries (`SkillEntriesEditor`,
+// owner 2026-10-08), the Education card list — so the two places a person types
+// their history look like one tool.
 //
 // Email is the account's, shown here and changed on the Account page as
 // before; it is only typed here when there is none at all (the prefill may
@@ -23,9 +24,9 @@ import type { FC, ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Check, LoaderCircle, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import SkillsEditor from "@/app/components/dashboard/resume/content/SkillsEditor";
+import SkillEntriesEditor from "@/app/components/dashboard/resume/content/SkillEntriesEditor";
 import { FIELD_CLASS, FIELD_TONE } from "@/app/components/dashboard/resume/content/FormField";
-import { FIELD_LABELS, MIN_SKILLS, PROFILE_LIMITS, cleanSkills, roleCount, schoolCount, type ProfileField, type ProfileForm } from "@/app/lib/onboarding/profile";
+import { FIELD_LABELS, MIN_SKILLS, PROFILE_LIMITS, cleanSkills, roleCount, schoolCount, skillEdit, type ProfileField, type ProfileForm } from "@/app/lib/onboarding/profile";
 import EducationEditor from "./EducationEditor";
 import ExperienceEditor from "./ExperienceEditor";
 import StepHeading from "./StepHeading";
@@ -244,8 +245,8 @@ const ProfileStep: FC<ProfileStepProps> = ({ form, saved, dirty, done, prefilled
               {skills >= MIN_SKILLS ? `${skills} added` : `${skills} of ${MIN_SKILLS} minimum`}
             </span>
           }
-          hint="Enter or a comma adds one; paste a list and it splits.">
-          <SkillsEditor skills={form.skills} onChange={(next) => edit({ skills: next })} />
+          hint="One skill per entry, or a name like Soft Skills with its sub skills separated by commas.">
+          <SkillEntriesEditor entries={form.skillEntries} onChange={(next) => edit(skillEdit(next))} />
         </Field>
 
         <Field

@@ -81,6 +81,7 @@ import {
   type StoredResumeDocument,
 } from "@/app/lib/resume/api";
 import ResumeLanding from "@/app/components/dashboard/resume/ResumeLanding";
+import DocumentLoading from "@/app/components/dashboard/ui/DocumentLoading";
 import BuildResumeDialog from "@/app/components/dashboard/resume/BuildResumeDialog";
 import ResumeScreenBody, { RESUME_JOB_SPEC, type ResumeJob, type TailorPreset } from "@/app/components/dashboard/resume/ResumeScreenBody";
 import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
@@ -422,25 +423,11 @@ const ResumeScreen: FC = () => {
     );
   }
 
-  // A link is waiting on the list to know which resume it opens: the landing,
-  // saying so, with nothing to start from until it does.
-  const status = waitingForCopy ? "Making an editable copy of your file…" : waitingForNamed ? "Opening your resume…" : null;
-  return (
-    <ResumeLanding
-      library={library.isError ? "error" : "loading"}
-      onRetry={() => void library.refetch()}
-      documents={[]}
-      banner={
-        status ? (
-          <p role="status" className="text-xs font-semibold text-black/55">
-            {status}
-          </p>
-        ) : (
-          banner
-        )
-      }
-    />
-  );
+  // A link is waiting on the list (or its own read, or the copy) to know which resume it opens: it
+  // says so, centred, and never shows the landing it did not ask for (owner, 2026-10-08). Only a list
+  // that failed falls back to the landing, which says so and offers to retry.
+  if (!library.isError) return <DocumentLoading kind="resume" />;
+  return <ResumeLanding library="error" onRetry={() => void library.refetch()} documents={[]} banner={banner} />;
 };
 
 const ResumeClient: FC = () => (

@@ -186,10 +186,7 @@ export interface ResumeDesign {
     bulletGlyph: BulletGlyph;
     indentBullets: boolean;
   };
-  /**
-   * How skills split into titled groups print. A single plain list keeps its
-   * pills; these only apply once the Content tab has the skills as sub skills.
-   */
+  /** How the Skills entries print, plain skills and sub skills alike (customize/SkillsPanel.tsx). */
   skills: {
     groupLayout: SkillGroupLayout;
     separator: SkillSeparator;

@@ -28,7 +28,7 @@ import type { DateFormatId, ResumeDesign, SectionConfig } from "@/app/lib/dashbo
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { displayDates } from "@/app/lib/resume/dates";
 import { displayUrl } from "@/app/lib/dashboard/resume/link-platforms";
-import { isGrouped, printableGroups, skillLine } from "@/app/lib/resume/skills";
+import { printableSkills, skillLine } from "@/app/lib/resume/skills";
 
 const TWIPS_PER_MM = 56.6929;
 
@@ -175,35 +175,31 @@ export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, se
         break;
       }
       case "skills": {
-        if (isGrouped(content)) {
-          // Sub skills: the underlined title, then the skills in the design's separator. Word has
-          // no wrapping grid or pills, so the grid and bubbles layouts print the title over one
-          // line of skills (bubbles, which have no separator of their own, with bullets).
-          const groups = printableGroups(content.skillGroups);
-          if (groups.length === 0) break;
-          children.push(heading(section.label));
-          const { groupLayout, separator } = design.skills;
-          for (const group of groups) {
-            const line = skillLine(group.skills, groupLayout === "bubbles" ? "bullet" : separator);
-            if (groupLayout === "line") {
-              children.push(
-                new Paragraph({
-                  spacing: { after: 40 },
-                  children: [
-                    ...(group.title ? [new TextRun({ text: group.title, bold: true, underline: {} }), new TextRun({ text: ": ", bold: true })] : []),
-                    new TextRun(line),
-                  ],
-                }),
-              );
-            } else {
-              if (group.title) children.push(new Paragraph({ children: [new TextRun({ text: group.title, bold: true, underline: {} })] }));
-              children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun(line)] }));
-            }
+        // The entries: a name with sub skills is underlined over them, a run of plain skills is
+        // one line without a name, both in the design's separator. Word has no wrapping grid or
+        // bubbles, so those layouts print the name over one line of skills (bubbles, which have
+        // no separator of their own, with bullets).
+        const groups = printableSkills(content);
+        if (groups.length === 0) break;
+        children.push(heading(section.label));
+        const { groupLayout, separator } = design.skills;
+        for (const group of groups) {
+          const line = skillLine(group.skills, groupLayout === "bubbles" ? "bullet" : separator);
+          if (groupLayout === "line") {
+            children.push(
+              new Paragraph({
+                spacing: { after: 40 },
+                children: [
+                  ...(group.title ? [new TextRun({ text: group.title, bold: true, underline: {} }), new TextRun({ text: ": ", bold: true })] : []),
+                  new TextRun(line),
+                ],
+              }),
+            );
+          } else {
+            if (group.title) children.push(new Paragraph({ children: [new TextRun({ text: group.title, bold: true, underline: {} })] }));
+            children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun(line)] }));
           }
-          break;
         }
-        if (content.skills.filter((s) => clean(s)).length === 0) break;
-        children.push(heading(section.label), new Paragraph({ children: [new TextRun(content.skills.map(clean).filter(Boolean).join("  ·  "))] }));
         break;
       }
       case "projects": {
@@ -326,13 +322,9 @@ export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig
         }
         break;
       case "skills":
-        if (isGrouped(content)) {
-          for (const group of printableGroups(content.skillGroups)) {
-            block.push(`${group.title ? `**${group.title}:** ` : ""}${group.skills.join(" · ")}`, "");
-          }
-          break;
+        for (const group of printableSkills(content)) {
+          block.push(`${group.title ? `**${group.title}:** ` : ""}${group.skills.join(" · ")}`, "");
         }
-        if (content.skills.some((s) => clean(s))) block.push(content.skills.map(clean).filter(Boolean).join(" · "));
         break;
       case "projects":
         for (const p of content.projects) {

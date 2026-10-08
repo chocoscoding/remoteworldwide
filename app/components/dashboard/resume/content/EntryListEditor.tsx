@@ -22,7 +22,7 @@
 //
 // Removing an entry is one undo step in the editor, so it asks nothing first.
 
-import { useState, type FocusEvent, type ReactNode } from "react";
+import { useRef, useState, type FocusEvent, type ReactNode } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -41,7 +41,14 @@ export interface EntryListEditorProps<T extends { id: string }> {
   items: T[];
   onChange: (items: T[]) => void;
   createItem: () => T;
-  renderFields: (item: T, update: (patch: Partial<T>) => void, isActive: boolean, remove: () => void) => ReactNode;
+  /** `invalid`: Add was pressed while this entry fails `validate`, so its fields say what is missing, in red. */
+  renderFields: (item: T, update: (patch: Partial<T>) => void, isActive: boolean, remove: () => void, invalid: boolean) => ReactNode;
+  /**
+   * An entry that must be filled in before another can be added. Add stays pressable (owner,
+   * 2026-10-08): pressed while one fails, it adds nothing, opens the first that fails, scrolls
+   * to it and marks it, and every one that fails says so.
+   */
+  validate?: (item: T) => boolean;
   addLabel: string;
   emptyLabel: string;
   /** Cards: the fields place the entry's delete themselves (`renderFields`' `remove`), so the card shows none. */
@@ -102,9 +109,14 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
   noun = "entry",
   hideable = false,
   autoEditId = null,
+  validate,
 }: EntryListEditorProps<T>) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Add was pressed while an entry failed `validate`: the failing ones say so until one is added.
+  const [showErrors, setShowErrors] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const invalid = (item: T) => showErrors && validate !== undefined && !validate(item);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -129,6 +141,19 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
     onChange(items.filter((item) => item.id !== id));
   };
   const addItem = () => {
+    const failing = validate ? items.find((item) => !validate(item)) : undefined;
+    if (failing) {
+      setShowErrors(true);
+      if (summarize) setEditingId(failing.id);
+      // After the card has opened: to the entry, and into its first field.
+      window.requestAnimationFrame(() => {
+        const entry = listRef.current?.querySelector<HTMLElement>(`[data-entry-id="${window.CSS.escape(failing.id)}"]`);
+        entry?.scrollIntoView({ behavior: "smooth", block: "center" });
+        entry?.querySelector<HTMLElement>("input, textarea")?.focus({ preventScroll: true });
+      });
+      return;
+    }
+    setShowErrors(false);
     const item = createItem();
     onChange([...items, item]);
     if (summarize) setEditingId(item.id);
@@ -154,7 +179,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
 
   if (!summarize) {
     return (
-      <div className="flex flex-col gap-2.5">
+      <div ref={listRef} className="flex flex-col gap-2.5">
         {items.length === 0 ? (
           <p className="text-xs italic text-black/50">{emptyLabel}</p>
         ) : (
@@ -163,6 +188,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
             return (
               <div
                 key={item.id}
+                data-entry-id={item.id}
                 {...pointerProps(item.id)}
                 className={cn(
                   "group relative flex flex-col gap-2.5 rounded-[10px] bg-white p-2.5 transition-[border-color,box-shadow] duration-200",
@@ -185,6 +211,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
                   (patch) => updateItem(item.id, patch),
                   isActive,
                   () => removeItem(item.id),
+                  invalid(item),
                 )}
               </div>
             );
@@ -199,7 +226,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={listRef} className="flex flex-col gap-2">
       {items.length === 0 && <p className="px-1 text-xs italic text-black/50">{emptyLabel}</p>}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
@@ -286,7 +313,11 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
                   onClick={() => setEditingId(item.id)}
                   className="flex min-w-0 flex-1 cursor-pointer flex-col py-0.5 text-left">
                   <span className={cn("truncate text-[13px] font-bold", hidden ? "text-[#5f6062]" : "text-primary")}>{name}</span>
-                  {hidden ? null : summary.meta && <span className="truncate text-xs text-[#5f6062]">{summary.meta}</span>}
+                  {invalid(item) ? (
+                    <span className="truncate text-xs font-semibold text-[#b23c26]">Fill this {noun} in first</span>
+                  ) : hidden ? null : (
+                    summary.meta && <span className="truncate text-xs text-[#5f6062]">{summary.meta}</span>
+                  )}
                 </button>
                 {hideable && eye}
                 <button
@@ -307,6 +338,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
               <SortableShell key={item.id} id={item.id}>
                 {(grip, dragging) => (
                   <div
+                    data-entry-id={item.id}
                     className={cn(
                       "rounded-[10px] transition-colors",
                       isEditing
@@ -324,6 +356,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
                           (patch) => updateItem(item.id, patch),
                           false,
                           () => removeItem(item.id),
+                          invalid(item),
                         )}
                       </div>
                     </Collapse>

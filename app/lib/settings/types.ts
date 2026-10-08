@@ -24,6 +24,12 @@ export interface ProfileSettings {
   github: string;
   skills: string[];
   /**
+   * The same skills as the resume editor's entries (onboarding edits these): a skill, or a name over
+   * its sub skills. A save that sends them rewrites `skills` from them. Optional: a profile from
+   * before entries, or an older backend, has none, and reads `skills` as one entry each.
+   */
+  skillEntries?: ProfileSkillEntry[];
+  /**
    * Where you studied, in the order entered. Saved whole, like `skills`: PUT /api/settings/profile
    * replaces the array. The backend always sends it (default []); optional here because a settings
    * object persisted to disk before it existed, or an older backend, does not carry it — read it as
@@ -58,6 +64,14 @@ export interface ProfileExperience {
  * required (≤160), the rest may be "" (degree ≤160, dates ≤60, location ≤120, detail ≤500), at
  * most 10 entries. No id: the list is replaced whole on save, so an editor keys its own rows.
  */
+/** One Skills entry on the profile. Saved ones have no id; an unsaved edit in Settings keeps the editor's. */
+export interface ProfileSkillEntry {
+  id?: string;
+  title: string;
+  skills: string[];
+  hidden?: boolean;
+}
+
 export interface ProfileEducation {
   school: string;
   degree: string;

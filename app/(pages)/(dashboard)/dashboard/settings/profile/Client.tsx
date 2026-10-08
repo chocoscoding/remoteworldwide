@@ -1,20 +1,29 @@
 "use client";
 
-import { FC, FormEvent, useRef, useState } from "react";
-import { Check, Plus, Upload } from "lucide-react";
+import { FC, useRef } from "react";
+import { Check, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
 import { useUploadAvatar } from "@/hooks/mutations/useAvatarMutation";
-import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection, TagList } from "@/app/components/dashboard/settings/settings-ui";
+import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection } from "@/app/components/dashboard/settings/settings-ui";
+import SkillEntriesEditor from "@/app/components/dashboard/resume/content/SkillEntriesEditor";
 import EducationEditor from "@/app/components/onboarding/EducationEditor";
 import ExperienceEditor from "@/app/components/onboarding/ExperienceEditor";
-import { educationOf, educationProblems, experienceOf, experienceProblems, type EducationRow, type ExperienceRow } from "@/app/lib/onboarding/profile";
+import {
+  educationOf,
+  educationProblems,
+  entriesFromProfile,
+  experienceOf,
+  experienceProblems,
+  skillEdit,
+  type EducationRow,
+  type ExperienceRow,
+} from "@/app/lib/onboarding/profile";
 
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
 
 const ProfileClient: FC = () => {
   const { profile, setProfile, save, saving } = useSettings();
-  const [skillDraft, setSkillDraft] = useState("");
   const photoRef = useRef<HTMLInputElement | null>(null);
   const uploadPhoto = useUploadAvatar();
 
@@ -24,6 +33,8 @@ const ProfileClient: FC = () => {
   // The same, for roles (a role needs a title or a company).
   const experienceRows: ExperienceRow[] = (profile.experience ?? []).map((entry, index) => ({ id: `role-${index}`, ...entry }));
   const experienceBlocked = experienceProblems(experienceRows).length > 0;
+  // The same Skills entries as the resume editor and onboarding (owner, 2026-10-08), in step with the flat list.
+  const skillEntries = entriesFromProfile(profile.skills, profile.skillEntries ?? []);
 
   const initials = profile.fullName
     .split(" ")
@@ -31,19 +42,6 @@ const ProfileClient: FC = () => {
     .slice(0, 2)
     .map((n) => n[0]?.toUpperCase() ?? "")
     .join("");
-
-  function addSkill(e: FormEvent) {
-    e.preventDefault();
-    const skill = skillDraft.trim();
-    if (!skill) return;
-    // Case-insensitive so "Figma" and "figma" don't both end up in the list.
-    if (profile.skills.some((s) => s.toLowerCase() === skill.toLowerCase())) {
-      setSkillDraft("");
-      return;
-    }
-    setProfile({ skills: [...profile.skills, skill] });
-    setSkillDraft("");
-  }
 
   return (
     <>
@@ -147,24 +145,7 @@ const ProfileClient: FC = () => {
       </SettingsSection>
 
       <SettingsSection title="Skills" description="Used to match you against roles and to score your resume.">
-        <form onSubmit={addSkill} className="mb-3.5 flex gap-2">
-          <input
-            className={cn(INPUT, "flex-1")}
-            placeholder="Add a skill…"
-            value={skillDraft}
-            onChange={(e) => setSkillDraft(e.target.value)}
-            aria-label="Add a skill"
-          />
-          <button type="submit" className={BUTTON_OUTLINE} disabled={!skillDraft.trim()}>
-            <Plus className="h-3.5 w-3.5" />
-            Add
-          </button>
-        </form>
-        <TagList
-          tags={profile.skills}
-          onRemove={(t) => setProfile({ skills: profile.skills.filter((s) => s !== t) })}
-          emptyNote="No skills yet. Add a few so we can match you properly."
-        />
+        <SkillEntriesEditor entries={skillEntries} onChange={(next) => setProfile(skillEdit(next))} />
       </SettingsSection>
 
       {/* The same editor as onboarding's, and optional there too, so a role entered in one is edited in the other. Saved with the
