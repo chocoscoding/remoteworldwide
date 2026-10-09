@@ -7,7 +7,7 @@ const COMPANY = "Remote Worldwide";
 const CONTACT_EMAIL = "contact@remoteworldwide.net";
 const JURISDICTION = "the Federal Republic of Nigeria";
 const COURTS = "the courts of Lagos State, Nigeria";
-const LAST_UPDATED = "8 September 2026";
+const LAST_UPDATED = "9 October 2026";
 
 // The page title takes the root template ("%s | Remote Worldwide"); social cards don't, so they get the full name.
 const TITLE = "Terms and Conditions";
@@ -36,7 +36,8 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
       <>
         <p>
           These terms are a contract between you and {COMPANY} (&ldquo;we&rdquo;, &ldquo;us&rdquo;). They cover everything at {SITE_URL}:
-          the job board, the company directory, the blog and its downloads, the career tools in your dashboard, and the emails we send you.
+          the job board, the company directory, the blog and its downloads, the career tools in your dashboard, our Chrome extension, and the
+          emails we send you.
         </p>
         <p>
           By using the site or creating an account you accept these terms. If you do not accept them, please do not use the site. If you use
@@ -112,6 +113,28 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         <p>
           You are responsible for what you submit to an employer, including anything a tool here helped you write. Usage limits, quotas and
           the mix of available tools may change as the product develops.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "extension",
+    title: "The Chrome extension",
+    body: (
+      <>
+        <p>
+          Our Chrome extension fills job application forms for you from your own {SITE_NAME} data: your profile, your saved answers, your
+          documents, and answers you gave on earlier forms. By installing it, switching it on for a site and asking it to fill a form, you
+          consent to it reading that form and using your data to fill it on your behalf.
+        </p>
+        <p>
+          We use what the extension reads, saves and remembers only to fill your applications, save your drafts and track the applications you
+          send, as our <Link href="/privacy-policy#extension">Privacy Policy</Link> describes. We do not use it for anything else.
+        </p>
+        <p>
+          The extension never submits an application for you. Check every field it fills, and anything AI wrote, before you submit: what you send
+          to an employer is your responsibility. You can switch the extension off for a site, change what it remembers in its Settings, or remove
+          it at any time.
         </p>
       </>
     ),

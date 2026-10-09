@@ -6,7 +6,7 @@ import { absoluteUrl, SITE_NAME, SITE_URL } from "@/app/lib/seo";
 const COMPANY = "Remote Worldwide";
 const CONTACT_EMAIL = "contact@remoteworldwide.net";
 const JURISDICTION = "Nigeria";
-const LAST_UPDATED = "5 October 2026";
+const LAST_UPDATED = "9 October 2026";
 
 // The page title takes the root template ("%s | Remote Worldwide"); social cards don't, so they get the full name.
 const TITLE = "Privacy Policy";
@@ -77,10 +77,12 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         </p>
         <p>
           <strong>What you create.</strong> Resumes, cover letters, documents you upload to your vault, saved jobs, tracked applications,
-          interview practice and reports, career coach and &ldquo;Ask about a job&rdquo; conversations, your plan and streak, and the answers you
-          save for job application forms. If you choose to save answers to demographic questions (for example gender, ethnicity, disability or
-          veteran status), or upload an identity document to your vault, we store them like any other content. Demographic answers are never
-          sent to our AI providers.
+          interview practice and reports, career coach and &ldquo;Ask about a job&rdquo; conversations, your plan and streak, the answers you
+          save for job application forms, and the application drafts our Chrome extension saves while you fill in a form. If you choose to save
+          answers to demographic questions (for example gender, ethnicity, disability or veteran status) on {SITE_NAME}, or upload an identity
+          document to your vault, we store them like any other content. Demographic answers are never sent to our AI providers. The demographic
+          answers you give on application forms are remembered by the extension in your browser, not by us (see{" "}
+          <a href="#extension">The Chrome extension</a>).
         </p>
         <p>
           <strong>People in your network.</strong> If you import your LinkedIn connections or save people from a referral search, we store data
@@ -129,8 +131,9 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         </ul>
         <p>
           Where the law asks for a legal basis, ours are: performing our contract with you (your account and the tools you use), your consent
-          (optional email, and data you choose to give us such as demographic answers), our legitimate interests (security, analytics and
-          improving the product), and legal obligation where one applies.
+          (optional email, the extension&rsquo;s access to the application forms you ask it to fill, and data you choose to give us such as
+          demographic answers), our legitimate interests (security, analytics and improving the product), and legal obligation where one
+          applies.
         </p>
       </>
     ),
@@ -250,21 +253,54 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
       <>
         <p>
           The extension works on job application pages: Greenhouse, Lever and Ashby, plus any other site you switch it on for. It does not run in
-          incognito windows. On those pages it reads the form&rsquo;s questions, your current answers, and the job details shown on the page.
+          incognito windows. On those pages it reads the form&rsquo;s questions, what is filled in on the form, and the job details shown on the
+          page.
+        </p>
+        <p>
+          <strong>It acts on your consent.</strong> Installing the extension, switching it on for a site and pressing a fill button is how you
+          give it access: to read that application form, and to use your {SITE_NAME} data to fill it for you. You can switch any part of it off
+          in the extension&rsquo;s Settings, or remove it, at any time.
+        </p>
+        <p>
+          <strong>We use this data to fill your applications, and nothing else.</strong> What the extension reads, saves and remembers is used
+          only to fill your application forms, to save your progress on them, and to track the applications you send. We do not use it for any
+          other purpose, and we do not sell it or share it with advertisers.
         </p>
         <ul>
           <li>
-            It fills fields only when you ask, using your saved answers or AI drafts for the questions you choose. Question labels are sent to
-            Groq for drafting; demographic questions never are.
+            It fills fields only when you ask (&ldquo;Autofill from my resume&rdquo; or &ldquo;Continue my draft&rdquo;), or as forms load if you
+            switch that on. Question labels are sent to Groq only for the questions you ask AI to answer; demographic questions never are.
           </li>
           <li>It never reads or fills identity numbers, bank or card numbers, passwords or dates of birth, and it never submits a form for you.</li>
-          <li>Demographic answers are filled only from answers you saved yourself, and only if you switch that setting on. It is off by default.</li>
           <li>
-            When it sees an application submitted, it logs it to your tracker after a 10-second window in which you can undo it. You can switch
-            logging off.
+            <strong>Application drafts.</strong> While you fill in a form, what is on it (your answers and the contact details it asks for) is
+            saved to your account, so a refresh, a lost connection or a closed tab does not lose your work. Demographic answers, identity numbers
+            and files are never part of a draft. When you apply, the draft&rsquo;s answers to the form&rsquo;s questions are added to that
+            application in your tracker. A draft is deleted 90 days after you last changed it, or 30 days after you apply, and you can delete one
+            yourself at any time.
+          </li>
+          <li>
+            <strong>Demographic answers stay in your browser.</strong> When you answer a question about your gender, ethnicity, veteran status,
+            disability, sexual orientation or similar on an application form, the extension remembers your answer in this browser so it can fill
+            the same question on your next application. It is never sent to us or to any AI provider. This is on by default: switch off
+            &ldquo;Remember my answers to demographic questions&rdquo; in the extension&rsquo;s Settings and every answer it kept is deleted.
+            Removing the extension deletes them too. Answers you save on {SITE_NAME} itself fill these questions only if you switch that account
+            setting on.
+          </li>
+          <li>
+            When it attaches your resume or a cover letter to a form, it notes which one in this browser, so &ldquo;Continue my draft&rdquo; can
+            attach the same one again.
+          </li>
+          <li>
+            When it sees an application submitted, it asks whether you applied, with Yes, No and a 10-second countdown. Yes saves it to your
+            tracker, No saves nothing, and if you choose neither it is saved when the countdown ends. Switch automatic saving off and it only
+            asks.
           </li>
         </ul>
-        <p>It talks only to {SITE_URL}, using your existing sign-in, and keeps its settings and a short-lived cache in your browser.</p>
+        <p>
+          It talks only to {SITE_URL}, using your existing sign-in, and keeps its settings, unsent drafts and the browser-only data above in your
+          browser&rsquo;s extension storage.
+        </p>
       </>
     ),
   },
@@ -370,7 +406,8 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         <p>
           <strong>Browser storage.</strong> To keep the dashboard fast we keep a copy of some of your data, such as your settings, profile and
           tracker, in your browser for up to 24 hours, and clear it when you sign out. Unsent drafts and small preferences are also kept in your
-          browser and stay on your device.
+          browser and stay on your device. The Chrome extension keeps its own data in your browser as well; see{" "}
+          <a href="#extension">The Chrome extension</a>.
         </p>
         <p>
           Your browser can block or delete cookies; blocking the essential ones stops sign-in working. Links we share can carry campaign tags (
@@ -390,6 +427,13 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         <li>
           <strong>Voice recordings, transcripts and reports</strong>: until you delete the session or your account. Upload pieces and working
           copies go within 7 days.
+        </li>
+        <li>
+          <strong>Application drafts</strong>: 90 days after you last changed one, or 30 days after you apply.
+        </li>
+        <li>
+          <strong>Demographic answers the extension remembers</strong>: in your browser only, until you switch that off or remove the
+          extension. We never hold them.
         </li>
         <li>
           <strong>Signed-in devices</strong>: 30 days after last use, or until you sign the device out.
