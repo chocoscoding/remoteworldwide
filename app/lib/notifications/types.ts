@@ -8,6 +8,8 @@ export type NotificationKind =
   | "pod.removed"
   | "pod.deleted"
   | "pod.rotated"
+  // Someone downvoted a pod goal, so it is under review; links to /dashboard/pod?goal=<id>.
+  | "pod.goal-review"
   // A reviewer put you in front of a company, or the company sent its questions.
   | "recommendation.created"
   | "recommendation.questions"

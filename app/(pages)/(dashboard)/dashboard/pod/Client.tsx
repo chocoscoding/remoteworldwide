@@ -30,6 +30,7 @@ import { useLivePod } from "@/app/components/dashboard/pod/LivePodProvider";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { GOAL_KIND_META } from "@/app/components/dashboard/pod/pod-goal-meta";
 import { JOIN_PARAM, JOIN_REFUSAL } from "@/app/lib/dashboard/pod-invite";
+import { GOAL_LINK_PARAM } from "@/app/lib/pod/goalVotes";
 import type { PodMember } from "@/app/lib/pod/types";
 
 const initialsOf = (name: string) =>
@@ -115,6 +116,19 @@ const PodClient: FC = () => {
       });
     })();
   }, [joinParam, joinWithCode, pathname, router]);
+
+  /**
+   * A "goal under review" notification lands here as `?goal=<id>`, which opens the goals dialog on
+   * that goal. Read from the address rather than copied into state, so clicking the same
+   * notification again opens it again; closing the dialog takes the parameter off.
+   */
+  const focusGoalId = inPod ? params.get(GOAL_LINK_PARAM) : null;
+  const goalsOpen = manageOpen || focusGoalId !== null;
+
+  function closeGoals() {
+    setManageOpen(false);
+    if (focusGoalId !== null) router.replace(pathname, { scroll: false });
+  }
 
   function share() {
     const text = draft.trim();
@@ -446,7 +460,9 @@ const PodClient: FC = () => {
       <JoinPodDialog open={joinOpen} onOpenChange={setJoinOpen} />
       <CreatePodDialog open={createOpen} onOpenChange={setCreateOpen} />
       <LeavePodDialog open={leaveOpen} onOpenChange={setLeaveOpen} />
-      {manageOpen && <ManageGoalsDialog onClose={() => setManageOpen(false)} onSuggest={() => setSuggestOpen(true)} />}
+      {goalsOpen && (
+        <ManageGoalsDialog key={focusGoalId ?? "manage"} focusGoalId={focusGoalId} onClose={closeGoals} onSuggest={() => setSuggestOpen(true)} />
+      )}
       <SuggestGoalDialog open={suggestOpen} onOpenChange={setSuggestOpen} onSuggest={handleSuggest} />
       <ShareWinModal open={shareWinOpen} onOpenChange={setShareWinOpen} />
     </div>

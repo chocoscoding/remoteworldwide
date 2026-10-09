@@ -78,8 +78,10 @@ export interface PodContextValue {
   /** Majority needed to resolve a vote — derived from pod size. */
   voteMajority: number;
   suggestGoal: (input: SuggestedGoal) => void;
+  /** Your downvote on a live goal, which puts it under review (app/lib/pod/goalVotes.ts). */
   suggestRemoval: (goalId: string) => void;
-  castVote: (goalId: string, choice: "for" | "against") => void;
+  /** An upvote ("for") or downvote ("against") on the goal itself, add or review alike; null takes yours back. */
+  castVote: (goalId: string, choice: "for" | "against" | null) => void;
 
   /**
    * The whole reason a job win is worth logging: it lands on the pod feed as

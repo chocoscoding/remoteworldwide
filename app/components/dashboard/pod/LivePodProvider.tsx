@@ -75,7 +75,9 @@ export const LivePodProvider: FC<{ initial: PodOverview; children: ReactNode }> 
   const win = useRecordWin();
 
   const pod = data.pod;
-  const busy = [match, create, rename, mute, join, leave, share, suggest, removal, vote, log, win].some((m) => m.isPending);
+  // Goal writes (suggest, removal, vote) are left out: they show on the screen at the click, so
+  // nothing has to wait on them.
+  const busy = [match, create, rename, mute, join, leave, share, log, win].some((m) => m.isPending);
 
   const value: LivePodValue = {
     overview: data,

@@ -6,16 +6,17 @@
 // with the response — no refetch, no partial patching, and the cache is always
 // exactly what the server stored.
 //
-// Only the fire reaction is optimistic. It is the one action people fire off
-// repeatedly and expect to feel instant; everything else is a deliberate act
-// where a moment of latency reads as the thing being saved. Optimism costs a
-// rollback path, so it is spent where it buys something.
+// The fire reaction and the goal votes are optimistic: people tap them in quick
+// runs and expect the screen to move with the tap. Everything else is a
+// deliberate act where a moment of latency reads as the thing being saved.
+// Optimism costs a rollback path, so it is spent where it buys something.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { apiPatch, apiPost } from "@/app/lib/api/client";
+import { apiDelete, apiPatch, apiPost } from "@/app/lib/api/client";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { qk } from "@/app/lib/query/keys";
+import { PENDING_GOAL_PREFIX, applyRemovalSuggestion, applySuggestion, applyVote } from "@/app/lib/pod/goalVotes";
 import type { PodGoalKind, PodOverview } from "@/app/lib/pod/types";
 
 export interface SuggestGoalBody {
@@ -90,19 +91,69 @@ export const useSharePost = () =>
     () => toast.success("Shared with your pod", { description: "It's on What's moving, where they'll see it." }),
   );
 
+const POD_GOAL_WRITES = ["pod", "goal-write"] as const;
+
+/**
+ * A goal write, shown before the round trip: `patch` applies it to the cached overview at the
+ * click, and the server's overview replaces the guess when it answers.
+ *
+ * Goal writes share a scope, so they reach the server one at a time in click order: "upvote, then
+ * downvote" can never be stored as "downvote, then upvote". And only the last write still in flight
+ * stores the server's answer, because an earlier answer would briefly undo the clicks made since.
+ */
+function useOptimisticGoalWrite<V>(request: (vars: V) => Promise<PodOverview>, patch: (old: PodOverview, vars: V) => PodOverview, onDone?: () => void) {
+  const queryClient = useQueryClient();
+  const isLastWrite = () => queryClient.isMutating({ mutationKey: POD_GOAL_WRITES }) <= 1;
+
+  return useMutation<PodOverview, unknown, V, { previous?: PodOverview }>({
+    mutationKey: POD_GOAL_WRITES,
+    scope: { id: "pod-goal-writes" },
+    mutationFn: request,
+
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: qk.pod.overview() });
+      const previous = queryClient.getQueryData<PodOverview>(qk.pod.overview());
+      queryClient.setQueryData<PodOverview>(qk.pod.overview(), (old) => (old ? patch(old, vars) : old));
+      return { previous };
+    },
+
+    onSuccess: (data) => {
+      if (isLastWrite()) queryClient.setQueryData(qk.pod.overview(), data);
+      onDone?.();
+    },
+
+    // The rollback is the screen as it was before this click, and the refetch is the truth: someone
+    // else may have voted, or the vote may have closed, in the meantime.
+    onError: (error, _vars, context) => {
+      toast.error(apiMessage(error));
+      if (!isLastWrite()) return;
+      if (context?.previous) queryClient.setQueryData(qk.pod.overview(), context.previous);
+      void queryClient.invalidateQueries({ queryKey: qk.pod.overview() });
+    },
+  });
+}
+
 export const useSuggestGoal = () =>
-  usePodAction<SuggestGoalBody>(
+  useOptimisticGoalWrite<SuggestGoalBody>(
     (body) => apiPost<PodOverview>("/api/pod/goals", body),
-    () => toast.success("Suggested", { description: "Your pod votes on it. A majority makes it live." }),
+    (old, body) => applySuggestion(old, body, `${PENDING_GOAL_PREFIX}${Date.now()}`, new Date().toISOString()),
+    () => toast.success("Suggested", { description: "Your pod votes on it. A majority of upvotes makes it live." }),
   );
 
 export const useSuggestRemoval = () =>
-  usePodAction<string>(
+  useOptimisticGoalWrite<string>(
     (goalId) => apiPost<PodOverview>(`/api/pod/goals/${goalId}/removal`),
-    () => toast.success("Vote opened", { description: "A majority retires the goal." }),
+    (old, goalId) => applyRemovalSuggestion(old, goalId, new Date().toISOString()),
+    () => toast.success("Downvoted", { description: "Your pod is reviewing it. It goes if a majority of the pod downvotes it." }),
   );
 
-export const useCastVote = () => usePodAction<{ goalId: string; choice: "for" | "against" }>(({ goalId, choice }) => apiPost<PodOverview>(`/api/pod/goals/${goalId}/vote`, { choice }));
+/** An upvote, a downvote, or `choice: null` to take yours back. */
+export const useCastVote = () =>
+  useOptimisticGoalWrite<{ goalId: string; choice: "for" | "against" | null }>(
+    ({ goalId, choice }) =>
+      choice === null ? apiDelete<PodOverview>(`/api/pod/goals/${goalId}/vote`) : apiPost<PodOverview>(`/api/pod/goals/${goalId}/vote`, { choice }),
+    (old, { goalId, choice }) => applyVote(old, goalId, choice),
+  );
 
 export const useLogDay = () => usePodAction<number>((apps) => apiPost<PodOverview>("/api/pod/log", { apps }));
 
