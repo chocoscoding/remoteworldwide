@@ -25,6 +25,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { describeScanFailure, findIngested, resolveResumeId, streamScan, type ScanFailure } from "@/app/lib/ats/api";
 import type { IngestedResume, ScanReport } from "@/app/lib/ats/types";
+import type { ImportedResume } from "@/app/lib/resume/api";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
 import { qk } from "@/app/lib/query/keys";
 
@@ -46,6 +47,12 @@ export interface ScanRequest {
   /** The posting to score against, or null for a general score. */
   job: { id?: string; description: string } | null;
   ingested: readonly IngestedResume[];
+  /**
+   * A resume built in the Resume creator has no file to import: its content is
+   * ingested as text instead, the way the editor's own ATS card does it. The
+   * service dedupes an unedited document, so a second scan skips the work.
+   */
+  importContent?: () => Promise<ImportedResume>;
 }
 
 const IDLE: ScanState = { status: "idle", report: null, unexplained: null, failure: null, scannedAt: null };
@@ -81,7 +88,7 @@ export function useScanResume() {
    * it elsewhere) without reading state back during a render.
    */
   const run = useCallback(
-    async ({ doc, job, ingested }: ScanRequest): Promise<ScanReport | null> => {
+    async ({ doc, job, ingested, importContent }: ScanRequest): Promise<ScanReport | null> => {
       runIdRef.current += 1;
       const runId = runIdRef.current;
       abortRef.current?.abort();
@@ -93,18 +100,26 @@ export function useScanResume() {
 
       // A document with no ingested resume behind it has to be parsed and
       // embedded first, which is slow enough that the UI names it separately.
-      const known = findIngested(doc, ingested) !== null;
+      const known = !importContent && findIngested(doc, ingested) !== null;
       setState({ ...IDLE, status: known ? "scoring" : "preparing" });
 
       try {
-        const resumeId = await resolveResumeId(doc, ingested);
-        if (!current()) return null;
+        let resumeId: string;
+        if (importContent) {
+          const imported = await importContent();
+          if (!current()) return null;
+          resumeId = imported.resumeId;
+          if (!imported.duplicate) void queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
+        } else {
+          resumeId = await resolveResumeId(doc, ingested);
+          if (!current()) return null;
 
-        // An import happened, so the list the picker matches against is stale —
-        // and so is the document, which the bridge has just linked to it.
-        if (!known) {
-          void queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
-          void queryClient.invalidateQueries({ queryKey: qk.documents.list() });
+          // An import happened, so the list the picker matches against is stale —
+          // and so is the document, which the bridge has just linked to it.
+          if (!known) {
+            void queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
+            void queryClient.invalidateQueries({ queryKey: qk.documents.list() });
+          }
         }
 
         setState((prev) => ({ ...prev, status: "scoring" }));

@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useRef, useState } from "react";
-import { FileText, Link2, ScanSearch, Upload } from "lucide-react";
+import { FileText, Link2, ScanSearch, Search, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
@@ -10,6 +10,10 @@ import { Lottie } from "lottie-react";
 /**
  * The front door: pick which resume to scan, then choose how to scan it.
  * No toolbar, no half-filled results behind it — the choice IS the screen.
+ *
+ * The resumes are one list, not a grid of cards (owner, 2026-10-09): with
+ * uploads and every resume built here side by side there can be dozens, so it
+ * scrolls past about five rows and a search box filters it by name.
  */
 export interface AtsLandingProps {
   resumes: VaultDoc[];
@@ -36,6 +40,7 @@ export interface AtsLandingProps {
 
 const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload, onScoreGeneral, onScoreVsJob }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   async function handleFile(file: File | undefined) {
@@ -45,6 +50,9 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
     const entry = await onUpload(file);
     if (entry) setSelectedId(entry.id);
   }
+
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? resumes.filter((r) => r.name.toLowerCase().includes(needle)) : resumes;
 
   return (
     <div className="mx-auto flex min-h-[440px] max-w-[680px] flex-col items-center justify-center text-center">
@@ -65,57 +73,14 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
       </p>
 
       {/* Step 1 — which resume */}
-      {/* Two columns once there are resumes to choose between. With none, the
-          upload tile is the only child, and a two-column grid would leave it
-          stranded at half width beside an empty cell. */}
-      <div className={cn("mt-2 grid w-full grid-cols-1 gap-2.5", resumes.length > 0 && "sm:grid-cols-2")}>
-        {resumes.map((r) => {
-          const selected = r.id === selectedId;
-          const badge = sourceBadgeLabel(r.source);
-          const general = scores.get(r.id);
-          return (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setSelectedId(r.id)}
-              aria-pressed={selected}
-              className={cn(
-                "flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors cursor-pointer",
-                selected ? "border-[#222325] bg-[#f6faea]" : "border-black/10 bg-white hover:border-black/30",
-              )}>
-              <span
-                className={cn(
-                  "grid h-9 w-9 flex-none place-content-center rounded-lg",
-                  selected ? "bg-[#222325] text-[#e1f073]" : "bg-[#f0f0ea] text-primary",
-                )}>
-                <FileText className="h-4 w-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
-                  <span className="truncate text-sm font-bold text-primary">{r.name}</span>
-                  {badge && (
-                    <span className="flex-none rounded-full bg-[#f0f0ea] px-2 py-0.5 text-[10px] font-bold text-black/55">{badge}</span>
-                  )}
-                </span>
-                <span className="block truncate text-xs text-black/45">{r.updatedLabel}</span>
-              </span>
-              <span className="flex-none text-right">
-                {general == null ? (
-                  <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/30">Not scored</span>
-                ) : (
-                  <>
-                    <span className="block text-base font-bold text-primary tabular-nums">{general}</span>
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">General</span>
-                  </>
-                )}
-              </span>
-            </button>
-          );
-        })}
-
+      <div className="mt-3 w-full text-left">
         {/* Upload — any resume, whether or not it lives here. */}
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-dashed border-black/20 bg-white p-3.5 text-left transition-colors hover:border-[#222325]">
-          <span className="grid h-9 w-9 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
+        <label
+          className={cn(
+            "flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-dashed border-black/20 bg-white px-3.5 py-2.5 text-left transition-colors hover:border-[#222325]",
+            resumes.length > 0 && "mt-2.5",
+          )}>
+          <span className="grid h-8 w-8 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
             <Upload className="h-4 w-4 text-primary" />
           </span>
           <span className="min-w-0 flex-1">
@@ -130,6 +95,71 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
         </label>
+        <br />
+        {resumes.length > 0 && (
+          <div className="overflow-hidden rounded-xl border border-black/10 bg-white">
+            {/* Search shows once the list is long enough to need it. */}
+            {resumes.length > 4 && (
+              <label className="flex items-center gap-2 border-b border-black/8 px-3.5">
+                <Search aria-hidden className="h-4 w-4 flex-none text-black/35" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={`Search ${resumes.length} resumes`}
+                  aria-label="Search your resumes"
+                  className="h-11 min-w-0 flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-black/35"
+                />
+              </label>
+            )}
+            <div role="listbox" aria-label="Your resumes" className="max-h-[300px] overflow-y-auto">
+              {shown.map((r) => {
+                const selected = r.id === selectedId;
+                const badge = sourceBadgeLabel(r.source);
+                const general = scores.get(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => setSelectedId(r.id)}
+                    className={cn(
+                      "flex w-full cursor-pointer items-center gap-3 border-b border-black/6 px-3.5 py-2.5 text-left transition-colors last:border-b-0",
+                      selected ? "bg-[#f6faea]" : "hover:bg-[#fbfbf7]",
+                    )}>
+                    <span
+                      className={cn(
+                        "grid h-8 w-8 flex-none place-content-center rounded-lg",
+                        selected ? "bg-[#222325] text-[#e1f073]" : "bg-[#f0f0ea] text-primary",
+                      )}>
+                      <FileText className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-primary">{r.name}</span>
+                      <span className="flex items-center gap-1.5 text-xs text-black/45">
+                        {badge && <span className="font-semibold text-black/55">{badge}</span>}
+                        {badge && <span aria-hidden>·</span>}
+                        <span className="truncate">{r.updatedLabel}</span>
+                      </span>
+                    </span>
+                    <span className="flex-none text-right">
+                      {general == null ? (
+                        <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/30">Not scored</span>
+                      ) : (
+                        <>
+                          <span className="block text-base font-bold text-primary tabular-nums">{general}</span>
+                          <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">General</span>
+                        </>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+              {shown.length === 0 && <p className="px-3.5 py-4 text-sm text-black/45">No resume matches “{query.trim()}”.</p>}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Step 2 — how to scan it */}
@@ -156,7 +186,9 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
               </span>
               <span className="mt-3 block text-sm font-bold text-primary">{job ? "Against this job" : "Against a job"}</span>
               <span className="mt-1 block text-xs leading-relaxed text-black/50">
-                {job ? `${job.role} at ${job.company}. We score the match.` : "Pick a listing or paste any posting, and we score the match."}
+                {job
+                  ? `${job.role} at ${job.company}. We score the match.`
+                  : "Pick a listing or paste any posting, and we score the match."}
               </span>
             </button>
           </div>

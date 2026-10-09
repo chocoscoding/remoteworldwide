@@ -34,6 +34,8 @@ export function inferDocKind(filename: string): DocKind {
 export function sourceBadgeLabel(source: DocSource): string | null {
   if (source === "uploaded") return "Uploaded";
   if (source === "google-drive") return "Google Drive";
+  // A resume built in the Resume creator, as the ATS scorer lists it beside uploads.
+  if (source === "created") return "Created here";
   return null;
 }
 

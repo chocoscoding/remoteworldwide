@@ -15,6 +15,11 @@
 // is none. That is why the first scan of a document says "Reading your
 // resume" and later ones do not.
 //
+// Resumes built in the Resume creator are listed too (owner, 2026-10-09),
+// under `built:<id>` so they never collide with a vault id. They have no file:
+// a scan loads the document and ingests its content as text, the way the
+// editor's ATS card does, and their archive switch is the library's own.
+//
 // A scan costs a credit, so nothing here scores speculatively. `generalScores`
 // remembers only what was actually run, which is what the landing cards and
 // the resumes table show in place of a number they have not earned.
@@ -40,6 +45,9 @@ import { docForScan, explanationNote, isScanGone } from "@/app/lib/ats/api";
 import type { ScanRecord } from "@/app/lib/ats/types";
 import { useIngestedResumesQuery, useScanQuery } from "@/hooks/queries/useAtsQueries";
 import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
+import { useCreatedDocumentAction, useCreatedResumes } from "@/hooks/queries/useCreatedDocuments";
+import { getResumeDocument, importResumeContent } from "@/app/lib/resume/api";
+import type { ResumeDocumentSummary } from "@/app/lib/dashboard/types";
 import { useScanResume, type ScanStatus } from "@/hooks/mutations/useScanResume";
 import AtsLanding from "@/app/components/dashboard/ats/AtsLanding";
 import AtsResults from "@/app/components/dashboard/ats/AtsResults";
@@ -82,12 +90,30 @@ const standInResume = (record: ScanRecord): ResumeEntry => ({
   updatedLabel: "",
 });
 
+const BUILT = "built:";
+
+/** A resume made in the Resume creator, as the pickers list it beside uploads. */
+const builtEntry = (row: ResumeDocumentSummary): ResumeEntry => {
+  const at = new Date(row.updatedAt);
+  return {
+    id: `${BUILT}${row.id}`,
+    name: row.label,
+    kind: "resume",
+    source: "created",
+    addedAt: at.getTime(),
+    updatedLabel: `Edited ${at.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+    archived: row.archived === true,
+  };
+};
+
 const AtsScreen: FC = () => {
   const { docs, loading: docsLoading, addUploads, toggleArchive } = useDocuments();
   const { pickJob } = useJobPicker();
   // The bridge's left-hand side. An empty list is not an error: it only means
   // every scan on this screen starts with an import.
   const { data: ingested } = useIngestedResumesQuery();
+  const { data: builtRows } = useCreatedResumes();
+  const builtAction = useCreatedDocumentAction();
   const scan = useScanResume();
 
   const [view, setView] = useState<AtsView>("score");
@@ -112,7 +138,11 @@ const AtsScreen: FC = () => {
   const savedJob = !contextDismissed && saved.data && saved.data.id === context.savedJobId ? saved.data : null;
   const linkedJob = savedJob ? atsJobFrom(savedJob) : null;
 
-  const resumes = docs.filter((d) => d.kind === "resume");
+  // Newest first across both sources: a resume just built sits beside a file just uploaded.
+  const resumes = useMemo(
+    () => [...docs.filter((d) => d.kind === "resume"), ...(builtRows ?? []).map(builtEntry)].sort((a, b) => b.addedAt - a.addedAt),
+    [docs, builtRows],
+  );
   const activeResumes = resumes.filter((r) => !r.archived);
 
   // A link from the late-explanation email (?scan=<scan id>) opens that scan's
@@ -160,7 +190,7 @@ const AtsScreen: FC = () => {
    */
   const startScan = useCallback(
     async (docId: string, forJob: AtsJob | null) => {
-      const doc = docs.find((d) => d.id === docId);
+      const doc = resumes.find((d) => d.id === docId);
       if (!doc) return;
 
       // A report run here replaces one opened from a link, for good.
@@ -171,7 +201,15 @@ const AtsScreen: FC = () => {
       setJob(forJob);
       setView("score");
 
-      const report = await scan.run({ doc, job: forJob, ingested: ingested ?? [] });
+      const builtId = docId.startsWith(BUILT) ? docId.slice(BUILT.length) : null;
+      const report = await scan.run({
+        doc,
+        job: forJob,
+        ingested: ingested ?? [],
+        importContent: builtId
+          ? () => getResumeDocument(builtId).then((stored) => importResumeContent(stored.content, stored.label))
+          : undefined,
+      });
 
       // The general score is what the landing cards and the resumes table
       // show, so it is remembered per document. A job-specific score is about
@@ -179,7 +217,7 @@ const AtsScreen: FC = () => {
       // on screen.
       if (report && !forJob) setGeneralScores((prev) => new Map(prev).set(docId, report.score));
     },
-    [docs, ingested, scan],
+    [resumes, ingested, scan],
   );
 
   function scoreGeneral(id: string) {
@@ -219,6 +257,13 @@ const AtsScreen: FC = () => {
   async function handleUpload(file: File): Promise<ResumeEntry | null> {
     const [entry] = await addUploads([file], { kind: "resume" });
     return entry ?? null;
+  }
+
+  /** A built resume archives in the library; a file, in My documents. Both lists then drop it from the pickers. */
+  function toggleResumeArchive(id: string) {
+    if (!id.startsWith(BUILT)) return toggleArchive(id);
+    const entry = resumes.find((r) => r.id === id);
+    if (entry) builtAction.mutate({ kind: "resume", id: id.slice(BUILT.length), type: "archive", archived: !entry.archived });
   }
 
   function toggleFix(id: string) {
@@ -304,7 +349,7 @@ const AtsScreen: FC = () => {
           <AtsResumesTable
             resumes={resumes}
             scores={generalScores}
-            onToggleArchive={toggleArchive}
+            onToggleArchive={toggleResumeArchive}
             onGeneral={scoreGeneral}
             onVsJob={scoreVsJob}
           />
