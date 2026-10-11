@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { nextMilestone, tierFor } from "@/app/lib/dashboard/streak";
 import { GIFT_CATALOGUE, type GiftKind } from "@/app/lib/dashboard/gifts";
+import { cn } from "@/lib/utils";
 import { useStreak } from "./StreakContext";
 
 const CONFETTI_COLORS = ["#e1f073", "#cddd54", "#f0c86a", "#222325"];
@@ -123,27 +124,34 @@ const StreakMilestoneModal: FC = () => {
             {celebrating.blurb} You are officially at <span className="font-bold text-primary">{tier.label}</span>.
           </DialogDescription>
 
-          {/* Reward payout */}
+          {/* Reward payout. A rung with no gift (Spark) celebrates without one;
+              a perk alone still shows. */}
+          {(celebrating.gift || celebrating.perk) && (
           <motion.div
             initial={reduceMotion ? undefined : { opacity: 0, scale: 0.9 }}
             animate={reduceMotion ? undefined : { opacity: 1, scale: 1 }}
             transition={{ delay: 0.36, type: "spring", stiffness: 360, damping: 22 }}
             className="mb-3 w-full rounded-xl border-2 bg-[#e1f073] px-5 py-3.5 br-bold">
-            <div className="flex items-center justify-center gap-2">
-              <Flame className="h-4 w-4 text-primary" />
-              <span className="text-lg" aria-hidden>🎁</span>
-              <span className="text-lg font-extrabold text-primary">
-                {celebrating.gift ? GIFT_CATALOGUE[celebrating.gift as GiftKind].label : "A gift"}
-              </span>
-              <span className="text-sm font-bold text-primary/70">is waiting for you</span>
-            </div>
+            {celebrating.gift && (
+              <div className="flex items-center justify-center gap-2">
+                <Flame className="h-4 w-4 text-primary" />
+                <span className="text-lg" aria-hidden>🎁</span>
+                <span className="text-lg font-extrabold text-primary">{GIFT_CATALOGUE[celebrating.gift as GiftKind].label}</span>
+                <span className="text-sm font-bold text-primary/70">is waiting for you</span>
+              </div>
+            )}
             {celebrating.perk && (
-              <div className="mt-1.5 flex items-center justify-center gap-1.5 border-t border-[#222325]/20 pt-1.5">
+              <div
+                className={cn(
+                  "flex items-center justify-center gap-1.5",
+                  celebrating.gift && "mt-1.5 border-t border-[#222325]/20 pt-1.5",
+                )}>
                 <Snowflake className="h-3 w-3 text-primary/70" />
                 <span className="text-xs font-semibold text-primary/75">{celebrating.perk}</span>
               </div>
             )}
           </motion.div>
+          )}
 
           <div className="mb-6 flex w-full items-center gap-2 text-[11px] font-semibold text-black/45">
             <span className="flex-1 rounded-lg bg-[#f0f0ea] px-3 py-2">{giftsWaiting} gifts waiting</span>

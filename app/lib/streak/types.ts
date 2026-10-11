@@ -23,7 +23,8 @@ export interface StreakDayItem {
 
 export interface StreakMilestoneItem {
   days: number;
-  gift: GiftKind;
+  /** Null for a rung that celebrates only (Spark). */
+  gift: GiftKind | null;
   at: string;
   /** False until its celebration has been shown. */
   seen: boolean;
@@ -87,7 +88,13 @@ export interface StreakWeeks {
 
 /** `GET /api/streak`. */
 export interface StreakItem {
+  /** The zone today's key is in now. */
   timezone: string;
+  /**
+   * A timezone change waiting for the current day to end: the streak never switches zones
+   * mid-day, so a change can't reach back into a day already gone. Absent from older backends.
+   */
+  nextTimezone?: { timezone: string; from: string } | null;
   /** Today's key after the grace hour. */
   today: string;
   /** The hour on the user's own clock. */
@@ -120,6 +127,11 @@ export interface GiftItem {
    * a priority intro made. Absent from a backend older than these gifts.
    */
   deliveredAt?: string | null;
+  /**
+   * While an interview or offer gift is on hold: when it lands (ISO). It can't be used before,
+   * and it only lands if the card is still at that stage then. Absent from older backends.
+   */
+  pendingUntil?: string | null;
   /** What the redemption produced: a day of Pro's end (ISO), "waiting" for a priority intro. */
   detail?: string | null;
 }

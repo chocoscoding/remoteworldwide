@@ -193,7 +193,7 @@ const PayoffPanel: FC<PayoffPanelProps> = ({ result, onClose }) => {
         <div className="flex items-center gap-2.5 border-b-2 border-[#222325] bg-[#e1f073] px-7 py-3">
           <Trophy className="h-4 w-4 flex-none text-primary" />
           <p className="text-sm font-bold text-primary">
-            {pendingMilestone.label} unlocked. A gift is waiting
+            {pendingMilestone.label} unlocked{pendingMilestone.giftTier ? ". A gift is waiting" : "."}
             {pendingMilestone.perk ? ` · ${pendingMilestone.perk}` : ""}
           </p>
         </div>

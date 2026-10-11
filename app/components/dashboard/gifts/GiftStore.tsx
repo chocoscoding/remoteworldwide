@@ -27,6 +27,7 @@ const KINDS = Object.keys(GIFT_CATALOGUE) as GiftKind[];
 
 const GiftStore: FC = () => {
   const { giftsOpen, closeGifts, gifts, giftsWaiting, redeemGift } = useActivity();
+  const onHold = gifts.filter((g) => !g.usedAt && g.pendingUntil);
   const [rewriteOpen, setRewriteOpen] = useState(false);
 
   const use = (kind: GiftKind) => {
@@ -91,9 +92,22 @@ const GiftStore: FC = () => {
                 })}
               </div>
             )}
+            {onHold.length > 0 && (
+              <div className="mt-4">
+                <p className="text-[13px] font-bold text-primary mb-1">On its way</p>
+                <p className="text-xs text-black/45 mb-2">Interview and offer gifts land 3 days later if the card is still there.</p>
+                <div className="flex flex-col gap-1.5">
+                  {onHold.map((g) => (
+                    <p key={g.id} className="text-xs text-black/60" suppressHydrationWarning>
+                      {GIFT_CATALOGUE[g.kind].label}: {g.reason} · lands {proUntilLabel(g.pendingUntil!)}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* History */}
+          {/* History. Gifts on hold show here with when they land. */}
           <div className="min-w-0">
             <p className="text-[15px] font-bold text-primary mb-1">History</p>
             <p className="text-xs text-black/45 mb-3">Every gift has a reason.</p>

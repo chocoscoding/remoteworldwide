@@ -221,7 +221,7 @@ const ManageGoalsDialog: FC<ManageGoalsDialogProps> = ({ onClose, onSuggest, foc
                           <p className="text-[11px] text-black/50">
                             {adding
                               ? `${voteMajority} ${voteMajority === 1 ? "upvote adds" : "upvotes add"} it.`
-                              : `${voteMajority} ${voteMajority === 1 ? "downvote removes" : "downvotes remove"} it.`}
+                              : `${voteMajority} ${voteMajority === 1 ? "upvote keeps" : "upvotes keep"} it, ${voteMajority} ${voteMajority === 1 ? "downvote removes" : "downvotes remove"} it.`}
                           </p>
                         </div>
                       </div>

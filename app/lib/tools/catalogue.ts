@@ -514,7 +514,7 @@ export const TOOLS: Tool[] = [
       { title: "Drafted follow-up messages", body: "A message ready to copy for each follow-up. Nothing is ever sent for you." },
       { title: "Fed by the rest of the toolkit", body: "Applications you finish in the apply wizard land here with the resume, score and letter you used, and the extension tracks the forms you submit." },
       { title: "Insights", body: "See where your applications actually go, stage by stage, so you know what to change." },
-      { title: "Streaks and a weekly goal", body: "A weekly application goal and a streak, with two free freezes a week, to make showing up a little easier." },
+      { title: "Streaks and a weekly goal", body: "A weekly application goal and a streak, with one free freeze a week, to make showing up a little easier." },
     ],
     whyHeading: "Stop losing track.",
     why: [

@@ -279,31 +279,23 @@ function romanNumeral(n: number): string {
  *
  * Six rungs, deliberately — a longer ladder read as a wall. The milestone
  * modal's "Next: X at Y days" line covers the gaps between them.
+ *
+ * Mirrors the backend's `STREAK_MILESTONES` (src/types/streak.ts), trimmed by
+ * the owner on 2026-10-11: Spark celebrates without a gift, the pools climb
+ * slower, and a perk is only listed when the server actually grants it.
  */
 export const STREAK_MILESTONES: StreakMilestone[] = [
-  { days: 3, tierId: "spark", emoji: "🔥", label: "Spark", blurb: "Three days back to back.", giftTier: "small" },
-  { days: 7, tierId: "ember", emoji: "🔥", label: "Ember", blurb: "Seven days without dropping it.", giftTier: "small", perk: "+1 streak freeze" },
-  { days: 14, tierId: "flame", emoji: "🔥", label: "Flame", blurb: "A fortnight of showing up.", giftTier: "mid", perk: "+1 streak freeze" },
-  {
-    days: 30,
-    tierId: "blaze",
-    emoji: "🔥",
-    label: "Blaze",
-    blurb: "Thirty days. This is a habit now.",
-    giftTier: "mid",
-    // Deliberately not a free week of Pro. That lands on your most engaged
-    // user at precisely the moment they were about to convert, and trades a
-    // subscription for a week of goodwill. A permanent unlock rewards the
-    // streak without cannibalising the upgrade.
-    perk: "Unlimited resume tailoring, permanently",
-  },
-  { days: 60, tierId: "wildfire", emoji: "🔥", label: "Wildfire", blurb: "Sixty days of steady work.", giftTier: "big", perk: "+2 streak freezes" },
-  { days: 100, tierId: "firestorm", emoji: "🔥", label: "Firestorm", blurb: "One hundred days. Very few get here.", giftTier: "big", perk: "Profile badge" },
+  { days: 3, tierId: "spark", emoji: "🔥", label: "Spark", blurb: "Three days without a break.", giftTier: null },
+  { days: 7, tierId: "ember", emoji: "🔥", label: "Ember", blurb: "Seven days without dropping it.", giftTier: "small" },
+  { days: 14, tierId: "flame", emoji: "🔥", label: "Flame", blurb: "A fortnight of showing up.", giftTier: "small", perk: "+1 streak freeze" },
+  { days: 30, tierId: "blaze", emoji: "🔥", label: "Blaze", blurb: "Thirty days. This is a habit now.", giftTier: "mid" },
+  { days: 60, tierId: "wildfire", emoji: "🔥", label: "Wildfire", blurb: "Sixty days of steady work.", giftTier: "mid", perk: "+1 streak freeze" },
+  { days: 100, tierId: "firestorm", emoji: "🔥", label: "Firestorm", blurb: "One hundred days. Very few get here.", giftTier: "big", perk: "+1 streak freeze" },
 ];
 /**
  * Rungs past the last fixed one, generated every 100 days so the ladder never
  * dead-ends. Generated rungs stay on the big-gift pool, and the freeze perk
- * keeps them worth reaching.
+ * keeps them worth reaching (one freeze, as the backend grants).
  */
 function generatedMilestone(level: number): StreakMilestone {
   const days = level * TIER_REPEAT_DAYS;
@@ -314,7 +306,7 @@ function generatedMilestone(level: number): StreakMilestone {
     label: `Firestorm ${romanNumeral(level)}`,
     blurb: `${days} days. This is who you are now.`,
     giftTier: "big",
-    perk: "+2 streak freezes",
+    perk: "+1 streak freeze",
   };
 }
 

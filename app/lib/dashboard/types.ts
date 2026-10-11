@@ -702,8 +702,9 @@ export interface StreakMilestone {
   /**
    * Which gift pool this rung draws from when it fires. WHICH gift lands is
    * random — the surprise is the point — but the tier scales with the rung.
+   * Null: the rung is a celebration only (Spark).
    */
-  giftTier: "small" | "mid" | "big";
+  giftTier: "small" | "mid" | "big" | null;
   /**
    * The gift actually drawn, filled in at unlock. Absent on the static ladder
    * definition; present on the instance that reaches the inventory and the

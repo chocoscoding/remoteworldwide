@@ -112,6 +112,7 @@ const StreakRewards: FC<StreakRewardsProps> = ({ dark = false, className }) => {
                       Seeded history has no entry — fall back to the promise. */}
                   {(() => {
                     const drawn = gifts.find((g) => g.refId === milestoneGiftRef(m.days));
+                    if (!m.giftTier) return m.perk ?? "Bragging rights";
                     const what = unlocked && drawn ? `\u{1F381} ${GIFT_CATALOGUE[drawn.kind].label}` : "\u{1F381} Surprise gift";
                     return `${what}${m.perk ? ` · ${m.perk}` : ""}`;
                   })()}

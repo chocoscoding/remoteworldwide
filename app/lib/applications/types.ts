@@ -189,6 +189,12 @@ export interface GoalsItem {
   /** The daily habits, each ticked by the action kind it is bound to. The defaults until the user edits them. */
   habits: HabitItem[];
   boardImportedAt: string | null;
+  /**
+   * A rest-day change counts from tomorrow: until `restDaysFrom` the streak keeps
+   * `restDaysBefore`. Null when none is waiting; absent from older backends.
+   */
+  restDaysBefore?: number[] | null;
+  restDaysFrom?: string | null;
 }
 
 export type UpdateGoalsInput = Partial<Pick<GoalsItem, "weeklyTarget" | "restDays" | "huntHour" | "paused" | "pauseEndsOn" | "habits">>;

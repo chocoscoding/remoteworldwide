@@ -121,8 +121,25 @@ describe("a goal under review", () => {
   const review = (votes, memberCount = 3, voteMajority = 2) =>
     overview([goal({ status: "voting-remove", proposedBy: "Grace", proposedAt: NOW, votes })], memberCount, voteMajority);
 
-  it("stays while short of a majority of downvotes, and upvotes never close it early", () => {
-    assert.equal(goalOf(applyVote(review([down("Grace"), up("Alan")]), "g1", "for")).status, "voting-remove");
+  it("stays while short of a majority either way", () => {
+    assert.equal(goalOf(applyVote(review([down("Grace")]), "g1", "for")).status, "voting-remove");
+    assert.equal(goalOf(applyVote(review([down("Grace"), up("Alan")], 5, 3), "g1", "for")).status, "voting-remove");
+  });
+
+  it("moves back up when your upvote makes the majority", () => {
+    const kept = goalOf(applyVote(review([down("Grace"), up("Alan")]), "g1", "for"));
+    assert.equal(kept.status, "active");
+    assert.equal(kept.proposedAt, undefined);
+    assert.equal(kept.proposedBy, undefined);
+  });
+
+  it("is not closed as it opens by the upvotes that voted the goal in", () => {
+    const o = overview([goal({ votes: [up("Grace"), up("Alan")] })]);
+    assert.equal(goalOf(applyRemovalSuggestion(o, "g1", NOW)).status, "voting-remove");
+  });
+
+  it("is not moved up by taking your downvote back", () => {
+    assert.equal(goalOf(applyVote(review([down(ME), up("Grace"), up("Alan")]), "g1", null)).status, "voting-remove");
   });
 
   it("goes once a majority of the pod downvotes it", () => {

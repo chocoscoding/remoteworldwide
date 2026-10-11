@@ -72,6 +72,9 @@ const PauseSearchDialog: FC<PauseSearchDialogProps> = ({ open, onOpenChange }) =
               Not now
             </button>
           </div>
+          <p className="mt-4 text-[11px] leading-relaxed text-black/45">
+            Nothing logged today? A pause covers today once every 14 days. Otherwise it starts tomorrow.
+          </p>
         </div>
       </DialogContent>
     </Dialog>

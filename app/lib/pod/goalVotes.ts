@@ -8,7 +8,8 @@
 //  - a vote is always about the goal: "for" is an upvote (add it, keep it), "against" a downvote,
 //    and you can take yours back;
 //  - votes count against the whole pod: a new goal goes live at a majority of upvotes and is
-//    rejected at a majority of downvotes, and a goal under review goes at a majority of downvotes;
+//    rejected at a majority of downvotes; a goal under review goes at a majority of downvotes, and
+//    moves back up at a majority of upvotes once one of them is cast during the review;
 //  - short of a majority either way, nothing changes until the 7 days run out;
 //  - "Suggest removing" is the caller's downvote, and puts the goal under review.
 //
@@ -49,17 +50,21 @@ export function withMyVote(votes: PodGoalVote[], choice: Choice | null): PodGoal
 }
 
 /**
- * The backend's `settleVote`: what a goal up for a vote becomes with these votes, null when it is off
- * the list. Upvotes reaching a majority never close a review early, because the upvotes that voted
- * the goal in still stand.
+ * The backend's `verdictFor`: what a goal up for a vote becomes with these votes, null when it is off
+ * the list. A review moves back up at a majority of upvotes only when one of them was cast during it
+ * (`upvotedNow`): the upvotes that voted the goal in still stand, and alone they would close every
+ * review the moment it opened. The server knows when each vote landed; here it is only ever yours.
  */
-export function settle(goal: PodGoal, majority: number): PodGoal | null {
+export function settle(goal: PodGoal, majority: number, upvotedNow = false): PodGoal | null {
   const { up, down } = tally(goal);
   if (goal.status === "voting-add") {
     if (up >= majority) return { ...goal, status: "active", proposedAt: undefined };
     return down >= majority ? null : goal;
   }
-  if (goal.status === "voting-remove") return down >= majority ? null : goal;
+  if (goal.status === "voting-remove") {
+    if (down >= majority) return null;
+    if (up >= majority && upvotedNow) return { ...goal, status: "active", proposedAt: undefined, proposedBy: undefined };
+  }
   return goal;
 }
 
@@ -77,7 +82,7 @@ function withGoal(overview: PodOverview, goalId: string, next: PodGoal | null): 
 export function applyVote(overview: PodOverview, goalId: string, choice: Choice | null): PodOverview {
   const goal = overview.goals.find((g) => g.id === goalId);
   if (!goal || goal.status === "active") return overview;
-  return withGoal(overview, goalId, settle({ ...goal, votes: withMyVote(goal.votes, choice) }, majorityOf(overview)));
+  return withGoal(overview, goalId, settle({ ...goal, votes: withMyVote(goal.votes, choice) }, majorityOf(overview), choice === "for"));
 }
 
 /** "Suggest removing": your downvote, and the goal goes under review with its upvotes standing. */

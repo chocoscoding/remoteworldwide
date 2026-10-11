@@ -73,7 +73,12 @@ export interface GiftEvent {
   deliveredAt?: string;
   /** What it produced: a day of Pro's end (ISO), "waiting" for a priority intro. */
   detail?: string;
+  /** An interview or offer gift on hold until then (ISO): listed, not usable yet. */
+  pendingUntil?: string;
 }
+
+/** Ready to use: not used, and not on hold. */
+export const isWaiting = (gift: Pick<GiftEvent, "usedAt" | "pendingUntil">): boolean => !gift.usedAt && !gift.pendingUntil;
 
 /** What a priority intro's `detail` reads while it waits for a reviewer. */
 export const INTRO_WAITING = "waiting";
@@ -83,6 +88,7 @@ export const INTRO_WAITING = "waiting";
  * formats a day of Pro's end ("Oct 7, 3:45 PM"), so the time zone is the caller's.
  */
 export function giftStatusLabel(gift: GiftEvent, when: (iso: string) => string): string {
+  if (!gift.usedAt && gift.pendingUntil) return `lands ${when(gift.pendingUntil)} if the card is still there`;
   if (!gift.usedAt) return "waiting";
   switch (gift.kind) {
     case "pro-day": {
@@ -100,7 +106,7 @@ export function giftStatusLabel(gift: GiftEvent, when: (iso: string) => string):
 
 /** Unused gifts, oldest first — redemption consumes from the front. */
 export function heldGifts(gifts: GiftEvent[]): GiftEvent[] {
-  return gifts.filter((g) => !g.usedAt);
+  return gifts.filter(isWaiting);
 }
 
 /**
@@ -114,5 +120,5 @@ export function holdsPriorityIntro(gifts: GiftEvent[]): boolean {
 
 /** Held count for one kind. */
 export function heldOf(gifts: GiftEvent[], kind: GiftKind): number {
-  return gifts.reduce((n, g) => (g.kind === kind && !g.usedAt ? n + 1 : n), 0);
+  return gifts.reduce((n, g) => (g.kind === kind && isWaiting(g) ? n + 1 : n), 0);
 }

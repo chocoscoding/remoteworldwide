@@ -133,6 +133,9 @@ const HomeClient: FC = () => {
   // nothing ever read — the picker used to be purely decorative.
   const weeklyTarget = goals.weeklyTarget;
   const restDays = new Set(goals.restDays);
+  // A rest-day change counts from tomorrow, so days before then keep the old set.
+  const restOn = (key: string, index: number): boolean =>
+    goals.restDaysFrom && goals.restDaysBefore && key < goals.restDaysFrom ? goals.restDaysBefore.includes(index) : restDays.has(index);
   const streakTier = tierFor(streak);
 
   // The Monday-first week that contains today, resolved against the server's
@@ -272,7 +275,7 @@ const HomeClient: FC = () => {
                   const isDone = status === "logged" || status === "backfilled";
                   // A rest day is whatever the user marked as one, not whatever
                   // the seeded history happens to say.
-                  const isRest = restDays.has(d.index);
+                  const isRest = restOn(d.key, d.index);
                   const isOpenToday = d.isToday && !isDone && !isRest;
                   const glyph = dayVisual(status, streakTier).glyph;
                   return (
@@ -456,7 +459,7 @@ const HomeClient: FC = () => {
                 {/* Rest-day picker */}
                 <div>
                   <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-1">Working days</p>
-                  <p className="text-xs text-black/45 mb-2.5">Filled days are the ones you work. Tap one to make it a rest day.</p>
+                  <p className="text-xs text-black/45 mb-2.5">Filled days are the ones you work. Tap one to make it a rest day. Changes start tomorrow.</p>
                   <div className="flex gap-1.5">
                     {WEEK_DAY_LABELS.map((day, i) => {
                       // Filled means active. The picker used to fill the *rest*

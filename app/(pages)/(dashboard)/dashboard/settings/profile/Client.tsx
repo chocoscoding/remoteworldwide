@@ -5,6 +5,7 @@ import { Check, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "../SettingsProvider";
 import { useUploadAvatar } from "@/hooks/mutations/useAvatarMutation";
+import { useStreakQuery } from "@/hooks/queries/useStreakQuery";
 import { BUTTON_OUTLINE, BUTTON_SOLID, INPUT, SettingsRow, SettingsSection } from "@/app/components/dashboard/settings/settings-ui";
 import SkillEntriesEditor from "@/app/components/dashboard/resume/content/SkillEntriesEditor";
 import EducationEditor from "@/app/components/onboarding/EducationEditor";
@@ -22,8 +23,24 @@ import {
 
 const TIMEZONES = ["GMT-8", "GMT-5", "GMT+0", "GMT+1", "GMT+2", "GMT+4", "GMT+8"];
 
+/** "GMT+0", "GMT" and "UTC" are one zone; the streak calls it "UTC". */
+const zoneKey = (zone: string): string => (/^(?:GMT|UTC)(?:[+-]0{1,2}(?::?00)?)?$/i.test(zone.trim()) ? "UTC" : zone.trim().toUpperCase());
+
+/**
+ * The streak never switches zones mid-day (a change could otherwise reach back into yesterday),
+ * so a new timezone starts counting when the current day ends. Says so when that is pending:
+ * saved (the server's `nextTimezone`) or picked and not saved yet.
+ */
+function streakZoneNote(picked: string, streakZone: string | undefined, next: { timezone: string } | null | undefined): string | null {
+  if (next) return `Your streak switches to ${next.timezone} when your current day ends.`;
+  if (picked && streakZone && zoneKey(picked) !== zoneKey(streakZone)) return "Your streak switches to this timezone when your current day ends.";
+  return null;
+}
+
 const ProfileClient: FC = () => {
   const { profile, setProfile, save, saving } = useSettings();
+  const streak = useStreakQuery().data;
+  const zoneNote = streakZoneNote(profile.timezone, streak?.timezone, streak?.nextTimezone);
   const photoRef = useRef<HTMLInputElement | null>(null);
   const uploadPhoto = useUploadAvatar();
 
@@ -129,6 +146,7 @@ const ProfileClient: FC = () => {
               ))}
             </select>
           </div>
+          {zoneNote && <p className="mt-2 text-xs text-black/55">{zoneNote}</p>}
         </SettingsRow>
       </SettingsSection>
 

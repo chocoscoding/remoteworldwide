@@ -39,7 +39,7 @@ import {
   dailyTargetFrom,
 } from "@/app/lib/dashboard/activity";
 import { MAX_STREAK_PROMPTS_PER_DAY } from "@/app/lib/dashboard/credits";
-import { GIFT_CATALOGUE, type GiftEvent, type GiftKind } from "@/app/lib/dashboard/gifts";
+import { GIFT_CATALOGUE, isWaiting, type GiftEvent, type GiftKind } from "@/app/lib/dashboard/gifts";
 import { proUntilLabel } from "@/app/lib/settings/boost";
 import type { StrongEventKind } from "@/app/lib/dashboard/rewards";
 import { DEFAULT_LOG_SECONDS, clampTarget } from "@/app/lib/dashboard/goals";
@@ -76,12 +76,22 @@ export interface GoalsState {
   huntHour: number;
   /** Suspends streak, goals and prompts without losing the count. */
   paused: boolean;
+  /** The rest days the streak still uses until `restDaysFrom` (a change counts from tomorrow). */
+  restDaysBefore?: number[] | null;
+  restDaysFrom?: string | null;
 }
 
 const DEFAULT_GOALS: GoalsState = { weeklyTarget: 8, restDays: [5, 6], huntHour: 19, paused: false };
 
 function goalsStateOf(row: GoalsItem): GoalsState {
-  return { weeklyTarget: row.weeklyTarget, restDays: row.restDays, huntHour: row.huntHour, paused: row.paused };
+  return {
+    weeklyTarget: row.weeklyTarget,
+    restDays: row.restDays,
+    huntHour: row.huntHour,
+    paused: row.paused,
+    restDaysBefore: row.restDaysBefore ?? null,
+    restDaysFrom: row.restDaysFrom ?? null,
+  };
 }
 
 /** What `update` changed, as a PATCH body: a save carries only the fields that moved. */
@@ -121,12 +131,13 @@ const giftEventOf = (gift: GiftItem): GiftEvent => ({
   usedAt: gift.usedAt ?? undefined,
   deliveredAt: gift.deliveredAt ?? undefined,
   detail: gift.detail ?? undefined,
+  pendingUntil: gift.pendingUntil ?? undefined,
 });
 
 /** A reached rung as the celebration renders it: the ladder's copy, with the gift the server drew. */
-function milestoneOf(days: number, gift: GiftKind): StreakMilestone | null {
+function milestoneOf(days: number, gift: GiftKind | null): StreakMilestone | null {
   const rung = milestonesUpTo(days).find((m) => m.days === days);
-  return rung ? { ...rung, gift } : null;
+  return rung ? { ...rung, gift: gift ?? undefined } : null;
 }
 
 const EMPTY_DAYS: StreakDayItem[] = [];
@@ -486,7 +497,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // is fetched again. New gifts get one quiet toast; a rung's gift is the
   // celebration's to announce.
   const waitingOnServer = streak?.giftsWaiting;
-  const waitingInList = giftsQuery.data ? giftItems.filter((g) => !g.usedAt).length : undefined;
+  const waitingInList = giftsQuery.data ? giftItems.filter((g) => !g.usedAt && !g.pendingUntil).length : undefined;
   const giftsFetching = giftsQuery.isFetching;
   // Once per count the server reports, so a list that can never match (one
   // capped at its page size) cannot turn this into a refetch loop.
@@ -510,10 +521,19 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const fresh = giftItems.filter((g) => !known.has(g.id));
     for (const g of fresh) known.add(g.id);
     const announce = fresh.filter((g) => !g.usedAt && !g.refId?.startsWith("milestone:"));
-    if (announce.length === 0) return;
-    toast.success(`\u{1F381} ${announce.map((g) => GIFT_CATALOGUE[g.kind].label).join(" · ")}`, {
-      description: `${announce.map((g) => g.reason).join(" · ")}. Waiting in your gifts.`,
-    });
+    const ready = announce.filter((g) => !g.pendingUntil);
+    const held = announce.filter((g) => g.pendingUntil);
+    if (ready.length > 0) {
+      toast.success(`\u{1F381} ${ready.map((g) => GIFT_CATALOGUE[g.kind].label).join(" · ")}`, {
+        description: `${ready.map((g) => g.reason).join(" · ")}. Waiting in your gifts.`,
+      });
+    }
+    // An interview or offer gift is held for a few days, landing only if the card stays there.
+    if (held.length > 0) {
+      toast.success(`\u{1F381} ${held.map((g) => GIFT_CATALOGUE[g.kind].label).join(" · ")} on its way`, {
+        description: `${held.map((g) => g.reason).join(" · ")}. It lands in 3 days if the card is still there.`,
+      });
+    }
   }, [giftsLoaded, giftItems]);
 
   // ------------------------------------------------------------------
@@ -596,7 +616,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // A rewrite is spent by the resume build it pays for (the gift store's picker), never here:
     // the server refuses it on its own, so nothing is used up with nothing delivered.
     if (kind === "rewrite") return false;
-    if (!gifts.some((g) => g.kind === kind && !g.usedAt)) return false;
+    if (!gifts.some((g) => g.kind === kind && isWaiting(g))) return false;
     redeem.mutate(kind, {
       onSuccess: (data) => {
         if (kind === "pro-day") {
@@ -664,7 +684,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     todayIntensity,
     awardStrongEvent,
     gifts,
-    giftsWaiting: streak?.giftsWaiting ?? gifts.filter((g) => !g.usedAt).length,
+    giftsWaiting: streak?.giftsWaiting ?? gifts.filter(isWaiting).length,
     redeemGift,
     giftsOpen,
     openGifts: () => setGiftsOpen(true),
