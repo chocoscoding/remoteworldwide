@@ -10,7 +10,10 @@
 //  - votes count against the whole pod: a new goal goes live at a majority of upvotes and is
 //    rejected at a majority of downvotes; a goal under review goes at a majority of downvotes, and
 //    moves back up at a majority of upvotes once one of them is cast during the review;
-//  - short of a majority either way, nothing changes until the 7 days run out;
+//  - short of a majority either way, nothing changes until the 7 days run out, unless the whole pod
+//    has voted in this vote and it's level: then the side that got there first wins. The server
+//    knows when each vote landed and settles that; the screen waits for its answer;
+//  - a goal under review is still the pod's goal: it stays on the list and keeps counting;
 //  - "Suggest removing" is the caller's downvote, and puts the goal under review.
 //
 // Type-only imports, so `npm test` loads this file without a resolve hook.
@@ -38,6 +41,13 @@ export function tally(goal: Pick<PodGoal, "votes">): { up: number; down: number 
   const down = goal.votes.filter((vote) => vote.choice === "against").length;
   return { up: goal.votes.length - down, down };
 }
+
+/** On the pod's goals list: live, or under review (still the pod's until the review carries). */
+export const isStandingGoal = (goal: Pick<PodGoal, "status">): boolean => goal.status === "active" || goal.status === "voting-remove";
+
+/** Votes still waiting on you: open, named by the server, and not yet voted on. Feeds the Manage badge. */
+export const awaitingMyVote = (goals: readonly PodGoal[]): number =>
+  goals.filter((goal) => goal.status !== "active" && !isPendingGoal(goal) && myVote(goal) === null).length;
 
 export const myVote = (goal: Pick<PodGoal, "votes">): Choice | null => goal.votes.find((vote) => vote.memberName === ME)?.choice ?? null;
 

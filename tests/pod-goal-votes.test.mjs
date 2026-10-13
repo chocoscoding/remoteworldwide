@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-const { ME, applyRemovalSuggestion, applySuggestion, applyVote, isPendingGoal, myVote, tally, withMyVote } = await import(
+const { ME, applyRemovalSuggestion, applySuggestion, applyVote, awaitingMyVote, isPendingGoal, isStandingGoal, myVote, tally, withMyVote } = await import(
   "../app/lib/pod/goalVotes.ts"
 );
 
@@ -154,5 +154,24 @@ describe("a goal under review", () => {
     // A pod of five needs three: two down and one up is more down, but not a majority.
     const o = review([down("Grace"), up("Alan")], 5, 3);
     assert.equal(goalOf(applyVote(o, "g1", "against")).status, "voting-remove");
+  });
+});
+
+describe("the pod's goals list and the Manage badge", () => {
+  it("keeps a goal under review on the pod's goals, and leaves a new one off until it carries", () => {
+    assert.equal(isStandingGoal(goal()), true);
+    assert.equal(isStandingGoal(goal({ status: "voting-remove" })), true);
+    assert.equal(isStandingGoal(goal({ status: "voting-add" })), false);
+  });
+
+  it("counts the open votes still waiting on you, not live goals, your own votes or unsaved suggestions", () => {
+    const goals = [
+      goal({ id: "live" }),
+      goal({ id: "new", status: "voting-add", votes: [up("Grace")] }),
+      goal({ id: "review", status: "voting-remove", votes: [{ memberName: "Grace", choice: "against" }] }),
+      goal({ id: "voted", status: "voting-add", votes: [up(ME)] }),
+      goal({ id: "pending-1", status: "voting-add" }),
+    ];
+    assert.equal(awaitingMyVote(goals), 2);
   });
 });
