@@ -6,9 +6,7 @@ import type { Metadata } from "next";
 import { absoluteUrl } from "@/app/lib/seo";
 export const revalidate = 86400; // 3600 * 24
 
-// The brand leads, so a search for it matches the homepage first; the rest is what the
-// site is, in the words people search with. Under ~60 and ~155 characters so Google
-// shows them whole.
+
 const TITLE = "Remote Worldwide: Worldwide Remote Jobs and AI Job Tools";
 const DESCRIPTION =
   "Vetted remote jobs you can do from anywhere, plus AI tools to land them: tailored resumes, ATS checks, cover letters and voice mock interviews. Start free.";
