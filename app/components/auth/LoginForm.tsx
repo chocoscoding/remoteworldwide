@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { AuthLogo, GitHubIcon } from "./AuthIcons";
 import {
   AuthDivider,
+  AuthFormError,
   brutalistCard,
   brutalistCardFrame,
   brutalistFooter,
@@ -49,16 +50,25 @@ export default function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /** Why the last attempt was refused; cleared the moment either field changes. */
+  const [error, setError] = useState<string | null>(null);
 
   const handleCredentialsLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
+    // noValidate: no browser bubble over the form (owner, 2026-10-13). Whatever was typed goes to the
+    // server, and anything it refuses, a malformed email included, reads "Invalid credentials".
+    if (!email.trim() || !password) {
+      setError(signInErrorMessage(undefined));
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await signIn("credentials", { email, password, redirect: false });
       if (result?.error) {
         // `code` carries the only reason worth distinguishing — an account with no password,
         // because it signs in through Google or GitHub. See app/lib/auth/sign-in-error.
-        toast.error(signInErrorMessage(result.code));
+        setError(signInErrorMessage(result.code));
         return;
       }
       toast.success("Signed in successfully");
@@ -69,6 +79,8 @@ export default function LoginForm({
       }
       router.push(oauthCallbackUrl);
       router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -107,7 +119,7 @@ export default function LoginForm({
 
         <AuthDivider />
 
-        <form className="space-y-5" onSubmit={handleCredentialsLogin}>
+        <form className="space-y-5" noValidate onSubmit={handleCredentialsLogin} onChange={() => setError(null)}>
           <div className="space-y-2">
             <Label className="font-bold" htmlFor={`email-${idPrefix}`}>
               Email
@@ -157,6 +169,7 @@ export default function LoginForm({
               </Button>
             </div>
           </div>
+          <AuthFormError message={error} />
           <Button className="w-full rounded-md font-bold" disabled={submitting} type="submit" variant="brutalist-accent">
             {submitting ? "Signing in…" : "Sign in"}
           </Button>

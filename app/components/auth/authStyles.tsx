@@ -16,6 +16,29 @@ export const brutalistSubtitle = "text-pretty text-gray-600 text-sm";
 export const brutalistFooter =
   "flex flex-row items-center justify-center sm:justify-center rounded-b-lg border-t-2 border-black bg-primary2 px-6 py-4";
 
+/**
+ * Why a sign-in or sign-up was refused, inside the form, right above its button (owner, 2026-10-13):
+ * a toast in the corner sat under the cookie card and the extension's button, so a wrong password
+ * looked like nothing happened. Nothing renders without a message.
+ */
+export const AuthFormError = ({ message }: { message: string | null }) =>
+  message ? (
+    <p role="alert" className="rounded-md border-2 border-[#b23c26] bg-[#fdf1ee] px-3 py-2 font-semibold text-[#b23c26] text-sm">
+      {message}
+    </p>
+  ) : null;
+
+/** A field's own problem, under the field (an email that isn't complete). Nothing renders without one. */
+export const AuthFieldError = ({ id, message }: { id: string; message: string | null }) =>
+  message ? (
+    <p id={id} className="font-semibold text-[#b23c26] text-xs">
+      {message}
+    </p>
+  ) : null;
+
+/** The red edge an input takes while its AuthFieldError shows. */
+export const brutalistInputInvalid = "border-[#b23c26] focus-visible:shadow-[3px_3px_0_0_#f3c4b8]";
+
 export const AuthDivider = () => (
   <div className="relative">
     <div className="absolute inset-0 flex items-center">

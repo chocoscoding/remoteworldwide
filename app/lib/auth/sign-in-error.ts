@@ -15,7 +15,7 @@ const PROVIDER_NAMES: Record<string, string> = {
 };
 
 /** The one answer for a wrong password, an unknown address, and anything unrecognised. */
-export const WRONG_CREDENTIALS = "Wrong email or password";
+export const WRONG_CREDENTIALS = "Invalid credentials";
 
 export const signInErrorMessage = (code: string | undefined): string => {
   if (!code) return WRONG_CREDENTIALS;

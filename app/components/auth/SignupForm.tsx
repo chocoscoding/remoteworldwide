@@ -14,16 +14,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { evaluatePassword, MIN_PASSWORD_LENGTH } from "@/app/lib/auth/password-strength";
+import { emailProblem } from "@/app/lib/auth/email-check";
 import { DEFAULT_NEXT, loginWithNext } from "@/app/lib/next-url";
 import { AuthLogo, GitHubIcon, GoogleIcon } from "./AuthIcons";
 import PasswordStrength from "./PasswordStrength";
 import {
   AuthDivider,
+  AuthFieldError,
+  AuthFormError,
   brutalistCard,
   brutalistCardFrame,
   brutalistCheckbox,
   brutalistFooter,
   brutalistInput,
+  brutalistInputInvalid,
   brutalistLink,
   brutalistLogoTile,
   brutalistSubtitle,
@@ -64,6 +68,12 @@ export default function SignupForm({
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** Why the last attempt was refused, shown above the button; cleared when a field changes. */
+  const [error, setError] = useState<string | null>(null);
+  // The email's problem shows on submit and goes the moment they type in it again (owner, 2026-10-13):
+  // they already know, so it waits for the next submit rather than staying stuck under the field.
+  const [emailChecked, setEmailChecked] = useState(false);
+  const emailHint = emailChecked ? emailProblem(email) : null;
 
   const strength = evaluatePassword(password);
   const mismatch = confirmPassword.length > 0 && confirmPassword !== password;
@@ -84,19 +94,29 @@ export default function SignupForm({
     event.preventDefault();
     // Checked here as well as on the button: the form can still be submitted
     // by pressing Enter in a field, which bypasses a disabled button.
+    // The form is noValidate (the browser's email bubble talks over ours), so the names are asked for here.
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("Enter your first and last name");
+      return;
+    }
+    if (emailProblem(email)) {
+      setEmailChecked(true);
+      return;
+    }
     if (!strength.meetsRequirements) {
       setPasswordTouched(true);
-      toast.error("Your password doesn't meet the requirements yet");
+      setError("Your password doesn't meet the requirements yet");
       return;
     }
     if (password !== confirmPassword) {
-      toast.error("Those passwords don't match");
+      setError("Those passwords don't match");
       return;
     }
     if (!agreed) {
-      toast.error("Please accept the Terms and Conditions and the Privacy Policy");
+      setError("Please accept the Terms and Conditions and the Privacy Policy");
       return;
     }
+    setError(null);
     setSubmitting(true);
     try {
       // Registration is a plain backend endpoint (proxied, no session issued);
@@ -109,17 +129,17 @@ export default function SignupForm({
           body: JSON.stringify({ firstName, lastName, email, password }),
         });
       } catch {
-        toast.error("Couldn't reach the server. Check your connection and try again.");
+        setError("Couldn't reach the server. Check your connection and try again.");
         return;
       }
       // Over the sign-up limit the answer is plain text, not the JSON envelope.
       if (response.status === 429) {
-        toast.error("Too many sign-ups from here just now. Try again in a few minutes.");
+        setError("Too many sign-ups from here just now. Try again in a few minutes.");
         return;
       }
       const payload = (await response.json().catch(() => null)) as { message?: string } | null;
       if (!response.ok) {
-        toast.error(payload?.message ?? "Could not create your account");
+        setError(payload?.message ?? "Could not create your account");
         return;
       }
 
@@ -179,7 +199,7 @@ export default function SignupForm({
 
         <AuthDivider />
 
-        <form className="space-y-5" onSubmit={handleSignup}>
+        <form className="space-y-5" noValidate onSubmit={handleSignup} onChange={() => setError(null)}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="font-bold" htmlFor={`firstName-${idPrefix}`}>
@@ -214,15 +234,21 @@ export default function SignupForm({
               Email address
             </Label>
             <Input
+              aria-describedby={emailHint ? `email-${idPrefix}-hint` : undefined}
+              aria-invalid={emailHint ? true : undefined}
               autoComplete="email"
-              className={brutalistInput}
+              className={cn(brutalistInput, emailHint && brutalistInputInvalid)}
               id={`email-${idPrefix}`}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setEmailChecked(false);
+              }}
               placeholder="you@example.com"
               required
               type="email"
               value={email}
             />
+            <AuthFieldError id={`email-${idPrefix}-hint`} message={emailHint} />
           </div>
 
           <div className="space-y-2">
@@ -313,6 +339,7 @@ export default function SignupForm({
             </label>
           </div>
 
+          <AuthFormError message={error} />
           <Button
             className="w-full rounded-md disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!canSubmit}
