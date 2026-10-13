@@ -14,7 +14,7 @@ import { absoluteUrl, SITE_NAME, SITE_URL } from "./lib/seo";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import Downtime from "./components/Downtime";
-import CookieConsent from "./components/consent/CookieConsent";
+// import CookieConsent from "./components/consent/CookieConsent";
 import ConsentScripts from "./components/consent/ConsentScripts";
 
 const font = Manrope({
@@ -117,7 +117,7 @@ export default function RootLayout({
               the whole app. */}
           <QueryProvider>{children}</QueryProvider>
         </SessionProvider>
-        <CookieConsent />
+        {/* <CookieConsent /> */}
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 "use client";
 
-// The cookie choice: a compact card bottom-left until someone decides, and a small settings dialog
+// The cookie choice: a small cookie button on the right until someone decides (owner, 2026-10-13: the
+// open card on every page was too much), which opens the compact card; and a small settings dialog
 // that the card's "Settings" and the footer's "Cookie settings" both open.
 //
 // Two kinds of cookie, and only one needs asking about: strictly necessary ones (signing in, form
@@ -10,14 +11,14 @@
 //
 // Nothing renders until the browser's choice is known (the server never knows it), so someone who
 // already decided never sees the card flash. Never on /print/*: those pages are paper.
-// z-40: above the page and its back-to-top button, below every dialog (z-50). Bottom-left, so the
-// extension's floating button (bottom-right) stays clear on a desktop; on a phone the card spans
-// the width, and "Settings" sits beside Reject rather than in the corner.
+// z-40: above the page and its back-to-top button, below every dialog (z-50). Right side, raised off
+// the corner so the extension's floating button (bottom-right) stays clear; the card opens above
+// the button, and on a phone it spans the width.
 
-import { useEffect, useId, useState, type FC } from "react";
+import { useEffect, useId, useRef, useState, type FC } from "react";
 import { usePathname } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUpRight, X } from "lucide-react";
+import { ArrowUpRight, Cookie, X } from "lucide-react";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { Toggle } from "@/app/components/dashboard/settings/settings-ui";
 import { onOpenConsentSettings, saveConsent, useConsent } from "@/app/lib/consent/consent";
@@ -28,6 +29,9 @@ const CookieConsent: FC = () => {
   const pathname = usePathname() ?? "";
   const consent = useConsent();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** The card, opened from the cookie button. Starts closed on every page. */
+  const [cardOpen, setCardOpen] = useState(false);
+  const iconRef = useRef<HTMLButtonElement>(null);
   /** The settings dialog's switch, saved only on Save. */
   const [analytics, setAnalytics] = useState(false);
   const titleId = useId();
@@ -41,6 +45,18 @@ const CookieConsent: FC = () => {
       }),
     [current],
   );
+
+  // Escape folds the card back into the button, as a popover should.
+  useEffect(() => {
+    if (!cardOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || settingsOpen) return;
+      setCardOpen(false);
+      iconRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cardOpen, settingsOpen]);
 
   if (pathname.startsWith("/print/")) return null;
 
@@ -61,40 +77,63 @@ const CookieConsent: FC = () => {
   return (
     <>
       {showCard && (
-        <section
-          role="region"
-          aria-labelledby={titleId}
-          className="fixed bottom-4 left-4 right-4 z-40 rounded-xl border-[1.5px] bg-white p-4 text-[#222325] br-shadow sm:left-auto sm:w-[360px]">
-          <h2 id={titleId} className="sr-only">
-            Cookies
-          </h2>
-          <p className="text-[13px] leading-relaxed">
-            We use analytics cookies to improve the site.{" "}
-            <a
-              href={PRIVACY_HREF}
-              target="_blank"
-              rel="noopener"
-              className="inline-flex items-center gap-0.5 whitespace-nowrap font-bold underline decoration-black/30 underline-offset-2 hover:decoration-[#222325]">
-              Privacy
-              <ArrowUpRight className="h-3 w-3" aria-hidden />
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <StickerButton variant="primary" size="sm" onClick={() => save(true)}>
-              Accept
-            </StickerButton>
-            <StickerButton variant="outline" size="sm" onClick={() => save(false)}>
-              Reject
-            </StickerButton>
-            <button
-              type="button"
-              onClick={openSettings}
-              className="cursor-pointer rounded px-1 text-xs font-semibold sm:ml-auto text-black/60 underline decoration-black/25 underline-offset-2 hover:text-[#222325] hover:decoration-[#222325] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073]">
-              Settings
-            </button>
-          </div>
-        </section>
+        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-2">
+          {cardOpen && (
+            <section
+              role="region"
+              aria-labelledby={titleId}
+              className="w-[calc(100vw-2rem)] rounded-xl border-[1.5px] bg-white p-4 text-[#222325] br-shadow sm:w-[340px]">
+              <div className="flex items-start justify-between gap-3">
+                <h2 id={titleId} className="text-[13px] font-bold">
+                  Cookies
+                </h2>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setCardOpen(false)}
+                  className="-mr-1 -mt-1 grid h-6 w-6 flex-none cursor-pointer place-content-center rounded-md text-black/45 transition-colors hover:bg-black/5 hover:text-[#222325]">
+                  <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </button>
+              </div>
+              <p className="mt-1 text-[13px] leading-relaxed">
+                We use analytics cookies to improve the site.{" "}
+                <a
+                  href={PRIVACY_HREF}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex items-center gap-0.5 whitespace-nowrap font-bold underline decoration-black/30 underline-offset-2 hover:decoration-[#222325]">
+                  Privacy
+                  <ArrowUpRight className="h-3 w-3" aria-hidden />
+                  <span className="sr-only">(opens in a new tab)</span>
+                </a>
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <StickerButton variant="primary" size="sm" onClick={() => save(true)}>
+                  Accept
+                </StickerButton>
+                <StickerButton variant="outline" size="sm" onClick={() => save(false)}>
+                  Reject
+                </StickerButton>
+                <button
+                  type="button"
+                  onClick={openSettings}
+                  className="cursor-pointer rounded px-1 text-xs font-semibold sm:ml-auto text-black/60 underline decoration-black/25 underline-offset-2 hover:text-[#222325] hover:decoration-[#222325] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e1f073]">
+                  Settings
+                </button>
+              </div>
+            </section>
+          )}
+          <button
+            ref={iconRef}
+            type="button"
+            aria-label="Cookie choices"
+            aria-expanded={cardOpen}
+            title="Cookies"
+            onClick={() => setCardOpen((open) => !open)}
+            className="grid h-11 w-11 cursor-pointer place-content-center rounded-full bg-white text-[#222325] br-plain-press">
+            <Cookie className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
       )}
 
       <DialogPrimitive.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
