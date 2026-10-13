@@ -196,11 +196,11 @@ const PodClient: FC = () => {
             <div className="hidden items-center sm:flex">
               {stacked.map((member, i) => (
                 <span key={member.userId} title={member.name} className={cn("rounded-full border-2 border-white", i > 0 && "-ml-2")}>
-                  <PodAvatar name={member.name} image={member.image} size={28} />
+                  <PodAvatar name={member.name} image={member.image} size={25} />
                 </span>
               ))}
               {moreFaces > 0 && (
-                <span className="-ml-2 grid h-8 w-8 place-content-center rounded-full border-2 border-white bg-[#f0f0ea] text-[11px] font-extrabold">
+                <span className="-ml-2 grid h-[29px] w-[29px] place-content-center rounded-full border-2 border-white bg-[#f0f0ea] text-[10px] font-extrabold">
                   +{moreFaces}
                 </span>
               )}
@@ -220,8 +220,8 @@ const PodClient: FC = () => {
               onClick={logToday}
               disabled={busy}
               title={loggedToday ? "Show the pod what you did today" : "Log an application. The pod sees it on its own"}
-              className="flex h-10 cursor-pointer items-center gap-2 rounded-[9px] bg-[#e1f073] px-4 text-[13px] font-extrabold br-shadow-press disabled:opacity-50">
-              <Flame className="h-[15px] w-[15px]" strokeWidth={2.2} />
+              className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-[#e1f073] px-3 text-xs font-extrabold br-shadow-press disabled:opacity-50">
+              <Flame className="h-3.5 w-3.5" strokeWidth={2.2} />
               Log today
             </button>
 
@@ -230,8 +230,8 @@ const PodClient: FC = () => {
                 <button
                   type="button"
                   aria-label="Pod options"
-                  className="grid h-10 w-10 cursor-pointer place-content-center rounded-full border-[1.5px] border-[#222325] bg-[#f0f0ea] transition-colors hover:bg-[#e6e6de]">
-                  <Ellipsis className="h-[17px] w-[17px]" />
+                  className="grid h-7 w-7 cursor-pointer place-content-center rounded-full border-[1.5px] border-[#222325] bg-[#f0f0ea] transition-colors hover:bg-[#e6e6de]">
+                  <Ellipsis className="h-3 w-3" />
                 </button>
               </PopoverTrigger>
               <PopoverContent align="end" sideOffset={8} className="flex w-[220px] flex-col rounded-xl bg-white p-1.5 br-shadow">
@@ -344,7 +344,6 @@ const PodClient: FC = () => {
                             <span className="flex min-w-0 items-center gap-2 text-[13px] font-bold">
                               <span className="truncate">{goal.label}</span>
                               {goal.protected && <Lock aria-label="Default goal, can't be removed" className="h-3 w-3 flex-none text-[#5f6062]" strokeWidth={2.2} />}
-                              {goal.status === "voting-remove" && <span className="flex-none text-xs font-semibold text-[#b23c26]">in review</span>}
                               {meta.href && meta.linkLabel && (
                                 <Link href={meta.href} className="flex-none text-xs font-semibold text-[#5f6062] underline underline-offset-2 hover:text-[#222325]">
                                   {meta.linkLabel}
