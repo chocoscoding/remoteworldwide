@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ArrowDown, ArrowUp, CircleHelp, Lock, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePod } from "./PodProvider";
+import { useLivePod } from "./LivePodProvider";
 import PodAvatar from "./PodAvatar";
 import { GOAL_KIND_META } from "./pod-goal-meta";
 import { isPendingGoal, isStandingGoal, myVote, tally } from "@/app/lib/pod/goalVotes";
@@ -90,6 +91,10 @@ const VoteDots: FC<{ cast: number; of: number }> = ({ cast, of }) => (
 
 const ManageGoalsDialog: FC<ManageGoalsDialogProps> = ({ onClose, onSuggest, focusGoalId = null }) => {
   const { goals, castVote, suggestRemoval, voteMajority, memberCount } = usePod();
+  // A proposer's photo, by the name the server gave them on the goal, which is the name their member
+  // row carries too ("You" for you). Someone who has left, or hides their profile, keeps initials.
+  const { members } = useLivePod();
+  const photoOf = (name: string) => members.find((member) => member.name === name)?.image ?? null;
   // Read once on mount — feeds the 7-day voting-window math without calling
   // the impure Date.now() from render.
   const [now] = useState(() => Date.now());
@@ -177,7 +182,7 @@ const ManageGoalsDialog: FC<ManageGoalsDialogProps> = ({ onClose, onSuggest, foc
                         className={cn("flex flex-col gap-2.5 rounded-xl border-[1.5px] border-[#222325] bg-[#f4f9c9] px-3.5 py-3 transition-shadow", ring(goal.id))}>
                         <div className="flex items-center gap-2.5">
                           <span title={proposer}>
-                            <PodAvatar name={proposer} size={28} />
+                            <PodAvatar name={proposer} image={photoOf(proposer)} size={28} />
                           </span>
                           <span className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate text-sm font-extrabold">{goal.label}</span>
