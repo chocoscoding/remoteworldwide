@@ -16,6 +16,8 @@ import type { WinRecord } from "@/app/lib/dashboard/win";
 /** One row of "What's moving" — the pod's shared feed. */
 export interface PodMovingItem {
   id: string;
+  /** Who posted it, as the pod sees them ("You" for your own). Absent from a server before 2026-10-13. */
+  author?: { name: string; image: string | null };
   text: string;
   time: string;
   /** Fire-reaction count. The fire is the only reaction — one tap, one dopamine hit. */

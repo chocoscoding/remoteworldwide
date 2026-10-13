@@ -4,20 +4,35 @@
 //
 // It shows what a real pod actually has: panels that would be empty for a new
 // pod say so rather than being filled with plausible numbers.
+//
+// Laid out after the owner's 2026-10-13 mockup ("pods new"): one header with the pod's chip, its
+// faces and the one action (Log today), everything else behind "⋯"; a dark strip for today; then
+// Goals and What's moving beside This week, as compact hairline rows.
 
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowUpRight, Bell, BellOff, Flame, LogOut, Send, Settings2, Trophy, UserPlus, UsersRound } from "lucide-react";
+import {
+  ArrowUp,
+  Bell,
+  BellOff,
+  CircleAlert,
+  Copy,
+  Ellipsis,
+  Flame,
+  Lock,
+  LogOut,
+  Plus,
+  SlidersHorizontal,
+  Trophy,
+  UsersRound,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
-import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
-import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
-import Pill from "@/app/components/dashboard/ui/Pill";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import SuggestGoalDialog, { type SuggestedGoalInput } from "@/app/components/dashboard/modals/SuggestGoalDialog";
 import ShareWinModal from "@/app/components/dashboard/modals/ShareWinModal";
 import ManageGoalsDialog from "@/app/components/dashboard/pod/ManageGoalsDialog";
@@ -25,31 +40,22 @@ import InvitePodDialog from "@/app/components/dashboard/pod/InvitePodDialog";
 import JoinPodDialog from "@/app/components/dashboard/pod/JoinPodDialog";
 import CreatePodDialog from "@/app/components/dashboard/pod/CreatePodDialog";
 import LeavePodDialog from "@/app/components/dashboard/pod/LeavePodDialog";
+import AboutPodDialog from "@/app/components/dashboard/pod/AboutPodDialog";
+import PodAvatar from "@/app/components/dashboard/pod/PodAvatar";
 import PodEmptyState from "@/app/components/dashboard/pod/PodEmptyState";
 import { useLivePod } from "@/app/components/dashboard/pod/LivePodProvider";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { GOAL_KIND_META } from "@/app/components/dashboard/pod/pod-goal-meta";
 import { JOIN_PARAM, JOIN_REFUSAL } from "@/app/lib/dashboard/pod-invite";
-import { GOAL_LINK_PARAM } from "@/app/lib/pod/goalVotes";
-import type { PodMember } from "@/app/lib/pod/types";
+import { awaitingMyVote, GOAL_LINK_PARAM, isStandingGoal } from "@/app/lib/pod/goalVotes";
 
-const initialsOf = (name: string) =>
-  name === "You"
-    ? "ME"
-    : name
-        .split(" ")
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
+/** Faces shown in the header before the rest fold into "+N". */
+const STACK_LIMIT = 5;
 
-const Face: FC<{ member: PodMember }> = ({ member }) =>
-  member.image ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={member.image} alt="" className="h-full w-full object-cover" />
-  ) : (
-    <>{initialsOf(member.name)}</>
-  );
+const CARD = "overflow-hidden rounded-[14px] border border-black/15 bg-white";
+const ROW = "flex min-h-[52px] items-center gap-3 border-t border-black/10 px-4 py-2";
+const MENU_ITEM =
+  "flex h-[38px] w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] font-bold text-[#222325] transition-colors hover:bg-[#f0f0ea] disabled:cursor-default disabled:opacity-50";
 
 const PodClient: FC = () => {
   const {
@@ -62,13 +68,11 @@ const PodClient: FC = () => {
     busy,
     matching,
     muted,
-    isOwner,
     joinByMatching,
     joinWithCode,
     shareToPod,
     toggleFire,
     toggleMute,
-    renamePod,
     suggestGoal,
     logDay,
   } = useLivePod();
@@ -83,16 +87,18 @@ const PodClient: FC = () => {
   const [joinOpen, setJoinOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [shareWinOpen, setShareWinOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  /** Null unless the owner is editing the name; holds the in-progress text. */
-  const [nameDraft, setNameDraft] = useState<string | null>(null);
 
   const pod = overview.pod;
-  const activeGoals = useMemo(() => goals.filter((g) => g.status === "active"), [goals]);
-  const votingCount = goals.length - activeGoals.length;
+  // A goal under review is still the pod's (owner, 2026-10-13): it stays here until the review carries.
+  const activeGoals = useMemo(() => goals.filter(isStandingGoal), [goals]);
+  /** Open votes you haven't cast: the badge on Manage. */
+  const awaiting = useMemo(() => awaitingMyVote(goals), [goals]);
 
   /**
    * An invite link lands here as `?join=<code>`. Consumed once and stripped, so
@@ -142,102 +148,125 @@ const PodClient: FC = () => {
     setSuggestOpen(false);
   }
 
-  /** Commits a rename, or quietly abandons it when nothing changed. */
-  function commitName() {
-    const next = nameDraft?.trim();
-    setNameDraft(null);
-    if (next && next !== pod?.name) renamePod(next);
+  /** The board moves from what was really done: with something logged today this syncs it to the pod; with nothing yet it opens the log. */
+  function logToday() {
+    if (loggedToday) logDay(1);
+    else openLog();
   }
 
+  async function copyCode() {
+    if (!pod) return;
+    try {
+      await navigator.clipboard.writeText(pod.inviteCode);
+      toast.success("Invite code copied", { description: "Anyone with it can join while there's a seat." });
+    } catch {
+      setInviteOpen(true);
+    }
+  }
+
+  /** Picks a menu item: the menu closes first, so the dialog it opens takes the focus. */
+  const fromMenu = (action: () => void) => () => {
+    setMenuOpen(false);
+    action();
+  };
+
+  const stacked = members.slice(0, STACK_LIMIT);
+  const moreFaces = members.length - stacked.length;
+
   return (
-    <div className="min-h-screen bg-[#f6f6f6]">
-      {/* Wraps on a phone: the title row, then the actions under it, so nothing is pushed off
-          screen. From md up it is the one 64px bar every dashboard screen has. */}
-      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-black/10 bg-white/85 px-4 py-3 backdrop-blur-sm md:h-16 md:flex-nowrap md:px-8 md:py-0">
-        <div className="flex min-w-0 items-center gap-3">
-          <h1 className="whitespace-nowrap text-[17px] font-bold text-primary">Your pod</h1>
-          {/* The pod's own name, where the matching blurb used to be. `criteria` still explains how
-              you got here, but it belongs in Pod settings — this is the pod's identity. */}
-          {pod &&
-            (nameDraft !== null ? (
-              <input
-                autoFocus
-                value={nameDraft}
-                maxLength={40}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={commitName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitName();
-                  if (e.key === "Escape") setNameDraft(null);
-                }}
-                aria-label="Pod name"
-                className="min-w-0 max-w-[220px] rounded-md border-[1.5px] border-[#222325] bg-white px-2 py-0.5 text-sm font-semibold text-primary outline-none"
-              />
-            ) : isOwner ? (
+    <div className="min-h-screen bg-[#f6f6f6] text-[13px] text-[#222325]">
+      <header className="sticky top-0 z-10 flex min-h-16 flex-wrap items-center gap-3 border-b border-black/10 bg-white/90 px-4 py-2.5 backdrop-blur-sm md:px-8">
+        <h1 className="whitespace-nowrap text-[17px] font-extrabold">Your pod</h1>
+        {pod && (
+          <button
+            type="button"
+            onClick={copyCode}
+            aria-label={`Copy the invite code for ${pod.name}`}
+            title="Copy the invite code"
+            className="flex h-7 max-w-[180px] cursor-pointer items-center gap-1.5 rounded-full bg-[#f0f0ea] px-2.5 text-xs font-bold text-[#44453f] transition-colors hover:bg-[#e6e6de]">
+            <span className="truncate">{pod.name}</span>
+            <Copy className="h-3 w-3 flex-none" />
+          </button>
+        )}
+        <div className="flex-1" />
+
+        {/* Every action here acts on a pod, so out of one the bar holds only the bell. */}
+        {inPod && pod && (
+          <>
+            <div className="hidden items-center sm:flex">
+              {stacked.map((member, i) => (
+                <span key={member.userId} title={member.name} className={cn("rounded-full border-2 border-white", i > 0 && "-ml-2")}>
+                  <PodAvatar name={member.name} image={member.image} size={28} />
+                </span>
+              ))}
+              {moreFaces > 0 && (
+                <span className="-ml-2 grid h-8 w-8 place-content-center rounded-full border-2 border-white bg-[#f0f0ea] text-[11px] font-extrabold">
+                  +{moreFaces}
+                </span>
+              )}
               <button
                 type="button"
-                onClick={() => setNameDraft(pod.name)}
-                title="Rename this pod"
-                className="truncate rounded-md px-1.5 py-0.5 text-sm font-semibold text-black/55 transition-colors hover:bg-[#f0f0ea] hover:text-primary cursor-pointer">
-                {pod.name}
-              </button>
-            ) : (
-              <span className="truncate text-sm font-semibold text-black/45">{pod.name}</span>
-            ))}
-        </div>
-        {/* Every action here acts on a pod, so out of one the bar holds only
-            the bell rather than offering things that would have nowhere to land. */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:flex-none md:flex-nowrap">
-          {inPod && (
-            <>
-              {/* Below sm, Invite and Mute are icons with their names for screen readers. */}
-              <StickerButton
-                variant="outline"
-                size="md"
                 onClick={() => setInviteOpen(true)}
                 disabled={seatsLeft === 0}
-                aria-label="Invite"
+                aria-label="Invite to pod"
                 title={seatsLeft === 0 ? "This pod is full" : `${seatsLeft} ${seatsLeft === 1 ? "seat" : "seats"} left`}
-                className="px-2.5 sm:px-4">
-                <UserPlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Invite</span>
-              </StickerButton>
-              <StickerButton
-                variant="outline"
-                size="md"
-                onClick={toggleMute}
-                disabled={busy}
-                aria-label="Mute"
-                aria-pressed={muted}
-                title={muted ? "You'll still hear about your own membership" : "Silence this pod's activity"}
-                className="px-2.5 sm:px-4">
-                {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-                <span className="hidden sm:inline">{muted ? "Muted" : "Mute"}</span>
-              </StickerButton>
-              {/* An interview or offer off the tracker, to this pod and beyond. */}
-              <StickerButton variant="outline" size="md" onClick={() => setShareWinOpen(true)}>
-                <Trophy className="h-4 w-4" />
-                Share a win
-              </StickerButton>
-              {/* The board moves from what was really done ("no artifact, no
-                  day"): with something logged today this syncs it to the pod;
-                  with nothing yet it opens the log, which is the real action. */}
-              <StickerButton
-                variant="primary"
-                size="md"
-                onClick={() => (loggedToday ? logDay(1) : openLog())}
-                disabled={busy}
-                title={loggedToday ? "Show the pod what you did today" : "Log an application. The pod sees it on its own"}>
-                <Flame className="h-4 w-4" />
-                Log today
-              </StickerButton>
-            </>
-          )}
-          <NotificationBell />
-        </div>
+                className="-ml-2 grid h-8 w-8 cursor-pointer place-content-center rounded-full border-[1.5px] border-dashed border-[#222325] bg-white transition-colors hover:bg-[#f4f9c9] disabled:cursor-default disabled:opacity-40">
+                <Plus className="h-3.5 w-3.5" strokeWidth={2.4} />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={logToday}
+              disabled={busy}
+              title={loggedToday ? "Show the pod what you did today" : "Log an application. The pod sees it on its own"}
+              className="flex h-10 cursor-pointer items-center gap-2 rounded-[9px] bg-[#e1f073] px-4 text-[13px] font-extrabold br-shadow-press disabled:opacity-50">
+              <Flame className="h-[15px] w-[15px]" strokeWidth={2.2} />
+              Log today
+            </button>
+
+            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Pod options"
+                  className="grid h-10 w-10 cursor-pointer place-content-center rounded-full border-[1.5px] border-[#222325] bg-[#f0f0ea] transition-colors hover:bg-[#e6e6de]">
+                  <Ellipsis className="h-[17px] w-[17px]" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={8} className="flex w-[220px] flex-col rounded-xl bg-white p-1.5 br-shadow">
+                {/* Invite lives in the faces above from sm up; on a phone it is here. */}
+                <button type="button" onClick={fromMenu(() => setInviteOpen(true))} disabled={seatsLeft === 0} className={cn(MENU_ITEM, "sm:hidden")}>
+                  <Plus className="h-[15px] w-[15px]" />
+                  Invite
+                </button>
+                <button type="button" onClick={fromMenu(() => setSuggestOpen(true))} className={MENU_ITEM}>
+                  <Plus className="h-[15px] w-[15px]" />
+                  Suggest a goal
+                </button>
+                <button type="button" onClick={fromMenu(toggleMute)} disabled={busy} aria-pressed={muted} className={MENU_ITEM}>
+                  {muted ? <Bell className="h-[15px] w-[15px]" /> : <BellOff className="h-[15px] w-[15px]" />}
+                  {muted ? "Unmute pod" : "Mute pod"}
+                </button>
+                <button type="button" onClick={fromMenu(() => setAboutOpen(true))} className={MENU_ITEM}>
+                  <CircleAlert className="h-[15px] w-[15px]" />
+                  About this pod
+                </button>
+                <div className="mx-1.5 my-1 h-px bg-black/15" />
+                {/* Never the plain action: for the last member out this deletes the pod, and the
+                    dialog is where that gets said before it happens. */}
+                <button type="button" onClick={fromMenu(() => setLeaveOpen(true))} disabled={busy} className={cn(MENU_ITEM, "text-[#b23c26] hover:bg-[#fdf3f1]")}>
+                  <LogOut className="h-[15px] w-[15px]" />
+                  {pod.soleMember ? "Delete pod" : "Leave pod"}
+                </button>
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
+        <NotificationBell />
       </header>
 
-      <main className="mx-auto max-w-[1180px] px-4 py-7 pb-14 md:px-8">
+      <main className="mx-auto flex max-w-[1120px] flex-col gap-4 px-4 pb-12 pt-6 md:px-8">
         {!inPod || !pod ? (
           <PodEmptyState
             capacity={capacity}
@@ -247,212 +276,206 @@ const PodClient: FC = () => {
             onJoinWithCode={() => setJoinOpen(true)}
           />
         ) : (
-          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_360px]">
-            <div className="flex min-w-0 flex-col gap-5">
-              <DashCard className="bg-[#222325] p-6 text-white">
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-white/45">{pod.weekLabel}</p>
-                    <p className="mt-1 text-2xl font-bold">
-                      {pod.memberCount} {pod.memberCount === 1 ? "person" : "people"}, one week
-                    </p>
-                    <p className="mt-1 text-sm text-white/55">
-                      {pod.loggedTodayCount} of {pod.memberCount} logged today · quorum is {pod.quorum}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[32px] font-extrabold leading-none tabular-nums">{pod.streakDays}</p>
-                    <p className="text-xs text-white/55">day pod streak</p>
-                  </div>
+          <>
+            {/* Today, at a glance: who has logged, what keeps the streak, and the streak. */}
+            <section aria-label="Today" className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[14px] bg-[#222325] px-5 py-3.5 text-white">
+              <span className="flex-none rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-[0.06em]">{pod.weekLabel}</span>
+              <div className="flex min-w-0 flex-[999_1_280px] items-center gap-3">
+                <div role="img" aria-label={`${pod.loggedTodayCount} of ${pod.memberCount} logged today`} className="flex gap-1">
+                  {Array.from({ length: pod.memberCount }, (_, i) => (
+                    <span key={i} className={cn("h-2 w-[22px] rounded", i < pod.loggedTodayCount ? "bg-[#e1f073]" : "bg-white/20")} />
+                  ))}
                 </div>
-              </DashCard>
+                <span className="text-sm font-bold">
+                  {pod.loggedTodayCount} of {pod.memberCount} logged today{" "}
+                  <span className="font-medium text-white/75">· {pod.quorum} keep the streak</span>
+                </span>
+              </div>
+              <span className="flex flex-none items-center gap-1.5 text-sm font-extrabold">
+                <Flame className="h-4 w-4 text-[#e1f073]" strokeWidth={2.2} />
+                {pod.streakDays}-day streak
+              </span>
+            </section>
 
-              <DashCard className="p-6">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[15px] font-bold text-primary">Pod goals</p>
-                    <p className="text-xs text-black/60">
-                      Application goals reset each day. The others stay until the pod finishes them.
-                    </p>
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="flex min-w-0 flex-col gap-4">
+                <section aria-label="Pod goals" className={CARD}>
+                  <div className="flex items-center gap-2.5 py-3 pl-4 pr-3">
+                    <h2 className="flex-1 text-sm font-extrabold">Goals</h2>
+                    <button
+                      type="button"
+                      onClick={() => setManageOpen(true)}
+                      aria-label={awaiting > 0 ? `Manage goals, ${awaiting} ${awaiting === 1 ? "vote" : "votes"} waiting on you` : "Manage goals"}
+                      className="flex h-[34px] cursor-pointer items-center gap-2 rounded-[9px] bg-white pl-3 pr-2 text-[13px] font-extrabold br-shadow-press br-lime">
+                      <SlidersHorizontal className="h-[15px] w-[15px]" />
+                      Manage
+                      {awaiting > 0 ? (
+                        <span className="grid h-5 min-w-5 place-content-center rounded-full bg-[#b23c26] px-1.5 text-[11px] font-extrabold tabular-nums text-white">
+                          {awaiting}
+                        </span>
+                      ) : (
+                        <span className="w-1" />
+                      )}
+                    </button>
                   </div>
-                  <StickerButton variant="outline" size="sm" onClick={() => setManageOpen(true)}>
-                    <Settings2 className="h-3.5 w-3.5" />
-                    Manage{votingCount > 0 ? ` (${votingCount})` : ""}
-                  </StickerButton>
-                </div>
 
-                {activeGoals.length === 0 ? (
-                  <DashEmptyState
-                    bare
-                    icon={Trophy}
-                    title="No goals yet"
-                    body="Suggest one and the pod votes on it. A majority makes it live."
-                    ctaLabel="Suggest a goal"
-                    onCta={() => setSuggestOpen(true)}
-                  />
-                ) : (
-                  <div className="flex flex-col gap-2.5">
-                    {activeGoals.map((goal) => {
+                  {activeGoals.length === 0 ? (
+                    <div className="border-t border-black/10 px-4 py-2">
+                      <DashEmptyState
+                        bare
+                        icon={Trophy}
+                        title="No goals yet"
+                        body="Suggest one and the pod votes on it. A majority makes it live."
+                        ctaLabel="Suggest a goal"
+                        onCta={() => setSuggestOpen(true)}
+                      />
+                    </div>
+                  ) : (
+                    activeGoals.map((goal) => {
                       const meta = GOAL_KIND_META[goal.kind];
                       const Icon = meta.icon;
                       const pct = goal.target > 0 ? Math.min(100, Math.round((goal.current / goal.target) * 100)) : 0;
                       return (
-                        <div key={goal.id} data-goal={goal.id} className="rounded-lg border border-black/10 bg-[#fbfbf7] p-3.5">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex min-w-0 items-start gap-2.5">
-                              <span className="mt-0.5 grid h-7 w-7 flex-none place-content-center rounded-full bg-[#e1f073]">
-                                <Icon className="h-3.5 w-3.5 text-[#222325]" />
-                              </span>
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-primary">{goal.label}</p>
-                                {goal.detail && <p className="mt-0.5 text-xs text-black/50">{goal.detail}</p>}
-                              </div>
-                            </div>
-                            <span className="flex-none text-xs font-semibold tabular-nums text-black/55">
-                              {goal.current}/{goal.target}
+                        <div key={goal.id} data-goal={goal.id} className={ROW}>
+                          <span className={cn("grid h-[30px] w-[30px] flex-none place-content-center rounded-lg", goal.protected ? "bg-[#f0f0ea]" : "bg-[#e1f073]")}>
+                            <Icon className="h-[15px] w-[15px]" />
+                          </span>
+                          <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                            <span className="flex min-w-0 items-center gap-2 text-[13px] font-bold">
+                              <span className="truncate">{goal.label}</span>
+                              {goal.protected && <Lock aria-label="Default goal, can't be removed" className="h-3 w-3 flex-none text-[#5f6062]" strokeWidth={2.2} />}
+                              {goal.status === "voting-remove" && <span className="flex-none text-xs font-semibold text-[#b23c26]">in review</span>}
+                              {meta.href && meta.linkLabel && (
+                                <Link href={meta.href} className="flex-none text-xs font-semibold text-[#5f6062] underline underline-offset-2 hover:text-[#222325]">
+                                  {meta.linkLabel}
+                                </Link>
+                              )}
                             </span>
-                          </div>
-                          <div className="mt-2.5">
-                            <ProgressBar value={pct} fillColor="#cddd54" height="h-1.5" />
-                          </div>
-                          {meta.href && (
-                            <Link href={meta.href} className="mt-2.5 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">
-                              {meta.actionLabel}
-                              <ArrowUpRight className="h-3 w-3" />
-                            </Link>
-                          )}
+                            <span role="img" aria-label={`${goal.current} of ${goal.target}`} className="h-1.5 rounded-[3px] bg-[#ecece6]">
+                              <span className="block h-1.5 rounded-[3px] bg-[#cddd54]" style={{ width: `${pct}%` }} />
+                            </span>
+                          </span>
+                          <span className="w-10 flex-none text-right text-[13px] font-extrabold tabular-nums">
+                            {goal.current}
+                            <span className="font-semibold text-[#9a9b95]">/{goal.target}</span>
+                          </span>
                         </div>
                       );
-                    })}
+                    })
+                  )}
+                </section>
+
+                <section aria-label="What's moving" className={CARD}>
+                  <div className="m-3 flex items-center gap-2 rounded-[10px] border border-black/30 bg-[#fbfbf7] py-1 pl-3 pr-1 focus-within:border-[#222325]">
+                    <input
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && share()}
+                      placeholder="Tell the pod what moved today…"
+                      aria-label="Share an update with your pod"
+                      className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
+                    />
+                    {/* An interview or offer off the tracker, to this pod and beyond. */}
+                    <button
+                      type="button"
+                      onClick={() => setShareWinOpen(true)}
+                      aria-label="Share a win"
+                      title="Share a win from your tracker"
+                      className="grid h-9 w-9 flex-none cursor-pointer place-content-center rounded-lg transition-colors hover:bg-[#f0f0ea]">
+                      <Trophy className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={share}
+                      disabled={busy || !draft.trim()}
+                      aria-label="Post"
+                      className="grid h-9 w-9 flex-none cursor-pointer place-content-center rounded-lg bg-[#222325] text-white transition-opacity disabled:cursor-default disabled:opacity-40">
+                      <ArrowUp className="h-4 w-4" strokeWidth={2.4} />
+                    </button>
                   </div>
-                )}
-              </DashCard>
 
-              <DashCard className="p-6">
-                <p className="mb-1 text-[15px] font-bold text-primary">What&apos;s moving</p>
-                <p className="mb-4 text-xs text-black/60">Live updates from your pod.</p>
-
-                <div className="mb-4 flex gap-2">
-                  <input
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && share()}
-                    placeholder="Sent 4 applications this morning…"
-                    aria-label="Share an update with your pod"
-                    className="min-w-0 flex-1 rounded-lg border-[1.5px] border-black/15 bg-white px-3 py-2 text-sm outline-none placeholder:text-black/35 focus:border-[#222325]"
-                  />
-                  <StickerButton variant="primary" size="md" onClick={share} disabled={busy || !draft.trim()}>
-                    <Send className="h-3.5 w-3.5" />
-                    Share
-                  </StickerButton>
-                </div>
-
-                {overview.moving.length === 0 ? (
-                  <DashEmptyState bare icon={UsersRound} title="Nothing yet" body="Be the first to say what you're working on today." />
-                ) : (
-                  <div className="flex flex-col gap-2.5">
-                    {/* A new post arriving is the whole reason to look at this panel, so it slides
-                        in rather than appearing between two renders. `layout` keeps the rows below
-                        it from jumping as it does. */}
+                  {overview.moving.length === 0 ? (
+                    <div className="border-t border-black/10 px-4 py-2">
+                      <DashEmptyState bare icon={UsersRound} title="Nothing yet" body="Be the first to say what you're working on today." />
+                    </div>
+                  ) : (
+                    // A new post arriving is the whole reason to look at this panel, so it slides in
+                    // rather than appearing between two renders. `layout` keeps the rows below it
+                    // from jumping as it does.
                     <AnimatePresence initial={false}>
-                      {overview.moving.map((item) => (
-                        <motion.div
-                          key={item.id}
-                          data-post={item.id}
-                          layout={!reduceMotion}
-                          initial={reduceMotion ? undefined : { opacity: 0, y: -8, scale: 0.98 }}
-                          animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
-                          exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98 }}
-                          transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                          className={cn(
-                            "flex items-start gap-3 rounded-lg border p-3.5",
-                            item.hot ? "border-[#cddd54] bg-[#f8fbe8]" : "border-black/10 bg-[#fbfbf7]",
-                          )}>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-primary">{item.text}</p>
-                            <p className="mt-0.5 text-[11px] text-black/40">
-                              {item.time}
-                              {item.mine && " · you"}
-                            </p>
-                          </div>
-                          {/* The mutation is already optimistic, so the punch lands on the same
-                              frame as the count — the button is not waiting for anything. */}
-                          <motion.button
-                            type="button"
-                            onClick={() => toggleFire(item.id)}
-                            aria-pressed={item.firedByMe}
-                            aria-label={item.firedByMe ? "Remove your fire" : "Add a fire"}
-                            whileTap={reduceMotion ? undefined : { scale: 0.88 }}
-                            transition={{ type: "spring", stiffness: 620, damping: 18 }}
-                            className={cn(
-                              "inline-flex flex-none cursor-pointer items-center gap-1 rounded-full border-[1.5px] px-2 py-1 text-[11px] font-bold transition-colors",
-                              item.firedByMe ? "border-[#222325] bg-[#e1f073] text-[#222325]" : "border-black/15 bg-white text-black/45 hover:border-black/30",
-                            )}>
-                            <Flame className="h-3 w-3" />
-                            <span className="tabular-nums">{item.fires}</span>
-                          </motion.button>
-                        </motion.div>
-                      ))}
+                      {overview.moving.map((item) => {
+                        const author = item.author ?? { name: item.mine ? "You" : "Someone", image: null };
+                        return (
+                          <motion.div
+                            key={item.id}
+                            data-post={item.id}
+                            layout={!reduceMotion}
+                            initial={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+                            animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+                            exit={reduceMotion ? undefined : { opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                            className={cn(ROW, item.hot && "bg-[#f8fbe8]")}>
+                            <PodAvatar name={author.name} image={author.image} size={30} />
+                            <span className="min-w-0 flex-1 text-[13px]">
+                              <strong className="font-extrabold">{author.name}</strong> {item.text}
+                            </span>
+                            <span className="flex-none text-xs text-[#5f6062]">{item.time}</span>
+                            {/* The mutation is already optimistic, so the punch lands on the same frame as the count. */}
+                            <motion.button
+                              type="button"
+                              onClick={() => toggleFire(item.id)}
+                              aria-pressed={item.firedByMe}
+                              aria-label={item.firedByMe ? `Take back your cheer, ${item.fires} so far` : `Cheer, ${item.fires} so far`}
+                              whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                              transition={{ type: "spring", stiffness: 620, damping: 18 }}
+                              className={cn(
+                                "flex h-7 flex-none cursor-pointer items-center gap-1 rounded-full border px-2.5 text-xs font-bold transition-colors",
+                                item.firedByMe ? "border-[#222325] bg-[#e1f073]" : "border-black/30 bg-white hover:border-[#222325]",
+                              )}>
+                              <Flame className="h-[13px] w-[13px]" strokeWidth={2.2} />
+                              <span className="tabular-nums">{item.fires}</span>
+                            </motion.button>
+                          </motion.div>
+                        );
+                      })}
                     </AnimatePresence>
-                  </div>
-                )}
-              </DashCard>
-            </div>
+                  )}
+                </section>
+              </div>
 
-            <div className="flex flex-col gap-5">
-              <DashCard className="p-6">
-                <p className="mb-1 text-[15px] font-bold text-primary">This week</p>
-                <p className="mb-4 text-xs text-black/60">Applications logged, most first.</p>
-                <ul className="flex flex-col gap-1.5">
+              <aside aria-label="This week" className={CARD}>
+                <div className="flex items-baseline justify-between gap-2.5 px-4 py-3">
+                  <h2 className="text-sm font-extrabold">This week</h2>
+                  <span className="text-xs text-[#5f6062]">applications</span>
+                </div>
+                <ol className="flex flex-col gap-0.5 px-2 pb-2">
                   {members.map((member) => (
                     <li
                       key={member.userId}
                       data-member={member.userId}
-                      className={cn("flex items-center gap-3 rounded-lg px-2 py-1.5", member.me && "bg-[#f0f0ea]")}>
-                      <span className="w-4 flex-none text-xs font-bold tabular-nums text-black/35">{member.rank}</span>
-                      <span className="grid h-8 w-8 flex-none place-content-center overflow-hidden rounded-full bg-[#222325] text-[10px] font-extrabold text-[#e1f073]">
-                        <Face member={member} />
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-primary">{member.name}</span>
-                      {member.loggedToday && <Pill variant="positive" className="flex-none">Today</Pill>}
-                      <span className="flex-none text-xs tabular-nums text-black/50">{member.apps}</span>
+                      className={cn("flex min-h-11 items-center gap-2.5 rounded-lg px-2", member.me && "bg-[#f4f9c9]")}>
+                      <span className="w-3.5 flex-none text-xs font-extrabold text-[#5f6062]">{member.rank}</span>
+                      <PodAvatar name={member.name} image={member.image} size={28} />
+                      <span className={cn("min-w-0 flex-1 truncate text-[13px]", member.me ? "font-extrabold" : "font-bold")}>{member.name}</span>
+                      {member.loggedToday ? (
+                        <span title="Logged today" className="h-2 w-2 flex-none rounded-full bg-[#cddd54]" />
+                      ) : (
+                        member.me && (
+                          <button
+                            type="button"
+                            onClick={openLog}
+                            className="flex-none cursor-pointer text-xs font-extrabold underline underline-offset-2">
+                            Log
+                          </button>
+                        )
+                      )}
+                      <span className="flex-none text-[13px] font-extrabold tabular-nums">{member.apps}</span>
                     </li>
                   ))}
-                </ul>
-              </DashCard>
-
-              <DashCard className="p-6">
-                <p className="mb-1 text-[15px] font-bold text-primary">Pod settings</p>
-                <p className="mb-4 text-xs leading-relaxed text-black/45">{pod.criteria}</p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSuggestOpen(true)}
-                    className="cursor-pointer rounded-lg border border-black/10 px-3 py-2 text-left text-[13px] font-semibold text-primary hover:bg-[#f6f6f2]">
-                    Suggest a goal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleMute}
-                    disabled={busy}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-left text-[13px] font-semibold text-primary hover:bg-[#f6f6f2] disabled:opacity-50">
-                    {muted ? <BellOff className="h-3.5 w-3.5 text-black/45" /> : <Bell className="h-3.5 w-3.5 text-black/45" />}
-                    {muted ? "Unmute pod notifications" : "Mute pod notifications"}
-                  </button>
-                  {/* Never the plain action: for the last member out this deletes the pod, and the
-                      dialog is where that gets said before it happens. */}
-                  <button
-                    type="button"
-                    onClick={() => setLeaveOpen(true)}
-                    disabled={busy}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-left text-[13px] font-semibold text-[#b23c26] hover:bg-[#fdf3f1] disabled:opacity-50">
-                    <LogOut className="h-3.5 w-3.5" />
-                    {pod.soleMember ? "Delete this pod" : "Leave this pod"}
-                  </button>
-                </div>
-              </DashCard>
+                </ol>
+              </aside>
             </div>
-          </div>
+          </>
         )}
       </main>
 
@@ -460,6 +483,7 @@ const PodClient: FC = () => {
       <JoinPodDialog open={joinOpen} onOpenChange={setJoinOpen} />
       <CreatePodDialog open={createOpen} onOpenChange={setCreateOpen} />
       <LeavePodDialog open={leaveOpen} onOpenChange={setLeaveOpen} />
+      <AboutPodDialog open={aboutOpen} onOpenChange={setAboutOpen} />
       {goalsOpen && (
         <ManageGoalsDialog key={focusGoalId ?? "manage"} focusGoalId={focusGoalId} onClose={closeGoals} onSuggest={() => setSuggestOpen(true)} />
       )}

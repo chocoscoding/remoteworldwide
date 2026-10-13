@@ -13,14 +13,15 @@ import type { PodGoalKind } from "@/app/lib/dashboard/types";
  */
 export const GOAL_KIND_META: Record<
   PodGoalKind,
-  { icon: LucideIcon; kindLabel: string; actionLabel: string | null; href: string | null }
+  /** `linkLabel`: the one-word link beside the goal on the pod page ("tracker"). */
+  { icon: LucideIcon; kindLabel: string; actionLabel: string | null; linkLabel: string | null; href: string | null }
 > = {
-  "job-win": { icon: PartyPopper, kindLabel: "Job win", actionLabel: "Log your win", href: null },
-  applications: { icon: Send, kindLabel: "Applications", actionLabel: "Open your tracker", href: "/dashboard/tracker" },
-  referrals: { icon: Users, kindLabel: "Referrals", actionLabel: "Find a referral", href: "/dashboard/referrals" },
-  prep: { icon: Mic, kindLabel: "Interview prep", actionLabel: "Run a prep session", href: "/dashboard/prep" },
-  resume: { icon: FileText, kindLabel: "Resume", actionLabel: "Work on your resume", href: "/dashboard/resume" },
-  custom: { icon: Trophy, kindLabel: "Custom", actionLabel: null, href: null },
+  "job-win": { icon: PartyPopper, kindLabel: "Job win", actionLabel: "Log your win", linkLabel: null, href: null },
+  applications: { icon: Send, kindLabel: "Applications", actionLabel: "Open your tracker", linkLabel: "tracker", href: "/dashboard/tracker" },
+  referrals: { icon: Users, kindLabel: "Referrals", actionLabel: "Find a referral", linkLabel: "referrals", href: "/dashboard/referrals" },
+  prep: { icon: Mic, kindLabel: "Interview prep", actionLabel: "Run a prep session", linkLabel: "prep", href: "/dashboard/prep" },
+  resume: { icon: FileText, kindLabel: "Resume", actionLabel: "Work on your resume", linkLabel: "resume", href: "/dashboard/resume" },
+  custom: { icon: Trophy, kindLabel: "Custom", actionLabel: null, linkLabel: null, href: null },
 };
 
 /** The kinds a member may pick when suggesting a goal — job-win is the pod's protected default, not suggestable. */
