@@ -2,6 +2,7 @@
 import { EyeOffIcon, LoaderCircle, Pencil, Trash } from "lucide-react";
 import { FC, useState } from "react";
 import { deleteOneJob, toggleJobActiveState } from "@/libs/query";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -25,8 +26,8 @@ const JobActions: FC<{ id: string; isJobActive: boolean; slug: string }> = ({ id
         theme: "dark",
       });
       await push("/heroshima/jobs");
-    } catch (error: any) {
-      toast.error(`Failed to delete job: ${error.message}`);
+    } catch (error) {
+      toast.error(`Failed to delete job: ${actionErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
@@ -47,8 +48,8 @@ const JobActions: FC<{ id: string; isJobActive: boolean; slug: string }> = ({ id
         theme: "dark",
       });
       setIsActive((prev) => !prev);
-    } catch (error: any) {
-      toast.error(`Failed to update job: ${error.message}`);
+    } catch (error) {
+      toast.error(`Failed to update job: ${actionErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }

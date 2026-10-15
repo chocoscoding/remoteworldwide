@@ -57,14 +57,20 @@ export interface PickRow {
 const admin = <T>(path: string, init: BackendInit = {}) => backend<T>(`/blog/admin${path}`, { ...init, session: true });
 
 // Every export is a public endpoint (app/lib/auth/action-guards.ts) and the
-// backend's isWriter/isAdmin stays the real boundary. The exports that take an
-// id also refuse a caller without the role on their own, and pass the id
-// through `idSegment` so an argument names one resource, never a path. The
-// three (fulladmin)-only ones (settings row, stats, featured rank) refuse an
-// AUTHOR here only to match their one screen, not as a boundary: the backend
-// routes behind them are isWriter on purpose and answer straight through the
-// /api/blog rewrite, so an author can still read the row and stats and set a
-// rank there (and on their own post through BlogForm).
+// backend's isWriter/isAdmin stays the real boundary. Each export still refuses
+// a caller without the role first, with the role of the route it calls
+// (`writer()` for isWriter, requireAdminAction for isAdmin), so an anonymous or
+// USER call fails at the edge rather than on the backend's word alone, as in
+// libs/query.ts. Until 2026-10-15 only the id-taking exports checked, which left
+// the creates, the settings save, the preview and the reads to the backend alone.
+// Each check is one session read, far inside the backend's per-visitor /api/auth
+// budget even on a page that fans out four of these at once.
+// The exports that take an id pass it through `idSegment` so an argument names
+// one resource, never a path. The three (fulladmin)-only ones (settings row,
+// stats, featured rank) refuse an AUTHOR here only to match their one screen,
+// not as a boundary: the backend routes behind them are isWriter on purpose and
+// answer straight through the /api/blog rewrite, so an author can still read the
+// row and stats and set a rank there (and on their own post through BlogForm).
 const writer = () => requireRoleAction("ADMIN", "AUTHOR");
 
 // `kind` is a union only to TypeScript; at runtime it is whatever was sent.
@@ -86,13 +92,19 @@ async function attempt<T>(run: () => Promise<T>): Promise<{ data: T; error?: nev
   }
 }
 
-export const listLeadMagnets = async () => admin<LeadMagnetRow[]>("/lead-magnets");
+export const listLeadMagnets = async () => {
+  await writer();
+  return admin<LeadMagnetRow[]>("/lead-magnets");
+};
 // The edit page hands this its URL param. A malformed id names nothing: null, like a 404.
 export const getLeadMagnet = async (id: string) => {
   await writer();
   return isObjectId(id) ? backendOrNull<LeadMagnet>(`/blog/admin/lead-magnets/${id}`, { session: true }) : null;
 };
-export const createLeadMagnet = async (input: LeadMagnetInput) => attempt(() => admin<LeadMagnet>("/lead-magnets", { method: "POST", body: input }));
+export const createLeadMagnet = async (input: LeadMagnetInput) => {
+  await writer();
+  return attempt(() => admin<LeadMagnet>("/lead-magnets", { method: "POST", body: input }));
+};
 // `idSegment` runs inside `attempt`, so a malformed id comes back as the form's error, not a crash.
 export const updateLeadMagnet = async (id: string, input: Partial<LeadMagnetInput>) => {
   await writer();
@@ -105,12 +117,18 @@ export const deleteLeadMagnet = async (id: string) => {
   return { status: "deleted" };
 };
 
-export const listCtas = async () => admin<Cta[]>("/ctas");
+export const listCtas = async () => {
+  await writer();
+  return admin<Cta[]>("/ctas");
+};
 export const getCta = async (id: string) => {
   await writer();
   return isObjectId(id) ? backendOrNull<Cta>(`/blog/admin/ctas/${id}`, { session: true }) : null;
 };
-export const createCta = async (input: CtaInput) => attempt(() => admin<Cta>("/ctas", { method: "POST", body: input }));
+export const createCta = async (input: CtaInput) => {
+  await writer();
+  return attempt(() => admin<Cta>("/ctas", { method: "POST", body: input }));
+};
 export const updateCta = async (id: string, input: Partial<CtaInput>) => {
   await writer();
   return attempt(() => admin<Cta>(`/ctas/${idSegment(id)}`, { method: "PUT", body: input }));
@@ -122,7 +140,10 @@ export const deleteCta = async (id: string) => {
   return { status: "deleted" };
 };
 
-export const listConversions = async () => admin<{ magnets: LeadMagnetRow[]; ctas: Cta[] }>("/conversions");
+export const listConversions = async () => {
+  await writer();
+  return admin<{ magnets: LeadMagnetRow[]; ctas: Cta[] }>("/conversions");
+};
 
 export const setOfferActive = async (kind: ConversionKind, id: string, active: boolean) => {
   await writer();
@@ -139,9 +160,16 @@ export const getBlogSettingsRow = async () => {
   await requireAdminAction();
   return admin<BlogSettings>("/settings");
 };
-export const saveBlogSettings = async (input: BlogSettingsInput) => attempt(() => admin<BlogSettings>("/settings", { method: "PUT", body: input }));
+// The write is isAdmin on the backend too, so this one is a mirror, not the stricter side.
+export const saveBlogSettings = async (input: BlogSettingsInput) => {
+  await requireAdminAction();
+  return attempt(() => admin<BlogSettings>("/settings", { method: "PUT", body: input }));
+};
 
-export const listPicks = async () => admin<PickRow[]>("/posts/picks");
+export const listPicks = async () => {
+  await writer();
+  return admin<PickRow[]>("/posts/picks");
+};
 // The (fulladmin) "Start here" picker's action. The backend route stays isWriter:
 // writers set the same rank on their post through BlogForm's "Start here rank".
 export const setFeaturedRank = async (blogId: string, featuredRank: number | null) => {
@@ -151,7 +179,11 @@ export const setFeaturedRank = async (blogId: string, featuredRank: number | nul
   return { data: result };
 };
 
-export const listSubscribers = async (page: number) => admin<{ rows: Subscriber[]; total: number; page: number; pageSize: number }>(`/subscribers?page=${page}`);
+// Subscriber emails: isAdmin on the backend, so ADMIN here as well.
+export const listSubscribers = async (page: number) => {
+  await requireAdminAction();
+  return admin<{ rows: Subscriber[]; total: number; page: number; pageSize: number }>(`/subscribers?page=${page}`);
+};
 
 // Only the (fulladmin) blog-settings screen shows these totals.
 export const blogConversionStats = async () => {
@@ -180,11 +212,22 @@ export interface PreviewInput {
   inlineOffers: string[];
 }
 
+// The one export left open: GET /blog/authors is public on the backend.
 export const listAuthorPicks = async () => backend<Author[]>("/blog/authors");
-export const myAuthor = async () => backendOrNull<Author>("/blog/admin/authors/me", { session: true });
-export const listLinkableUsers = async () => admin<LinkableUser[]>("/authors/users");
+// The (admin) layout calls this for every staff render behind `.catch(() => null)`, so
+// a refusal there still reads as "no author profile".
+export const myAuthor = async () => {
+  await writer();
+  return backendOrNull<Author>("/blog/admin/authors/me", { session: true });
+};
+// Every account's name and email: isAdmin on the backend.
+export const listLinkableUsers = async () => {
+  await requireAdminAction();
+  return admin<LinkableUser[]>("/authors/users");
+};
 
 export const previewBlog = async (input: PreviewInput) => {
+  await writer();
   const { content, inlineOffers, ...draft } = input;
   const offers = await admin<ArticleOffers & { settings: BlogSettings }>("/posts/preview", { method: "POST", body: draft });
   return { ...offers, rendered: renderArticle({ content, inlineOffers, autoCtas: false }, offers) };
@@ -202,8 +245,16 @@ export interface MyAuthorInput {
 
 export type AdminPostScope = "mine" | "all";
 
-export const createMyAuthor = async (input: MyAuthorInput) => attempt(() => admin<Author>("/authors/me", { method: "POST", body: input }));
-export const updateMyAuthor = async (input: MyAuthorInput) => attempt(() => admin<Author>("/authors/me", { method: "PUT", body: input }));
+export const createMyAuthor = async (input: MyAuthorInput) => {
+  await writer();
+  return attempt(() => admin<Author>("/authors/me", { method: "POST", body: input }));
+};
+export const updateMyAuthor = async (input: MyAuthorInput) => {
+  await writer();
+  return attempt(() => admin<Author>("/authors/me", { method: "PUT", body: input }));
+};
 
-export const listAdminPosts = async (page: number, scope: AdminPostScope) =>
-  admin<{ data: PostFull[]; count: number }>(`/posts?page=${page}${scope === "mine" ? "&mine=1" : ""}`);
+export const listAdminPosts = async (page: number, scope: AdminPostScope) => {
+  await writer();
+  return admin<{ data: PostFull[]; count: number }>(`/posts?page=${page}${scope === "mine" ? "&mine=1" : ""}`);
+};

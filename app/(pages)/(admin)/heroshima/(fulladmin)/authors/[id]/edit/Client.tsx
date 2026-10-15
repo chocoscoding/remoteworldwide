@@ -5,6 +5,7 @@ import { CldUploadWidget } from "next-cloudinary";
 import Image from "next/image";
 import { toast } from "react-toastify";
 import { updateAuthor } from "@/libs/query";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import { useRouter } from "next/navigation";
 import { FormStateAuthor_Client } from "@/types/main";
 import LinkedAccountSelect from "@/app/components/ADMIN/blog/LinkedAccountSelect";
@@ -39,25 +40,25 @@ const UpdateAuthorClient: FC<{ data: FormStateAuthor_Client; id: string }> = ({ 
 
     try {
       const author = await updateAuthor(id, { ...formValues });
-      if (await author.data) {
-        toast.success("Author updated successfully!", {
-          position: "bottom-right",
-          autoClose: 3500,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          theme: "dark",
-        });
+      // The backend's own words: "Author name taken, use another" is its 409 now, where
+      // this once matched Prisma's "Unique constraint failed" text.
+      if ("error" in author) {
+        toast.error(author.error);
+        return;
       }
-      push("/heroshima/authors/" + (await author.data).slug + "/edit");
-    } catch (error: any) {
-      if (error.message.includes("Unique constraint failed")) {
-        toast.error(`Author name taken, use another`);
-      } else {
-        toast.error(`Failed to update author: ${error.message}`);
-      }
+      toast.success("Author updated successfully!", {
+        position: "bottom-right",
+        autoClose: 3500,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+      push("/heroshima/authors/" + author.data.slug + "/edit");
+    } catch (error) {
+      toast.error(`Failed to update author: ${actionErrorMessage(error)}`);
     } finally {
       setIsLoading(false);
     }

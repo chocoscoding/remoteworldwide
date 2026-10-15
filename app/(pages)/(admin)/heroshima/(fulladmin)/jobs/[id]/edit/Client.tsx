@@ -8,6 +8,7 @@ import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
 import { Job } from "@prisma/client";
 import { updateOneJob } from "@/libs/query";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import OverlayLoader from "@/app/components/OverlayLoader";
 import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
 import type { Company } from "@prisma/client";
@@ -137,8 +138,8 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
           theme: "dark",
         });
         push("/heroshima/jobs/" + data.slug);
-      } catch (error: any) {
-        toast.error(`Failed to create job: ${error.message}`);
+      } catch (error) {
+        toast.error(`Failed to update job: ${actionErrorMessage(error)}`);
       } finally {
         setIsLoading(false);
       }

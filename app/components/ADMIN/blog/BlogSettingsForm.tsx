@@ -4,6 +4,7 @@ import { useState, type FC, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { saveBlogSettings, type BlogSettingsInput } from "@/libs/blog-admin";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import { BLOG_CATEGORIES } from "@/app/lib/blog/categories";
 import { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
 
@@ -38,7 +39,7 @@ const BlogSettingsForm: FC<{
       toast.success("Settings saved");
       router.refresh();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not save");
+      toast.error(`Could not save: ${actionErrorMessage(err)}`);
     } finally {
       setBusy(false);
     }

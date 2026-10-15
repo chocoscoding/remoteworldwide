@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { Save, UserPlus } from "lucide-react";
 import type { Author } from "@/app/lib/blog/types";
 import { createMyAuthor, updateMyAuthor, type MyAuthorInput } from "@/libs/blog-admin";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
 
 type Values = { name: string; about: string; profileImage: string; website: string; linkedin: string; twitter: string; instagram: string };
@@ -64,7 +65,7 @@ const ProfileForm: FC<{ author: Author | null }> = ({ author }) => {
       toast.success(editing ? "Profile saved" : "Author profile created");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save");
+      toast.error(`Could not save: ${actionErrorMessage(error)}`);
     } finally {
       setBusy(false);
     }

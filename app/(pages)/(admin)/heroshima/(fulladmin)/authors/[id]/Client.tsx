@@ -4,6 +4,7 @@ import { Edit, Trash } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { deleteAuthor } from "@/libs/query";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import { useRouter } from "next/navigation";
 import { AuthorWithBlog } from "@/types/main";
 import Image from "next/image";
@@ -19,7 +20,12 @@ const AuthorDetailsPage: FC<{ data: AuthorWithBlog }> = ({ data }) => {
       toast.info("Deleting author...", { autoClose: 300 });
 
       try {
-        await deleteAuthor(authorsInfo.id);
+        // "This author still has posts. Reassign or delete them first." is the one to expect.
+        const result = await deleteAuthor(authorsInfo.id);
+        if ("error" in result) {
+          toast.error(result.error);
+          return;
+        }
 
         toast.success("Author deleted successfully!", {
           position: "bottom-right",
@@ -32,8 +38,8 @@ const AuthorDetailsPage: FC<{ data: AuthorWithBlog }> = ({ data }) => {
           theme: "dark",
         });
         push("/heroshima/authors");
-      } catch (error: any) {
-        toast.error(`Failed to create job: ${error.message}`);
+      } catch (error) {
+        toast.error(`Failed to delete author: ${actionErrorMessage(error)}`);
       } finally {
         setIsLoading(false);
       }

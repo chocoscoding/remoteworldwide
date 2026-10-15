@@ -14,6 +14,7 @@ import type { Author, Blog } from "@/app/lib/blog/types";
 import type { Option } from "@/types/main";
 import { createBlog, editBlog } from "@/libs/query";
 import { previewBlog } from "@/libs/blog-admin";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import { quillToolbarOptions } from "@/libs/quillconfig";
 import { BLOG_CATEGORIES, categoryBySlug, inferCategory } from "@/app/lib/blog/categories";
 import { slugifyTitle } from "@/app/lib/blog/slug";
@@ -258,7 +259,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
       setPreview(await previewBlog({ content, category: chosenCategory, tags, leadMagnetId: leadMagnetId || null, ctaKey: ctaKey || null, inlineOffers: offers.map(offerToken) }));
       setView("preview");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not build the preview");
+      toast.error(`Could not build the preview: ${actionErrorMessage(error)}`);
     } finally {
       setPreviewing(false);
     }
@@ -298,11 +299,15 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
       // Before the server action: base64 images would be dropped on the page, and can exceed its 1MB body limit.
       const content = await hostInlineImages(normalizeEditorHtml(text), hostedImages.current);
       const res = blog ? await editBlog(blog.id, { ...values, content }) : await createBlog({ ...values, content });
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
+      }
       toast.success(blog ? "Blog updated" : "Blog created");
       router.push(`/heroshima/blogs/${res.data.slug}`);
       router.refresh();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not save");
+      toast.error(`Could not save: ${actionErrorMessage(err)}`);
     } finally {
       setBusy(false);
     }

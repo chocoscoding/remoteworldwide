@@ -8,6 +8,7 @@ import { closeUploadWidget } from "./uploadWidget";
 import { toast } from "react-toastify";
 import type { LeadMagnet } from "@/app/lib/blog/types";
 import { createLeadMagnet, deleteLeadMagnet, updateLeadMagnet, type LeadMagnetInput } from "@/libs/blog-admin";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import LeadMagnetCard from "@/app/components/blog/LeadMagnetCard";
 import OfferTargeting, { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
 import { OfferSwitch } from "./OfferSwitch";
@@ -61,7 +62,7 @@ const LeadMagnetForm: FC<{ initial?: LeadMagnet }> = ({ initial }) => {
       router.push("/heroshima/conversions");
       router.refresh();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not save");
+      toast.error(`Could not save: ${actionErrorMessage(err)}`);
     } finally {
       setBusy(false);
     }
@@ -76,7 +77,7 @@ const LeadMagnetForm: FC<{ initial?: LeadMagnet }> = ({ initial }) => {
       router.push("/heroshima/conversions");
       router.refresh();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not delete");
+      toast.error(`Could not delete: ${actionErrorMessage(err)}`);
       setBusy(false);
     }
   };

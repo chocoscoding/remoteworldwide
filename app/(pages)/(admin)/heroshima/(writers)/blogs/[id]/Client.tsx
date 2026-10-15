@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { deleteBlog } from "@/libs/query";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import type { BlogStatus } from "@/app/lib/blog/types";
 
 const BTN = "inline-flex h-9 items-center gap-1.5 rounded-sm border-2 border-primary px-3 text-xs font-bold transition-all drop-shadow-primary2-hover disabled:opacity-50";
@@ -18,12 +19,17 @@ const AdminPostActions: FC<{ id: string; slug: string; title: string; status: Bl
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
     setBusy(true);
     try {
-      await deleteBlog(id);
+      const result = await deleteBlog(id);
+      if ("error" in result) {
+        toast.error(result.error);
+        setBusy(false);
+        return;
+      }
       toast.success("Blog deleted");
       router.push("/heroshima/blogs");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not delete");
+      toast.error(`Could not delete: ${actionErrorMessage(error)}`);
       setBusy(false);
     }
   };

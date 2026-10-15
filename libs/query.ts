@@ -253,6 +253,18 @@ const surface = (error: unknown): never => {
   throw new Error(error instanceof BackendError ? error.message : "something went wrong");
 };
 
+// How the post and author writes below answer a refusal the editor can fix. A thrown
+// action message reaches the browser in development only: production swaps it for
+// React's generic text, so "Author name taken, use another", a taken slug or "This
+// author still has posts" all reached the editor as the same blank failure. A 4xx (the
+// backend's validation, conflict, not-found and ownership answers, and idSegment's own
+// 400) is therefore returned as `{ error }` in the backend's words, as libs/blog-admin.ts's
+// `attempt` does; a 5xx or a dropped connection still throws through `surface`.
+const refused = (error: unknown): { error: string } => {
+  if (error instanceof BackendError && error.status < 500) return { error: error.message };
+  return surface(error);
+};
+
 // The backend's isWriter, checked at the edge: posts are written by ADMIN or AUTHOR.
 const requireWriterAction = () => requireRoleAction("ADMIN", "AUTHOR");
 
@@ -263,19 +275,19 @@ export const createAuthor = async (body: AuthorInput) => {
   try {
     return { data: await admin<Author>("/authors", { method: "POST", body }) };
   } catch (error) {
-    return surface(error);
+    return refused(error);
   }
 };
 
 // The ids below go through `idSegment` (app/lib/backend.ts): pasted raw, `../../..`
 // turned "delete this post" into a request to any backend path under the caller's
-// cookie. Inside the `try`, so a malformed id surfaces as the backend's own 400 text.
+// cookie. Inside the `try`, so a malformed id comes back as an `{ error }`, like the backend's own 400.
 export const updateAuthor = async (id: string, body: AuthorInput) => {
   await requireAdminAction();
   try {
     return { data: await admin<Author>(`/authors/${idSegment(id)}`, { method: "PUT", body }) };
   } catch (error) {
-    return surface(error);
+    return refused(error);
   }
 };
 
@@ -285,7 +297,7 @@ export const deleteAuthor = async (id: string) => {
     await admin(`/authors/${idSegment(id)}`, { method: "DELETE" });
     return { status: "deleted author successfully" };
   } catch (error) {
-    return surface(error);
+    return refused(error);
   }
 };
 
@@ -294,7 +306,12 @@ export const findAuthorBySlug = async (slug: string) => {
   return { data: await backendOrNull<Author>(`/blog/admin/authors/${encodeURIComponent(slug)}`, { session: true }) };
 };
 
-export const allAuthorsSelect = async () => admin<{ label: string; value: string }[]>("/authors/options");
+// Nothing imports this now, but an export stays a live endpoint: the writers'
+// check, like the isWriter route behind it.
+export const allAuthorsSelect = async () => {
+  await requireWriterAction();
+  return admin<{ label: string; value: string }[]>("/authors/options");
+};
 
 export interface BlogConversionFields {
   category?: string;
@@ -323,7 +340,7 @@ export const createBlog = async (data: BlogInput) => {
     revalidatePath("/blogs");
     return { data: blog };
   } catch (error) {
-    return surface(error);
+    return refused(error);
   }
 };
 
@@ -340,7 +357,7 @@ export const editBlog = async (id: string, data: Partial<BlogInput>) => {
     for (const slug of [blog.slug, ...blog.previousSlugs]) revalidatePath("/blogs/" + slug);
     return { data: blog };
   } catch (error) {
-    return surface(error);
+    return refused(error);
   }
 };
 
@@ -351,7 +368,7 @@ export const deleteBlog = async (id: string) => {
     revalidatePath("/blogs");
     return { status: "deleted blog successfully" };
   } catch (error) {
-    return surface(error);
+    return refused(error);
   }
 };
 

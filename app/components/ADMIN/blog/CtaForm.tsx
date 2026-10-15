@@ -8,6 +8,7 @@ import { closeUploadWidget } from "./uploadWidget";
 import { toast } from "react-toastify";
 import type { Cta, CtaImageSide, CtaTone } from "@/app/lib/blog/types";
 import { createCta, deleteCta, updateCta, type CtaInput } from "@/libs/blog-admin";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import CtaCard from "@/app/components/blog/CtaCard";
 import OfferTargeting, { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
 import { OfferSwitch } from "./OfferSwitch";
@@ -73,7 +74,7 @@ const CtaForm: FC<{ initial?: Cta }> = ({ initial }) => {
       router.push("/heroshima/conversions");
       router.refresh();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not save");
+      toast.error(`Could not save: ${actionErrorMessage(err)}`);
     } finally {
       setBusy(false);
     }
@@ -88,7 +89,7 @@ const CtaForm: FC<{ initial?: Cta }> = ({ initial }) => {
       router.push("/heroshima/conversions");
       router.refresh();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Could not delete");
+      toast.error(`Could not delete: ${actionErrorMessage(err)}`);
       setBusy(false);
     }
   };
