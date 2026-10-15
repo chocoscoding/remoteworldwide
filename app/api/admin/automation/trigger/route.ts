@@ -7,13 +7,15 @@
 //
 // So the token lives here now, server-side, and the gate is the admin session
 // itself: `requireAdmin()` decides who may trigger a run, and only this route ever
-// sees the bot's token. The browser sends nothing but the channel list.
+// sees the bot's token. The browser sends nothing but the channel list and the most
+// jobs the run may post (default 2), out of the ones created today on the Lagos calendar.
 //
 // The bot's token must still be rotated — the old one shipped publicly and has to be
 // assumed compromised (OWNER-TASKS.md § 1.1).
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/auth/require-admin";
+import { MAX_POST_LIMIT, parsePostLimit } from "@/app/lib/automation/limit";
 
 const CHANNELS = ["twitter", "linkedin", "telegram"] as const;
 type Channel = (typeof CHANNELS)[number];
@@ -35,8 +37,9 @@ export async function POST(request: NextRequest) {
   }
 
   let channels: unknown;
+  let rawLimit: unknown;
   try {
-    ({ channels } = await request.json());
+    ({ channels, limit: rawLimit } = await request.json());
   } catch {
     return NextResponse.json({ success: false, message: "Expected a JSON body." }, { status: 400 });
   }
@@ -47,10 +50,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Pick at least one valid channel." }, { status: 400 });
   }
 
+  const limit = parsePostLimit(rawLimit);
+  if (limit === null) {
+    return NextResponse.json({ success: false, message: `Pick a limit from 1 to ${MAX_POST_LIMIT}.` }, { status: 400 });
+  }
+
   const unique = [...new Set(channels)];
 
   try {
-    const res = await fetch(`${baseUrl}/trigger?channels=${unique.join(",")}`, {
+    const res = await fetch(`${baseUrl}/trigger?channels=${unique.join(",")}&limit=${limit}`, {
       headers: { "x-admin-token": token },
       cache: "no-store",
       signal: AbortSignal.timeout(TIMEOUT_MS),

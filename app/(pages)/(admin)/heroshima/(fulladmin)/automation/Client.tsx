@@ -2,15 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
+import { DEFAULT_POST_LIMIT, MAX_POST_LIMIT, parsePostLimit } from "@/app/lib/automation/limit";
 
 // Same-origin, so the browser never holds the bot's token: the route checks the
 // admin session and calls the bot with a token only the server can read.
-async function triggerJobPosting(channels: Channel[]) {
+async function triggerJobPosting(channels: Channel[], limit: number) {
   try {
     const res = await fetch("/api/admin/automation/trigger", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channels }),
+      body: JSON.stringify({ channels, limit }),
     });
     return await res.json();
   } catch (error: any) {
@@ -20,6 +21,7 @@ async function triggerJobPosting(channels: Channel[]) {
 
 const COOLDOWN_KEY = "automation_cooldown_until";
 const CHANNELS_KEY = "automation_channels";
+const LIMIT_KEY = "automation_limit";
 
 type Channel = "twitter" | "linkedin" | "telegram";
 
@@ -56,6 +58,12 @@ const AutomationClient = () => {
       return DEFAULT_CHANNELS;
     }
   });
+  // Kept as typed, so the field can be cleared and retyped; only a valid number is remembered.
+  const [limitInput, setLimitInput] = useState(() => {
+    if (typeof window === "undefined") return String(DEFAULT_POST_LIMIT);
+    const stored = parsePostLimit(localStorage.getItem(LIMIT_KEY));
+    return String(stored ?? DEFAULT_POST_LIMIT);
+  });
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(false);
 
@@ -87,15 +95,31 @@ const AutomationClient = () => {
     });
   };
 
+  const limit = limitInput.trim() === "" ? null : parsePostLimit(limitInput);
+
+  const changeLimit = (value: string) => {
+    setLimitInput(value);
+    const parsed = value.trim() === "" ? null : parsePostLimit(value);
+    if (parsed !== null) localStorage.setItem(LIMIT_KEY, String(parsed));
+  };
+
   const handleTrigger = async () => {
-    if (channels.length === 0) return;
+    if (channels.length === 0 || limit === null) return;
     setLoading(true);
     const toast1 = toast.info("Triggering automation...");
 
     try {
-      const res = await triggerJobPosting(channels);
+      const res = await triggerJobPosting(channels, limit);
       if (res.success) {
-        toast.success("Jobs posted successfully!", {
+        // `posted` is how many the bot picked; an older bot does not send it.
+        const posted = typeof res.posted === "number" ? res.posted : null;
+        const message =
+          posted === null
+            ? "Jobs posted successfully!"
+            : posted === 0
+              ? "Nothing posted: no jobs were added today, or the bot could not read them."
+              : `Posted ${posted} job${posted === 1 ? "" : "s"} from today.`;
+        toast.success(message, {
           updateId: toast1,
           position: "bottom-right",
           autoClose: 3500,
@@ -125,7 +149,10 @@ const AutomationClient = () => {
       <h1 className="text-2xl font-bold mb-4">Automation Controls</h1>
 
       <section className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm max-w-screen-lg mb-6">
-        <h2 className="text-lg font-semibold mb-3 text-primary">Job Posting Automation</h2>
+        <h2 className="text-lg font-semibold mb-1 text-primary">Job Posting Automation</h2>
+        <p className="text-sm text-gray-600 mb-3">
+          Time zone: <span className="font-medium text-gray-800">GMT+1</span>. A run picks jobs added today, from midnight to midnight GMT+1.
+        </p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -156,10 +183,31 @@ const AutomationClient = () => {
             {channels.length === 0 && <p className="text-sm text-red-500 mt-2">Pick at least one channel.</p>}
           </div>
 
+          <div>
+            <label htmlFor="automation-limit" className="block text-sm font-medium text-primary mb-2">
+              Most jobs per run
+            </label>
+            <input
+              id="automation-limit"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_POST_LIMIT}
+              step={1}
+              value={limitInput}
+              onChange={(e) => changeLimit(e.target.value)}
+              className="w-24 h-10 rounded border border-gray-300 px-3 text-sm text-gray-800 focus:outline-none focus:border-black"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Posts the newest jobs added today (GMT+1), up to this many. Default {DEFAULT_POST_LIMIT}.
+            </p>
+            {limit === null && <p className="text-sm text-red-500 mt-2">Pick a whole number from 1 to {MAX_POST_LIMIT}.</p>}
+          </div>
+
           <div className="flex flex-col gap-2 items-stretch">
             <button
               type="submit"
-              disabled={loading || isCooldown || channels.length === 0}
+              disabled={loading || isCooldown || channels.length === 0 || limit === null}
               className="drop-shadow-primary2-hover flex items-center justify-center transition-all bg-transparent hover:bg-transparent text-black text-center border-2 border-primary font-bold h-12 rounded px-4 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed w-full">
               Trigger Automation
             </button>
