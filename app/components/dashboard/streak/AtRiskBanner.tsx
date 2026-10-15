@@ -2,11 +2,15 @@
 
 // The one in-app nudge.
 //
-// §8 asks for a notification at the user's hunt hour plus an at-risk banner
-// after 8pm local. The hunt-hour notification is an email now, sent by the
-// events service (`pushStreakReminder`); this is the in-app half. "Local"
-// is the user's own clock as the server reads it (their settings timezone),
-// and the day ends at the 4am grace hour, not at midnight.
+// §8 asks for a notification at the user's hunt hour plus an at-risk banner in
+// the evening. Both reminders are emails now, sent by the events service
+// (`pushStreakReminder`): the hunt-hour one, and the "streak at risk" one at
+// 6pm, six hours before midnight. This is the in-app half, from the same hour.
+// "Local" is the user's own clock as the server reads it (their settings
+// timezone); the 4am grace hour is a kindness, never promised.
+//
+// A freeze covers one day at a time, so the line says which night this is: one
+// a freeze would catch, or one that ends the run.
 //
 // Three things it will not do: appear on a rest day, appear while the search
 // is paused, or say anything about a streak you have already lost. There is no

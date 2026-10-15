@@ -5,8 +5,8 @@
 // invites page's own story. What remains is timing — when the at-risk banner
 // fires, how often the streak may prompt, and the repair windows.
 
-/** Hour after which the in-app at-risk banner may appear. */
-export const AT_RISK_HOUR = 20;
+/** Hour after which the in-app at-risk banner may appear: 6pm, with the "streak at risk" email (backend STREAK_RISK_HOUR). */
+export const AT_RISK_HOUR = 18;
 
 /** Hard cap on streak prompts per day, per §8. */
 export const MAX_STREAK_PROMPTS_PER_DAY = 2;

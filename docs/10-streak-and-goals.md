@@ -119,7 +119,7 @@ every consumer at once. `useStreak()` is now just an alias for `useActivity()`
 | `streak/StreakFlame.tsx` | Shared flame; burst on log, no idle animation |
 | `streak/StreakMilestoneModal.tsx` | Celebration, queued |
 | `streak/RepairStreakPanel.tsx` | Post-break restore / comeback |
-| `streak/AtRiskBanner.tsx` | In-app nudge after 8pm local |
+| `streak/AtRiskBanner.tsx` | In-app nudge from 6pm local |
 | `credits/CreditStore.tsx` | Spend catalogue + ledger history |
 | `ProofOfProgress.tsx` | Outcomes panel |
 | `PauseSearchDialog.tsx` | Pause the search |
@@ -187,8 +187,11 @@ read the clock once in a lazy `useState` initialiser.
   `hunt_hour`. That prompt is an email now: the events service asks the
   backend hourly (`GET /api/internal/streak/hunt-reminders`) who is at their
   hunting hour with the day still open and mails them once per local day,
-  under the `pushStreakReminder` switch. There is still no service worker, so
-  no push.
+  under the `pushStreakReminder` switch. The same walk (`risk=1`) carries the
+  "streak at risk" email at 18:00 local (`STREAK_RISK_HOUR`, six hours before
+  midnight) for anyone with a run going and nothing logged, saying whether a
+  freeze would catch the day; it replaces a hunting-hour mail at or after
+  18:00. There is still no service worker, so no push.
 - **Service gifts.** Redeeming a resume rewrite, a Pro day or a priority intro
   marks the gift used; nothing delivers the service yet.
 - **"Answered a company's questions".** Its gift is paid by the server only;
