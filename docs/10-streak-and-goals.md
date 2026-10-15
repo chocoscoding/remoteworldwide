@@ -141,11 +141,16 @@ render as skipped rather than as gaps. They come from `goals.restDays`
 after closing, so changing rest days later does not rewrite history. Paused
 days are transparent the same way; a pause with an end day ends on that day.
 
-**Freezes auto-apply.** An unplanned miss inside a live run is absorbed if a
-freeze is available — the free weekly tier (2 per ISO week, use-it-or-lose-it)
-first, then held stock (milestone perks, freeze gifts; free + held never pass
-4) — and the user is told *after the fact*, never asked. No freeze is spent
-when there is no run to protect.
+**Freezes auto-apply, one day at a time.** An unplanned miss inside a live run
+is absorbed if a freeze is available — the free weekly tier (1 per ISO week,
+use-it-or-lose-it) first, then held stock (milestone perks, freeze gifts; free +
+held never pass 3) — and the user is told *after the fact*, never asked. A
+freeze covers ONE day (owner, 2026-10-15): a second unplanned miss before a day
+that counts (logged or backfilled) breaks the run however many freezes are
+held, so a longer gap is bought back with credits or a restore gift. Rest days,
+paused days and a repair in between don't reset that; only a counted day does.
+No freeze is spent when there is no run to protect. The streak answer's
+`freezeReady` says whether a freeze would catch today.
 
 **Repairs.** A break can be bought back for 24 hours after the missed day
 closes: with a restore gift, with credits (`STREAK_REPAIR_CREDITS` = 5, a spend

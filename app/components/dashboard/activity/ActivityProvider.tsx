@@ -228,10 +228,12 @@ interface ActivityContextValue extends StreakState {
   todayIntensity: number;
 
   // --- freezes, two tiers ---
-  /** Free weekly allowance left (2/week, use-it-or-lose-it, no rollover). */
+  /** Free weekly allowance left (1/week, use-it-or-lose-it, no rollover). */
   freeFreezes: number;
   /** Purchased + milestone-perk stock. Spent only after the free tier. */
   heldFreezes: number;
+  /** Whether a freeze would cover today if it ends with nothing logged: one covers one day at a time. */
+  freezeReady: boolean;
 
   // --- gifts (the reward economy: no shop, no prices) ---
   /** Every gift ever granted, used or not. History reads straight off this. */
@@ -403,6 +405,8 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const loggedToday = streak?.loggedToday ?? false;
   const freeFreezes = streak?.freezes.free ?? 0;
   const heldFreezes = streak?.freezes.held ?? 0;
+  // An older backend still spends freezes back to back, so any freeze held covers today there.
+  const freezeReady = streak?.freezeReady ?? freeFreezes + heldFreezes > 0;
   const gifts = useMemo(() => giftItems.map(giftEventOf), [giftItems]);
   const retiredStreak = streak?.retiredStreak ?? null;
   const medianLogSeconds = logDurations.length >= 3 ? medianOf(logDurations) : DEFAULT_LOG_SECONDS;
@@ -486,8 +490,12 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     if (!streak || fresh.length === 0) return;
     for (const notice of fresh) told.current.add(notice.day);
     const left = streak.freezes.free + streak.freezes.held;
+    // A freeze covers one day at a time: right after one, today is unprotected until it counts.
+    const exposed = streak.current > 0 && !streak.loggedToday && streak.freezeReady === false;
     toast(`Life happened. A freeze covered ${fresh.map((notice) => weekdayName(notice.day)).join(" and ")}.`, {
-      description: `Your streak never broke. ${left} ${left === 1 ? "freeze" : "freezes"} left.`,
+      description: exposed
+        ? "Your streak never broke, but a freeze only covers one day. Log something today to keep it."
+        : `Your streak never broke. ${left} ${left === 1 ? "freeze" : "freezes"} left.`,
     });
     markSeenNow({ freezes: fresh.map((notice) => notice.day) });
   }, [streak, markSeenNow]);
@@ -680,6 +688,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     credits: 0,
     freeFreezes,
     heldFreezes,
+    freezeReady,
     dailyTarget,
     todayIntensity,
     awardStrongEvent,

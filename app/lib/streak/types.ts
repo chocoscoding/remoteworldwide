@@ -104,6 +104,12 @@ export interface StreakItem {
   loggedToday: boolean;
   days: StreakDayItem[];
   freezes: { free: number; held: number; cap: number };
+  /**
+   * Whether a freeze would cover today if it closes with nothing logged. A freeze covers one day
+   * at a time: false with freezes held once one covered a day since the last logged day. Absent
+   * from older backends.
+   */
+  freezeReady?: boolean;
   milestones: StreakMilestoneItem[];
   notices: StreakNotice[];
   repair: StreakRepairOffer | null;

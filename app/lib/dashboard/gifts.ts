@@ -24,7 +24,7 @@ export interface GiftSpec {
 }
 
 export const GIFT_CATALOGUE: Record<GiftKind, GiftSpec> = {
-  freeze: { kind: "freeze", label: "Streak freeze", detail: "Covers one unplanned missed day.", icon: Snowflake },
+  freeze: { kind: "freeze", label: "Streak freeze", detail: "Covers one missed day. Two in a row break the streak.", icon: Snowflake },
   backfill: { kind: "backfill", label: "Backfill", detail: "Logs a day you forgot to record.", icon: CalendarPlus },
   rewrite: { kind: "rewrite", label: "Resume rewrite", detail: "One free full AI rewrite of a saved resume.", icon: Sparkles },
   "pro-day": { kind: "pro-day", label: "1 day of Pro", detail: "Interview prep, likely questions and every Pro feature for 24 hours.", icon: Crown },
