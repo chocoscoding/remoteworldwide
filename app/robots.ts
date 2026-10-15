@@ -25,6 +25,13 @@ export default function robots(): MetadataRoute.Robots {
           "/*?*utm_",
         ],
       },
+      // Meta's AI training crawler: 269,000 requests in five days (Oct 2-6, 2026) and no visitors
+      // back. The firewall denies it too; this asks first. Facebook, Instagram and WhatsApp link
+      // previews come from facebookexternalhit, which this does not touch.
+      {
+        userAgent: "meta-externalagent",
+        disallow: "/",
+      },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,

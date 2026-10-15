@@ -1,6 +1,6 @@
 import type { FC } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/app/components/navigation/HoverPrefetchLink";
 import { cn } from "@/lib/utils";
 import { categoryBySlug } from "@/app/lib/blog/categories";
 import AuthorStack, { formatAuthorNames, type StackAuthor } from "./AuthorStack";

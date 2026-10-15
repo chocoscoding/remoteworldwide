@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { CompanyWithJobsCount } from "@/types/main";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import React, { cache } from "react";
 import { Metadata } from "next";
+import { prisma } from "@/prisma";
 import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 
 interface PageProps {
@@ -23,19 +24,22 @@ interface PageProps {
     facebook: string;
   };
 }
-const fetchCompany = async (slug: string): Promise<CompanyWithJobsCount | null> => {
+// Straight from the database, like the job page. This used to fetch the site's
+// own public /api/companies/slug URL, which sent every render back out through
+// the CDN firewall from Vercel's shared server addresses: the per-IP rate limit
+// then answered 429 now and then and a real company showed "Company Not Found".
+// cache() lets generateMetadata and the page share one query per request.
+const fetchCompany = cache(async (slug: string): Promise<CompanyWithJobsCount | null> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/companies/slug/${slug}`);
-    if (!response.ok) {
-      return null;
-    }
-    const data = await response.json();
-    return data.data;
+    return await prisma.company.findUnique({
+      where: { slug },
+      include: { _count: { select: { jobs: true } } },
+    });
   } catch (error) {
     console.error("Failed to fetch company:", error);
     return null;
   }
-};
+});
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const companySlug = decodeURIComponent((await params).slug);

@@ -1,7 +1,7 @@
 import { CompanyList } from "@/types/main";
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/app/components/navigation/HoverPrefetchLink";
 import React, { FC } from "react";
 
 const CompanyTile: FC<{ forCompany?: boolean; companyData: CompanyList }> = ({ forCompany = false, companyData }) => {

@@ -1,7 +1,7 @@
 import { JobTileType } from "@/types/main";
 import { Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/app/components/navigation/HoverPrefetchLink";
 import React, { FC } from "react";
 import TimeAgo from "timeago-react";
 
