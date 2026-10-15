@@ -74,7 +74,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
   const related = tool.related.map((key) => TOOLS.find((t) => t.key === key)).filter((t): t is Tool => Boolean(t));
   const cta = { href: tool.dashboardHref, openLabel: tool.openLabel };
   const breadcrumbs = breadcrumbJsonLd([
-    { name: "AI tools", path: "/tools" },
+    { name: "Features", path: "/tools" },
     { name: tool.name, path: toolPath(tool) },
   ]);
 
@@ -89,7 +89,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
           <div id="join" className="scroll-mt-28">
             <nav aria-label="Breadcrumb" className="mb-5 text-xs font-semibold text-primary/55">
               <Link href="/tools" className="hover:text-primary">
-                AI tools
+                Features
               </Link>
               <span className="mx-1.5" aria-hidden>
                 /
@@ -287,7 +287,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
               </h2>
             </div>
             <Link href="/tools" className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-bold text-primary underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary">
-              All AI tools
+              All features
             </Link>
           </div>
           <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

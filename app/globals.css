@@ -5,6 +5,14 @@
 :root {
   --back: #f6f6f6;
   --fore: #171717;
+  /* The site is light only (owner, 2026-10-15). Without this, and a background of its own, a browser
+     in dark mode painted its dark canvas behind every page while the text stayed black. */
+  color-scheme: only light;
+}
+
+html,
+body {
+  background-color: #fff;
 }
 
 body {

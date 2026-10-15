@@ -9,8 +9,8 @@ import ToolVisual from "@/app/components/tools/ToolVisual";
 import { ToolCta } from "@/app/components/tools/ToolCta";
 
 // The toolkit's front door: every AI tool with the step of the search it covers, each card a
-// crawlable link to its own page. "AI tools" leads the title so Google's sitelink for it reads so.
-const TITLE = "AI tools for your remote job search | Remote Worldwide";
+// crawlable link to its own page. "Features" leads the title so Google's sitelink for it reads as the navbar does.
+const TITLE = "Features: AI tools for your remote job search | Remote Worldwide";
 const DESCRIPTION =
   "Every step of the remote job search, with AI backup: tailor your resume, check it against the ATS, write the cover letter, autofill the form, rehearse the interview and track it all.";
 
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 const itemList = {
   "@context": "https://schema.org",
   "@type": "ItemList",
-  name: "Remote Worldwide AI tools",
+  name: "Remote Worldwide features",
   itemListElement: TOOLS.map((tool, i) => ({ "@type": "ListItem", position: i + 1, name: tool.name, url: absoluteUrl(toolPath(tool)) })),
 };
 
@@ -34,11 +34,11 @@ export default function ToolsPage() {
   return (
     <div className="bg-[#f9f8f1] text-primary">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(itemList) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbJsonLd([{ name: "AI tools", path: "/tools" }])) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbJsonLd([{ name: "Features", path: "/tools" }])) }} />
 
       <section className="mx-auto max-w-[1200px] px-4 pb-14 pt-10 md:pb-20 md:pt-16">
         <div className="mx-auto max-w-[820px] text-center">
-          <Eyebrow>AI tools</Eyebrow>
+          <Eyebrow>Features</Eyebrow>
           <h1 className="isolate mt-6 text-balance text-[2.25rem] font-extrabold leading-[1.05] tracking-tight xs:text-5xl sm:text-6xl">
             Every step of the search,{" "}
             <span className="relative inline-block whitespace-nowrap">

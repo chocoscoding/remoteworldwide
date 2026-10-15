@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "react-quill-new/dist/quill.snow.css";
 import "react-quill-new/dist/quill.bubble.css";
@@ -58,6 +58,12 @@ export const metadata: Metadata = {
     ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
     ...(process.env.BING_SITE_VERIFICATION ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } } : {}),
   },
+};
+
+// Light only: tells browsers (and the ones that darken pages on their own) not to restyle the site.
+export const viewport: Viewport = {
+  colorScheme: "only light",
+  themeColor: "#ffffff",
 };
 
 // Server-only, so the banner costs nothing until there is an incident. Setting
