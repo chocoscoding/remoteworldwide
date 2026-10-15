@@ -20,6 +20,7 @@
 import { prisma } from "@/prisma";
 import { Job } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { hexoid } from "hexoid";
 import { backend, BackendError, backendOrNull, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
 import type { Author, Blog, BlogStatus } from "@/app/lib/blog/types";
 import { requireAdminAction, requireRoleAction, requireUserAction } from "@/app/lib/auth/action-guards";
@@ -63,11 +64,53 @@ export const toggleJobActiveState = async (id: string, state: boolean) => {
   }
 };
 
+// A listing's slug: the title made URL-safe, then 30 random characters and the time, so two
+// listings with the same title never collide.
+const jobSlug = (title: string) =>
+  title
+    .replace(/[*+~.()^'"!#:@&/|{}[\]\\]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-") +
+  "-" +
+  hexoid(30)() +
+  Date.now();
+
+export type JobCreate = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "seniority"> & { region: string[] | string };
+
+// The admin's "Create job". It was POST /api/jobs until the public job reads moved to the
+// backend (2026-10-15); writing listings stays here, in Prisma, which the backend reads but
+// never writes. Every field is required, as the route required it.
+export const createOneJob = async (jobDetails: JobCreate) => {
+  await requireAdminAction();
+  const { title, description, companyId, applicationUrl, category, region, seniority } = jobDetails;
+  const regions = Array.isArray(region) ? region : region ? [region] : [];
+  const missing = [
+    !title && "title",
+    !description && "description",
+    !companyId && "companyId",
+    !applicationUrl && "applicationUrl",
+    !category && "category",
+    regions.length === 0 && "region",
+    !seniority && "seniority",
+  ].filter(Boolean) as string[];
+  if (missing.length) throw new Error(`Missing values: ${missing.join(", ")}`);
+  try {
+    const data = await prisma.job.create({
+      data: { title, description, companyId, applicationUrl, category, region: regions, seniority, slug: jobSlug(title) },
+    });
+    revalidatePath("/");
+    return { data };
+  } catch (error: any) {
+    throw new Error(error.message ?? "something went wrong");
+  }
+};
+
 // The fields the edit form owns. The type alone never limited the write — it is
 // erased at runtime, and `data: jobDetails` let a direct call pass anything the
 // update input accepts: `isActive` (publishing is toggleJobActiveState's job) or
 // `createdAt` (which orders the board). Naming each field makes the write match
-// the type, as the REST twin (app/api/jobs/[id]/route.ts PUT) does.
+// the type.
 type JobEdit = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "region" | "seniority" | "slug">;
 
 export const updateOneJob = async (id: string, jobDetails: JobEdit) => {
@@ -132,7 +175,7 @@ export const findJobsAdmin = async (page: number, active: boolean) => {
 };
 
 // The admin view of a company. The public /companies pages read through
-// app/api/companies and app/api/jobs/company, which filter to active listings.
+// app/api/companies and the backend's /api/jobs/company, which filter to active listings.
 export const findCompany = async (slug: string) => {
   await requireAdminAction();
   try {

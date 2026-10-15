@@ -9,6 +9,8 @@ import { toast } from "react-toastify";
 import AIJobParser from "./AIJobParser";
 import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
 import type { Company } from "@prisma/client";
+import { createOneJob, type JobCreate } from "@/libs/query";
+import { actionErrorMessage } from "@/app/lib/auth/action-error";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
@@ -186,18 +188,8 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       toast.info("Creating new Job...", { autoClose: 300 });
 
       try {
-        const response = await fetch("/api/jobs", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(finalValue),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.message);
-        }
+        // Every field was checked above, so the optional ones are set by now.
+        const data = await createOneJob(finalValue as JobCreate);
 
         toast.success("Job updated successfully!", {
           position: "bottom-right",
@@ -211,8 +203,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
         });
         push("/heroshima/jobs/" + data.data.slug);
       } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Failed to create job";
-        toast.error(`Failed to create job: ${errorMessage}`);
+        toast.error(`Failed to create job: ${actionErrorMessage(error)}`);
       } finally {
         setIsLoading(false);
       }

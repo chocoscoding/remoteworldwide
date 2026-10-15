@@ -1,8 +1,10 @@
 import { prisma } from "@/prisma";
 
-// The job board's search: GET /api/jobs answers with it, and the /jobs page runs it on
-// the server for the first paint, so the list (and every job link) is in the HTML that
-// crawlers read instead of arriving only after the browser's fetch.
+// The job board's search, for the /jobs page's first paint on the server, so the list (and
+// every job link) is in the HTML that crawlers read instead of arriving only after the
+// browser's fetch. The browser's later searches go to GET /api/jobs, which the backend
+// answers with the same query (remoteworldwidebackend src/services/jobBoardService.ts):
+// change one, change the other.
 
 export const JOBS_PER_PAGE = 50;
 const DEFAULT_START_DATE = { year: 2023, month: 12, day: 31 };

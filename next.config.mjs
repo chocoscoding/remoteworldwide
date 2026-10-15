@@ -225,6 +225,24 @@ const nextConfig = {
         source: "/api/coverage-requests/:path*",
         destination: `${backend}/api/coverage-requests/:path*`,
       },
+      // The public job board's reads: the /jobs search, a company page's listings and one listing
+      // by slug. They were Prisma routes here until 2026-10-15 and moved so scrapers meet the
+      // backend's per-visitor rate limit (proxy.ts tells it who each visitor is). No session.
+      // `/api/jobs/:slug` also reaches the backend's /api/jobs/bot and /parse, which keep their own
+      // guards (the bot's token, an admin session). Writing listings stays here, in libs/query.ts.
+      // Don't add an app/api/jobs route: rewrites run after routes, so it would shadow these.
+      {
+        source: "/api/jobs",
+        destination: `${backend}/api/jobs`,
+      },
+      {
+        source: "/api/jobs/company/:id",
+        destination: `${backend}/api/jobs/company/:id`,
+      },
+      {
+        source: "/api/jobs/:slug",
+        destination: `${backend}/api/jobs/:slug`,
+      },
       // Same-origin door to the admin job parser, so the Auth.js cookie is sent
       // and the backend can require an admin session instead of a token that
       // used to ship to every browser.
