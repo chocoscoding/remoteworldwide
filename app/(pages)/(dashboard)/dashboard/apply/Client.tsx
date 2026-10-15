@@ -394,11 +394,13 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
    * "By application" tab lists them. The route takes only a backend id, so a
    * new application's create is waited for first. A side record: the
    * application is tracked whether or not this lands, so a failure is dropped.
+   * The AI service also copies what is new to the library into it.
    */
   function logAnswerUses(applicationId: string | Promise<string | null>, answers: ApplicationAnswer[]) {
     if (answers.length === 0) return;
     void Promise.resolve(applicationId)
-      .then((id) => (id ? recordAnswerUses({ applicationId: id, answers }) : null))
+      // The company keeps answers that only fit it out of the saved-answer library, which applying feeds.
+      .then((id) => (id ? recordAnswerUses({ applicationId: id, answers, company: job.company }) : null))
       .then((recorded) => {
         if (recorded) void queryClient.invalidateQueries({ queryKey: qk.answers.history() });
       })

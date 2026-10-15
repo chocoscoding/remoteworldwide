@@ -20,6 +20,7 @@ import type { TrackerCard } from "@/app/lib/dashboard/types";
 import {
   APPLICATION_LIMITS,
   CLOSED_REASONS,
+  type ApplicationDetail,
   type ApplicationItem,
   type ApplicationStatus,
   type ApplicationSummary,
@@ -63,6 +64,11 @@ export function createApplication(input: CreateApplicationInput) {
 /** Any move, a touch, or a field edit. Another user's id is a 404, never a 403, so ids cannot be probed. */
 export function updateApplication(id: string, input: UpdateApplicationInput) {
   return apiPatch<ApplicationItem>(at(id), input);
+}
+
+/** One application with what was sent on it: the resume, the cover letter and the answers. */
+export function getApplication(id: string, signal?: AbortSignal) {
+  return apiGet<ApplicationDetail>(at(id), signal);
 }
 
 /** The response body is not part of the contract, so nothing reads it. */

@@ -3,7 +3,7 @@
 import { FC, useId, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
-import { ArrowUpRight, Check, ChevronDown, Copy, Kanban, Trash2 } from "lucide-react";
+import { ArrowUpRight, BookmarkCheck, BookmarkPlus, Check, ChevronDown, Copy, Kanban, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Avatar from "@/app/components/dashboard/ui/Avatar";
@@ -12,6 +12,7 @@ import LogoMini from "@/app/components/svg/LogoMini";
 import type { ListedDraft } from "@/app/lib/drafts/api";
 import type { ApplicationDraftAnswer, ApplicationDraftItem } from "@/app/lib/drafts/types";
 import { TRACKER_HREF, useDeleteDraft } from "@/hooks/mutations/useDraftMutations";
+import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
 import MarkAppliedDialog from "./MarkAppliedDialog";
 
 /** Quiet inline control — weight is reserved for the row's real actions (the saved-jobs page's). */
@@ -78,6 +79,49 @@ const CopyButton: FC<{ text: string; what: string }> = ({ text, what }) => {
   );
 };
 
+/** A question as the library compares it, near enough: case, punctuation and spacing gone. The server decides for real. */
+const questionKey = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * Keeps one of the draft's answers for every form from now on. A draft is never
+ * copied into the library on its own: it was not sent and may be half written
+ * (owner, 2026-10-15). Applying copies what is new automatically; this is for
+ * the answers worth keeping before then.
+ */
+const SaveToLibrary: FC<{ answer: ApplicationDraftAnswer }> = ({ answer }) => {
+  const { items, addAnswer } = useAnswers();
+  const [saving, setSaving] = useState(false);
+  const inLibrary = items.some((item) => questionKey(item.q) === questionKey(answer.question));
+
+  async function save() {
+    setSaving(true);
+    const result = await addAnswer({ q: answer.question, a: answer.answer, cat: "screening" });
+    setSaving(false);
+    if (!result) return;
+    if (result.added) toast.success("Saved to your library", { description: "Reused whenever we fill a form from now on." });
+    else toast("Already in your library", { description: result.existing.q });
+  }
+
+  if (inLibrary) {
+    return (
+      <span className="mt-2 inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-black/45">
+        <BookmarkCheck className="h-3.5 w-3.5" />
+        In your library
+      </span>
+    );
+  }
+  return (
+    <button type="button" className={cn(GHOST_BTN, "mt-2")} onClick={() => void save()} disabled={saving}>
+      <BookmarkPlus className="h-3.5 w-3.5" />
+      {saving ? "Saving…" : "Save to library"}
+    </button>
+  );
+};
+
 /**
  * One saved answer. A profile value is labelled as one: it is a field the user
  * typed for this job (a phone number, a current company), not a question, and
@@ -96,7 +140,10 @@ const DraftAnswerCard: FC<{ answer: ApplicationDraftAnswer }> = ({ answer }) => 
         )}
       </div>
       <p className={cn("whitespace-pre-wrap break-words text-sm leading-relaxed text-black/70", letter && "max-h-72 overflow-y-auto")}>{answer.answer}</p>
-      <CopyButton text={answer.answer} what={letter ? "cover letter" : `answer to “${answer.question}”`} />
+      <div className="flex flex-wrap items-center">
+        <CopyButton text={answer.answer} what={letter ? "cover letter" : `answer to “${answer.question}”`} />
+        {answer.kind === "question" && answer.question.trim() && <SaveToLibrary answer={answer} />}
+      </div>
     </div>
   );
 };
@@ -131,6 +178,8 @@ const DraftRow: FC<DraftRowProps> = ({ draft }) => {
     draft.location,
     `${count} answer${count === 1 ? "" : "s"}`,
     at ? `${applied ? "applied" : "saved"} ${at}` : null,
+    // A draft for a job that is neither saved nor tracked is deleted 30 days after its last save.
+    !applied && draft.expiresAt ? `deleted ${ago(draft.expiresAt)} unless you save the job` : null,
   ]
     .filter(Boolean)
     .join(" · ");

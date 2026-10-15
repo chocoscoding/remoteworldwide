@@ -58,6 +58,8 @@ export interface AnswerHistoryItem {
 export interface RecordAnswerUsesInput {
   applicationId: string;
   answers: Array<{ question: string; answer: string }>;
+  /** The employer: answers naming it stay with this application, out of the saved-answer library. */
+  company?: string | null;
 }
 
 export interface RecordAnswerUsesResult {

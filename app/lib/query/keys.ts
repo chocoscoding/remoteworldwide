@@ -72,6 +72,9 @@ export const qk = {
     all: ["answers"] as const,
     list: () => [...qk.answers.all, "list"] as const,
     history: () => [...qk.answers.all, "history"] as const,
+    // One tracker entry with what was sent on it (`GET /api/applications/:id`): the tracker's
+    // "Your application answers". Under `answers`, not `activity`, so it never reaches the disk.
+    application: (id: string) => [...qk.answers.all, "application", id] as const,
   },
   // Application drafts, from the AI service: what the extension kept of a form
   // left before applying. `list(status)` is one read per filter ("all" feeds

@@ -48,12 +48,15 @@ export interface ApplicationDraftItem {
   listing: ListingLink | null;
   status: ApplicationDraftStatus;
   applicationId: string | null;
+  /** The tracker entry this posting is on, sent or not. Absent from a service that predates it. */
+  trackedApplicationId?: string | null;
   appliedAt: string | null;
   answers: ApplicationDraftAnswer[];
   answerCount: number;
   createdAt: string;
   updatedAt: string;
-  expiresAt: string;
+  /** Null while the job is saved or on the tracker: the draft then lasts as long as the job does. */
+  expiresAt: string | null;
 }
 
 export interface SaveDraftInput {

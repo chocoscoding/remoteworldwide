@@ -23,6 +23,8 @@ import StatusMenu from "./StatusMenu";
 import MoveToButton from "./MoveToButton";
 import { useTracker } from "./TrackerProvider";
 import { COLUMN_LABELS, STATUS_ORDER } from "./tracker-meta";
+import JobAnswers from "./JobAnswers";
+import { isObjectId } from "@/app/lib/applications/api";
 
 /**
  * Click any job, in any view, and this is where it opens: everything that has
@@ -296,6 +298,10 @@ const JobTimelineDialog: FC<JobTimelineDialogProps> = ({ card, columnId, onOpenC
                   })}
                 </div>
               </div>
+
+              {/* What was sent on this application, or the unsent draft tied to it. */}
+              {/* A card still being created has a client id: it has nothing sent on it yet. */}
+              {isObjectId(card.id) && <JobAnswers key={`answers-${card.id}`} applicationId={card.id} />}
 
               {/* Feels like progress? Put it on the pod's board. */}
               {/* Owed a follow-up? Say so here, where the user already is,
