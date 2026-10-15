@@ -86,7 +86,7 @@ export const FALLBACK_CATALOGUE: PricingCatalogue = {
       interval: "month",
       monthlyCredits: 50,
       prioritySupport: false,
-      features: ["50 AI credits a month", "Resume builder (one resume)", "One cover letter and ATS scans", "Application tracking and drafts"],
+      features: ["50 AI credits a month", "Every AI tool, a little each month", "1 interview prep session a month", "One resume and one cover letter"],
     },
     {
       key: "basic",
@@ -141,7 +141,7 @@ export interface CreditCost {
 export const CREDIT_COSTS: CreditCost[] = [
   { action: "Import a job", detail: "Paste a link or posting and it's ready to tailor against.", credits: 0 },
   // No typed practice interview: the website only starts voice sessions (PrepLive), so it isn't sold here.
-  { action: "AI coach reply", detail: "On Basic and up, the first 15 replies every day are free.", credits: 0, label: "15 free / day" },
+  { action: "AI coach reply", detail: "On Basic and up, the first 15 replies every day are free. Free gets 5 replies a month.", credits: 0, label: "15 free / day" },
   { action: "ATS scan", detail: "Score your resume against a posting, keyword by keyword.", credits: 1 },
   { action: "Resume suggestion", detail: "Add missing keywords, quantify bullets, or shorten to a page.", credits: 1 },
   { action: "Ask about a job", detail: "An answer grounded in the posting and your profile.", credits: 1 },
@@ -155,18 +155,15 @@ export const CREDIT_COSTS: CreditCost[] = [
 ];
 
 /**
- * Plans the interview-prep tools are on, voice interviews included. The comparison table and the
- * estimator share it, and the AI service enforces it (remoteworldwideai services/planService.ts:
- * prep is on Pro).
- */
-const INTERVIEW_PLANS = ["pro", "ultra"];
-
-/**
- * Every paid plan: no ads (app/lib/ads.ts), AI help in the resume builder and more than one resume
- * start at Basic, and so do the coach, voice talk, the daily plan, pods and recommendations
- * (owner, 2026-10-01). Streaks stay on Free.
+ * Every paid plan: no ads (app/lib/ads.ts) and more than one resume start at Basic (owner,
+ * 2026-10-01). The AI tools, the coach, voice talk and recommendations are on Free a little each
+ * month (owner, 2026-10-15; `freeMonthly`), and only the pod has none. Streaks stay on Free.
  */
 const PAID_PLANS = ["basic", "pro", "ultra"];
+
+/** A row Free gets a little of each month (owner, 2026-10-15), with the plans that have it in full. */
+const freeMonthly = (amount: string, below: string[] = ["free"]): Record<string, string> =>
+  Object.fromEntries(below.map((plan) => [plan, `${amount} a month`]));
 
 export interface EstimatorItem {
   key: string;
@@ -185,7 +182,7 @@ export interface EstimatorItem {
 export const ESTIMATOR_ITEMS: EstimatorItem[] = [
   { key: "scans", label: "ATS scans", unit: "scan", credits: 1, max: 80, initial: 20 },
   { key: "letters", label: "Cover letters", unit: "letter", credits: 2, max: 40, initial: 10, limits: { free: 1 } },
-  { key: "interviews", label: "Voice mock interviews", unit: "interview", credits: 5, max: 30, initial: 6, plans: INTERVIEW_PLANS },
+  { key: "interviews", label: "Voice mock interviews", unit: "interview", credits: 5, max: 30, initial: 6, limits: { free: 1, basic: 1 } },
 ];
 
 export interface FeatureRow {
@@ -210,10 +207,12 @@ export const CREDIT_ROWS: FeatureRow[] = [
 ];
 
 /**
- * The comparison table under the plan cards. Free's limits (one resume, no AI in the builder) and
- * interview prep on Pro are enforced by the AI service, the coaching tools and recommendations on
- * Basic by the AI service and backend, and ads by app/lib/ads.ts; priority support and early access
- * are the Ultra plan's promise. Referral search is left out for now.
+ * The comparison table under the plan cards. Free's limits (one resume, one letter, a little of each
+ * AI tool a month: services/planService.ts FREE_MONTHLY) and interview prep on Pro (one session a
+ * month below it) are enforced by the AI service, the coaching tools and recommendations on Basic
+ * by the AI service and backend (one recommendation a month below it), the pod on Basic by the
+ * backend, and ads by app/lib/ads.ts; priority support and early access are the Ultra plan's
+ * promise. Referral search is left out for now.
  */
 export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
@@ -231,8 +230,8 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     rows: [
       { label: "Resume builder", plans: "all", values: { free: "1 resume", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" } },
       { label: "Import your resume", note: "Upload a PDF, Word or text file · free", plans: "all" },
-      { label: "Build a resume with AI", note: "A full resume around a target role · 3 credits", plans: PAID_PLANS },
-      { label: "AI help in the resume builder", note: "Tailor, add keywords, quantify, shorten · 1 credit", plans: PAID_PLANS },
+      { label: "Build a resume with AI", note: "A full resume around a target role · 3 credits", plans: "all", values: freeMonthly("1") },
+      { label: "AI help in the resume builder", note: "Tailor, add keywords, quantify, shorten · 1 credit", plans: "all", values: freeMonthly("3") },
       { label: "ATS scans", note: "Keyword-by-keyword score against a posting · 1 credit", plans: "all" },
       { label: "Cover letters", note: "2 credits a draft, 1 per revision", plans: "all", values: { free: "1 letter", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" } },
       { label: "Document vault", note: "Your files in one place, with a master resume", plans: "all" },
@@ -247,26 +246,27 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
       { label: "Autofill from your profile", note: "Your details and saved answers · free", plans: "all" },
       { label: "AI answers in the extension", note: "New questions answered from your resume · 1 credit", plans: "all" },
       { label: "Application drafts", note: "Pick an application back up later", plans: "all" },
-      { label: "Recommendations to companies", note: "Reviewers put strong profiles in front of hiring teams", plans: PAID_PLANS },
+      { label: "Recommendations to companies", note: "Reviewers put strong profiles in front of hiring teams", plans: "all", values: freeMonthly("1") },
     ],
   },
   {
     title: "Interview prep",
     rows: [
-      { label: "Prep tracks for each role", note: "Built on the real posting, synced with your tracker", plans: INTERVIEW_PLANS },
-      { label: "Likely interview questions", note: "A tailored set for the role · 1 credit", plans: INTERVIEW_PLANS },
-      { label: "Voice mock interviews", note: "5 credits for up to 10 minutes, then 1 a minute", plans: INTERVIEW_PLANS },
-      { label: "Interview reports", note: "Scores, transcript and recording playback", plans: INTERVIEW_PLANS },
-      { label: "Delivery analysis", note: "Long pauses, filler words and pitch", plans: INTERVIEW_PLANS },
-      { label: "Positioning, diction and grammar", note: "Every point backed by a quote from your answers", plans: INTERVIEW_PLANS },
+      { label: "Prep tracks for each role", note: "Built on the real posting, synced with your tracker", plans: "all" },
+      { label: "Likely interview questions", note: "A tailored set for the role · 1 credit", plans: "all", values: freeMonthly("1 set", ["free", "basic"]) },
+      { label: "Voice mock interviews", note: "5 credits for up to 10 minutes, then 1 a minute", plans: "all", values: freeMonthly("1", ["free", "basic"]) },
+      { label: "Interview reports", note: "Scores, transcript and recording playback", plans: "all" },
+      { label: "Delivery analysis", note: "Long pauses, filler words and pitch", plans: "all" },
+      { label: "Positioning, diction and grammar", note: "Every point backed by a quote from your answers", plans: "all" },
     ],
   },
   {
     title: "Coaching & momentum",
     rows: [
-      { label: "AI career coach", note: "15 free replies a day, then 1 credit each", plans: PAID_PLANS },
-      { label: "Talk it through by voice", note: "With the coach and Ask about a job", plans: PAID_PLANS },
-      { label: "Daily plan", note: "Today's tasks, picked for your search", plans: PAID_PLANS },
+      { label: "AI career coach", note: "15 free replies a day, then 1 credit each", plans: "all", values: freeMonthly("5 replies") },
+      { label: "Talk it through by voice", note: "With the coach and Ask about a job", plans: "all", values: freeMonthly("1 talk") },
+      { label: "Daily plan", note: "Today's tasks, picked for your search", plans: "all" },
+      { label: "Coach plans on your daily plan", note: "The coach's suggested tasks, added in one go", plans: "all", values: freeMonthly("1") },
       { label: "Job-search pod", note: "Weekly goals and wins with a small group", plans: PAID_PLANS },
       { label: "Streaks", note: "A streak to keep, from the work you do", plans: "all" },
     ],

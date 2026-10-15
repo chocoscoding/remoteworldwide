@@ -12,7 +12,8 @@ import { PREP_BILLING_HREF } from "@/app/lib/voice/api";
 import { useGenerateLikelyQuestions } from "@/hooks/mutations/usePrepTrackMutations";
 import { useLikelyQuestions } from "@/hooks/queries/usePrepTrackQueries";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
-import { usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
 import Chip from "./Chip";
 import PrepEmptyState from "./PrepEmptyState";
 import { useTrackResume } from "./useTrackResume";
@@ -76,9 +77,11 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
 
   // The first set, without a click: a posting to write from, nothing written yet, and a plan and
   // balance that cover it. Once per track per visit; a refusal or failure leaves the button.
-  const { allows } = usePlanGate();
+  // Below Pro the first set a month is free, so it is written without a click there too; the
+  // service refuses past it, and a refusal leaves the button.
+  const { locked } = usePlanLock(FREE_ALLOWANCE_GATES.likelyQuestions);
   const { subscription } = useBilling();
-  const covered = allows("pro") && subscription.creditBalance >= cost;
+  const covered = !locked && subscription.creditBalance >= cost;
   const due = Boolean(trackId && hasPosting && covered && !set && query.isSuccess && !busy && !generate.isError);
   useEffect(() => {
     if (!due || !trackId || autoWritten.has(trackId)) return;

@@ -43,7 +43,9 @@ import AiAssistRail from "./AiAssistRail";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
 import { applyToneFix, pinToneFixes, proposalState, type ToneProposal } from "@/app/lib/resume/tone-fixes";
-import { PlanChip, usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
+import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
 import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import type { PickedJob } from "@/app/lib/jobs/fields";
 // `applyQuantify` is the one tool function still executed in the browser, and
@@ -228,9 +230,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // Free has the builder without its AI: the tools show a lock and open the upgrade popup instead.
   // The AI service enforces the same, so this only saves a refused request. (A new resume is
   // started from the landing, where Free's one-resume limit is checked.)
-  const { allows, openUpgrade } = usePlanGate();
-  const aiLocked = !allows("basic");
-  const lockedAi = () => openUpgrade({ kind: "plan", requiredPlan: "basic", message: "AI help with your resume is on Basic and up." });
+  // Below Basic there are a few free runs a month, so the tools stay open and the service's refusal
+  // past them opens the upgrade popup; `aiLocked` only holds if that allowance is ever taken away.
+  const aiLock = usePlanLock(FREE_ALLOWANCE_GATES.resumeAi);
+  const aiLocked = aiLock.locked;
+  const lockedAi = aiLock.upgrade;
 
   // The Content form's edits. Typing into one field folds into one undo step until the typing
   // pauses; adding, removing or moving an entry is a step of its own. Everything else that changes

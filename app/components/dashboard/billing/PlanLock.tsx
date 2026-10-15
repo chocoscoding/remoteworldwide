@@ -8,14 +8,17 @@ import { PLAN_TIER_NAMES } from "@/app/lib/settings/types";
 import { PlanChip, usePlanGate } from "./UpgradeModal";
 
 /**
- * Whether the account's plan is below `gate`, and the upgrade popup for it, opened before any
- * request is made. The control it guards stays on screen: pressing it is what offers the plan.
+ * Whether the control `gate` guards is locked up front, and the upgrade popup for it, opened before
+ * any request is made. The control stays on screen: pressing it is what offers the plan. A gate with
+ * a monthly free allowance is never locked here: the service counts the free uses and its refusal
+ * opens the same popup. `below` says the plan is under the gate's, for a quiet plan chip.
  */
 export function usePlanLock(gate: PlanGateSpec) {
   const { allows, openUpgrade } = usePlanGate();
-  const { plan, message } = gate;
+  const { plan, message, freeMonthly } = gate;
   const upgrade = useCallback(() => openUpgrade({ kind: "plan", requiredPlan: plan, message }), [openUpgrade, plan, message]);
-  return { locked: !allows(plan), upgrade };
+  const below = !allows(plan);
+  return { locked: below && freeMonthly === 0, below, upgrade };
 }
 
 export interface PlanLockNoteProps {

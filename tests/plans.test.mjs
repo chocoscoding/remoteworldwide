@@ -90,18 +90,19 @@ describe("the four plans", () => {
 });
 
 describe("the comparison table's gates", () => {
-  it("Basic: no ads and the resume AI", () => {
-    for (const label of ["No ads", "Build a resume with AI", "AI help in the resume builder"]) {
-      assert.deepEqual(plansWith(label), ["basic", "pro", "ultra"], label);
-    }
+  it("Basic: no ads and the pod; the resume AI is on Free a little each month", () => {
+    for (const label of ["No ads", "Job-search pod"]) assert.deepEqual(plansWith(label), ["basic", "pro", "ultra"], label);
+    assert.deepEqual(row("Build a resume with AI").values, { free: "1 a month" });
+    assert.deepEqual(row("AI help in the resume builder").values, { free: "3 a month" });
     assert.deepEqual(row("Resume builder").values, { free: "1 resume", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" });
   });
 
-  it("Pro: interview prep, voice interviews included", () => {
+  it("Pro: interview prep in full, one session a month below it", () => {
     const prep = FEATURE_GROUPS.find((group) => group.title === "Interview prep").rows;
     assert.ok(prep.some((r) => r.label === "Voice mock interviews"));
-    for (const r of prep) assert.deepEqual(plansWith(r.label), ["pro", "ultra"], r.label);
-    assert.deepEqual(ESTIMATOR_ITEMS.find((item) => item.key === "interviews").plans, ["pro", "ultra"]);
+    for (const r of prep) assert.deepEqual(plansWith(r.label), ["free", "basic", "pro", "ultra"], r.label);
+    assert.deepEqual(row("Voice mock interviews").values, { free: "1 a month", basic: "1 a month" });
+    assert.deepEqual(ESTIMATOR_ITEMS.find((item) => item.key === "interviews").limits, { free: 1, basic: 1 });
   });
 
   it("Ultra: priority support and early access", () => {
@@ -199,13 +200,13 @@ describe("the AI service's gates (remoteworldwideai services/planService.ts)", {
     assert.deepEqual(listOf(readFileSync(AI_PLAN, "utf8"), "TIERS"), [...PLAN_TIERS]);
   });
 
-  // Each lock on the site, and the refusal it saves a request for.
+  // Each control on the site, and the refusal (past the month's free uses) behind it.
   for (const [lock, allows, service, gate] of [
-    ["app/(pages)/(dashboard)/dashboard/resume/Client.tsx", 'allows("basic")', "resumeBuildService.ts", /requireTier\(\w+, "basic", "Building a resume with AI"\)/],
-    ["app/components/dashboard/resume/ResumeScreenBody.tsx", 'allows("basic")', "suggestionService.ts", /requireTier\([\w.]+, "basic", "AI help with your resume"\)/],
-    ["app/components/dashboard/resume/ResumeScreenBody.tsx", 'allows("basic")', "planService.ts", /upgrade to Basic to build more\.", "basic", tier\)/],
-    ["app/components/dashboard/prep/PrepSetup.tsx", 'allows("pro")', "prepSessionService.ts", /requireTier\(\w+, "pro", "Interview prep"\)/],
-    ["app/components/dashboard/prep/PrepSetup.tsx", 'allows("pro")', "likelyQuestionService.ts", /requireTier\(\w+, "pro", "Likely interview questions"\)/],
+    ["app/(pages)/(dashboard)/dashboard/resume/Client.tsx", "FREE_ALLOWANCE_GATES.resumeBuild", "resumeBuildService.ts", /requireTierOrFree\(\w+, "basic", "Building a resume with AI", "resumeBuild"\)/],
+    ["app/components/dashboard/resume/ResumeScreenBody.tsx", "FREE_ALLOWANCE_GATES.resumeAi", "suggestionService.ts", /requireTierOrFree\([\w.]+, "basic", "AI help with your resume", "resumeHelp"\)/],
+    ["app/(pages)/(dashboard)/dashboard/resume/Client.tsx", "usePlanLock", "planService.ts", /upgrade to Basic to build more\.", "basic", tier\)/],
+    ["app/components/dashboard/prep/PrepSetup.tsx", "FREE_ALLOWANCE_GATES.prep", "prepSessionService.ts", /requireTierOrFree\(\w+, "pro", "Interview prep", "prep"\)/],
+    ["app/components/dashboard/prep/LikelyQuestions.tsx", "FREE_ALLOWANCE_GATES.likelyQuestions", "likelyQuestionService.ts", /requireTierOrFree\(\w+, "pro", "Likely interview questions", "likelyQuestions"\)/],
   ]) {
     it(`${lock.split("/").pop()} locks at the tier ${service} refuses below`, () => {
       assert.ok(site(lock).includes(allows), `${lock} no longer says ${allows}`);

@@ -63,7 +63,8 @@ import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
 import { ResumeDesignProvider } from "@/app/components/dashboard/resume/ResumeDesignContext";
 import { createBlankContent, fromStored, importLabel, type ResumeDocument } from "@/app/components/dashboard/resume/resume-document";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import { usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
 
 /** Refused for the account's plan: the upgrade popup already says so. */
 const isPlanRefusal = (error: unknown): boolean => error instanceof BackendError && (error.code === "plan_required" || error.status === 402);
@@ -226,16 +227,13 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
 
   // "Build with AI". The builder saved the document already, so it is opened,
   // not created again; the build spent credits, so the balance is refreshed.
-  // Building with AI is on Basic and up, so Free sees it locked and gets the
-  // upgrade popup instead of a dialog it can't finish.
+  // Building with AI is on Basic and up, with one free build a month below it: the dialog stays
+  // open to everyone, and the AI service's refusal past the free build opens the upgrade popup.
   const queryClient = useQueryClient();
-  const { allows, openUpgrade } = usePlanGate();
-  const buildLocked = !allows("basic");
+  const buildLock = usePlanLock(FREE_ALLOWANCE_GATES.resumeBuild);
+  const buildLocked = buildLock.locked;
   const [buildOpen, setBuildOpen] = useState(false);
-  const startBuild = () =>
-    buildLocked
-      ? openUpgrade({ kind: "plan", requiredPlan: "basic", message: "Building a resume with AI is on Basic and up." })
-      : setBuildOpen(true);
+  const startBuild = () => (buildLocked ? buildLock.upgrade() : setBuildOpen(true));
   const openBuilt = (stored: StoredResumeDocument) => {
     open(fromStored(stored));
     void queryClient.invalidateQueries({ queryKey: qk.billing.overview() });

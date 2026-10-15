@@ -26,7 +26,9 @@ import Chip from "./Chip";
 import ResumePickerDialog from "./ResumePickerDialog";
 import { useTrackResume } from "./useTrackResume";
 import { BUTTON_SOLID } from "./prep-styles";
-import { PlanChip, usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
+import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
+import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
 
 const FORMAT_ICON: Record<SessionFormat, LucideIcon> = { behavioural: MessageCircle, portfolio: Presentation, salary: DollarSign };
 
@@ -115,8 +117,10 @@ export interface PrepSetupProps {
 
 const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQuestions, onStart }) => {
   const [formats, setFormats] = useState<SessionFormat[]>(initialFormats?.length ? initialFormats : ["behavioural"]);
-  const { allows, openUpgrade } = usePlanGate();
-  const prepLocked = !allows("pro");
+  // One free session a month below Pro: only the chip says it is a Pro feature, and the AI service's
+  // refusal past the free session opens the upgrade popup.
+  const prepLock = usePlanLock(FREE_ALLOWANCE_GATES.prep);
+  const prepLocked = prepLock.locked;
 
   // Never let the last one be unticked — a session with no format has no
   // questions to ask, so the control refuses rather than erroring later.
@@ -278,7 +282,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
     // Interview prep is on Pro: below it, the upgrade popup rather than a session the AI
     // service would refuse once the microphone is already asked for.
     if (prepLocked) {
-      openUpgrade({ kind: "plan", requiredPlan: "pro", message: "Interview prep is on Pro." });
+      prepLock.upgrade();
       return;
     }
     // A master document default is parsed and stored on the track here, once,
@@ -541,7 +545,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
               : offerMinutes !== null
                 ? `Start ${offerMinutes}-minute session`
                 : "Start session"}
-            {prepLocked ? <PlanChip plan="pro" className="bg-white" /> : null}
+            {prepLock.below ? <PlanChip plan="pro" className="bg-white" /> : null}
           </button>
         )}
       </div>

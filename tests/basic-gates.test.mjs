@@ -1,7 +1,9 @@
-// What Free does not get (owner, 2026-10-01): the career coach, talking it
-// through by voice (the coach and Ask about a job; typed Ask about a job stays
-// free), the daily plan, the job-search pod and being recommended to companies
-// start at Basic, and Free keeps one cover letter. Streaks stay on Free.
+// The Basic gates (owner, 2026-10-01): the career coach, talking it through by
+// voice (the coach and Ask about a job; typed Ask about a job stays free), a
+// coach plan on the daily plan, the job-search pod and being recommended to
+// companies start at Basic, and Free keeps one cover letter. Streaks stay on
+// Free. Since 2026-10-15 Free gets every one of them a little each month
+// (`freeMonthly`) except the pod, and the daily plan itself is open to all.
 //
 // Checked here: each lock on the site names the same plan, in the same words,
 // as the refusal behind it (app/lib/settings/planGates.ts against the AI
@@ -41,7 +43,7 @@ registerHooks({
   },
 });
 
-const { BASIC_GATES } = await import("../app/lib/settings/planGates.ts");
+const { BASIC_GATES, FREE_ALLOWANCE_GATES } = await import("../app/lib/settings/planGates.ts");
 const { TALK_PROBLEM_KINDS, problemAction, problemCopy } = await import("../app/lib/voice/talkState.ts");
 const { ELIGIBILITY_REQUIREMENTS } = await import("../app/lib/recommendations/types.ts");
 
@@ -58,6 +60,13 @@ const sentence = (feature) => `${feature} is on Basic and up.`;
 describe("the Basic gates", () => {
   it("all start at Basic", () => {
     for (const [name, gate] of Object.entries(BASIC_GATES)) assert.equal(gate.plan, "basic", name);
+  });
+
+  it("give Free a little of each a month, except the pod and the one-letter count", () => {
+    for (const [name, gate] of Object.entries(BASIC_GATES)) {
+      if (name === "pod" || name === "coverLetters") assert.equal(gate.freeMonthly, 0, name);
+      else assert.ok(gate.freeMonthly > 0, name);
+    }
   });
 
   it("are read by every screen that offers them", () => {
@@ -155,11 +164,22 @@ describe("the AI service's refusals (remoteworldwideai)", { skip: !existsSync(AI
     const feature = /const COACH_FEATURE = "([^"]+)";/.exec(coach)?.[1];
     assert.ok(feature, "coachService.ts no longer names COACH_FEATURE");
     assert.equal(sentence(feature), BASIC_GATES.coach.message);
-    assert.equal((coach.match(/requireTier\(uid, "basic", COACH_FEATURE\)/g) ?? []).length, 2, "the coach is gated at a new session and at a turn");
-    assert.match(coach, /requireTier\(uid, "basic", "The daily plan"\)/);
+    assert.equal((coach.match(/requireTierOrFree\(uid, "basic", COACH_FEATURE, "coach"\)/g) ?? []).length, 2, "the coach is gated at a new session and at a turn");
+    assert.match(coach, /requireTierOrFree\(uid, "basic", "The daily plan", "planAccept"\)/);
     assert.equal(sentence("The daily plan"), BASIC_GATES.dailyPlan.message);
-    assert.match(ai("voiceConversationService.ts"), /requireTier\(userId, "basic", "Talking it through by voice"\)/);
+    assert.match(ai("voiceConversationService.ts"), /requireTierOrFree\(userId, "basic", "Talking it through by voice", "voiceTalk"\)/);
     assert.equal(sentence("Talking it through by voice"), BASIC_GATES.voice.message);
+  });
+
+  it("give the same free uses a month as the site says", () => {
+    const plan = ai("planService.ts");
+    const free = (key) => Number(new RegExp(`\\n  ${key}: (\\d+),`).exec(plan)?.[1]);
+    assert.equal(free("coach"), BASIC_GATES.coach.freeMonthly);
+    assert.equal(free("voiceTalk"), BASIC_GATES.voice.freeMonthly);
+    assert.equal(free("planAccept"), BASIC_GATES.dailyPlan.freeMonthly);
+    for (const [key, gate] of Object.entries({ resumeBuild: "resumeBuild", resumeHelp: "resumeAi", prep: "prep", likelyQuestions: "likelyQuestions" })) {
+      assert.equal(free(key), FREE_ALLOWANCE_GATES[gate].freeMonthly, key);
+    }
   });
 
   it("keep one cover letter on Free, word for word", () => {
@@ -175,17 +195,14 @@ describe("the AI service's refusals (remoteworldwideai)", { skip: !existsSync(AI
 });
 
 describe("the backend's refusals (remoteworldwidebackend)", { skip: !existsSync(BACKEND) }, () => {
-  it("are the plan's, the pod's and recommendations', in the site's words", () => {
+  it("are the pod's, in the site's words, and leave the plan and recommendations open", () => {
     assert.ok(backend("services/planGate.ts").includes("`${feature} is on ${PLAN_NAMES[min]} and up.`"));
-    for (const [file, feature, gate] of [
-      ["routes/task.routes.ts", "The daily plan", "dailyPlan"],
-      ["routes/pod.routes.ts", "The job-search pod", "pod"],
-      ["routes/recommendation.routes.ts", "Being recommended to companies", "recommendations"],
-    ]) {
-      // A third argument is an alternative entitlement (recommendations: a waiting priority intro, a streak gift).
-      assert.ok(backend(file).includes(`requirePlan("basic", "${feature}")`) || backend(file).includes(`requirePlan("basic", "${feature}", `), file);
-      assert.equal(sentence(feature), BASIC_GATES[gate].message, file);
-    }
+    assert.ok(backend("routes/pod.routes.ts").includes(`requirePlan("basic", "The job-search pod")`));
+    assert.equal(sentence("The job-search pod"), BASIC_GATES.pod.message);
+    // The daily plan is open to every tier; recommendations give Free one a month through eligibility.
+    assert.doesNotMatch(backend("routes/task.routes.ts"), /requirePlan/);
+    assert.doesNotMatch(backend("routes/recommendation.routes.ts"), /requirePlan/);
+    assert.match(backend("services/recommendationEligibility.ts"), /\|\| !recommendedThisMonth/);
   });
 
   it("leave streaks, leaving a pod and the internal routes alone", () => {
