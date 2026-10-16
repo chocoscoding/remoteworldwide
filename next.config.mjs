@@ -55,6 +55,10 @@ const CSP_REPORT_ONLY = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Dev only: lets phones and laptops on the same Wi-Fi open `next dev` at this machine's LAN
+  // address (http://192.168.x.x:3000). Next 16 refuses its dev scripts and live reload to any
+  // origin but localhost otherwise, so the page loads but never runs. Ignored by `next build`.
+  allowedDevOrigins: ["192.168.*.*"],
   // The job share card reads its Manrope cuts with readFile at runtime, which the tracer
   // can't follow, so name them or the deployed route has no fonts.
   outputFileTracingIncludes: {

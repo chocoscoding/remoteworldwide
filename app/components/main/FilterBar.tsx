@@ -20,16 +20,18 @@ const FilterPill: FC<{
   active: boolean;
   count?: number;
   icon?: ReactNode;
+  compact?: boolean;
   onOpenChange?: (open: boolean) => void;
   contentClassName?: string;
   children: ReactNode;
-}> = ({ label, active, count, icon, onOpenChange, contentClassName, children }) => (
+}> = ({ label, active, count, icon, compact, onOpenChange, contentClassName, children }) => (
   <Popover onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
       <button
         type="button"
         className={cn(
           "group inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full pl-3.5 pr-2.5 text-sm font-semibold text-primary br-shadow-press transition-[transform,box-shadow,background-color] duration-100 ease-out data-[state=open]:translate-x-[2px] data-[state=open]:translate-y-[2px] data-[state=open]:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+          compact && "h-8 gap-1 pl-3 pr-2 text-xs sm:h-9 sm:gap-1.5 sm:pl-3.5 sm:pr-2.5 sm:text-sm",
           active ? "bg-secondary" : "bg-white",
         )}>
         {icon}
@@ -39,7 +41,7 @@ const FilterPill: FC<{
             {count}
           </span>
         ) : null}
-        <ChevronDown className="h-4 w-4 opacity-50 transition-transform group-data-[state=open]:rotate-180" />
+        <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform group-data-[state=open]:rotate-180", compact && "h-3.5 w-3.5 sm:h-4 sm:w-4")} />
       </button>
     </PopoverTrigger>
     <PopoverContent align="start" className={cn("w-64 border-primary/15 p-0", contentClassName)}>
@@ -109,7 +111,8 @@ const Chip: FC<{ label: string; onRemove: () => void }> = ({ label, onRemove }) 
   </span>
 );
 
-const FilterBar: FC<{ className?: string }> = ({ className }) => {
+// `compact` draws smaller pills below sm (the /jobs board); from sm up they're the usual size.
+const FilterBar: FC<{ className?: string; compact?: boolean }> = ({ className, compact }) => {
   const {
     rolesOptions,
     seniorityOptions,
@@ -144,7 +147,8 @@ const FilterBar: FC<{ className?: string }> = ({ className }) => {
       <FilterPill
         label="Date range"
         active={dateLabel !== null}
-        icon={<CalendarIcon className="h-4 w-4 opacity-60" />}
+        compact={compact}
+        icon={<CalendarIcon className={cn("h-4 w-4 opacity-60", compact && "h-3.5 w-3.5 sm:h-4 sm:w-4")} />}
         contentClassName="w-auto"
         onOpenChange={(open) => {
           if (open) setMonths(window.matchMedia("(min-width: 640px)").matches ? 2 : 1);
@@ -160,7 +164,7 @@ const FilterBar: FC<{ className?: string }> = ({ className }) => {
       </FilterPill>
 
       {groups.map((group) => (
-        <FilterPill key={group.name} label={group.name} active={group.selected.length > 0} count={group.selected.length}>
+        <FilterPill key={group.name} label={group.name} active={group.selected.length > 0} count={group.selected.length} compact={compact}>
           <OptionList
             name={group.name}
             options={group.options}

@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-const SearchBar: React.FC<{ activeSearch?: boolean; alwaysActive?: boolean }> = ({ activeSearch = false, alwaysActive = false }) => {
+
+const SearchBar: React.FC<{ activeSearch?: boolean; alwaysActive?: boolean; compact?: boolean }> = ({
+  activeSearch = false,
+  alwaysActive = false,
+  compact = false,
+}) => {
   const [searchValue, setSearchValue] = useState("");
   const searchParams = useSearchParams();
   const { push } = useRouter();
@@ -52,11 +57,12 @@ const SearchBar: React.FC<{ activeSearch?: boolean; alwaysActive?: boolean }> = 
       className={cn(
         alwaysActive && "br-bold br-lime",
         "w-full h-[3.5rem] md:h-[4rem] outline outline-2 outline-black rounded-md bg-white p-1.5 md:p-2 flex transition-shadow duration-150 ease-out focus-within:shadow-[5px_5px_0_0_#e1f073]",
+        compact && "h-11 p-1 md:h-[3.25rem] md:p-1.5",
       )}>
       <div className="flex flex-1 items-center gap-4 px-2">
-        {searchValue.length <= 0 && <Search className="text-primary hidden md:block" />}
+        {searchValue.length <= 0 && <Search className={cn("text-primary hidden md:block", compact && "h-5 w-5")} />}
         <input
-          className="h-full w-full outline-none border-none text-sm md:text-xl"
+          className={cn("h-full w-full outline-none border-none text-sm md:text-xl", compact && "md:text-base")}
           type="text"
           placeholder="search 500+ remote jobs"
           value={searchValue}
@@ -77,7 +83,10 @@ const SearchBar: React.FC<{ activeSearch?: boolean; alwaysActive?: boolean }> = 
           </Link>
         ) : (
           <button
-            className="px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md br-shadow-press br-lime flex items-center justify-center gap-3"
+            className={cn(
+              "px-4 py-1.5 md:py-0 md:px-7 md:w-auto w-fit h-auto md:h-full text-white bg-primary rounded-md br-shadow-press br-lime flex items-center justify-center gap-3",
+              compact && "!px-3 py-1 md:!px-5",
+            )}
             type="submit">
             <InnerContent />
           </button>

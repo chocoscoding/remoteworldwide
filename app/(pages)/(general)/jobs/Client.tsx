@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 const Client = ({ showAds, initialJobs }: { showAds: boolean; initialJobs?: InitialJobs }) => {
   return (
     <div className="w-full">
-      <SearchBar activeSearch />
-      <FilterBar className="mt-4 mb-10" />
+      <SearchBar activeSearch compact />
+      <FilterBar className="mt-4 mb-10" compact />
 
       {/* With ads they flank the list: none on mobile, slim on tablet, wider from lg up, where the
           list takes 3/5 of the row (the old sidebar layout gave it 3/4). Without ads the list is full width. */}

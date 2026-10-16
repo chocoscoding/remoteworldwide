@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, FC } from "react";
-import JobTile from "@/app/components/main/JobTile";
+import JobTileV2 from "@/app/components/main/JobTileV2";
 import { fetchLatestJobs } from "@/libs/query";
 import { JobTileType } from "@/types/main";
 import JobTileSkeletonList from "@/app/components/main/JobTileSkeletonList";
@@ -45,7 +45,7 @@ const JobListSection: FC<{ latestJobs: JobTileType[] }> = ({ latestJobs }) => {
   return (
     <div>
       {jobs.map((job, index) => (
-        <JobTile key={index} {...job} />
+        <JobTileV2 key={index} {...job} />
       ))}
     </div>
   );

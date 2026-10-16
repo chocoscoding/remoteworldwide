@@ -177,7 +177,8 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
 };
 
 // The words in the bar: tight, since the sliding underline under them is what shows hover and "you're here".
-const TRIGGER = "inline-flex h-9 items-center whitespace-nowrap rounded-full text-sm font-semibold text-primary/80 transition-colors hover:text-primary";
+const TRIGGER =
+  "inline-flex h-9 items-center whitespace-nowrap rounded-full text-sm font-semibold text-primary/80 transition-colors hover:text-primary";
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const GAP = 16; // the panel never comes closer than this to the window's edge
 
@@ -219,7 +220,7 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
     }
     const rootLeft = root.current.getBoundingClientRect().left;
     const left = Math.min(...marks.map((r) => r.left)) - rootLeft;
-    const width = Math.max(...marks.map((r) => r.right)) - rootLeft - left;
+    const width = Math.max(...marks.map((r) => r.right)) - rootLeft - left - 20;
     setLine((p) => ({ left, width, height: 0, shown: true, instant: !p.shown }));
   }, [lineAt]);
 
@@ -327,7 +328,10 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
                   aria-expanded={open === i}
                   aria-controls="nav-panel"
                   aria-label={`More ${group.label} pages`}
-                  className={cn("grid h-9 w-7 cursor-pointer place-content-center rounded-full pr-1 text-primary/70 hover:text-primary", FOCUS)}>
+                  className={cn(
+                    "grid h-9 w-7 cursor-pointer place-content-center rounded-full pr-1 text-primary/70 hover:text-primary",
+                    FOCUS,
+                  )}>
                   {chevron}
                 </button>
               </>
@@ -470,7 +474,10 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
                     onClick={() => setGroup(expanded ? null : i)}
                     aria-expanded={expanded}
                     aria-controls={`mobile-menu-${i}`}
-                    className={cn("flex min-h-14 w-full cursor-pointer items-center justify-between text-base font-bold text-primary", FOCUS)}>
+                    className={cn(
+                      "flex min-h-14 w-full cursor-pointer items-center justify-between text-base font-bold text-primary",
+                      FOCUS,
+                    )}>
                     {navGroup.label}
                     <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", expanded && "rotate-180")} aria-hidden />
                   </button>

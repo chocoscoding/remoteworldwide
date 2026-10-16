@@ -70,9 +70,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
         </div>
       )}
 
-      <div className=" p-3 sm:p-5 md:p-8 w-full">
-        <text className="text-gray-500 text-sm">Job Description</text>
-
+      <div className=" p-3 sm:p-4 w-full">
         <section className="mt-3 flex w-full flex-wrap xs:flex-row flex-col">
           <div className="w-full flex-1">
             <h1 className="font-semibold text-2xl md:text-3xl mb-1 sm:mb-3 w-full break-words text-pretty">{title}</h1>
@@ -112,9 +110,9 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
           </div>
         </section>
         <hr className="bg-gray-500 my-6" />
-        <section className="middle min-h-[50vh]">
+        <section className="middle min-h-[50vh]" id="jd">
           <Suspense fallback={<p>Loading...</p>}>
-            <ReactQuill value={description} readOnly={true} theme={"bubble"} />
+            <ReactQuill  value={description} readOnly={true} theme={"bubble"} />
           </Suspense>
         </section>
         <Link

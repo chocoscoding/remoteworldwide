@@ -33,6 +33,7 @@ body {
  *   br-plain         flat: a hairline, no shadow (the default card or row)
  *   br-plain-press   flat at rest; outlined with a hard shadow on hover, pressed on click
  *                    (clickable cards and rows)
+ *   br-sticker-press br-plain-press with the 4px shadow on hover (the /jobs board's job tile)
  *
  * Shadow colour: ink by default; add br-lime or br-white (on dark surfaces). It's a custom
  * property, so setting it on a container recolours every br-* shadow inside it.
@@ -47,7 +48,8 @@ body {
   .br-bold,
   .br-bold-press,
   .br-plain,
-  .br-plain-press {
+  .br-plain-press,
+  .br-sticker-press {
     box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
   }
 
@@ -64,14 +66,16 @@ body {
   }
 
   .br-plain,
-  .br-plain-press {
+  .br-plain-press,
+  .br-sticker-press {
     border: 1px solid rgb(34 35 37 / 0.12);
     --tw-shadow: 0 0 #0000;
   }
 
   .br-shadow-press,
   .br-bold-press,
-  .br-plain-press {
+  .br-plain-press,
+  .br-sticker-press {
     cursor: pointer;
     transition:
       transform 100ms ease-out,
@@ -95,6 +99,12 @@ body {
     --tw-shadow: 2px 2px 0 0 var(--br-c, #222325);
   }
 
+  .br-sticker-press:hover,
+  .group:hover .br-sticker-press {
+    border-color: #222325;
+    --tw-shadow: 4px 4px 0 0 var(--br-c, #222325);
+  }
+
   .br-shadow-press:active,
   .group:active .br-shadow-press,
   .br-plain-press:active,
@@ -104,7 +114,9 @@ body {
   }
 
   .br-bold-press:active,
-  .group:active .br-bold-press {
+  .group:active .br-bold-press,
+  .br-sticker-press:active,
+  .group:active .br-sticker-press {
     transform: translate(4px, 4px);
     --tw-shadow: 0 0 #0000;
   }
@@ -1149,4 +1161,8 @@ body {
   text-decoration-color: #9aab1f;
   text-decoration-thickness: 2px;
   text-underline-offset: 2px;
+}
+
+#jd .ql-editor {
+  padding: 0px !important;
 }

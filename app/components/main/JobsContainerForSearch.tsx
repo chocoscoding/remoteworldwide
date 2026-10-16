@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import JobTile from "./JobTile";
+import JobTile from "./JobTileV2";
 import { AlertCircle } from "lucide-react";
 import JobTileSkeleton from "./JobTileSkeleton";
 import { JobTileType } from "@/types/main";
