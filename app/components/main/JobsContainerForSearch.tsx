@@ -11,7 +11,8 @@ import PaginationControlNew from "./PaginationControlNew";
 /** The page the server already rendered: its query string and what GET /api/jobs would answer for it. */
 export type InitialJobs = { query: string; data: JobTileType[]; count: number };
 
-const JobsContainerForSearch = ({ initial }: { initial?: InitialJobs }) => {
+/** `jobBasePath`: where a tile opens its job (see JobTileV2). */
+const JobsContainerForSearch = ({ initial, jobBasePath }: { initial?: InitialJobs; jobBasePath?: string }) => {
   const jobsPerPage = 50;
   const [totalJobs, setTotalJobs] = useState<number>(initial?.count ?? 0);
   const totalPages = Math.ceil(totalJobs / jobsPerPage);
@@ -129,7 +130,7 @@ const JobsContainerForSearch = ({ initial }: { initial?: InitialJobs }) => {
   return (
     <div>
       {jobs.map((job, index) => (
-        <JobTile {...job} key={index} />
+        <JobTile {...job} jobBasePath={jobBasePath} key={index} />
       ))}
 
       {/* pagination */}

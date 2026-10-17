@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bookmark,
+  Briefcase,
   ChevronLeft,
   ChevronRight,
   FilePen,
@@ -81,7 +82,11 @@ function inviteMeterOf(summary: InviteSummary | undefined): InviteMeter | null {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    items: [{ id: "home", label: "Home", href: "/dashboard", icon: Home }],
+    items: [
+      { id: "home", label: "Home", href: "/dashboard", icon: Home },
+      // The job board inside the dashboard; the public /jobs board stays as it is.
+      { id: "jobs", label: "Jobs", href: "/dashboard/jobs", icon: Briefcase },
+    ],
   },
   {
     label: "Build",

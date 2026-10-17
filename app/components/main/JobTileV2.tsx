@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 // The whole tile opens the job: the title link stretches over it, and the company link and the "+N"
 // locations button sit above that stretch so they still take their own clicks.
 // Pay and visa aren't in the board's list data yet, so their pills show only when a caller passes them.
-type JobTileV2Props = JobTileType & { pay?: string; visa?: string };
+// `jobBasePath` is where the tile opens the job: the public board by default, "/dashboard/jobs" inside the dashboard.
+type JobTileV2Props = JobTileType & { pay?: string; visa?: string; jobBasePath?: string };
 
 /** Locations shown as pills before the rest fold into "+N". One extra shows whole: a "+1" pill is no shorter. */
 const SHOWN_LOCATIONS = 3;
@@ -58,7 +59,7 @@ const MoreLocations = ({ rest }: { rest: string[] }) => {
 };
 
 const JobTileV2: FC<JobTileV2Props> = (props) => {
-  const { title, slug, company, region, createdAt, seniority, pay, visa } = props;
+  const { title, slug, company, region, createdAt, seniority, pay, visa, jobBasePath = "/jobs" } = props;
   const [logoBroken, setLogoBroken] = useState(false);
   const locations = region.length > 0 ? region : ["Anywhere in the world"];
   const shown = locations.length > SHOWN_LOCATIONS + 1 ? locations.slice(0, SHOWN_LOCATIONS) : locations;
@@ -95,7 +96,7 @@ const JobTileV2: FC<JobTileV2Props> = (props) => {
       </div>
 
       <Link
-        href={"/jobs/" + slug}
+        href={`${jobBasePath}/${slug}`}
         className="col-span-2 mt-2 text-[18px] font-extrabold leading-snug after:absolute after:inset-0 after:rounded-[10px] hover:text-black sm:col-span-1 sm:col-start-2 sm:mt-0">
         {title}
       </Link>
