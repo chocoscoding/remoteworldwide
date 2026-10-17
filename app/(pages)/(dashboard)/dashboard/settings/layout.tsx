@@ -13,7 +13,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div className="min-h-screen bg-[#f6f6f6]">
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-black/10 bg-white/85 px-8 backdrop-blur-sm">
           <h1 className="text-[17px] font-bold text-primary">Settings</h1>
-          <span className="hidden text-sm text-black/45 sm:inline">Your profile, preferences and plan</span>
+
           <NotificationBell className="ml-auto" />
         </header>
 
