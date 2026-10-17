@@ -52,7 +52,7 @@ const PLAN_GRID: Record<number, string> = { 1: "md:grid-cols-1", 2: "md:grid-col
 const FAQ: { q: string; a: React.ReactNode }[] = [
   {
     q: "What do I get on Free?",
-    a: "50 credits every month, topped back up to 50 at the start of each month, for ATS scans, your cover letter, questions about a job and autofill. You also get the resume builder for one resume, one cover letter, application tracking and drafts, and streaks. AI help inside the resume builder, the career coach, the daily plan, pods and recommendations to companies come with Basic, and interview prep with Pro.",
+    a: "30 credits every month, topped back up to 30 at the start of each month, for ATS scans, your cover letter, questions about a job and autofill. You also get the resume builder for one resume, one cover letter, application tracking and drafts, and streaks. AI help inside the resume builder, the career coach, the daily plan, pods and recommendations to companies come with Basic, and interview prep with Pro.",
   },
   {
     q: "Do unused credits roll over?",
@@ -170,7 +170,7 @@ export default async function PricingPage() {
             </span>
           </h1>
           <p className="mx-auto mt-5 max-w-[520px] text-balance text-base text-primary/70 md:text-lg">
-            Start free with 50 credits a month. Upgrade when your search picks up.
+            Start free with 30 credits a month. Upgrade when your search picks up.
           </p>
           <BillingToggle saving={yearlySavingLabel(plans)} className="mt-8" />
           <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-primary/70">

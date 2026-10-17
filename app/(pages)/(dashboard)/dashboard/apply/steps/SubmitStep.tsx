@@ -438,7 +438,7 @@ const SubmitStep: FC<SubmitStepProps> = ({
               {draftError.message}{" "}
               {draftError.credits && (
                 <Link href={ATS_BILLING_HREF} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">
-                  Top up credits
+                  Get more credits
                 </Link>
               )}
             </p>

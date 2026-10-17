@@ -21,7 +21,8 @@
 //    `insufficientCreditsOf`, `openSessionOf` and `limitedOf`.
 
 import { apiDelete, apiGet, apiPost } from "@/app/lib/api/client";
-import { BackendError } from "@/app/lib/api/core";
+import { PLANS_HREF } from "@/app/lib/settings/types";
+import { BackendError, signalPlanLimit } from "@/app/lib/api/core";
 import {
   PREP_LIMIT_REASONS,
   type CreatePrepSessionInput,
@@ -50,8 +51,8 @@ import {
 export const PREP_PATH = "/api/ai/prep";
 const SESSIONS_PATH = `${PREP_PATH}/sessions`;
 
-/** Where a 402 sends someone to top up. */
-export const PREP_BILLING_HREF = "/dashboard/settings/billing";
+/** Where a 402 sends someone for more credits: the plans, where Pro is cheaper per credit than a pack. */
+export const PREP_BILLING_HREF = PLANS_HREF;
 
 // Ids go into the path, so they are encoded, as in `app/lib/jobs/api.ts`.
 const sessionPath = (id: string) => `${SESSIONS_PATH}/${encodeURIComponent(id)}`;
@@ -67,9 +68,17 @@ export class PrepRequestError extends BackendError {
     message: string,
     public readonly data: unknown,
   ) {
-    super(status, message);
+    // A 403 "plan_required" keeps its code and plan, so `planRequiredOf` and the popup can read it.
+    const reason = (typeof data === "object" && data !== null ? data : {}) as { code?: unknown; requiredPlan?: unknown };
+    super(status, message, typeof reason.code === "string" ? reason.code : null, typeof reason.requiredPlan === "string" ? reason.requiredPlan : null);
     this.name = "PrepRequestError";
   }
+}
+
+/** A 403 from create: this month's free session is used and the plan is below prep's. Null otherwise. */
+export function planRequiredOf(error: unknown): { requiredPlan: string | null } | null {
+  if (!(error instanceof PrepRequestError) || error.status !== 403 || error.code !== "plan_required") return null;
+  return { requiredPlan: error.requiredPlan };
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -111,7 +120,12 @@ async function postKeepingData<T>(path: string, body?: unknown): Promise<T> {
   if (!res.ok) {
     // An empty message falls through to apiMessage's wording for the status.
     const message = typeof json?.message === "string" ? json.message : res.statusText;
-    throw new PrepRequestError(res.status, message, json?.data ?? null);
+    const error = new PrepRequestError(res.status, message, json?.data ?? null);
+    // The same popup every other call opens through `unwrapEnvelope`: out of credits, or past the
+    // month's free session (owner, 2026-10-17: the second prep session is the Pro moment).
+    const kind = error.status === 402 ? "credits" : error.code === "plan_required" ? "plan" : null;
+    if (kind) signalPlanLimit({ kind, message: error.message, requiredPlan: error.requiredPlan });
+    throw error;
   }
   return json?.data as T;
 }

@@ -14,6 +14,7 @@
 import type { FC, FocusEvent, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Check, Hash, Loader2, PenLine, Scissors, SpellCheck2, Tag, Target, X } from "lucide-react";
+import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import { cn } from "@/lib/utils";
 import type { SuggestionTool } from "@/app/lib/resume/ai";
 import type { QuantifySuggestion, RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
@@ -411,6 +412,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
       <div className="flex items-baseline justify-between gap-3 px-1">
         <h2 className="text-lg font-extrabold tracking-[-0.01em] text-primary">AI tools</h2>
       </div>
+      <FreeUsesNote feature="resumeHelp" noun="AI resume help" className="-mt-2 px-1" />
 
       <div className="rounded-2xl border border-black/10 bg-white p-2">
         <p className={GROUP_LABEL_CLASS}>Match the job</p>

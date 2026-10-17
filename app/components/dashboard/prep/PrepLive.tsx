@@ -39,7 +39,7 @@ import { formatsLabel, type PrepTrack, type TranscriptTurn } from "@/app/lib/das
 import { pickSessionQuestions, type SessionQuestion } from "@/app/lib/prep/sessionQuestions";
 import type { LikelyQuestion } from "@/app/lib/prep/types";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import { PREP_BILLING_HREF, getQuestionSpeech, insufficientCreditsOf, limitedOf, openSessionOf } from "@/app/lib/voice/api";
+import { PREP_BILLING_HREF, getQuestionSpeech, insufficientCreditsOf, limitedOf, openSessionOf, planRequiredOf } from "@/app/lib/voice/api";
 import { withoutAudioTags } from "@/app/lib/voice/audioTags";
 import { formatClock as formatRecordingClock } from "@/app/lib/voice/format";
 import { engineTurnId, hasEngineAnswer, type EngineProblem, type EngineProblemKind } from "@/app/lib/voice/capture/engineInterview";
@@ -100,7 +100,7 @@ type StartState =
   | { kind: "local"; reason: string }
   | {
       kind: "refused";
-      problem: "mic" | "capture" | "engine" | "credits" | "open" | "limited" | "other";
+      problem: "mic" | "capture" | "engine" | "credits" | "plan" | "open" | "limited" | "other";
       message: string;
       openSessionId?: string;
       engine?: EngineProblem;
@@ -807,8 +807,9 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
         const open = openSessionOf(error);
         const credits = insufficientCreditsOf(error);
         const limited = limitedOf(error);
+        const plan = planRequiredOf(error);
         refuse({
-          problem: open ? "open" : credits ? "credits" : limited ? "limited" : "other",
+          problem: open ? "open" : credits ? "credits" : plan ? "plan" : limited ? "limited" : "other",
           message: credits ? creditsRefusal(credits, settings.credits) : apiMessage(error),
           ...(open ? { openSessionId: open.sessionId } : {}),
         });
@@ -1783,7 +1784,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
         : refusal.message;
   const refusalTitle = refusal?.engine ? ENGINE_PROBLEM_TITLE[refusal.engine.kind] : null;
   // Today's voice minutes are gone, or this browser can't run the interviewer: another try would fail the same way.
-  const canRetry = refusal?.problem !== "open" && refusal?.engine?.kind !== "minutes" && !refusal?.engine?.browser;
+  const canRetry = refusal?.problem !== "open" && refusal?.problem !== "plan" && refusal?.engine?.kind !== "minutes" && !refusal?.engine?.browser;
 
   return (
     <div className="bg-[#222325] text-white min-h-screen lg:h-screen flex flex-col">
@@ -1907,7 +1908,15 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
                   <>
                     {" "}
                     <Link href={PREP_BILLING_HREF} className="font-bold text-[#e1f073] underline underline-offset-2">
-                      Top up
+                      Get more credits
+                    </Link>
+                  </>
+                )}
+                {refusal?.problem === "plan" && (
+                  <>
+                    {" "}
+                    <Link href={PREP_BILLING_HREF} className="font-bold text-[#e1f073] underline underline-offset-2">
+                      Get Pro to keep practising
                     </Link>
                   </>
                 )}

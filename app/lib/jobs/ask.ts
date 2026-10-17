@@ -12,6 +12,7 @@
 // nobody can spend model calls on text of their own choosing through this file.
 
 import { apiGet, apiPost } from "@/app/lib/api/client";
+import { PLANS_HREF } from "@/app/lib/settings/types";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import {
   JD_QUICK_QUESTION_IDS,
@@ -25,7 +26,7 @@ import {
 export const JOB_THREADS_PATH = "/api/ai/jobs/threads";
 
 /** Where a 402 sends someone to top up. */
-export const BILLING_HREF = "/dashboard/settings/billing";
+export const BILLING_HREF = PLANS_HREF;
 
 /**
  * Mirrors `MAX_JOB_QUESTION_CHARS` in the AI service's jobs validator. Enforced

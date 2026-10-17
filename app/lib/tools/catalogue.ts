@@ -163,11 +163,11 @@ export const TOOLS: Tool[] = [
     ],
     cost: {
       heading: "1 credit a scan, on every plan.",
-      body: "The checker isn't behind a plan. Free comes with 50 credits a month, so you can score dozens of applications before paying anything.",
+      body: "The checker isn't behind a plan. Free comes with 30 credits a month, so you can score dozens of applications before paying anything.",
     },
-    priceNote: "1 credit per scan on every plan, including Free (50 credits a month).",
+    priceNote: "1 credit per scan on every plan, including Free (30 credits a month).",
     faq: [
-      { q: "Is the ATS resume checker free?", a: "It's on every plan, including Free. Each scan costs 1 credit, and Free comes with 50 credits every month." },
+      { q: "Is the ATS resume checker free?", a: "It's on every plan, including Free. Each scan costs 1 credit, and Free comes with 30 credits every month." },
       { q: "What is an ATS?", a: "An applicant tracking system: the software employers use to collect applications and, often, to filter and rank them by how well a resume matches the posting." },
       { q: "Do I need a job posting to get a score?", a: "No. You can get a general score with no job. Scoring against a posting tells you much more: which of its requirements and keywords you cover." },
       { q: "Can I check against a job from another site?", a: "Yes. Paste the link or the whole posting text and we fill in the fields for you." },

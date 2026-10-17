@@ -431,7 +431,7 @@ const FailureBubble: FC<{ failure: AskFailure; onRetry: () => void; retryDisable
               <div className="mt-3 flex flex-wrap gap-2">
                 {/* A new tab, so this question and its Try again are still here once the top-up is done. */}
                 <Link href={BILLING_HREF} target="_blank" rel="noopener noreferrer" className={PRIMARY_LINK_SM}>
-                  Get credits
+                  Get more credits
                 </Link>
                 {retry}
               </div>

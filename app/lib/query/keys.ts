@@ -23,6 +23,9 @@ export const qk = {
   billing: {
     all: ["billing"] as const,
     overview: () => [...qk.billing.all, "overview"] as const,
+    // Under the overview on purpose: every spend already invalidates `overview()`, and a prefix
+    // match refreshes this with it, so a free use counted by the AI service shows straight away.
+    freeUsage: () => [...qk.billing.overview(), "free-usage"] as const,
   },
 
   // --- reserved; used as each domain's endpoints land ----------------------

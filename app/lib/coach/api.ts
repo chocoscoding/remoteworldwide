@@ -15,6 +15,7 @@
 // reject like any other failed call.
 
 import { apiGet, apiPost } from "@/app/lib/api/client";
+import { PLANS_HREF } from "@/app/lib/settings/types";
 import { createSseParser, type SseFrame } from "@/app/lib/api/sse";
 import { BackendError, apiMessage, revive, signalPlanLimit } from "@/app/lib/api/core";
 import type {
@@ -39,7 +40,7 @@ const SESSIONS_PATH = `${COACH_PATH}/sessions`;
 const PROPOSALS_PATH = `${COACH_PATH}/proposals`;
 
 /** Where a 402 sends someone to top up. */
-export const COACH_BILLING_HREF = "/dashboard/settings/billing";
+export const COACH_BILLING_HREF = PLANS_HREF;
 
 // Ids go into the path, so they are encoded, as in `app/lib/jobs/api.ts`.
 const at = (base: string, id: string) => `${base}/${encodeURIComponent(id)}`;

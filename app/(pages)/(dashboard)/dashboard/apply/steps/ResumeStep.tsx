@@ -680,7 +680,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
               {live.failure.kind === "credits" && (
                 <Link href={ATS_BILLING_HREF} target="_blank" rel="noopener noreferrer">
                   <StickerButton variant="primary" size="sm">
-                    Top up credits
+                    Get more credits
                   </StickerButton>
                 </Link>
               )}
@@ -773,7 +773,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm font-semibold text-primary underline underline-offset-2">
-                Top up credits
+                Get more credits
               </Link>
             )}
           </>

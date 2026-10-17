@@ -84,9 +84,9 @@ export const FALLBACK_CATALOGUE: PricingCatalogue = {
       priceCents: 0,
       currency: "USD",
       interval: "month",
-      monthlyCredits: 50,
+      monthlyCredits: 30,
       prioritySupport: false,
-      features: ["50 AI credits a month", "Every AI tool, a little each month", "1 interview prep session a month", "One resume and one cover letter"],
+      features: ["30 AI credits a month", "Every AI tool, a little each month", "1 interview prep session a month", "One resume and one cover letter"],
     },
     {
       key: "basic",
@@ -123,9 +123,9 @@ export const FALLBACK_CATALOGUE: PricingCatalogue = {
     },
   ],
   creditPacks: [
-    { key: "small", name: "50 credits", credits: 50, priceCents: 3000 },
-    { key: "medium", name: "150 credits", credits: 150, priceCents: 7500 },
-    { key: "large", name: "400 credits", credits: 400, priceCents: 16000 },
+    { key: "small", name: "25 credits", credits: 25, priceCents: 500 },
+    { key: "medium", name: "75 credits", credits: 75, priceCents: 1500 },
+    { key: "large", name: "200 credits", credits: 200, priceCents: 4000 },
   ],
 };
 

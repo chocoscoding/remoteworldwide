@@ -35,6 +35,7 @@ import ExtensionCard from "./ExtensionCard";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
 import { useInviteSummary } from "@/hooks/queries/useInviteSummary";
 import type { InviteSummary } from "@/app/lib/invites/types";
+import { creditMeter } from "@/app/lib/settings/creditMeter";
 
 type NavItem = { id: string; label: string; href: string; icon: LucideIcon; tag?: NavTag };
 type NavGroup = { label?: string; items: NavItem[] };
@@ -148,7 +149,8 @@ const DashboardSidebar: FC = () => {
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "?";
   const credits = subscription.creditBalance;
-  const allowance = subscription.monthlyCredits || credits;
+  // Against everything held this period (left + spent), the same measure as the billing screen.
+  const { total: allowance, usedPct } = creditMeter(subscription);
   // Low at a tenth of the plan's allowance or less. With no plan the allowance
   // is the wallet itself, so only an empty one is low.
   const lowCredits = credits <= allowance * LOW_CREDITS_SHARE;
@@ -276,7 +278,7 @@ const DashboardSidebar: FC = () => {
           href="/dashboard/settings/profile"
           title={
             allowance > 0
-              ? `${credits} credits left${lowCredits ? ", running low" : ""} · ${Math.max(0, allowance - credits)} of ${allowance} used`
+              ? `${credits} credits left${lowCredits ? ", running low" : ""} · ${usedPct}% used`
               : "No credits yet"
           }
           className={cn(
@@ -285,7 +287,7 @@ const DashboardSidebar: FC = () => {
             isActive("/dashboard/settings") ? "bg-[#f0f0ea]" : "hover:bg-[#f3f3ef]",
           )}>
           <ScoreRing
-            value={allowance > 0 ? Math.min(100, Math.round((credits / allowance) * 100)) : 0}
+            value={allowance > 0 ? 100 - usedPct : 0}
             size={32}
             // Red, and a red track too, so an empty ring still reads as "out".
             fillColor={lowCredits ? "#b23c26" : undefined}

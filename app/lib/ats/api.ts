@@ -15,6 +15,7 @@
 // events, and reject like any other failed call.
 
 import { apiGet, apiPost } from "@/app/lib/api/client";
+import { PLANS_HREF } from "@/app/lib/settings/types";
 import { BackendError, apiMessage, signalPlanLimit } from "@/app/lib/api/core";
 import { createSseParser } from "@/app/lib/api/sse";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
@@ -27,7 +28,7 @@ const RESUMES_PATH = "/api/ai/resume";
 const RESUME_FOR_DOC_PATH = "/api/ats/resume-for-doc";
 
 /** Where a 402 sends someone to top up. */
-export const ATS_BILLING_HREF = "/dashboard/settings/billing";
+export const ATS_BILLING_HREF = PLANS_HREF;
 
 /** What one scan costs, for the copy that warns before spending it. */
 export const SCAN_CREDITS = 1;

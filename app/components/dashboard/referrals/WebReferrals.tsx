@@ -151,7 +151,7 @@ const FailureCard: FC<{ failure: ReferralFailure; onRetry: () => void }> = ({ fa
     <div className="flex flex-none items-center gap-2">
       {failure.kind === "credits" && (
         <Link href={BILLING_HREF} target="_blank" className={cn(stickerButtonVariants({ variant: "primary", size: "sm" }), "br-lime")}>
-          Get credits
+          Get more credits
         </Link>
       )}
       <StickerButton variant="outline" size="sm" onClick={onRetry}>

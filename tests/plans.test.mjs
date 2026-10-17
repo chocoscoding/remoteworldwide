@@ -39,7 +39,7 @@ registerHooks({
 const { ESTIMATOR_ITEMS, FALLBACK_CATALOGUE, FEATURE_GROUPS, RECOMMENDED_PLAN, rowIncludes, yearlySavingLabel } = await import(
   "../app/lib/pricing/catalogue.ts"
 );
-const { AD_FREE_FROM, PLAN_TIERS, PLAN_TIER_NAMES, tierAllows, upgradeTierFor } = await import("../app/lib/settings/types.ts");
+const { AD_FREE_FROM, PLAN_TIERS, PLAN_TIER_NAMES, freeLeftLabel, freeResetsLabel, leadTierFor, tierAllows, upgradeTierFor } = await import("../app/lib/settings/types.ts");
 
 const sibling = (path) => fileURLToPath(new URL(`../../${path}`, import.meta.url));
 const site = (path) => readFileSync(fileURLToPath(new URL(path, ROOT)), "utf8");
@@ -62,7 +62,7 @@ describe("the four plans", () => {
     assert.deepEqual(
       FALLBACK_CATALOGUE.plans.map((p) => [p.key, p.name, p.priceCents, p.yearlyPriceCents ?? null, p.monthlyCredits]),
       [
-        ["free", "Free", 0, null, 50],
+        ["free", "Free", 0, null, 30],
         ["basic", "Basic", 1700, 18000, 100],
         ["pro", "Pro", 3100, 33600, 200],
         ["ultra", "Ultra", 5500, 60000, 400],
@@ -147,6 +147,24 @@ describe("the tiers on the site", () => {
     assert.equal(upgradeTierFor("pro", "pro"), null);
     // A plan this build doesn't know: the next tier up, as for credits.
     assert.equal(upgradeTierFor("basic", "enterprise"), "pro");
+  });
+
+  it("lead with Pro below it, keeping the smaller plan as the second choice", () => {
+    assert.deepEqual(leadTierFor("free", "basic"), { lead: "pro", alternative: "basic" });
+    assert.deepEqual(leadTierFor("free", "pro"), { lead: "pro", alternative: null });
+    assert.deepEqual(leadTierFor("basic", "pro"), { lead: "pro", alternative: null });
+    assert.deepEqual(leadTierFor("pro", "ultra"), { lead: "ultra", alternative: null });
+    assert.equal(leadTierFor("ultra", null), null);
+    // Out of credits on Free: the next tier up is Basic, and Pro leads it.
+    assert.deepEqual(leadTierFor("free", upgradeTierFor("free")), { lead: "pro", alternative: "basic" });
+  });
+
+  it("count free uses in plain words, back on the 1st", () => {
+    const a = { feature: "prep", plan: "pro", allowance: 1, used: 0, left: 1 };
+    assert.equal(freeLeftLabel(a, "interview prep session"), "1 of 1 free interview prep session left this month");
+    assert.equal(freeLeftLabel({ ...a, used: 1, left: 0 }, "interview prep session"), "You've used this month's free interview prep session");
+    assert.equal(freeResetsLabel("2026-10"), "Nov 1");
+    assert.equal(freeResetsLabel("2026-12"), "Jan 1");
   });
 
   it("are what the popup and the plan chips use", () => {

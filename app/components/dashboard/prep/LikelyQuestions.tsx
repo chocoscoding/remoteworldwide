@@ -12,6 +12,8 @@ import { PREP_BILLING_HREF } from "@/app/lib/voice/api";
 import { useGenerateLikelyQuestions } from "@/hooks/mutations/usePrepTrackMutations";
 import { useLikelyQuestions } from "@/hooks/queries/usePrepTrackQueries";
 import { useBilling } from "@/app/(pages)/(dashboard)/dashboard/settings/BillingProvider";
+import { useFreeUsage } from "@/hooks/queries/useFreeUsage";
+import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
 import Chip from "./Chip";
@@ -79,9 +81,13 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
   // balance that cover it. Once per track per visit; a refusal or failure leaves the button.
   // Below Pro the first set a month is free, so it is written without a click there too; the
   // service refuses past it, and a refusal leaves the button.
-  const { locked } = usePlanLock(FREE_ALLOWANCE_GATES.likelyQuestions);
+  const { locked, below } = usePlanLock(FREE_ALLOWANCE_GATES.likelyQuestions);
   const { subscription } = useBilling();
-  const covered = !locked && subscription.creditBalance >= cost;
+  // Below Pro, only while this month's free set is known to be unused: opening a track must never
+  // spend it on a guess or pop an upgrade by itself.
+  const freeSet = useFreeUsage().of("likelyQuestions");
+  const freeLeft = !below || (freeSet !== null && freeSet.left > 0);
+  const covered = !locked && freeLeft && subscription.creditBalance >= cost;
   const due = Boolean(trackId && hasPosting && covered && !set && query.isSuccess && !busy && !generate.isError);
   useEffect(() => {
     if (!due || !trackId || autoWritten.has(trackId)) return;
@@ -98,7 +104,7 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
         <>
           {" "}
           <Link href={PREP_BILLING_HREF} className="font-bold underline underline-offset-2">
-            Top up
+            Get more credits
           </Link>
         </>
       )}
@@ -189,6 +195,7 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
           {busy ? "Writing questions…" : `Write likely questions`}
         </button>
+        <FreeUsesNote feature="likelyQuestions" noun="set of likely questions" />
         {failureNote}
       </div>
     );
@@ -252,6 +259,7 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
           )}
         </div>
       </div>
+      {variant === "full" && <FreeUsesNote feature="likelyQuestions" noun="set of likely questions" className="px-5 pb-3" />}
       {failureNote && <div className="px-5 pb-3">{failureNote}</div>}
     </div>
   );

@@ -522,7 +522,7 @@ const ScanFailureCard: FC<{ failure: ScanFailure; onRetry: () => void }> = ({ fa
       {failure.kind === "credits" ? (
         // A new tab, so this report and its Retry are still here once the top-up is done.
         <Link href={ATS_BILLING_HREF} target="_blank" rel="noopener noreferrer" className={TOP_UP_LINK}>
-          Top up credits
+          Get more credits
         </Link>
       ) : null}
       {failure.retryable && (

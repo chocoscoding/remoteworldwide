@@ -995,7 +995,7 @@ const CoverScreen: FC = () => {
                       <Link
                         href={COVER_BILLING_HREF}
                         className="text-xs font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
-                        Top up credits
+                        Get more credits
                       </Link>
                     )}
                     {failure.kind === "resume" && (

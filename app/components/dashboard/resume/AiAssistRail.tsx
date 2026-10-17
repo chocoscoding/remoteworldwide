@@ -339,7 +339,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
             {checkFailure.message}{" "}
             {checkFailure.kind === "credits" && (
               <Link href={ATS_BILLING_HREF} className="font-bold underline decoration-[#e1f073] decoration-2 underline-offset-2">
-                Top up credits
+                Get more credits
               </Link>
             )}
           </p>

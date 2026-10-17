@@ -19,6 +19,7 @@
 // the upgrade popup instead of a request, and the plan in the rail says what it is.
 
 import { FC, FormEvent, Suspense, UIEvent, useCallback, useEffect, useRef, useState } from "react";
+import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -209,7 +210,7 @@ const FailureRow: FC<{ failure: CoachFailure; onRetry: () => void; retryDisabled
               <div className="mt-3 flex flex-wrap gap-2">
                 {/* A new tab, so this message and its Retry are still here once the top-up is done. */}
                 <Link href={COACH_BILLING_HREF} target="_blank" rel="noopener noreferrer" className={PRIMARY_LINK}>
-                  Get credits
+                  Get more credits
                 </Link>
                 {retry}
               </div>
@@ -913,6 +914,7 @@ const CoachScreen: FC = () => {
                   </span>
                 ) : null}
               </p>
+              <FreeUsesNote feature="coach" noun="coach replies" className="px-1 text-[11px]" />
             </div>
           </DashCard>
         </div>

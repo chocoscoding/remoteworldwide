@@ -12,6 +12,7 @@
 // on the button that spends them.
 
 import { useMemo, useState, type FC } from "react";
+import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import Link from "next/link";
 import { Briefcase, Loader2, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -183,7 +184,7 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
               <p className="min-w-0 flex-1 text-sm text-[#b23c26]">{failure.message}</p>
               {failure.credits && (
                 <Link href={ATS_BILLING_HREF} target="_blank" className={cn(stickerButtonVariants({ variant: "primary", size: "sm" }))}>
-                  Get credits
+                  Get more credits
                 </Link>
               )}
             </div>
@@ -191,7 +192,10 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
         </div>
 
         <div className="flex items-center justify-between gap-2.5 border-t border-black/8 px-6 py-4">
-          <p className="text-xs text-black/50">{building ? "Writing your resume. This can take up to half a minute." : `${BUILD_CREDITS} credits, only if it builds.`}</p>
+          <div className="flex flex-col gap-0.5">
+            <p className="text-xs text-black/50">{building ? "Writing your resume. This can take up to half a minute." : `${BUILD_CREDITS} credits, only if it builds.`}</p>
+            {!building && <FreeUsesNote feature="resumeBuild" noun="AI resume build" />}
+          </div>
           <div className="flex flex-none items-center gap-2.5">
             <StickerButton type="button" variant="outline" size="md" disabled={building} onClick={() => close(false)}>
               Cancel

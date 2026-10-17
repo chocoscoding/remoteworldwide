@@ -1,6 +1,10 @@
 "use client";
 
 import { FC, useEffect, useId, useState, type ReactNode } from "react";
+import { usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
+import { useFreeUsage } from "@/hooks/queries/useFreeUsage";
+import { freeResetsLabel } from "@/app/lib/settings/types";
+import { FALLBACK_CATALOGUE } from "@/app/lib/pricing/catalogue";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -343,6 +347,8 @@ const PrepReport: FC<PrepReportProps> = ({
         {player && <div className="flex min-w-0 flex-[1_1_380px] [&>*]:flex-1">{player}</div>}
       </section>
 
+      <ProPrepNudge />
+
       <SlidingTabs value={shown} options={tabs} onChange={onTabChange} tablist={{ id: tabsId, label: "Report sections" }} className="border-[1.5px] shadow-none" />
 
       {/* Keyed by tab, so each one opens fresh, as a page of its own would. */}
@@ -391,6 +397,40 @@ const PrepReport: FC<PrepReportProps> = ({
     </div>
   );
 };
+
+/**
+ * The Pro moment (owner, 2026-10-17): a report from this month's free session, read by an account
+ * below Pro. One slim line, only once the free session is known to be used; it opens the upgrade
+ * popup, which leads with Pro. Nothing on Pro and up, or when the count is unknown.
+ */
+const ProPrepNudge: FC = () => {
+  const usage = useFreeUsage();
+  const { openUpgrade } = usePlanGate();
+  const prep = usage.of("prep");
+  if (!prep || prep.left > 0 || !usage.month) return null;
+  return (
+    <aside
+      aria-label="Practise again"
+      data-pro-nudge
+      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#222325] px-5 py-3.5 text-white">
+      <p className="min-w-0 flex-[1_1_280px] text-[13px] leading-relaxed text-white/75">
+        <b className="font-bold text-white">That was this month&apos;s free session.</b> Practise the fixes before the real interview: Pro has no monthly cap on
+        sessions, and gives you {PRO_CREDITS_LINE}. Your next free one is on {freeResetsLabel(usage.month)}.
+      </p>
+      <button
+        type="button"
+        onClick={() =>
+          openUpgrade({ kind: "plan", requiredPlan: "pro", message: "You've used this month's free interview prep session. Interview prep is on Pro and up." })
+        }
+        className="inline-flex h-9 flex-none cursor-pointer items-center rounded-lg bg-[#e1f073] px-4 text-[13px] font-extrabold text-[#222325] br-shadow-press">
+        Get Pro
+      </button>
+    </aside>
+  );
+};
+
+/** Pro's monthly credits in words, from the fallback catalogue the pricing page also reads. */
+const PRO_CREDITS_LINE = `${FALLBACK_CATALOGUE.plans.find((p) => p.key === "pro")?.monthlyCredits ?? 200} credits a month`;
 
 /** The mockup's tab size: taller and wider than the bar's default. */
 const TAB_CLASS = "px-[18px] py-2.5 text-[13px]";

@@ -17,7 +17,7 @@
 
 import { createContext, useContext, useState, type FC, type ReactNode } from "react";
 import { useBillingQuery } from "@/hooks/queries/useBillingQuery";
-import { useBuyCredits, useBuyPlan, useCancelPlan } from "@/hooks/mutations/useBillingMutations";
+import { useBuyCredits, useBuyPlan, useCancelPlan, useOpenPortal } from "@/hooks/mutations/useBillingMutations";
 import type { BillingInterval, BillingOverview, Checkout } from "@/app/lib/settings/types";
 
 interface BillingContextValue extends BillingOverview {
@@ -28,6 +28,8 @@ interface BillingContextValue extends BillingOverview {
   buyPlan: (planKey: string, interval?: BillingInterval) => void;
   buyCredits: (packKey: string) => void;
   cancelPlan: () => void;
+  /** Stripe's billing portal, for an account that has paid by card. */
+  openPortal: () => void;
 }
 
 const BillingContext = createContext<BillingContextValue | null>(null);
@@ -43,7 +45,8 @@ export const BillingProvider: FC<{ initial: BillingOverview; children: ReactNode
   const buyPlan = useBuyPlan(setLastCheckout);
   const buyCredits = useBuyCredits(setLastCheckout);
   const cancelPlan = useCancelPlan();
-  const busy = buyPlan.isPending || buyCredits.isPending || cancelPlan.isPending;
+  const openPortal = useOpenPortal();
+  const busy = buyPlan.isPending || buyCredits.isPending || cancelPlan.isPending || openPortal.isPending;
 
   return (
     <BillingContext.Provider
@@ -54,6 +57,7 @@ export const BillingProvider: FC<{ initial: BillingOverview; children: ReactNode
         buyPlan: (planKey, interval = "month") => buyPlan.mutate({ planKey, interval }),
         buyCredits: (packKey) => buyCredits.mutate(packKey),
         cancelPlan: () => cancelPlan.mutate(),
+        openPortal: () => openPortal.mutate(),
       }}>
       {children}
     </BillingContext.Provider>

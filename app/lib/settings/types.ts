@@ -223,6 +223,56 @@ export const upgradeTierFor = (tier: PlanTier, requiredPlan?: string | null): Pl
   return wanted && PLAN_TIERS.indexOf(wanted) > PLAN_TIERS.indexOf(tier) ? wanted : null;
 };
 
+/**
+ * The plan the popup leads with (owner, 2026-10-17: get people onto at least Pro). Below Pro, any
+ * offer under Pro is led by Pro, with the smaller plan kept as the second choice; from Pro up the
+ * offer stands. Null when there is no offer.
+ */
+export const RECOMMENDED_TIER: PlanTier = "pro";
+export const leadTierFor = (tier: PlanTier, offered: PlanTier | null): { lead: PlanTier; alternative: PlanTier | null } | null => {
+  if (!offered) return null;
+  const rank = (t: PlanTier) => PLAN_TIERS.indexOf(t);
+  if (rank(offered) < rank(RECOMMENDED_TIER) && rank(tier) < rank(RECOMMENDED_TIER)) return { lead: RECOMMENDED_TIER, alternative: offered };
+  return { lead: offered, alternative: null };
+};
+
+/**
+ * Where every "get more credits" link lands: the plan cards on Billing, since a plan is always the
+ * cheaper way to buy credits. Packs sit just below them on the same screen.
+ */
+export const PLANS_HREF = "/dashboard/settings/billing#plans";
+
+/** A feature the AI service counts free monthly uses of (planService FREE_MONTHLY). */
+export type FreeFeature = "resumeBuild" | "resumeHelp" | "prep" | "likelyQuestions" | "coach" | "voiceTalk" | "planAccept";
+
+export interface FreeAllowance {
+  feature: FreeFeature;
+  /** The plan where the count stops. */
+  plan: PlanTier;
+  allowance: number;
+  used: number;
+  left: number;
+}
+
+/** GET /api/ai/plan/usage: only the features the account is below; empty from Pro up or when unknown. */
+export interface FreeUsage {
+  tier: PlanTier | null;
+  /** `YYYY-MM`, UTC. */
+  month: string;
+  features: FreeAllowance[];
+}
+
+/** "1 of 1 free interview prep session used this month" style counter text, kept short. */
+export const freeLeftLabel = (a: FreeAllowance, noun: string): string =>
+  a.left > 0 ? `${a.left} of ${a.allowance} free ${noun} left this month` : `You've used this month's free ${noun}`;
+
+/** When this month's free uses come back: the 1st of next month (UTC), as "Nov 1". */
+export const freeResetsLabel = (month: string): string => {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return "next month";
+  return new Date(Date.UTC(y, m, 1)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+};
+
 export interface Subscription {
   planKey: string | null;
   pendingPlanKey: string | null;
@@ -243,6 +293,8 @@ export interface Subscription {
   periodEnd: Date | null;
   /** When a yearly plan's next month of credits lands; null when a payment is what renews them. */
   nextRefillAt: Date | null;
+  /** Credits spent this period, net of refunds (billing overview only; absent on an older backend). */
+  periodSpent?: number;
   cancelAtPeriodEnd: boolean;
   provider: string | null;
 }
@@ -268,6 +320,10 @@ export interface Checkout {
   status: CheckoutStatus;
   completedAt: Date | null;
   createdAt: Date;
+  /** Where to pay: Stripe Checkout, or the invoice page when an upgrade needs a card check. Absent while payments are off. */
+  url?: string;
+  /** An upgrade of a Stripe subscription that was charged and applied in place: no page to visit. */
+  upgraded?: boolean;
 }
 
 export interface BillingOverview {
@@ -282,4 +338,8 @@ export interface BillingOverview {
    * control the site locks by plan; absent (an older backend) reads as on.
    */
   planGates?: boolean;
+  /** Whether card payments are on (Stripe). Off, choosing a plan only reserves it. */
+  payments?: boolean;
+  /** Whether this account has a Stripe customer, so "Manage billing" has something to open. */
+  manageBilling?: boolean;
 }

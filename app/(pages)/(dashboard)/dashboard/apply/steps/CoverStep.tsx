@@ -294,7 +294,7 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
             {cover.failure.kind === "credits" && (
               <Link href={COVER_BILLING_HREF} target="_blank" rel="noopener noreferrer">
                 <StickerButton variant="primary" size="sm">
-                  Top up credits
+                  Get more credits
                 </StickerButton>
               </Link>
             )}

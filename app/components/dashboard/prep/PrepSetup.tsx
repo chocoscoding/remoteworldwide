@@ -28,6 +28,9 @@ import { useTrackResume } from "./useTrackResume";
 import { BUTTON_SOLID } from "./prep-styles";
 import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
 import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
+import { usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
+import { useFreeUsage } from "@/hooks/queries/useFreeUsage";
 import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
 
 const FORMAT_ICON: Record<SessionFormat, LucideIcon> = { behavioural: MessageCircle, portfolio: Presentation, salary: DollarSign };
@@ -120,7 +123,11 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   // One free session a month below Pro: only the chip says it is a Pro feature, and the AI service's
   // refusal past the free session opens the upgrade popup.
   const prepLock = usePlanLock(FREE_ALLOWANCE_GATES.prep);
-  const prepLocked = prepLock.locked;
+  // This month's free session, once it is known to be used: the popup up front, before the mic.
+  const freeUsage = useFreeUsage();
+  const { openUpgrade } = usePlanGate();
+  const prepFree = freeUsage.of("prep");
+  const prepLocked = prepLock.locked || (prepLock.below && prepFree?.left === 0);
 
   // Never let the last one be unticked — a session with no format has no
   // questions to ask, so the control refuses rather than erroring later.
@@ -282,7 +289,9 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
     // Interview prep is on Pro: below it, the upgrade popup rather than a session the AI
     // service would refuse once the microphone is already asked for.
     if (prepLocked) {
-      prepLock.upgrade();
+      if (prepFree?.left === 0)
+        openUpgrade({ kind: "plan", requiredPlan: "pro", message: "You've used this month's free interview prep session. Interview prep is on Pro and up." });
+      else prepLock.upgrade();
       return;
     }
     // A master document default is parsed and stored on the track here, once,
@@ -511,6 +520,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
                   : "Pick your resume above to start."}
             </p>
           )}
+          <FreeUsesNote feature="prep" noun="interview prep session" tone="dark" className="mb-1" />
           <p className="text-xs text-white/60 leading-relaxed">
             {blocked
               ? `You've run ${MAX_SESSIONS_PER_TRACK} sessions for ${track.company} this week. Try a different track, or come back after acting on your open actions.`
