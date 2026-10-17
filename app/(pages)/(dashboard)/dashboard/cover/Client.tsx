@@ -132,6 +132,7 @@ import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
 import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
 import { useProfileSettings } from "@/hooks/queries/useSettingsQuery";
 import { Lottie } from "lottie-react";
+import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 
 // What a letter needs from a picked job. The posting is asked for but optional:
 // a letter can be written for a job nobody pasted the description of, and the
@@ -346,12 +347,21 @@ const CoverScreen: FC = () => {
     // Someone's CV, held only while this screen is open.
     gcTime: 0,
   });
-  const resumesPending = ingestedPending || library.isPending || docsLoading;
+  const masterResume = useMasterResumeQuery();
+  const resumesPending = ingestedPending || library.isPending || docsLoading || masterResume.isPending;
   const resume = useMemo((): { fileName: string; resumeId: CoverRunInput["resumeId"] } | null => {
     const imported = (resumeId: string) => {
       void queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
       return resumeId;
     };
+    // The master can be a resume made here: written from its content, through the same import.
+    const builtMaster = masterResume.data?.source === "built" ? (library.data ?? []).find((doc) => doc.id === masterResume.data?.id) : undefined;
+    if (builtMaster && resumeContentToText(builtMaster.content) !== "") {
+      return {
+        fileName: builtMaster.label,
+        resumeId: () => importResumeContent(builtMaster.content, builtMaster.label).then((row) => imported(row.resumeId)),
+      };
+    }
     const master = docs.find((doc) => doc.master && doc.kind === "resume" && !doc.archived && mimeForFileName(fileNameOf(doc)) !== null);
     if (master) {
       const parsed = findIngested(master, ingested ?? []);
@@ -380,7 +390,7 @@ const CoverScreen: FC = () => {
       .sort((a, b) => b.addedAt - a.addedAt)[0];
     if (file) return { fileName: fileNameOf(file), resumeId: () => resolveResumeId(file, ingested ?? []).then(imported) };
     return null;
-  }, [ingested, library.data, docs, queryClient]);
+  }, [ingested, library.data, docs, masterResume.data, queryClient]);
 
   // The letterhead prints the USER's name and contacts, so they come from
   // settings — the letter itself carries neither, and the service is explicit

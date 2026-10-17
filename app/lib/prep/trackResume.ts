@@ -25,15 +25,21 @@ export type TrackResumeSource =
   | { kind: "own"; resumeId: string }
   /** The default: the resume the linked tracker application was sent with. */
   | { kind: "application"; resumeId: string }
-  /** The default: the master document — a file, parsed onto the track before a session. */
-  | { kind: "master"; documentId: string; name: string }
+  /**
+   * The default: the master resume, parsed onto the track before a session. Usually a file in My
+   * documents; `built` when it is a resume made here (`documentId` is then its editor id), read from its content.
+   */
+  | { kind: "master"; documentId: string; name: string; built?: boolean }
   | { kind: "none" };
 
 export function resumeInEffect(item: Pick<PrepTrackItem, "resumeId" | "defaultResume">): TrackResumeSource {
   if (item.resumeId) return { kind: "own", resumeId: item.resumeId };
   const fallback = item.defaultResume;
   if (fallback?.source === "application") return { kind: "application", resumeId: fallback.resumeId };
-  if (fallback?.source === "master") return { kind: "master", documentId: fallback.documentId, name: fallback.name };
+  if (fallback?.source === "master")
+    return fallback.built
+      ? { kind: "master", documentId: fallback.documentId, name: fallback.name, built: true }
+      : { kind: "master", documentId: fallback.documentId, name: fallback.name };
   return { kind: "none" };
 }
 

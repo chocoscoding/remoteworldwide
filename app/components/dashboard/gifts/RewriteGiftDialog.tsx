@@ -28,6 +28,7 @@ import { qk } from "@/app/lib/query/keys";
 import { refreshStreak } from "@/hooks/mutations/useStreakMutations";
 import { useCreatedResumes } from "@/hooks/queries/useCreatedDocuments";
 import { cn } from "@/lib/utils";
+import { isBuiltMaster, useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 
 interface Row {
   key: string;
@@ -51,6 +52,7 @@ const RewriteGiftDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => vo
   const queryClient = useQueryClient();
   const { docs, loading } = useDocuments();
   const created = useCreatedResumes();
+  const master = useMasterResumeQuery();
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<Source | null>(null);
   const [reading, setReading] = useState<string | null>(null);
@@ -65,9 +67,9 @@ const RewriteGiftDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => vo
       .map((doc): Row => ({ key: `file:${doc.id}`, name: doc.ext ? `${doc.name}.${doc.ext}` : doc.name, origin: "uploaded", id: doc.id, master: Boolean(doc.master), at: doc.addedAt }));
     const made = (created.data ?? [])
       .filter((row) => !row.archived)
-      .map((row): Row => ({ key: `resume:${row.id}`, name: row.label, origin: "created", id: row.id, master: false, at: new Date(row.updatedAt).getTime() }));
+      .map((row): Row => ({ key: `resume:${row.id}`, name: row.label, origin: "created", id: row.id, master: isBuiltMaster(master.data, row.id), at: new Date(row.updatedAt).getTime() }));
     return [...uploaded, ...made].sort((a, b) => Number(b.master) - Number(a.master) || b.at - a.at);
-  }, [docs, created.data]);
+  }, [docs, created.data, master.data]);
 
   const q = query.trim().toLowerCase();
   const shown = q ? rows.filter((row) => row.name.toLowerCase().includes(q)) : rows;

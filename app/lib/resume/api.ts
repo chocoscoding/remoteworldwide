@@ -369,6 +369,17 @@ export async function editableCopyOf(vaultId: string, library: readonly StoredRe
 }
 
 /** The name an imported file's resume starts with: the file's name, read as words. Shared with the editor's own import. */
+/**
+ * A resume made here as a parsed resume id: what the screens that default to the master (the apply
+ * wizard, cover letters, Ask about a job, prep) send the AI service when the master is one made here
+ * rather than a file. Read from the document's content through the same text import a scan uses; an
+ * unedited document is deduped by the service, so asking again costs nothing.
+ */
+export async function parsedResumeOfBuilt(id: string, signal?: AbortSignal): Promise<ImportedResume> {
+  const doc = await getResumeDocument(id, signal);
+  return importResumeContent(doc.content, doc.label);
+}
+
 export const importLabel = (fileName: string): string =>
   fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim().slice(0, 80) || "Imported resume";
 

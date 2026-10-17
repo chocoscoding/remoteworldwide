@@ -71,6 +71,7 @@ import {
   createResumeDocument,
   getResumeDocument,
   importResume,
+  parsedResumeOfBuilt,
   resumeContentToText,
   saveResumeDocument,
   updateDraftResume,
@@ -85,6 +86,7 @@ import GapPicker from "../parts/GapPicker";
 import ResumePreviewDialog, { DownloadButton } from "../parts/ResumePreviewDialog";
 import { useResumeDownload } from "../parts/useResumeDownload";
 import SelectResumeDialog, { type PickedResume } from "../parts/SelectResumeDialog";
+import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 
 export interface ResumeStepProps {
   job: StartedJob;
@@ -159,10 +161,25 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
 
   // ---- The default: the master resume, else the newest one that was read ----------------------
   const masterImport = useRef(false);
+  const masterResume = useMasterResumeQuery();
   useEffect(() => {
     // Both lists first: deciding before My documents is in would skip the master.
-    if (!editable || resume.baseId || !ingested.data || docsLoading) return;
+    if (!editable || resume.baseId || !ingested.data || docsLoading || masterResume.isPending) return;
     const ready = ingested.data.filter((row) => row.status === "ready");
+    const built = masterResume.data?.source === "built" ? masterResume.data : null;
+    if (built && !masterImport.current) {
+      // The master is a resume made here: read from its content (deduped by the service when unedited).
+      masterImport.current = true;
+      void parsedResumeOfBuilt(built.id)
+        .then((prepared) => update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: prepared.resumeId, baseName: built.name } })))
+        .catch(() => {
+          const newest = ready[0];
+          if (newest)
+            update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: newest.resumeId, baseName: newest.fileName } }));
+        });
+      return;
+    }
+    if (built) return;
     const master = docs.find((doc) => doc.kind === "resume" && doc.master && !doc.archived);
     const masterName = master ? (master.ext ? `${master.name}.${master.ext}` : master.name) : null;
     const linked = master?.aiResumeId ? ready.find((row) => row.resumeId === master.aiResumeId) : undefined;
@@ -188,7 +205,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
       const newest = ready[0];
       update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: newest.resumeId, baseName: newest.fileName } }));
     }
-  }, [editable, resume.baseId, ingested.data, docs, docsLoading, update]);
+  }, [editable, resume.baseId, ingested.data, docs, docsLoading, masterResume.isPending, masterResume.data, update]);
 
   // ---- The score: automatic, and again after every change ---------------------------------------
   const stored = state.scan && state.scan.resumeId === sendingId && state.scan.version === version ? state.scan : null;

@@ -72,7 +72,11 @@ export function useCreatedDocumentAction() {
     },
     onError: (error) => toast.error(apiMessage(error)),
     onSettled: (_, __, action) => {
-      const keys = action.kind === "resume" ? [qk.resumes.library(), qk.resumes.list()] : [qk.letters.library(), qk.letters.recent()];
+      // A resume made here can be the master: archiving or deleting it hands the role on (the AI service tells the backend).
+      const keys =
+        action.kind === "resume"
+          ? [qk.resumes.library(), qk.resumes.list(), qk.documents.master(), qk.documents.list(), qk.recommendations.eligibility()]
+          : [qk.letters.library(), qk.letters.recent()];
       for (const queryKey of keys) void queryClient.invalidateQueries({ queryKey });
     },
   });

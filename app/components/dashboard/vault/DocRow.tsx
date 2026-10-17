@@ -45,6 +45,7 @@ import {
 } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { createdFileHref, editHref, type LibraryItem } from "@/app/lib/documents/library";
 import { useCreatedDocumentAction } from "@/hooks/queries/useCreatedDocuments";
+import { isBuiltMaster, useMasterResumeQuery, useSetBuiltMaster } from "@/hooks/queries/useMasterResume";
 
 // Re-exported so the screen's search keeps one import site for row concerns.
 export { KIND_LABELS };
@@ -180,10 +181,18 @@ const DocRow: FC<DocRowProps> = ({ item, renaming, onStartRename, onDoneRename }
   const created = useCreatedDocumentAction();
   const [confirmingRemove, setConfirmingRemove] = useState(false);
 
+  const master = useMasterResumeQuery().data;
+  const setBuiltMaster = useSetBuiltMaster();
+
   const doc = item.origin === "uploaded" ? item.doc : null;
   const isResume = item.kind === "resume";
-  // Only an uploaded resume can be the master; the server refuses anything else too.
-  const canBeMaster = doc !== null && isResume && !doc.archived && !doc.master;
+  // Any live resume can be the master: an upload (its own flag) or one made here (the backend's pointer).
+  const isMaster = isResume && (doc ? Boolean(doc.master) : isBuiltMaster(master, item.origin === "created" ? item.id : ""));
+  const canBeMaster = isResume && !item.archived && !isMaster;
+  const makeMaster = () => {
+    if (doc) files.setMaster(doc.id);
+    else if (item.origin === "created") setBuiltMaster.mutate({ id: item.id, name: item.name });
+  };
   const Icon = KIND_ICONS[item.kind];
   const badge = doc ? sourceBadgeLabel(doc.source) : "Created here";
   const edit = editHref(item);
@@ -203,7 +212,7 @@ const DocRow: FC<DocRowProps> = ({ item, renaming, onStartRename, onDoneRename }
   };
 
   const entries: MenuEntry[] = [
-    ...(canBeMaster && doc ? [{ id: "master", label: "Make master", icon: Star, onSelect: () => files.setMaster(doc.id) }] : []),
+    ...(canBeMaster ? [{ id: "master", label: "Make master", icon: Star, onSelect: makeMaster }] : []),
     ...(doc
       ? // Uploads hand back their original bytes.
         [{ id: "download", label: "Download", icon: Download, onSelect: () => downloadDoc(doc) }]
@@ -252,7 +261,7 @@ const DocRow: FC<DocRowProps> = ({ item, renaming, onStartRename, onDoneRename }
       <span className="truncate text-sm font-bold text-primary underline decoration-transparent decoration-2 underline-offset-4 transition-colors group-hover/open:decoration-[#222325]">
         {item.name}
       </span>
-      {doc?.master && (
+      {isMaster && (
         <span
           className="inline-flex flex-none items-center gap-1 rounded-full bg-[#e1f073] px-2 py-0.5 text-[10px] font-bold text-[#222325]"
           title="Your master resume. Reviewers read this one when they consider you for recommendations.">

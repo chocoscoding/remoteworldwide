@@ -22,6 +22,7 @@ import { prepareResumeForDoc } from "@/app/lib/ats/api";
 import { getResumeDocument, importResumeContent, resumeContentToText } from "@/app/lib/resume/api";
 import { useCreatedResumes } from "@/hooks/queries/useCreatedDocuments";
 import { cn } from "@/lib/utils";
+import { isBuiltMaster, useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 
 export interface PickedResume {
   resumeId: string;
@@ -44,6 +45,7 @@ const SelectResumeDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => v
 }) => {
   const { docs, loading } = useDocuments();
   const created = useCreatedResumes();
+  const master = useMasterResumeQuery();
   const [query, setQuery] = useState("");
   const [picking, setPicking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,10 +56,10 @@ const SelectResumeDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => v
       .map((doc): Row => ({ key: `file:${doc.id}`, name: doc.ext ? `${doc.name}.${doc.ext}` : doc.name, origin: "uploaded", id: doc.id, master: Boolean(doc.master), at: doc.addedAt }));
     const made = (created.data ?? [])
       .filter((row) => !row.archived)
-      .map((row): Row => ({ key: `resume:${row.id}`, name: row.label, origin: "created", id: row.id, master: false, at: new Date(row.updatedAt).getTime() }));
+      .map((row): Row => ({ key: `resume:${row.id}`, name: row.label, origin: "created", id: row.id, master: isBuiltMaster(master.data, row.id), at: new Date(row.updatedAt).getTime() }));
     // The master first: it is the default, and the one reviewers read.
     return [...uploaded, ...made].sort((a, b) => Number(b.master) - Number(a.master) || b.at - a.at);
-  }, [docs, created.data]);
+  }, [docs, created.data, master.data]);
 
   const q = query.trim().toLowerCase();
   const shown = q ? rows.filter((row) => row.name.toLowerCase().includes(q)) : rows;

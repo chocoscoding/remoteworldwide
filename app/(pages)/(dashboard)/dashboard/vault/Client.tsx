@@ -28,6 +28,7 @@ import DocRow, { KIND_LABELS } from "@/app/components/dashboard/vault/DocRow";
 import DropZone from "@/app/components/dashboard/vault/DropZone";
 import { inTab, libraryItems, tabCounts, tabFromParam, type LibraryTab } from "@/app/lib/documents/library";
 import { useCreatedDocuments } from "@/hooks/queries/useCreatedDocuments";
+import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 
 type SortKey = "recent" | "name" | "size";
 
@@ -60,6 +61,7 @@ const EMPTY_TITLES: Record<LibraryTab, string> = {
 const VaultClient: FC = () => {
   const { docs, addUploads } = useDocuments();
   const { resumes, letters } = useCreatedDocuments();
+  const master = useMasterResumeQuery();
 
   // The tab is the address's, so "See all" from an editor lands on its own.
   const params = useSearchParams();
@@ -108,9 +110,9 @@ const VaultClient: FC = () => {
   const missing = KIT.filter((k) => !presentKinds.has(k.kind));
   const kitPct = Math.round((covered.length / KIT.length) * 100);
   const totalBytes = activeFiles.reduce((sum, d) => sum + (d.size ?? 0), 0);
-  // The resume reviewers read — always an uploaded file. Recommendations need one, so its absence is said out loud.
-  const masterResume = activeFiles.find((d) => d.master && d.kind === "resume");
-  const uploadedResumes = activeFiles.filter((d) => d.kind === "resume").length;
+  // The resume reviewers read: an upload or one made here. Recommendations need one, so its absence is said out loud.
+  const masterResume = master.data ?? activeFiles.find((d) => d.master && d.kind === "resume") ?? null;
+  const liveResumes = items.filter((item) => item.kind === "resume" && !item.archived).length;
 
   /** A tab change abandons browsing state — page and any in-flight rename. */
   function changeTab(next: LibraryTab) {
@@ -199,7 +201,7 @@ const VaultClient: FC = () => {
                     Master resume: <span className="font-semibold text-white/80">{masterResume.name}</span>, what reviewers read when they
                     consider you.
                   </p>
-                ) : uploadedResumes > 0 ? (
+                ) : liveResumes > 0 ? (
                   <p className="mt-1.5 text-xs text-white/55">
                     <span className="font-semibold text-secondary">No master resume yet</span>. Pick one below with “Make master” so
                     reviewers can consider you for recommendations.

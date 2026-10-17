@@ -24,6 +24,7 @@ function sameTarget(a: TrackResume["busy"] | TrackResume["selected"], b: ResumeT
   if (!a || a === "upload" || a.kind !== b.kind) return false;
   if (a.kind === "document" && b.kind === "document") return a.documentId === b.documentId;
   if (a.kind === "parsed" && b.kind === "parsed") return a.resumeId === b.resumeId;
+  if (a.kind === "built" && b.kind === "built") return a.id === b.id;
   return a.kind === "default";
 }
 

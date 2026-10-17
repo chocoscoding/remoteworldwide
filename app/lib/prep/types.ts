@@ -63,7 +63,7 @@ export interface PrepRound {
  */
 export type PrepTrackDefaultResume =
   | { source: "application"; resumeId: string }
-  | { source: "master"; documentId: string; name: string };
+  | { source: "master"; documentId: string; name: string; built?: boolean };
 
 export interface PrepTrackItem {
   id: string;

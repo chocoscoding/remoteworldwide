@@ -21,6 +21,8 @@ import { setJobThreadResume } from "@/app/lib/jobs/ask";
 import type { JobThreadItem } from "@/app/lib/jobs/types";
 import { qk } from "@/app/lib/query/keys";
 import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
+import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
+import { parsedResumeOfBuilt } from "@/app/lib/resume/api";
 
 const docName = (doc: { name: string; ext?: string | null }) => (doc.ext ? `${doc.name}.${doc.ext}` : doc.name);
 
@@ -28,6 +30,7 @@ const AskResumeBar: FC<{ thread: JobThreadItem; disabled?: boolean }> = ({ threa
   const queryClient = useQueryClient();
   const { docs, loading: docsLoading } = useDocuments();
   const ingested = useIngestedResumesQuery();
+  const masterResume = useMasterResumeQuery();
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   // A name learnt from a pick, for a resume neither list names yet (a made-here resume just imported).
@@ -41,7 +44,24 @@ const AskResumeBar: FC<{ thread: JobThreadItem; disabled?: boolean }> = ({ threa
   // ---- The default: the master resume, once per thread, and never over a pick -------------------
   const defaulted = useRef<string | null>(null);
   useEffect(() => {
-    if (thread.chosenResumeId || defaulted.current === thread.id || docsLoading || !ingested.data) return;
+    if (thread.chosenResumeId || defaulted.current === thread.id || docsLoading || !ingested.data || masterResume.isPending) return;
+    const built = masterResume.data?.source === "built" ? masterResume.data : null;
+    if (built) {
+      // The master is a resume made here: read from its content, and named as it is in My documents.
+      defaulted.current = thread.id;
+      void Promise.resolve()
+        .then(() => {
+          setSaving(true);
+          return parsedResumeOfBuilt(built.id);
+        })
+        .then(async (prepared) => {
+          await save(prepared.resumeId);
+          setPickedName({ resumeId: prepared.resumeId, name: built.name });
+        })
+        .catch(() => undefined)
+        .finally(() => setSaving(false));
+      return;
+    }
     const master = docs.find((doc) => doc.kind === "resume" && doc.master && !doc.archived);
     if (!master) return; // No master: the newest ready resume stands in, as the AI service does on its own.
     defaulted.current = thread.id;
@@ -59,7 +79,7 @@ const AskResumeBar: FC<{ thread: JobThreadItem; disabled?: boolean }> = ({ threa
       .finally(() => setSaving(false));
     // `save` closes over the thread, which the deps already name.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thread.id, thread.chosenResumeId, thread.resumeId, docs, docsLoading, ingested.data]);
+  }, [thread.id, thread.chosenResumeId, thread.resumeId, docs, docsLoading, ingested.data, masterResume.isPending, masterResume.data]);
 
   async function onPicked(picked: PickedResume) {
     setPicking(false);

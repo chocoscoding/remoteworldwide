@@ -25,6 +25,9 @@ function useDocumentAction<V, R>(run: (vars: V) => Promise<R>, onDone?: (result:
     mutationFn: run,
     onSuccess: (result, vars) => {
       void queryClient.invalidateQueries({ queryKey: listKey() });
+      // An upload, archive or delete can move the master (either kind), and the recommendations checklist reads it.
+      void queryClient.invalidateQueries({ queryKey: qk.documents.master() });
+      void queryClient.invalidateQueries({ queryKey: qk.recommendations.eligibility() });
       onDone?.(result, vars);
     },
     onError: (error) => toast.error(apiMessage(error)),

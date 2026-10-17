@@ -33,9 +33,15 @@ import { qk } from "@/app/lib/query/keys";
 import { MAX_RESUME_BYTES, RESUME_TYPES_HINT, mimeForFileName } from "@/app/lib/resume/mime";
 import { useUpdatePrepTrack } from "@/hooks/mutations/usePrepTrackMutations";
 import { useIngestedResumeQuery, useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
+import { parsedResumeOfBuilt } from "@/app/lib/resume/api";
 
 /** What a pick names: a document to parse, a resume already parsed, or back to the default. */
-export type ResumeTarget = { kind: "document"; documentId: string } | { kind: "parsed"; resumeId: string } | { kind: "default" };
+export type ResumeTarget =
+  | { kind: "document"; documentId: string }
+  | { kind: "parsed"; resumeId: string }
+  /** A resume made here (the master can be one): parsed from its content. */
+  | { kind: "built"; id: string }
+  | { kind: "default" };
 
 /** After an upload: make it this track's resume, or leave the track on its default (which a first upload becomes, as the master). */
 export type AfterUpload = "choose" | "default";
@@ -100,7 +106,9 @@ export function useTrackResume(item: PrepTrackItem | undefined): TrackResume {
   const selected: TrackResume["selected"] = missing
     ? null
     : source.kind === "master"
-      ? { kind: "document", documentId: source.documentId }
+      ? source.built
+        ? { kind: "built", id: source.documentId }
+        : { kind: "document", documentId: source.documentId }
       : matched && !matched.archived
         ? { kind: "document", documentId: matched.id }
         : namedId
@@ -135,6 +143,9 @@ export function useTrackResume(item: PrepTrackItem | undefined): TrackResume {
         }
       } else if (target.kind === "parsed") {
         resumeId = target.resumeId;
+      } else if (target.kind === "built") {
+        resumeId = (await parsedResumeOfBuilt(target.id)).resumeId;
+        await queryClient.invalidateQueries({ queryKey: qk.ats.ingested() });
       }
       await patchTrack({ id: item.id, input: { resumeId } });
       return true;
@@ -147,7 +158,7 @@ export function useTrackResume(item: PrepTrackItem | undefined): TrackResume {
   }
 
   async function storeDefault(): Promise<boolean> {
-    if (source.kind === "master") return choose({ kind: "document", documentId: source.documentId });
+    if (source.kind === "master") return choose(source.built ? { kind: "built", id: source.documentId } : { kind: "document", documentId: source.documentId });
     return parsedResumeIdOf(source) !== null;
   }
 

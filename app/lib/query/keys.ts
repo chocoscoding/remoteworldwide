@@ -55,6 +55,8 @@ export const qk = {
   documents: {
     all: ["documents"] as const,
     list: () => [...qk.documents.all, "list"] as const,
+    /** The master resume, either kind (an upload or a resume made here): hooks/queries/useMasterResume.ts. */
+    master: () => [...qk.documents.all, "master"] as const,
   },
   pod: {
     all: ["pod"] as const,

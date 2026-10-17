@@ -93,10 +93,16 @@ export const listPriorityIntros = async (): Promise<PriorityIntroItem[]> => {
  * they have none. Someone who turned "Let recruiters find me" off is refused (409), and the refusal
  * comes back as its message: a server action's thrown error reaches the browser without one.
  */
-export const candidateResumeLink = async (candidateId: string): Promise<{ url: string; expiresAt: number; name: string } | { error: string } | null> => {
+export const candidateResumeLink = async (candidateId: string): Promise<{ url: string; name: string } | { error: string } | null> => {
   await requireAdminAction();
   try {
-    return await backendOrNull<{ url: string; expiresAt: number; name: string }>(`/recommendations/admin/candidates${at(candidateId)}/resume`, { session: true });
+    const master = await backendOrNull<{ url: string; expiresAt: number; name: string } | { name: string; builtId: string }>(
+      `/recommendations/admin/candidates${at(candidateId)}/resume`,
+      { session: true }
+    );
+    // A master made here has no stored file: the admin route renders it (app/api/admin/candidate-resume).
+    if (master && "builtId" in master) return { url: `/api/admin/candidate-resume${at(candidateId)}`, name: master.name };
+    return master;
   } catch (error) {
     if (error instanceof BackendError && error.status === 409) return { error: error.message };
     throw error;
