@@ -1159,15 +1159,20 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     });
   };
 
-  // The AI's numbers still to check, and their five-second highlight on the page.
+  // The AI's numbers still to check, and their highlight on the page: lit while the pill's card is
+  // open (the cursor on it), then gone 2.5s after it closes, the last 0.7s fading (owner, 2026-10-18).
   const aiFigures = useMemo(() => pendingAiFigures(content), [content]);
   const [figuresShown, setFiguresShown] = useState<"off" | "on" | "fading">("off");
   const figureTimers = useRef<number[]>([]);
   useEffect(() => () => figureTimers.current.forEach((id) => window.clearTimeout(id)), []);
   const showAiFigures = () => {
     figureTimers.current.forEach((id) => window.clearTimeout(id));
+    figureTimers.current = [];
     setFiguresShown("on");
-    figureTimers.current = [window.setTimeout(() => setFiguresShown("fading"), 4_300), window.setTimeout(() => setFiguresShown("off"), 5_000)];
+  };
+  const hideAiFigures = () => {
+    figureTimers.current.forEach((id) => window.clearTimeout(id));
+    figureTimers.current = [window.setTimeout(() => setFiguresShown("fading"), 1_800), window.setTimeout(() => setFiguresShown("off"), 2_500)];
   };
   const clearChecked = () => {
     figureTimers.current.forEach((id) => window.clearTimeout(id));
@@ -1606,7 +1611,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 <div className="pointer-events-none sticky bottom-4 z-10 -mt-14 pt-2">
                   {(aiFigures.length > 0 || readability.length > 0) && (
                     <div className="mb-2 flex flex-wrap justify-center gap-2">
-                      <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onClear={clearChecked} />
+                      <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onHide={hideAiFigures} onClear={clearChecked} />
                       <ReadabilityPill flags={readability} onFix={fixReadability} />
                     </div>
                   )}
@@ -1638,7 +1643,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
               <aside className="sticky top-[88px]">
                 {(aiFigures.length > 0 || readability.length > 0) && (
                   <div className="mb-2 flex flex-wrap gap-2">
-                    <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onClear={clearChecked} opens="down" />
+                    <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onHide={hideAiFigures} onClear={clearChecked} opens="down" />
                     <ReadabilityPill flags={readability} onFix={fixReadability} opens="down" />
                   </div>
                 )}

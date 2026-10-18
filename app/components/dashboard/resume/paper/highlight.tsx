@@ -203,9 +203,11 @@ const FigureMarks: FC<{ text: string; ranges: [number, number][]; fading: boolea
       <span
         key={i}
         data-resume-mark
+        // rounded-sm as it reads (owner, 2026-10-18): padding cancelled by an equal negative margin
+        // instead of a ring, so the corners stay 2px and the words don't move when it lights.
         className={cn(
-          "rounded-sm ring-[3px] transition-[background-color,box-shadow] duration-700 [box-decoration-break:clone]",
-          fading ? "bg-transparent ring-transparent" : "bg-[#f6d77a] text-[#222325] ring-[#f6d77a]",
+          "-mx-[3px] rounded-sm px-[3px] transition-[background-color] duration-700 [box-decoration-break:clone]",
+          fading ? "bg-transparent" : "bg-[#f6d77a] text-[#222325]",
         )}>
         {text.slice(start, end)}
       </span>,
