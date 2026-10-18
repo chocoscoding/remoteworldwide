@@ -42,7 +42,7 @@ import CustomizePanelsRail from "./CustomizePanelsRail";
 import AtsFloatingDock, { type AtsToolsProps } from "./AtsFloatingDock";
 import AtsDockedRail from "./AtsDockedRail";
 import { AiFiguresPill, ReadabilityPill } from "./AtsSidePills";
-import { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures } from "@/app/lib/dashboard/resume/ai-figures";
+import { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures, withLonger } from "@/app/lib/dashboard/resume/ai-figures";
 import { readabilityFlags, type ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
@@ -57,7 +57,7 @@ import type { PickedJob } from "@/app/lib/jobs/fields";
 // index. It is an array update, it has to feel instant, and a round trip could
 // only make it slower and occasionally fail. Everything that needs judgment —
 // or a credit — now runs in the AI service through `app/lib/resume/ai.ts`.
-import { applyQuantify, type QuantifySuggestion, type RewriteVariant, type TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
+import { applyQuantify, type AskLonger, type QuantifySuggestion, type RewriteVariant, type TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
 import { addSkills, hasSkill, reconcileGroups } from "@/app/lib/resume/skills";
 import {
   askForRewrite,
@@ -384,6 +384,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   const setAskStatus = (text: string | null) => dispatch({ type: "learn", askStatus: text });
   // Why the last ask failed, said in the chat. Not part of the undo history: it describes nothing on the page.
   const [askError, setAskError] = useState<string | null>(null);
+  // Ask's much longer lines, waiting on "Keep them anyway"; `base` is the content that run returned.
+  const [askLonger, setAskLonger] = useState<{ base: ResumeContent; longer: AskLonger[] } | null>(null);
 
   const [activeCustomizeItem, setActiveCustomizeItem] = useState("templates");
   const [flashCustomizeItem, setFlashCustomizeItem] = useState<string | null>(null);
@@ -1296,24 +1298,50 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     const sent = content;
     setAskStatus(null);
     setAskError(null);
+    setAskLonger(null);
     // A failure is said in the chat, in red, not as a toast (owner, 2026-10-18).
     const result = await runSuggestion("ask", () => askForRewrite({ content: sent, instruction }), {
       onError: (failure) => setAskError(failure.message),
     });
     if (!result) return;
 
+    // Lines that grew far past themselves wait for a go-ahead (owner, 2026-10-18: warn, and if they
+    // choose to continue, do it). Keeping them is applied here: no second run, no second credit.
+    const longer = result.longer ?? [];
+    if (longer.length > 0) setAskLonger({ base: result.content, longer });
+
     // The person asked for it, so it goes in (owner, 2026-10-18); any number the AI added is marked
     // for them to check by the "AI numbers" pill, beside Readability.
     const changed = changedLines(sent, result.content);
-    const added = changed.reduce((count, { before, after }) => count + addedFigures(before, after).length, 0);
-    const toCheck = added > 0 ? ` ${added} new number${added === 1 ? "" : "s"} to check: see AI numbers.` : "";
+    setAskInput("");
+    if (changed.length === 0) return;
     // The rewrite and what it says about itself are one undo step. One line, never the request read back.
     dispatch({
       type: "edit",
       content: (now) => withAiFigures(mergeRewrite(now, sent, result.content), changed),
-      marks: { askStatus: `Done.${toCheck} Like it? Reply to change it, or edit it directly.` },
+      marks: { askStatus: askDone(changed) },
     });
-    setAskInput("");
+  };
+
+  /** The one-line status after an Ask edit lands, with how many numbers the AI added to check. */
+  const askDone = (changed: Array<{ before: string; after: string }>) => {
+    const added = changed.reduce((count, { before, after }) => count + addedFigures(before, after).length, 0);
+    const toCheck = added > 0 ? ` ${added} new number${added === 1 ? "" : "s"} to check: see AI numbers.` : "";
+    return `Done.${toCheck} Like it? Reply to change it, or edit it directly.`;
+  };
+
+  /** "Keep them anyway": the held longer lines go in, merged where the page still matches what landed. */
+  const keepLonger = () => {
+    if (!askLonger) return;
+    const { base, longer } = askLonger;
+    const target = withLonger(base, longer);
+    const changed = changedLines(base, target);
+    setAskLonger(null);
+    dispatch({
+      type: "edit",
+      content: (now) => withAiFigures(mergeRewrite(now, base, target), changed),
+      marks: { askStatus: askDone(changed) },
+    });
   };
 
   // The paper's highlight: what is pointed at, and — on AI Tools, as in the design — each fix
@@ -1366,6 +1394,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     onDismissAskStatus: () => setAskStatus(null),
     askError,
     onDismissAskError: () => setAskError(null),
+    askLonger: askLonger ? askLonger.longer.length : 0,
+    onKeepLonger: keepLonger,
+    onSkipLonger: () => setAskLonger(null),
     jobLabel,
   };
 

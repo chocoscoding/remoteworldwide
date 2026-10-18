@@ -153,6 +153,15 @@ export interface AskResult {
   summaryChanged: boolean;
   /** How many existing bullets were rewritten. */
   bulletsChanged: number;
-  /** Proposed lines the service discarded (a figure the resume never had, or a line that ballooned) — the user's own line was kept. */
+  /** Proposed lines the service discarded. Always 0 since 2026-10-18: a ballooned line comes back in `longer`. */
   rejectedLines: number;
+  /** Lines that grew far past their old length, held out of `content` until the person says keep them. */
+  longer: AskLonger[];
+}
+
+/** One line Ask wrote much longer than it was. `at`: "summary", "<role>.<bullet>" or "c<section>.<point>". */
+export interface AskLonger {
+  at: string;
+  before: string;
+  after: string;
 }

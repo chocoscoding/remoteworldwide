@@ -134,6 +134,10 @@ export interface AiAssistRailProps {
   /** Why the last ask failed, shown in red in the chat itself rather than as a toast (owner, 2026-10-18). */
   askError?: string | null;
   onDismissAskError?: () => void;
+  /** How many lines Ask wrote much longer, waiting on "Keep them anyway" (owner, 2026-10-18: warn, then do it). */
+  askLonger?: number;
+  onKeepLonger?: () => void;
+  onSkipLonger?: () => void;
   /** The job a check "against a job" would use now, as "Role at Company"; null opens the picker. */
   jobLabel?: string | null;
   /**
@@ -179,6 +183,39 @@ const PickRow: FC<{
   </button>
 );
 
+/**
+ * The warning before Ask's much longer lines go in (owner, 2026-10-18: "suggest or warn them, and if
+ * they choose to continue, do it"). Keeping them costs nothing more: the run already wrote them.
+ */
+export const AskLongerNote: FC<{ count: number; onKeep: () => void; onSkip?: () => void }> = ({ count, onKeep, onSkip }) => (
+  <div role="status" className="flex flex-col gap-2 rounded-xl border border-[#c98a12]/40 bg-[#fdf8ec] px-3.5 py-2.5">
+    <p className="text-xs leading-relaxed text-black/75">
+      <span className="font-semibold text-[#8a5a00]">
+        {count === 1 ? "1 line came out" : `${count} lines came out`} much longer than before.
+      </span>{" "}
+      Long bullets can lose a recruiter skimming the page. Keep {count === 1 ? "it" : "them"} anyway?
+    </p>
+    <span className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={onKeep}
+        className="h-7 cursor-pointer rounded-lg bg-[#222325] px-3 text-xs font-bold text-[#e1f073]"
+      >
+        Keep {count === 1 ? "it" : "them"}
+      </button>
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="h-7 cursor-pointer rounded-lg px-2.5 text-xs font-semibold text-black/60 hover:bg-black/5 hover:text-primary"
+        >
+          No thanks
+        </button>
+      )}
+    </span>
+  </div>
+);
+
 const AiAssistRail: FC<AiAssistRailProps> = ({
   isBlank,
   cards,
@@ -203,6 +240,9 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   onDismissAskStatus,
   askError = null,
   onDismissAskError,
+  askLonger = 0,
+  onKeepLonger,
+  onSkipLonger,
   jobLabel = null,
   variant = "rail",
   header,
@@ -702,6 +742,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   // ── Ask for a rewrite (docked only) ─────────────────────────────────────────
   const ask = !floating && !isBlank && (
     <div className="flex flex-none flex-col gap-1.5 pb-1 pr-1">
+      {askLonger > 0 && onKeepLonger && <AskLongerNote count={askLonger} onKeep={onKeepLonger} onSkip={onSkipLonger} />}
       {askError && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#b23c26]/30 bg-[#fdf4f2] px-3.5 py-2.5">
           <p className="flex-1 text-xs font-semibold leading-relaxed text-[#b23c26]">{askError}</p>

@@ -15,7 +15,6 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
-  Info,
   Loader2,
   PanelRightOpen,
   RotateCw,
@@ -30,7 +29,7 @@ import {
   SUGGESTION_CREDITS,
 } from "@/app/lib/resume/ai";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
-import AiAssistRail, { type AiAssistRailProps } from "./AiAssistRail";
+import AiAssistRail, { AskLongerNote, type AiAssistRailProps } from "./AiAssistRail";
 
 /** Quick instructions for the ask box, as the design has them. */
 const ASK_CHIPS = [
@@ -261,18 +260,9 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
             {/* The AI mark leads the box (owner, 2026-10-18), the same one the dock's Ask AI wears. */}
             <span className="flex items-center gap-1.5 rounded-full bg-[#eef6ad] py-px pl-1.5 pr-2 font-bold text-primary">
               <Sparkle className="h-3.5 w-3.5" strokeWidth={2} />
-              Ask AI
+              AI
             </span>
             <span className="flex-1" />
-            {/* An icon with its label on hover (owner, 2026-10-18), not a line of text on the box. */}
-            <span
-              tabIndex={0}
-              aria-label="Uses what's on your resume. Numbers it adds for you are marked on the page to check."
-              title="Uses what's on your resume. Numbers it adds for you are marked on the page to check."
-              className="grid h-6 w-6 cursor-help place-content-center text-[#8a8b85] hover:text-primary"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </span>
             <button
               type="button"
               aria-label="Close"
@@ -282,6 +272,9 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
               <X className="h-3.5 w-3.5" />
             </button>
           </span>
+          {(props.askLonger ?? 0) > 0 && props.onKeepLonger && (
+            <AskLongerNote count={props.askLonger ?? 0} onKeep={props.onKeepLonger} onSkip={props.onSkipLonger} />
+          )}
           {props.askError && (
             <div role="alert" className="flex items-start gap-2 rounded-lg border border-[#b23c26]/30 bg-[#fdf4f2] px-3 py-2">
               <p className="flex-1 text-xs font-semibold leading-relaxed text-[#b23c26]">{props.askError}</p>

@@ -31,7 +31,7 @@ registerHooks({
 });
 
 const { changeCaption, resumeChanges } = await import("../app/lib/apply/changes.ts");
-const { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures } = await import("../app/lib/dashboard/resume/ai-figures.ts");
+const { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures, withLonger } = await import("../app/lib/dashboard/resume/ai-figures.ts");
 const { readabilityFlags } = await import("../app/lib/dashboard/resume/readability.ts");
 const { DEFAULT_DESIGN, DEFAULT_SECTIONS } = await import("../app/lib/dashboard/resume/design-defaults.ts");
 const { readApplyState } = await import("../app/lib/apply/state.ts");
@@ -112,6 +112,18 @@ describe("numbers Ask adds when asked (owner, 2026-10-18: do what the person ask
     assert.equal(pairs.length, 2);
     const next = withAiFigures(after, pairs);
     assert.deepEqual(pendingAiFigures(next).map((figure) => figure.figure), ["4+", "120"]);
+  });
+
+  it("puts the much longer lines in by address once the person keeps them", () => {
+    const base = content({ summary: "Short." });
+    const kept = withLonger(base, [
+      { at: "summary", after: "A much longer summary, kept on purpose." },
+      { at: "0.1", after: "Onboarded 40 new accounts in a quarter with a playbook the team still uses" },
+      { at: "9.9", after: "No such line" },
+    ]);
+    assert.equal(kept.summary, "A much longer summary, kept on purpose.");
+    assert.equal(kept.experience[0].bullets[1], "Onboarded 40 new accounts in a quarter with a playbook the team still uses");
+    assert.equal(changedLines(base, kept).length, 2);
   });
 });
 

@@ -47,6 +47,40 @@ export const changedLines = (before: ResumeContent, after: ResumeContent): Array
   return pairs;
 };
 
+/**
+ * Ask's much longer lines put in place (owner, 2026-10-18: warn, and if they choose to continue, do
+ * it). `at` is the service's address: "summary", "<role>.<bullet>" or "c<section>.<point>", by
+ * position in the content the service returned.
+ */
+export const withLonger = (content: ResumeContent, longer: ReadonlyArray<{ at: string; after: string }>): ResumeContent => {
+  let next = content;
+  for (const { at, after } of longer) {
+    if (at === "summary") {
+      next = { ...next, summary: after };
+      continue;
+    }
+    const custom = /^c(\d+)\.(\d+)$/.exec(at);
+    if (custom) {
+      const [s, p] = [Number(custom[1]), Number(custom[2])];
+      next = {
+        ...next,
+        customSections: (next.customSections ?? []).map((section, i) =>
+          i === s ? { ...section, items: section.items.map((item, j) => (j === p ? after : item)) } : section,
+        ),
+      };
+      continue;
+    }
+    const bullet = /^(\d+)\.(\d+)$/.exec(at);
+    if (!bullet) continue;
+    const [e, b] = [Number(bullet[1]), Number(bullet[2])];
+    next = {
+      ...next,
+      experience: next.experience.map((entry, i) => (i === e ? { ...entry, bullets: entry.bullets.map((line, j) => (j === b ? after : line)) } : entry)),
+    };
+  }
+  return next;
+};
+
 const wordsOf = (value: string): string[] => value.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 2);
 
 /**
