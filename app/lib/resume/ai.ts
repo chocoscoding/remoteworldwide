@@ -79,6 +79,8 @@ export interface SuggestionInput {
   keywords?: string[] | null;
   /** `keywords` only: list the posting's missing keywords to tick in (`proposeKeywords`), rather than work terms in. */
   propose?: boolean;
+  /** `shorten` only: "page" cuts to one page; absent trims to at most 750 words (owner, 2026-10-18). */
+  target?: "page" | null;
   /**
    * `rewrite` and `quantify`: the role picked on the page, by its index in `content.experience` —
    * its bullets are rewritten, or quantified, instead of the summary or every role.

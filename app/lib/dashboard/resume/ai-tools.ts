@@ -31,6 +31,14 @@ export interface TailorResult {
   content: ResumeContent;
   /** The JD terms woven in — surfaced in the done-caption. */
   woven: string[];
+  /** Gaps left out because the resume's history doesn't show them (or they're about where the candidate may work), with advice. */
+  notShown?: TermAdvice[];
+}
+
+/** A requested term the resume doesn't show yet, with one line of advice. Never written in, never charged for. */
+export interface TermAdvice {
+  term: string;
+  advice: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +65,10 @@ export interface KeywordInjection {
   missed: string[];
   /** Advisory only: requested terms worked in although nothing on the resume came close — "make sure you can back these up in an interview". */
   unbacked: string[];
+  /** Terms left out because the resume's history doesn't show them, each with advice. No retry, no charge. */
+  notShown?: TermAdvice[];
+  /** Where each added term went, by its spelling as sent: the lines that now show it ("Skills" for a skill name). */
+  placed?: Record<string, string[]>;
 }
 
 // ---------------------------------------------------------------------------

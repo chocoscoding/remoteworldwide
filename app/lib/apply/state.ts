@@ -7,7 +7,8 @@
 // trying to continue. Pure, and its imports are types or pure modules:
 // tests/apply.test.mjs runs it under plain `node --test`.
 
-import type { ScanReport } from "@/app/lib/ats/types";
+import type { CoverageState, ScanReport } from "@/app/lib/ats/types";
+import type { TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
 import type { CoverTone } from "@/app/lib/cover/api";
 import { DEFAULT_LETTER_DESIGN, LETTERHEAD_OPTIONS, LETTER_FONT_OPTIONS, SPACING_OPTIONS, THEME_OPTIONS } from "@/app/lib/cover/presentation";
 import type { LetterDesign, ResumeContent } from "@/app/lib/dashboard/types";
@@ -45,6 +46,10 @@ export interface ApplyProposal {
   unbacked: string[];
   /** Picked terms that wouldn't go in as resume lines: nothing of them is in `content`, and they can be tried again on it. */
   missed: string[];
+  /** Picked terms the resume's history doesn't show, each with advice. Never tried again. */
+  notShown: TermAdvice[];
+  /** Where each worked-in term went: the lines that show it ("Skills" for a skill name). */
+  placed: Record<string, string[]>;
 }
 
 export interface ApplyResumeState {
@@ -88,7 +93,14 @@ export interface ApplyState {
    * The last score, for the resume and the version it was run on, with the score of the version
    * scored before it, so the screen can say how much a change moved it.
    */
-  scan: { resumeId: string; version: number; report: ScanReport; previousScore: number | null } | null;
+  scan: {
+    resumeId: string;
+    version: number;
+    report: ScanReport;
+    previousScore: number | null;
+    /** Each requirement's state on the version scored before, by id: what "Up 15" is explained from. */
+    previousStates?: Record<string, CoverageState>;
+  } | null;
   proposal: ApplyProposal | null;
   cover: ApplyCoverState;
   questions: ApplyQuestion[];
@@ -109,6 +121,12 @@ export const EMPTY_APPLY_STATE: ApplyState = {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
+
+const STATES: readonly CoverageState[] = ["satisfied", "partial", "missing", "undetermined"];
+
+/** A stored map of requirement id to its state; anything else is dropped. */
+const readStates = (value: Record<string, unknown>): Record<string, CoverageState> =>
+  Object.fromEntries(Object.entries(value).filter((entry): entry is [string, CoverageState] => STATES.includes(entry[1] as CoverageState)));
 const isTone = (value: unknown): value is CoverTone => TONES.includes(value as CoverTone);
 const oneOf = <T extends string>(value: unknown, options: readonly { id: T }[], fallback: T): T =>
   options.some((option) => option.id === value) ? (value as T) : fallback;
@@ -184,7 +202,13 @@ export function readApplyState(raw: unknown): ApplyState {
     },
     scan:
       scan && report && typeof scan.resumeId === "string" && typeof scan.version === "number"
-        ? { resumeId: scan.resumeId, version: scan.version, report, previousScore: typeof scan.previousScore === "number" ? scan.previousScore : null }
+        ? {
+            resumeId: scan.resumeId,
+            version: scan.version,
+            report,
+            previousScore: typeof scan.previousScore === "number" ? scan.previousScore : null,
+            ...(isRecord(scan.previousStates) ? { previousStates: readStates(scan.previousStates) } : {}),
+          }
         : null,
     proposal:
       proposal && proposalContent && (proposal.tool === "tailor" || proposal.tool === "keywords") && typeof proposal.forResumeId === "string"
@@ -196,6 +220,13 @@ export function readApplyState(raw: unknown): ApplyState {
             // `skipped` is what a build from earlier on 2026-10-03 called it.
             unbacked: strings(proposal.unbacked ?? proposal.skipped),
             missed: strings(proposal.missed),
+            notShown: (Array.isArray(proposal.notShown) ? proposal.notShown : [])
+              .filter(isRecord)
+              .filter((row) => typeof row.term === "string" && typeof row.advice === "string")
+              .map((row) => ({ term: row.term as string, advice: row.advice as string })),
+            placed: isRecord(proposal.placed)
+              ? Object.fromEntries(Object.entries(proposal.placed).map(([term, lines]) => [term, strings(lines)]))
+              : {},
           }
         : null,
     cover: {

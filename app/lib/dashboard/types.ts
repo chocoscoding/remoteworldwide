@@ -226,6 +226,18 @@ export interface ResumeContent {
   skillGroups?: ResumeSkillGroup[];
   /** The points of each custom section, by its section's id. */
   customSections?: ResumeCustomSection[];
+  /** Numbers Quantify suggested, still to be checked by the person. Never printed. */
+  aiFigures?: ResumeAiFigure[];
+  /** The person said they checked the AI's numbers ("I've checked them"). */
+  aiFiguresCleared?: boolean;
+}
+
+/** One number the AI suggested: the figure, and the line as Quantify wrote it (RWW/ATS-QUALITY-PLAN.md, 13.8). */
+export interface ResumeAiFigure {
+  figure: string;
+  line: string;
+  /** ISO time it was accepted. */
+  addedAt: string;
 }
 
 // ---------------------------------------------------------------------------

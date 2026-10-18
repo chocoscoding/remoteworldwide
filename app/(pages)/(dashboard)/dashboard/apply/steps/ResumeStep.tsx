@@ -57,11 +57,11 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { Bone, LinesSkeleton, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import { useDocuments } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import { changeCount, resumeChanges } from "@/app/lib/apply/changes";
+import { changeCaption, changeCount, resumeChanges } from "@/app/lib/apply/changes";
 import { noteParts, scoreColor, withoutEmDashes } from "@/app/lib/apply/score";
 import { sendingResumeId, type ApplyProposal, type ApplyState, type ResumeToolId } from "@/app/lib/apply/state";
 import { ATS_BILLING_HREF, SCAN_CREDITS, missingGaps, prepareResumeForDoc, scanTier } from "@/app/lib/ats/api";
-import type { IngestedResumeDetail } from "@/app/lib/ats/types";
+import type { CoverageState, IngestedResumeDetail, RequirementVerdict, ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { qk } from "@/app/lib/query/keys";
 import { SUGGESTION_CREDITS, injectKeywords, tailorToJob } from "@/app/lib/resume/ai";
@@ -224,7 +224,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
           // Measured against the last version scored; a re-run of the same version keeps what it was measured against.
           const same = s.scan?.resumeId === resumeId && s.scan.version === scoredVersion;
           const previousScore = same ? (s.scan?.previousScore ?? null) : (s.scan?.report.score ?? null);
-          return { ...s, scan: { resumeId, version: scoredVersion, report: finished, previousScore } };
+          // Each requirement's state before this version, so "Up 15" can say what moved it.
+          const previousStates = same
+            ? s.scan?.previousStates
+            : s.scan
+              ? Object.fromEntries(s.scan.report.verdicts.map((verdict) => [verdict.requirement.id, verdict.state]))
+              : undefined;
+          return { ...s, scan: { resumeId, version: scoredVersion, report: finished, previousScore, ...(previousStates ? { previousStates } : {}) } };
         });
       });
     },
@@ -366,16 +372,26 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
     let proposal: ApplyProposal | null = null;
     if (tool === "tailor") {
       const result = await tools.run("tailor", () => tailorToJob(input));
-      if (result) proposal = { tool, forResumeId, content: result.content, terms: result.woven, unbacked: [], missed: [] };
+      if (result) proposal = { tool, forResumeId, content: result.content, terms: result.woven, unbacked: [], missed: [], notShown: result.notShown ?? [], placed: {} };
     } else {
       const result = await tools.run("keywords", () => injectKeywords(input));
       if (result) {
         const unbacked = result.unbacked.filter((term) => !closeOnResume.has(term));
         // `missed` is absent from a service that predates it, which worked every term in or failed.
         const missed = result.missed ?? [];
+        const notShown = result.notShown ?? [];
+        const placed = result.placed ?? {};
         proposal = onto
-          ? { ...onto, content: result.content, terms: [...onto.terms, ...result.added], unbacked: [...onto.unbacked, ...unbacked], missed }
-          : { tool, forResumeId, content: result.content, terms: result.added, unbacked, missed };
+          ? {
+              ...onto,
+              content: result.content,
+              terms: [...onto.terms, ...result.added],
+              unbacked: [...onto.unbacked, ...unbacked],
+              missed,
+              notShown: [...onto.notShown, ...notShown],
+              placed: { ...onto.placed, ...placed },
+            }
+          : { tool, forResumeId, content: result.content, terms: result.added, unbacked, missed, notShown, placed };
       }
     }
     if (!proposal) return false;
@@ -661,6 +677,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                   <Pill variant={scanTier(report.score).tone}>{scanTier(report.score).label}</Pill>
                   {scoreChange !== null && <ScoreChange delta={scoreChange} />}
                 </div>
+                {scoreChange !== null && scoreChange !== 0 && stored?.previousStates && (
+                  <ScoreMoves report={report} before={stored.previousStates} />
+                )}
+                <TwoStages report={report} />
                 {live?.status === "explaining" && (
                   <Loading label="Writing up why" className="w-full max-w-xl">
                     <LinesSkeleton lines={2} />
@@ -670,9 +690,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                 {report.degraded && (
                   <ScoringNote text={report.degradedReason ?? "Scored on a reduced path, so treat it as a rough read."} />
                 )}
+                {(report.stuffing ?? []).length > 0 && <StuffingNote reasons={report.stuffing ?? []} />}
               </div>
             </div>
-            {gaps.length > 0 && (
+            {(gaps.length > 0 || (report.eligibility ?? []).length > 0 || (report.needs ?? []).length > 0) && (
               <div className="border-t border-black/8 pt-5">
                 <GapPicker
                   gaps={gaps}
@@ -680,6 +701,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                   fixing={tools.running === "keywords"}
                   onFix={toolsIdle ? (labels) => runTool("keywords", labels) : undefined}
                   fixError={toolFrom === "gaps" ? (tools.failure?.message ?? null) : null}
+                  company={job.company}
+                  needs={report.needs ?? []}
+                  eligibility={report.eligibility ?? []}
+                  traits={report.traits ?? []}
                 />
               </div>
             )}
@@ -761,7 +786,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
               />
               <ToolButton
                 label="Work in missing keywords"
-                hint={`Works every gap the score found into your summary, skills and bullets. ${SUGGESTION_CREDITS} credit.`}
+                hint={`Improves your bullets to show the gaps your history backs, and gives advice for the rest. ${SUGGESTION_CREDITS} credit.`}
                 disabled={!toolsIdle || !canKeywords}
                 onClick={() => void runTool("keywords")}
               />
@@ -978,6 +1003,72 @@ const ScoreChange: FC<{ delta: number }> = ({ delta }) => (
   </span>
 );
 
+const STATE_RANK: Record<string, number> = { missing: 0, undetermined: 0, partial: 1, satisfied: 2 };
+
+/**
+ * What moved the score since the last version (RWW/ATS-QUALITY-PLAN.md, 3.3): which requirements
+ * changed state, and the line that now shows each one. A jump nobody can explain is then visible.
+ */
+const ScoreMoves: FC<{ report: ScanReport; before: Record<string, CoverageState> }> = ({ report, before }) => {
+  const moved = report.verdicts
+    .filter((verdict) => before[verdict.requirement.id] !== undefined && STATE_RANK[before[verdict.requirement.id]] !== STATE_RANK[verdict.state])
+    .map((verdict) => ({ verdict, up: STATE_RANK[verdict.state] > STATE_RANK[before[verdict.requirement.id]] }));
+  if (moved.length === 0) return null;
+  const name = (verdict: RequirementVerdict) => verdict.requirement.label || verdict.requirement.text;
+  return (
+    <ul className="flex w-full max-w-xl flex-col gap-1 text-[13px] leading-snug text-black/65">
+      {moved.slice(0, 4).map(({ verdict, up }) => (
+        <li key={verdict.requirement.id} className="flex gap-1.5">
+          <span className={cn("flex-none font-semibold", up ? "text-[#3d7a1f]" : "text-[#b23c26]")}>{up ? (verdict.state === "satisfied" ? "Now matched" : "Partly matched") : "No longer matched"}:</span>
+          <span className="min-w-0">
+            <span className="font-semibold text-primary">{name(verdict)}</span>
+            {up && verdict.evidence[0] && <span className="text-black/50"> by “{verdict.evidence[0].text.length > 70 ? `${verdict.evidence[0].text.slice(0, 70)}…` : verdict.evidence[0].text}”</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const METRIC_GROUPS: Array<{ title: string; ids: string[] }> = [
+  { title: "Pass the AI", ids: ["keyword-match", "parseability"] },
+  { title: "Pass the human", ids: ["impact-language", "length-format"] },
+];
+
+/**
+ * The two stages a resume has to pass (RWW/ATS-QUALITY-PLAN.md, 13.1): the AI reads and ranks it,
+ * then a person decides. Labels and grouping only; the headline stays the match score.
+ */
+const TwoStages: FC<{ report: ScanReport }> = ({ report }) => {
+  const byId = new Map(report.metrics.map((metric) => [metric.id, metric]));
+  return (
+    <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+      {METRIC_GROUPS.map((group) => (
+        <div key={group.title} className="rounded-lg border border-black/10 px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-black/45">{group.title}</p>
+          {group.ids.map((id) => {
+            const metric = byId.get(id);
+            return metric ? (
+              <p key={id} className="mt-1 flex items-baseline justify-between gap-2 text-[13px] text-black/70">
+                <span>{metric.label}</span>
+                <span className="font-semibold tabular-nums text-primary">{metric.value}</span>
+              </p>
+            ) : null;
+          })}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/** Why the score is held below "Strong match": the resume reads as keyword-stuffed (RWW/ATS-QUALITY-PLAN.md, 13.4). */
+const StuffingNote: FC<{ reasons: string[] }> = ({ reasons }) => (
+  <p className="max-w-xl rounded-lg border border-dashed border-[#b23c26]/35 px-3 py-2 text-[13px] leading-relaxed text-black/70">
+    <span className="font-semibold text-[#b23c26]">Held below Strong match.</span> This reads as keyword-stuffed: {reasons.join("; ")}. Say each thing once, next to the
+    work that proves it.
+  </p>
+);
+
 /** A note on how the score was reached, with the count in its "9 of 14" underlined (owner, 2026-10-03). */
 const ScoringNote: FC<{ text: string }> = ({ text }) => {
   const clean = withoutEmDashes(text).trim();
@@ -1101,6 +1192,8 @@ const ProposalPanel: FC<{
   const changes = resumeChanges(original, proposal.content);
   const nothing = changeCount(changes) === 0;
   const busy = using || retrying;
+  const [shownTerm, setShownTerm] = useState<string | null>(null);
+  const shownLines = shownTerm ? (proposal.placed[shownTerm] ?? []) : [];
 
   return (
     // Saving the version: the panel holds still and pulses until the draft is in.
@@ -1113,25 +1206,38 @@ const ProposalPanel: FC<{
             <div>
               <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-black/45">Worked in</p>
               <div className="flex flex-wrap gap-1.5">
-                {proposal.terms.map((term) => (
-                  <Pill key={term} variant="positive">
-                    {term}
-                  </Pill>
-                ))}
+                {proposal.terms.map((term) => {
+                  const lines = proposal.placed[term] ?? [];
+                  return lines.length > 0 ? (
+                    // Click (or hover, through the title) to see the line it went into (owner, 2026-10-18).
+                    <button
+                      key={term}
+                      type="button"
+                      title={lines.join("\n")}
+                      aria-pressed={shownTerm === term}
+                      onClick={() => setShownTerm((current) => (current === term ? null : term))}
+                      className="cursor-pointer rounded-full">
+                      <Pill variant="positive" className={cn(shownTerm === term && "ring-2 ring-[#222325]")}>
+                        {term}
+                      </Pill>
+                    </button>
+                  ) : (
+                    <Pill key={term} variant="positive">
+                      {term}
+                    </Pill>
+                  );
+                })}
               </div>
+              {shownLines.length > 0 && (
+                <ul className="mt-2 flex flex-col gap-1 border-l-2 border-[#e1f073] pl-3 text-[13px] leading-relaxed text-black/70">
+                  {shownLines.map((line) => (
+                    <li key={line}>{line === "Skills" ? "Added to your Skills" : `“${line}”`}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
-          <p className="text-sm leading-relaxed text-black/65">
-            {[
-              changes.summary.length > 0 ? "a new summary" : null,
-              changes.bullets.length > 0 ? `${changes.bullets.length} bullet${changes.bullets.length === 1 ? "" : "s"} reworded` : null,
-              changes.skills.length > 0 ? `${changes.skills.length} skill${changes.skills.length === 1 ? "" : "s"} added` : null,
-            ]
-              .filter(Boolean)
-              .join(", ")
-              .replace(/^./, (first) => first.toUpperCase())}
-            .
-          </p>
+          <p className="text-sm leading-relaxed text-black/65">{changeCaption(changes, Boolean(original?.summary.trim()))}.</p>
           {changes.summary.length > 0 && (
             <div className="rounded-xl bg-[#f6faea] p-4">
               <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-black/45">New summary</p>
@@ -1142,11 +1248,29 @@ const ProposalPanel: FC<{
       )}
       {/* Picked lines the AI couldn't put in resume language this time (owner, 2026-10-04: a run used to
           throw the rest away with them). Tried again on this version, so what went in stays. */}
+      {/* What the resume's history doesn't show (owner, 2026-10-18): advice, never a claim, and never a
+          paid retry, since another try can't make it true. */}
+      {proposal.notShown.length > 0 && (
+        <div className="rounded-xl border border-dashed border-black/20 p-4">
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-black/45">Your resume doesn&apos;t show these yet</p>
+          <p className="mb-2.5 text-sm leading-relaxed text-black/65">Nothing was written in for these. Here&apos;s how to show each one honestly.</p>
+          <ul className="flex flex-col gap-2">
+            {proposal.notShown.map((item) => (
+              <li key={item.term} className="flex flex-col gap-1">
+                <span className="self-start">
+                  <Pill variant="outline-dashed">{item.term}</Pill>
+                </span>
+                <span className="text-[13px] leading-relaxed text-black/65">{item.advice}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {proposal.missed.length > 0 && (
         <div className="rounded-xl border border-dashed border-[#b23c26]/35 p-4">
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#b23c26]">Didn&apos;t go in</p>
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#b23c26]">Couldn&apos;t be written cleanly</p>
           <p className="mb-2.5 text-sm leading-relaxed text-black/65">
-            These wouldn&apos;t go in as resume lines this time, so nothing of them was added.
+            These didn&apos;t pass the writing checks this time, so nothing of them was added.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {proposal.missed.map((term) => (

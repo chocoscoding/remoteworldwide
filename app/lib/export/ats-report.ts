@@ -16,7 +16,7 @@
 // file of the same scan can never disagree about what it said.
 
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
-import { coveredKeywords, scanTier, unmetRequirements } from "@/app/lib/ats/api";
+import { coveredKeywords, missingGaps, scanTier, unmetRequirements } from "@/app/lib/ats/api";
 import type { ScanReport } from "@/app/lib/ats/types";
 
 export interface AtsReportInput {
@@ -50,6 +50,8 @@ interface ReportModel {
   covered: string[];
   missing: string[];
   rewrites: { before: string; after: string; why: string }[];
+  /** What the posting says that is not a gap: eligibility, traits, and why a resume reads as stuffed. */
+  notes: string[];
   scanId: string;
 }
 
@@ -75,8 +77,14 @@ function modelOf({ report, resumeName, job, scannedAt }: AtsReportInput): Report
       closest: verdict.evidence[0]?.text ?? null,
     })),
     covered: coveredKeywords(report).map((k) => k.label),
-    missing: report.gaps.filter((g) => !g.present).map((g) => g.label),
+    missing: missingGaps(report).map((g) => g.label),
     rewrites: report.rewrites.map((r) => ({ before: r.before, after: r.after, why: r.why })),
+    notes: [
+      ...(report.stuffing ?? []).length > 0 ? [`Held below Strong match: this reads as keyword-stuffed (${(report.stuffing ?? []).join("; ")}).`] : [],
+      ...(report.needs ?? []).map((need) => `What they need solved: ${need}.`),
+      ...(report.eligibility ?? []).map((note) => `This role needs: ${note.text}. Check you meet it; it never goes on your resume and isn't in the score.`),
+      ...(report.traits ?? []).map((note) => `Show in your cover letter or interview: ${note.label || note.text}.`),
+    ],
     scanId: report.scanId,
   };
 }
@@ -107,6 +115,7 @@ export function atsReportToMarkdown(input: AtsReportInput): string {
   }
 
   if (m.explanation) lines.push("## What this comes down to", "", md(m.explanation), "");
+  if (m.notes.length > 0) lines.push("## Notes from the posting", "", ...m.notes.map((note) => `- ${md(note)}`), "");
 
   if (m.gaps.length > 0) {
     lines.push(`## Gaps to close (${m.gaps.length})`, "");
@@ -171,6 +180,10 @@ export async function atsReportToDocx(input: AtsReportInput): Promise<Blob> {
   if (m.explanation) {
     children.push(heading("What this comes down to"));
     children.push(body([new TextRun(m.explanation)]));
+  }
+  if (m.notes.length > 0) {
+    children.push(heading("Notes from the posting"));
+    for (const note of m.notes) children.push(new Paragraph({ bullet: { level: 0 }, spacing: { after: 60 }, children: [new TextRun(note)] }));
   }
 
   if (m.gaps.length > 0) {
@@ -245,6 +258,7 @@ export function atsReportHtml(input: AtsReportInput): string {
     parts.push(`<h2>Metrics</h2><table>${m.metrics.map((x) => `<tr><td>${esc(x.label)}</td><td class="v">${x.value}%</td></tr>`).join("")}</table>`);
   }
   if (m.explanation) parts.push(`<h2>What this comes down to</h2><p>${esc(m.explanation)}</p>`);
+  if (m.notes.length > 0) parts.push(`<h2>Notes from the posting</h2><ul>${m.notes.map((note) => `<li>${esc(note)}</li>`).join("")}</ul>`);
 
   if (m.gaps.length > 0) {
     parts.push(

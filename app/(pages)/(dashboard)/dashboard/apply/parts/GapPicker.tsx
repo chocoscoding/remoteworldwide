@@ -21,7 +21,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { INTERVIEW_ADVICE_LABEL, stepsForGap, type GapSteps } from "@/app/lib/apply/gapSteps";
 import { quantityParts } from "@/app/lib/apply/score";
-import type { AtsKeyword, RequirementVerdict } from "@/app/lib/ats/types";
+import type { AtsKeyword, PostingNote, RequirementVerdict } from "@/app/lib/ats/types";
 import { SUGGESTION_CREDITS } from "@/app/lib/resume/ai";
 import { cn } from "@/lib/utils";
 
@@ -122,9 +122,29 @@ export interface GapPickerProps {
   fixing: boolean;
   /** Why the last fix started here failed, said beside its button. */
   fixError?: string | null;
+  /** The employer, for "What Pencil needs solved". */
+  company?: string;
+  /** The problems the employer is hiring to solve (RWW/ATS-QUALITY-PLAN.md, 13.6). */
+  needs?: string[];
+  /** Where the candidate must live or may work: a notice, never a gap to pick (1.2). */
+  eligibility?: PostingNote[];
+  /** Personal qualities: for the cover letter or interview, never a gap to pick (1.3). */
+  traits?: PostingNote[];
 }
 
-const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixError = null }) => {
+/** One plain notice row: a title and the posting's items, never pickable. */
+const Notice: FC<{ title: string; items: string[]; tone?: "warn" | "plain" }> = ({ title, items, tone = "plain" }) => (
+  <div className={cn("rounded-lg border px-3.5 py-2.5", tone === "warn" ? "border-[#b26a00]/30 bg-[#fff8ec]" : "border-black/10 bg-white")}>
+    <p className={cn("text-[11px] font-bold uppercase tracking-[0.08em]", tone === "warn" ? "text-[#8a5200]" : "text-black/45")}>{title}</p>
+    <ul className="mt-1 flex flex-col gap-0.5 text-[13px] leading-relaxed text-black/75">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  </div>
+);
+
+const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixError = null, company, needs = [], eligibility = [], traits = [] }) => {
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -194,16 +214,17 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
   }
 
   return (
+    <div className="flex flex-col gap-4">
+      {needs.length > 0 && <Notice title={company ? `What ${company} needs solved` : "What they need solved"} items={needs} />}
+      {eligibility.length > 0 && (
+        <Notice tone="warn" title="This role needs" items={eligibility.map((note) => `${note.text}. Check you meet it; it never goes on your resume.`)} />
+      )}
+      {gaps.length > 0 && (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-base font-bold text-primary">Missing from your resume</p>
+        {/* No "Pick all" (owner, 2026-10-18): covering about half a posting's skills does best; covering every one does worse. */}
         <div className="flex items-center gap-3 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setPicked(new Set(gaps.map((gap) => gap.id)))}
-            className="cursor-pointer text-primary underline decoration-2 underline-offset-4">
-            Pick all {gaps.length}
-          </button>
           {chosen.length > 0 && (
             <button
               type="button"
@@ -217,7 +238,9 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
           )}
         </div>
       </div>
-      <p className="mt-1 text-sm text-black/55">Hover one to see what it needs. Pick the ones to fix.</p>
+      <p className="mt-1 text-sm text-black/55">
+        Hover one to see what it needs. Pick the ones your work really shows. You don&apos;t need every one: resumes covering about half of a posting&apos;s skills did best.
+      </p>
 
       <div className="mt-3.5 flex flex-wrap gap-2">
         {gaps.map((gap) => {
@@ -335,6 +358,11 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
             </p>
           )}
         </>
+      )}
+    </div>
+      )}
+      {traits.length > 0 && (
+        <Notice title="Show these in your cover letter or interview" items={traits.map((note) => note.label || note.text)} />
       )}
     </div>
   );

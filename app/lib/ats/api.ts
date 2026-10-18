@@ -19,7 +19,7 @@ import { PLANS_HREF } from "@/app/lib/settings/types";
 import { BackendError, apiMessage, signalPlanLimit } from "@/app/lib/api/core";
 import { createSseParser } from "@/app/lib/api/sse";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
-import type { BulletRewrite, ExtractedRequirements, IngestedResume, IngestedResumeDetail, ScanInput, ScanRecord, ScanReport, StoredScan } from "./types";
+import { isPostingNote, type BulletRewrite, type ExtractedRequirements, type IngestedResume, type IngestedResumeDetail, type ScanInput, type ScanRecord, type ScanReport, type StoredScan } from "./types";
 
 export const ATS_PATH = "/api/ai/scan";
 const RESUMES_PATH = "/api/ai/resume";
@@ -438,7 +438,15 @@ export function scanTier(score: number): { label: string; tone: "positive" | "ne
 }
 
 /** Missing keywords, highest impact first — what the gap list draws. */
-export const missingGaps = (report: ScanReport) => report.gaps.filter((gap) => !gap.present);
+/**
+ * The gaps to offer for fixing. An eligibility line or a trait is never one (owner, 2026-10-18: "Located
+ * in Europe" was offered as a keyword): the service leaves them out of `gaps`, and this drops any a
+ * scan from before that still carries.
+ */
+export const missingGaps = (report: ScanReport) => {
+  const notes = new Set(report.verdicts.filter((verdict) => isPostingNote(verdict.requirement)).map((verdict) => verdict.requirement.id));
+  return report.gaps.filter((gap) => !gap.present && !notes.has(gap.id));
+};
 
 /**
  * A requirement as a chip.
@@ -470,12 +478,15 @@ export function keywordLabel(text: string): string {
 
 /** The requirements the resume covered, as chips — the other half of the keyword panel. */
 export const coveredKeywords = (report: ScanReport) =>
-  report.verdicts.filter((v) => v.state === "satisfied").map((v) => ({ id: v.requirement.id, label: keywordLabel(v.requirement.text) }));
+  report.verdicts
+    .filter((v) => v.state === "satisfied" && !isPostingNote(v.requirement))
+    .map((v) => ({ id: v.requirement.id, label: v.requirement.label || keywordLabel(v.requirement.text) }));
 
 /** Requirements the resume did not cover, worst first, for the fix list. */
 export function unmetRequirements(report: ScanReport) {
   const rank: Record<string, number> = { missing: 0, partial: 1, undetermined: 2, satisfied: 3 };
   return report.verdicts
-    .filter((verdict) => verdict.state === "missing" || verdict.state === "partial")
+    // An eligibility line or a trait is a note, never a gap to close (a scan from before 2026-10-18 may carry one).
+    .filter((verdict) => (verdict.state === "missing" || verdict.state === "partial") && !isPostingNote(verdict.requirement))
     .sort((a, b) => rank[a.state] - rank[b.state] || b.requirement.weight - a.requirement.weight);
 }

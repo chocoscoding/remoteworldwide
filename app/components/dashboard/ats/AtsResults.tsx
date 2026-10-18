@@ -86,6 +86,61 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 /** The metric that needs a job description to mean anything. */
 const KEYWORD_METRIC = "keyword-match";
 
+/**
+ * What the posting says that is not a gap to close (owner, 2026-10-18): the problems the employer
+ * needs solved, where the candidate must be or may work (check it, it never goes on a resume), the
+ * personal qualities to show in a cover letter or interview, and why a resume reads as stuffed.
+ */
+const PostingNotes: FC<{ report: ScanReport; company: string | null }> = ({ report, company }) => {
+  const needs = report.needs ?? [];
+  const eligibility = report.eligibility ?? [];
+  const traits = report.traits ?? [];
+  const stuffing = report.stuffing ?? [];
+  if (needs.length + eligibility.length + traits.length + stuffing.length === 0) return null;
+  return (
+    <DashCard className="flex flex-col gap-4 p-6">
+      {stuffing.length > 0 && (
+        <p className="rounded-lg border border-dashed border-[#b23c26]/35 px-3.5 py-2.5 text-[13px] leading-relaxed text-black/70">
+          <span className="font-semibold text-[#b23c26]">Held below Strong match.</span> This reads as keyword-stuffed: {stuffing.join("; ")}. Say each thing
+          once, next to the work that proves it.
+        </p>
+      )}
+      {needs.length > 0 && (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-black/45">{company ? `What ${company} needs solved` : "What they need solved"}</p>
+          <ul className="mt-1.5 flex flex-col gap-1 text-sm leading-relaxed text-black/75">
+            {needs.map((need) => (
+              <li key={need}>{need}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {eligibility.length > 0 && (
+        <div className="rounded-lg border border-[#b26a00]/30 bg-[#fff8ec] px-3.5 py-2.5">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a5200]">This role needs</p>
+          <ul className="mt-1 flex flex-col gap-0.5 text-[13px] leading-relaxed text-black/75">
+            {eligibility.map((note) => (
+              <li key={note.id}>{note.text}. Check you meet it; it never goes on your resume, and it isn&apos;t in the score.</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {traits.length > 0 && (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-black/45">Show these in your cover letter or interview</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {traits.map((note) => (
+              <Pill key={note.id} variant="outline-dashed">
+                {note.label || note.text}
+              </Pill>
+            ))}
+          </div>
+        </div>
+      )}
+    </DashCard>
+  );
+};
+
 const AtsResults: FC<AtsResultsProps> = ({
   resume,
   report,
@@ -296,6 +351,9 @@ const AtsResults: FC<AtsResultsProps> = ({
           )}
 
           <AtsExplanation report={report} status={status} unexplained={unexplained} />
+
+          {/* Beside the score, never in it (RWW/ATS-QUALITY-PLAN.md, 1.2/1.3/13.4/13.6). */}
+          <PostingNotes report={report} company={job?.company ?? null} />
 
           {/* Fixes — the requirements this resume did not cover. */}
           {unmet.length > 0 && (

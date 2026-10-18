@@ -14,8 +14,17 @@ export type { AtsKeyword, AtsMetric };
 export const REQUIREMENT_TYPES = ["required", "preferred"] as const;
 export type RequirementType = (typeof REQUIREMENT_TYPES)[number];
 
-export const REQUIREMENT_CATEGORIES = ["skill", "experience", "education", "responsibility"] as const;
+/**
+ * `eligibility` (where the candidate must live or may work, visa, time zone) and `trait` (curiosity,
+ * passion) are never scored and never resume text: shown beside the score as notes
+ * (RWW/ATS-QUALITY-PLAN.md, 1.2/1.3).
+ */
+export const REQUIREMENT_CATEGORIES = ["skill", "experience", "education", "responsibility", "eligibility", "trait"] as const;
 export type RequirementCategory = (typeof REQUIREMENT_CATEGORIES)[number];
+
+/** Whether a requirement is a note beside the score rather than something the resume shows. */
+export const isPostingNote = (requirement: Pick<Requirement, "category">): boolean =>
+  requirement.category === "eligibility" || requirement.category === "trait";
 
 export interface Requirement {
   id: string;
@@ -24,6 +33,17 @@ export interface Requirement {
   category: RequirementCategory;
   /** 1-5; the extractor's view of how load-bearing this requirement is. */
   weight: number;
+  /** 2 to 5 words, the way a resume writer names it. Absent on scans from before 2026-10-18. */
+  label?: string;
+  /** Words a resume could prove it with ("SaaS", "ARR"). Absent on older scans. */
+  proof?: string[];
+}
+
+/** An eligibility line or a trait from the posting, shown beside the score. */
+export interface PostingNote {
+  id: string;
+  label: string;
+  text: string;
 }
 
 export const COVERAGE_STATES = ["satisfied", "partial", "missing", "undetermined"] as const;
@@ -77,6 +97,14 @@ export interface ScanReport {
   /** True when a provider was unavailable and the score came from a reduced path. */
   degraded: boolean;
   degradedReason: string | null;
+  /** Where the candidate must live or may work, as the posting says it. Never scored. Absent on older scans. */
+  eligibility?: PostingNote[];
+  /** Personal qualities the posting asks for: for the cover letter or interview. Never scored. */
+  traits?: PostingNote[];
+  /** The 2 to 4 problems the employer is hiring to solve. */
+  needs?: string[];
+  /** Why the resume reads as keyword-stuffed; when present the score is held at 84. */
+  stuffing?: string[];
   explanation: string | null;
   rewrites: BulletRewrite[];
 }
@@ -126,6 +154,9 @@ export interface ExtractedRequirements {
   requirements: Requirement[];
   /** "heuristic" means the model was unavailable and this list came from the fallback extractor. */
   source: "model" | "heuristic";
+  /** The 2 to 4 problems the employer is hiring to solve ([] from the fallback). */
+  needs?: string[];
+  version?: number;
 }
 
 export const RESUME_STATUSES = ["pending", "ready", "failed"] as const;

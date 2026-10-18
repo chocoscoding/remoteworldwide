@@ -41,6 +41,9 @@ import CustomizeNav from "./CustomizeNav";
 import CustomizePanelsRail from "./CustomizePanelsRail";
 import AtsFloatingDock, { type AtsToolsProps } from "./AtsFloatingDock";
 import AtsDockedRail from "./AtsDockedRail";
+import { AiFiguresPill, ReadabilityPill } from "./AtsSidePills";
+import { clearAiFigures, pendingAiFigures, withAiFigures } from "@/app/lib/dashboard/resume/ai-figures";
+import { readabilityFlags, type ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
 import { applyToneFix, pinToneFixes, proposalState, type ToneProposal } from "@/app/lib/resume/tone-fixes";
@@ -54,7 +57,7 @@ import type { PickedJob } from "@/app/lib/jobs/fields";
 // index. It is an array update, it has to feel instant, and a round trip could
 // only make it slower and occasionally fail. Everything that needs judgment —
 // or a credit — now runs in the AI service through `app/lib/resume/ai.ts`.
-import { applyQuantify, type QuantifySuggestion, type RewriteVariant } from "@/app/lib/dashboard/resume/ai-tools";
+import { applyQuantify, type QuantifySuggestion, type RewriteVariant, type TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
 import { addSkills, hasSkill, reconcileGroups } from "@/app/lib/resume/skills";
 import {
   askForRewrite,
@@ -490,10 +493,18 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   const handleDownload = async (format: DownloadFormat, fileName: string) => {
     // The name from the download dialog's field: the suggestion below, or what they changed it to.
     const base = fileName;
+    // Some applicant systems (Greenhouse among them) can't read a file over 2.5 MB, and a photo is
+    // the usual cause (RWW/ATS-QUALITY-PLAN.md, 13.3). A DOCX is measured; the PDF is the browser's
+    // own print, which can't be, so a photo is what's warned about.
+    const TOO_BIG = 2.5 * 1024 * 1024;
+    const sizeNote = "Some applicant systems can't read files over 2.5 MB. A smaller photo, or none, usually fixes it.";
     if (format === "docx") {
-      saveBlob(await resumeToDocx(content, design, sections), `${base}.docx`);
+      const blob = await resumeToDocx(content, design, sections);
+      saveBlob(blob, `${base}.docx`);
+      if (blob.size > TOO_BIG) toast.message(`This file is ${(blob.size / 1024 / 1024).toFixed(1)} MB. ${sizeNote}`);
       return;
     }
+    if (format === "pdf" && design.photo.show) toast.message(`Your resume shows a photo. ${sizeNote}`);
     if (format === "md") {
       saveText(resumeToMarkdown(content, sections, design.doc.dateFormat), `${base}.md`);
       return;
@@ -652,7 +663,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   };
 
   /** What a keywords run worked in, for its caption: short terms by name, lines from the posting by count, and how many didn't go in. */
-  const workedIn = (added: string[], missed = 0) => {
+  const workedIn = (added: string[], missed = 0, notShown: TermAdvice[] = []) => {
     const named = added.filter((term) => term.trim().split(/\s+/).length <= 4);
     const lines = added.length - named.length;
     const parts = [
@@ -660,9 +671,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       lines > 0 ? `${lines} ${lines === 1 ? "line" : "lines"} from the posting` : null,
     ];
     const left = missed > 0 ? ` ${missed} didn't go in this time.` : "";
-    return `Worked in ${parts.filter(Boolean).join(" and ")}.${left}`;
+    return `Worked in ${parts.filter(Boolean).join(" and ")}.${left}${notShownNote(notShown)}`;
   };
 
+  /** What the resume's history doesn't show yet, said with the first piece of advice. */
+  const notShownNote = (notShown: TermAdvice[]) =>
+    notShown.length === 0
+      ? ""
+      : ` Your resume doesn't show ${notShown.length === 1 ? quote([notShown[0].term]) : `${notShown.length} of them`} yet, so nothing was written in for ${notShown.length === 1 ? "it" : "those"}: ${notShown[0].advice}`;
 
   const runAiTool = (id: string) => {
     // A link's job still loading: Run waits for it rather than asking for another.
@@ -696,7 +712,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     if (id === "shorten") {
       const sent = forAi(content);
       void (async () => {
-        const result = await runSuggestion("shorten", () => shortenToOnePage({ content: sent }));
+        // This tool says "one page" on its button, so pressing it asks for one page (owner, 2026-10-18:
+        // never cut short unless the person wants it). Other callers get the 750-word default.
+        const result = await runSuggestion("shorten", () => shortenToOnePage({ content: sent, target: "page" }));
         if (!result) return;
         if (result.removedWords === 0) {
           landAiTool(id, "Already fits one page. Nothing worth cutting.");
@@ -765,11 +783,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     );
     if (!result) return;
 
-    // `woven` names only what the result carries, so it can be empty.
+    // `woven` names only what the result carries, so it can be empty. What the resume's history doesn't
+    // show was left out, with advice, never written in (owner, 2026-10-18).
+    const notShown = result.notShown ?? [];
     const caption =
-      result.woven.length > 0
+      (result.woven.length > 0
         ? `Tailored to ${job.role} at ${job.company}: wove ${quote(result.woven)} in.`
-        : `Tailored your summary to ${job.role} at ${job.company}.`;
+        : `Tailored your summary to ${job.role} at ${job.company}.`) + notShownNote(notShown);
     // Only the two fields the service actually rewrote, folded onto the
     // content as it is NOW. `tailorToJob` used to be a pure function this
     // screen could simply re-run against `prev`; it is a round trip now, and
@@ -1115,12 +1135,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     return { section: "education", entryId: where.entryId };
   };
 
+  // Every number Quantify adds is recorded for the person to check (owner, 2026-10-18): the "AI
+  // numbers" pill by the ATS check counts them and shows each on the page.
   const applyQuantifyAt = (index: number) => {
     const suggestion = quantifyList?.[index];
     if (!suggestion || quantifyApplied.has(index)) return;
     dispatch({
       type: "edit",
-      content: (prev) => applyQuantify(prev, suggestion),
+      content: (prev) => withAiFigures(applyQuantify(prev, suggestion), [suggestion]),
       marks: (m) => ({ quantified: [...m.quantified, quantifyKey(suggestion)] }),
     });
   };
@@ -1130,11 +1152,30 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     if (waiting.length === 0) return;
     dispatch({
       type: "edit",
-      content: (prev) => waiting.reduce(applyQuantify, prev),
+      content: (prev) => withAiFigures(waiting.reduce(applyQuantify, prev), waiting),
       marks: (m) => ({ quantified: [...m.quantified, ...waiting.map(quantifyKey)] }),
     });
   };
 
+  // The AI's numbers still to check, and their five-second highlight on the page.
+  const aiFigures = useMemo(() => pendingAiFigures(content), [content]);
+  const [figuresShown, setFiguresShown] = useState<"off" | "on" | "fading">("off");
+  const figureTimers = useRef<number[]>([]);
+  useEffect(() => () => figureTimers.current.forEach((id) => window.clearTimeout(id)), []);
+  const showAiFigures = () => {
+    figureTimers.current.forEach((id) => window.clearTimeout(id));
+    setFiguresShown("on");
+    figureTimers.current = [window.setTimeout(() => setFiguresShown("fading"), 4_300), window.setTimeout(() => setFiguresShown("off"), 5_000)];
+  };
+  const clearChecked = () => {
+    figureTimers.current.forEach((id) => window.clearTimeout(id));
+    setFiguresShown("off");
+    dispatch({ type: "edit", content: clearAiFigures });
+  };
+
+  // Readability: what in the design makes the resume harder for a parser to read, each with its fix.
+  const readability = useMemo(() => readabilityFlags(design, sections, content), [design, sections, content]);
+  const fixReadability = (flag: ReadabilityFlag) => flag.fix.forEach((action) => dispatch(action));
 
   const acceptSummarySuggestion = () => {
     if (!suggestions) return;
@@ -1165,12 +1206,12 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       const result = await runSuggestion("keywords", () => injectKeywords({ content: sent, keywords: suggestion.terms }));
       if (!result) return;
       if (result.added.length === 0) {
-        settle("Already covered. Nothing to add.");
+        settle((result.notShown ?? []).length > 0 ? `Nothing written in.${notShownNote(result.notShown ?? [])}` : "Already covered. Nothing to add.");
         return;
       }
       // Merged onto the content as it is NOW: the summary and bullets only where they are still
       // what was sent, and the service's Skills with anything typed meanwhile (`mergeKeywords`).
-      settleWith(workedIn(result.added, result.missed?.length ?? 0), (now) => mergeKeywords(now, sent, result.content));
+      settleWith(workedIn(result.added, result.missed?.length ?? 0, result.notShown ?? []), (now) => mergeKeywords(now, sent, result.content));
       return;
     }
 
@@ -1252,8 +1293,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     [docTab, toneProposals, content, marks.dismissedFixes],
   );
   const paperHighlight = useMemo(
-    () => ({ focus: pointFocus, marks: docTab === "ai" ? pinned : [], underlines }),
-    [pointFocus, docTab, pinned, underlines],
+    () => ({
+      focus: pointFocus,
+      marks: docTab === "ai" ? pinned : [],
+      underlines,
+      figures: figuresShown === "off" ? [] : aiFigures.map(({ line, figure }) => ({ line, figure })),
+      figuresFading: figuresShown === "fading",
+    }),
+    [pointFocus, docTab, pinned, underlines, figuresShown, aiFigures],
   );
 
   // The ATS check and the ask box, the same wherever they sit (floating dock or docked rail).
@@ -1546,6 +1593,12 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   page scrolls (owner, 2026-10-17: floating is the default). */}
               {atsPlace === "float" && docTab !== "customize" && (
                 <div className="pointer-events-none sticky bottom-4 z-10 -mt-14 pt-2">
+                  {(aiFigures.length > 0 || readability.length > 0) && (
+                    <div className="mb-2 flex flex-wrap justify-center gap-2">
+                      <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onClear={clearChecked} />
+                      <ReadabilityPill flags={readability} onFix={fixReadability} />
+                    </div>
+                  )}
                   <AtsFloatingDock
                     {...atsTools}
                     onDock={() => setAtsPlace("dock")}
@@ -1572,6 +1625,12 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
           ) : (
             atsPlace !== "float" && (
               <aside className="sticky top-[88px]">
+                {(aiFigures.length > 0 || readability.length > 0) && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onClear={clearChecked} opens="down" />
+                    <ReadabilityPill flags={readability} onFix={fixReadability} opens="down" />
+                  </div>
+                )}
                 <AtsDockedRail
                   {...atsTools}
                   open={atsPlace === "dock"}

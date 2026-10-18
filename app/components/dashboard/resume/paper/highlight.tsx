@@ -14,6 +14,7 @@
 // browser PDF export can strip all of it from its copy of the page.
 
 import { createContext, useContext, type FC, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import type { SectionKind } from "@/app/lib/dashboard/resume/design-types";
 
 /** A section of the page a control can point at. "personal" is the header block. */
@@ -66,10 +67,21 @@ export interface PaperUnderline {
   ranges: [number, number][];
 }
 
+/** A number the AI suggested, to highlight in the line it went into (RWW/ATS-QUALITY-PLAN.md, 13.8). */
+export interface PaperFigure {
+  /** The line as Quantify wrote it; a line that has changed a lot since is no longer marked. */
+  line: string;
+  figure: string;
+}
+
 export interface PaperHighlight {
   focus: PaperFocus | null;
   marks: PaperMark[];
   underlines?: PaperUnderline[];
+  /** The AI's numbers, highlighted while the "AI numbers" pill shows them. */
+  figures?: PaperFigure[];
+  /** True while the figures' highlight fades out. */
+  figuresFading?: boolean;
 }
 
 const NONE: PaperHighlight = { focus: null, marks: [], underlines: [] };
@@ -141,9 +153,12 @@ const sameLine = (a: UnderlineAt, b: UnderlineAt): boolean => {
  * 2026-10-04). `data-resume-mark`, so the PDF export strips the styling and keeps the words.
  */
 export const UnderlinedText: FC<{ at: UnderlineAt; text: string }> = ({ at, text }) => {
-  const { underlines = [] } = usePaperHighlight();
+  const { underlines = [], figures = [], figuresFading = false } = usePaperHighlight();
   const line = underlines.find((u) => u.text === text && sameLine(u.at, at));
-  if (!line || line.ranges.length === 0) return <>{text}</>;
+  if (!line || line.ranges.length === 0) {
+    const ranges = figureRanges(text, figures);
+    return ranges.length > 0 ? <FigureMarks text={text} ranges={ranges} fading={figuresFading} /> : <>{text}</>;
+  }
   const runs: ReactNode[] = [];
   let from = 0;
   line.ranges.forEach(([start, end], i) => {
@@ -153,6 +168,45 @@ export const UnderlinedText: FC<{ at: UnderlineAt; text: string }> = ({ at, text
         key={i}
         data-resume-mark
         className="underline decoration-[#e5484d] decoration-[2.5px] underline-offset-[3px] [text-decoration-skip-ink:none]">
+        {text.slice(start, end)}
+      </span>,
+    );
+    from = end;
+  });
+  if (from < text.length) runs.push(text.slice(from));
+  return <>{runs}</>;
+};
+
+/** Lowercase meaning words of a line, for "is this still the line the AI wrote?". */
+const wordsOf = (value: string): string[] => value.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 2);
+
+/** Where each AI number sits in this line, when the line still keeps at least half the words it had. */
+const figureRanges = (text: string, figures: readonly PaperFigure[]): [number, number][] => {
+  const ranges: [number, number][] = [];
+  const now = new Set(wordsOf(text));
+  for (const { line, figure } of figures) {
+    const was = wordsOf(line);
+    if (was.length > 0 && was.filter((word) => now.has(word)).length * 2 < was.length) continue;
+    const at = text.indexOf(figure);
+    if (at !== -1 && !ranges.some(([start, end]) => at < end && at + figure.length > start)) ranges.push([at, at + figure.length]);
+  }
+  return ranges.sort((a, b) => a[0] - b[0]);
+};
+
+/** The AI's numbers in lime, fading out when the pill's five seconds are up. `data-resume-mark`, so the PDF prints plain text. */
+const FigureMarks: FC<{ text: string; ranges: [number, number][]; fading: boolean }> = ({ text, ranges, fading }) => {
+  const runs: ReactNode[] = [];
+  let from = 0;
+  ranges.forEach(([start, end], i) => {
+    if (start > from) runs.push(text.slice(from, start));
+    runs.push(
+      <span
+        key={i}
+        data-resume-mark
+        className={cn(
+          "rounded-sm ring-[3px] transition-[background-color,box-shadow] duration-700 [box-decoration-break:clone]",
+          fading ? "bg-transparent ring-transparent" : "bg-[#f6d77a] text-[#222325] ring-[#f6d77a]",
+        )}>
         {text.slice(start, end)}
       </span>,
     );
