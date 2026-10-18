@@ -80,6 +80,17 @@ export interface BulletRewrite {
   why: string;
 }
 
+/** A fix a general score suggests, said plainly, with the resume's own lines it is about. Mirrors the scorer's. */
+export interface ScanAdvice {
+  id: string;
+  /** The metric it lifts: parseability, impact-language or length-format. */
+  metric: string;
+  title: string;
+  detail: string;
+  /** Up to two of the resume's own lines it is about. */
+  lines: string[];
+}
+
 /**
  * A finished scan. `explanation` and `rewrites` are empty until phase two
  * lands — the score does not wait on the write-up, so a report is renderable
@@ -88,7 +99,7 @@ export interface BulletRewrite {
 export interface ScanReport {
   scanId: string;
   resumeVersion: number;
-  /** 0-100 overall match. */
+  /** 0-99 overall match: nothing scores 100. */
   score: number;
   metrics: AtsMetric[];
   /** Missing keywords, highest impact first. */
@@ -107,6 +118,8 @@ export interface ScanReport {
   stuffing?: string[];
   /** The points those reasons took off the score (0 to 4). */
   stuffingPenalty?: number;
+  /** One or two fixes for a general score under 85, from its weakest sections. Absent on older scans. */
+  advice?: ScanAdvice[];
   explanation: string | null;
   rewrites: BulletRewrite[];
 }

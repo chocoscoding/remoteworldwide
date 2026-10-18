@@ -8,6 +8,7 @@ import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
+import { scoreStep } from "@/app/lib/ats/score-steps";
 
 /**
  * Every resume, with the scores actually run against it.
@@ -88,7 +89,7 @@ const AtsResumesTable: FC<AtsResumesTableProps> = ({ resumes, scores, onToggleAr
               ) : (
                 <>
                   <span className="text-base font-bold text-primary tabular-nums">{general}</span>
-                  <ProgressBar value={general} fillColor={general >= 80 ? "#e1f073" : "#cddd54"} height="h-1.5" className="w-11" />
+                  <ProgressBar value={general} height="h-1.5" className="w-11" fillClassName={scoreStep(general).fill} />
                 </>
               )}
             </div>

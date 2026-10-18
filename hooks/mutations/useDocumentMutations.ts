@@ -8,7 +8,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { apiDelete, apiPatch, apiPost } from "@/app/lib/api/client";
+import { apiDelete, apiPatch, apiUpload } from "@/app/lib/api/client";
 import { apiMessage } from "@/app/lib/api/core";
 import { qk } from "@/app/lib/query/keys";
 import type { DocKind, VaultDoc } from "@/app/lib/dashboard/types";
@@ -30,19 +30,29 @@ function useDocumentAction<V, R>(run: (vars: V) => Promise<R>, onDone?: (result:
       void queryClient.invalidateQueries({ queryKey: qk.recommendations.eligibility() });
       onDone?.(result, vars);
     },
-    onError: (error) => toast.error(apiMessage(error)),
+    // A cancel is the person's own doing: nothing to tell them.
+    onError: (error) => {
+      if (error instanceof Error && error.name === "AbortError") return;
+      toast.error(apiMessage(error));
+    },
   });
 }
 
+/** `onProgress` gets 0 to 1 as the file goes out; `signal` cancels it. */
+export interface UploadProgress {
+  onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
+}
+
 export const useUploadDocument = () =>
-  useDocumentAction<{ file: File; kind?: DocKind }, VaultDoc>(({ file, kind }) => {
+  useDocumentAction<{ file: File; kind?: DocKind } & UploadProgress, VaultDoc>(({ file, kind, onProgress, signal }) => {
     // Checked here as well as on the server so the common mistake never spends
     // ten megabytes of someone's upload bandwidth to be told no.
     if (file.size > MAX_UPLOAD_BYTES) throw new Error("That file is larger than 10MB");
     const body = new FormData();
     body.append("file", file);
     if (kind) body.append("kind", kind);
-    return apiPost<VaultDoc>("/api/documents", body);
+    return apiUpload<VaultDoc>("/api/documents", body, { onProgress, signal });
   }, (doc) => toast.success(`${doc.name} added`, { description: "It's in My documents." }));
 
 export const useRenameDocument = () =>

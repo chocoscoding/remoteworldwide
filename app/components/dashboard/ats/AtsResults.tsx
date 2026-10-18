@@ -20,8 +20,9 @@
 // only, never the projection: a report outlives the screen it came from.
 
 import { FC, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, Download, FileText, Link2, Loader2, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, Download, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
@@ -31,7 +32,9 @@ import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import AddToPlanButton from "@/app/components/dashboard/plan/AddToPlanButton";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
-import { ATS_BILLING_HREF, STUFFING_ADVICE, coveredKeywords, scanTier, stuffingHeadline, unmetRequirements, type ScanFailure } from "@/app/lib/ats/api";
+import { ATS_BILLING_HREF, MAX_SCAN_SCORE, STUFFING_ADVICE, coveredKeywords, scanTier, stuffingHeadline, unmetRequirements, type ScanFailure } from "@/app/lib/ats/api";
+import { fixHref, fixInstruction, fixesFor, writeFixHandoff } from "@/app/lib/ats/fix-handoff";
+import { scoreStep, scoreStepTrack } from "@/app/lib/ats/score-steps";
 import { ATS_REPORT_CSS, atsReportHtml, atsReportToDocx, atsReportToMarkdown } from "@/app/lib/export/ats-report";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
 import type { ScanReport } from "@/app/lib/ats/types";
@@ -82,6 +85,10 @@ export interface AtsResultsProps {
 const projectedLift = (weight: number) => Math.max(1, Math.round(weight * 1.2));
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+/** The General / Against a job switch's two halves. */
+const SEGMENT = "rounded-md px-3 py-1 text-sm font-semibold transition-colors";
+const SEGMENT_ON = "bg-white text-primary br-shadow";
 
 /** The metric that needs a job description to mean anything. */
 const KEYWORD_METRIC = "keyword-match";
@@ -159,6 +166,7 @@ const AtsResults: FC<AtsResultsProps> = ({
 }) => {
   const [keywordsOpen, setKeywordsOpen] = useState(true);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const router = useRouter();
 
   // Missing and partial requirements, worst first — the fix list, and the
   // source of the projected lifts.
@@ -177,13 +185,25 @@ const AtsResults: FC<AtsResultsProps> = ({
   );
 
   const base = report?.score ?? 0;
-  const displayed = clamp(base + lift, 0, 100);
+  // Nothing scores 100 (owner, 2026-10-18), the projection included.
+  const displayed = clamp(base + lift, 0, MAX_SCAN_SCORE);
   const tier = scanTier(displayed);
 
   // `degraded` means the scan could not really compare against the posting, so
   // the keyword figure is not a finding. Dropping it beats showing a 0 that
   // reads as "you matched nothing".
   const metrics = (report?.metrics ?? []).filter((m) => !(m.id === KEYWORD_METRIC && (report?.degraded || !job)));
+
+  // Everything the report suggests, as the editor's AI will read it ("Fix these in my resume").
+  const posting = useMemo(() => (job ? { company: job.company, role: job.role, description: job.description } : null), [job]);
+  const fixes = useMemo(() => (report ? fixesFor(report, posting) : []), [report, posting]);
+  const advice = job ? [] : (report?.advice ?? []);
+
+  const fixInEditor = () => {
+    if (!report) return;
+    writeFixHandoff({ resumeId: resume.id, report, job: posting, fixes, instruction: fixInstruction(posting) });
+    router.push(fixHref(resume));
+  };
 
   const reportFileName = safeFileName(`ATS report - ${resume.name}${job ? ` - ${job.company}` : ""}`);
 
@@ -210,57 +230,45 @@ const AtsResults: FC<AtsResultsProps> = ({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Context bar — what's being scored, and every way to change it. */}
-      <DashCard className="p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="grid h-9 w-9 flex-none place-content-center rounded-full bg-[#f0f0ea]">
-            <FileText className="h-4 w-4 text-primary" />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-sm text-black/50">
-              Scoring
-              <select
-                aria-label="Resume being scored"
-                value={resume.id}
-                onChange={(e) => onChangeResume(e.target.value)}
-                className="cursor-pointer rounded-lg border border-black/15 bg-white px-2 py-1.5 text-sm font-bold text-primary outline-none focus:border-[#222325]">
-                {resumes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {job ? (
-              <>
-                <span className="text-sm text-black/50">against</span>
-                <Pill variant="active">
-                  {job.company} · {job.role}
-                </Pill>
-              </>
-            ) : (
-              <Pill variant="neutral">General · your niche</Pill>
-            )}
-          </div>
-          <div className="flex flex-none items-center gap-2">
-            <StickerButton variant="outline" size="sm" onClick={onChangeJob}>
-              <Link2 className="h-3.5 w-3.5" />
-              {job ? "Change job" : "Score against a job"}
-            </StickerButton>
-            {job && (
-              <StickerButton variant="outline" size="sm" onClick={onRemoveJob}>
-                General instead
-              </StickerButton>
-            )}
+      {/* What's being scored, on one line (owner, 2026-10-18: it was breaking and too busy). */}
+      <DashCard className="px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 md:flex-nowrap">
+          <select
+            aria-label="Resume being scored"
+            value={resume.id}
+            onChange={(e) => onChangeResume(e.target.value)}
+            className="min-w-0 max-w-full cursor-pointer truncate rounded-lg border border-black/15 bg-white px-2.5 py-1.5 text-sm font-bold text-primary outline-none focus:border-[#222325] md:max-w-[18rem]">
+            {resumes.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+          <div role="group" aria-label="Score it" className="inline-flex flex-none rounded-lg border border-black/12 bg-[#f6f6f1] p-0.5">
             <button
               type="button"
-              onClick={onExit}
-              aria-label="Back to resume choice"
-              title="Score a different resume"
-              className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white text-[#222325] cursor-pointer br-shadow-press">
-              <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+              aria-pressed={!job}
+              onClick={job ? onRemoveJob : undefined}
+              className={cn(SEGMENT, !job ? SEGMENT_ON : "cursor-pointer text-black/55 hover:text-primary")}>
+              General
+            </button>
+            <button
+              type="button"
+              aria-pressed={Boolean(job)}
+              onClick={onChangeJob}
+              className={cn(SEGMENT, "cursor-pointer", job ? SEGMENT_ON : "text-black/55 hover:text-primary")}>
+              Against a job
             </button>
           </div>
+          {job && (
+            <button
+              type="button"
+              onClick={onChangeJob}
+              title="Change job"
+              className="min-w-0 cursor-pointer truncate text-sm text-black/60 underline-offset-2 hover:text-primary hover:underline">
+              {job.company} · {job.role}
+            </button>
+          )}
         </div>
       </DashCard>
 
@@ -272,10 +280,7 @@ const AtsResults: FC<AtsResultsProps> = ({
         <>
           {/* Score card */}
           <DashCard className="p-7">
-            <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-black/35">
-                {job ? `Scored against ${job.company} · ${job.role}` : "General score · how your resume reads on its own"}
-              </p>
+            <div className="mb-5 flex flex-wrap items-baseline justify-end gap-2">
               {scannedAt && (
                 <p className="flex items-baseline gap-2 text-[11px] font-semibold text-black/45">
                   <span>
@@ -304,7 +309,7 @@ const AtsResults: FC<AtsResultsProps> = ({
 
             <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start">
               <div className="relative flex-none">
-                <ScoreRing value={displayed} size={164} />
+                <ScoreRing value={displayed} size={164} fillColor={scoreStep(displayed).color} trackColor={scoreStepTrack(displayed)} />
                 {lift > 0 && (
                   <span className="absolute -right-1 -top-1 rounded-full border-[1.5px] border-[#222325] bg-[#e1f073] px-2 py-0.5 text-xs font-bold text-[#222325] tabular-nums">
                     +{lift}
@@ -318,8 +323,8 @@ const AtsResults: FC<AtsResultsProps> = ({
                   </Pill>
                   <p className="max-w-md text-[15px] leading-relaxed text-black/70">
                     {job
-                      ? `How ${resume.name} matches this posting, against ${report.verdicts.length} ${report.verdicts.length === 1 ? "requirement" : "requirements"} read from the description.`
-                      : `How ${resume.name} reads on its own: structure, parseability, impact language and length. Add a job to score the match itself.`}
+                      ? `Against ${report.verdicts.length} ${report.verdicts.length === 1 ? "requirement" : "requirements"} read from the posting.`
+                      : "How it reads on its own: structure, impact and length. Add a job to score the match."}
                   </p>
                   {lift > 0 && (
                     <p className="mt-2 max-w-md text-xs leading-relaxed text-black/45">
@@ -343,10 +348,36 @@ const AtsResults: FC<AtsResultsProps> = ({
                 <DashCard key={m.id} className="p-4">
                   <p className="mb-2 text-xs font-semibold text-black/45">{m.label}</p>
                   <p className="mb-2.5 text-2xl font-bold text-primary tabular-nums">{m.value}%</p>
-                  <ProgressBar value={m.value} fillColor={m.value >= 80 ? "#e1f073" : "#cddd54"} height="h-1.5" />
+                  <ProgressBar value={m.value} height="h-1.5" fillClassName={scoreStep(m.value).fill} />
                 </DashCard>
               ))}
             </div>
+          )}
+
+          {/* A general score under 85 says what to fix: one or two things, from the weakest sections. */}
+          {advice.length > 0 && (
+            <DashCard className="p-6">
+              <p className="text-[15px] font-bold text-primary">{advice.length === 1 ? "One thing to fix first" : "Two things to fix first"}</p>
+              <p className="mt-0.5 text-xs text-black/45">From the {advice.length === 1 ? "section" : "sections"} scoring lowest. These move the number most.</p>
+              <ol className="mt-4 flex flex-col gap-4">
+                {advice.map((item, index) => (
+                  <li key={item.id} className="flex gap-3">
+                    <span className="grid h-6 w-6 flex-none place-content-center rounded-full border-[1.5px] border-[#222325] text-xs font-bold text-primary tabular-nums">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-primary">{item.title}</p>
+                      <p className="mt-0.5 text-[13px] leading-relaxed text-black/60">{item.detail}</p>
+                      {item.lines.map((line) => (
+                        <p key={line} className="mt-1.5 rounded-lg bg-[#f6f6f1] px-3 py-1.5 text-xs leading-relaxed text-black/55">
+                          &ldquo;{line}&rdquo;
+                        </p>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </DashCard>
           )}
 
           <AtsExplanation report={report} status={status} unexplained={unexplained} />
@@ -459,6 +490,23 @@ const AtsResults: FC<AtsResultsProps> = ({
                 </div>
               )}
             </DashCard>
+          )}
+
+          {/* The call to action (owner, 2026-10-18): every fix above, sent to the editor's AI. */}
+          {fixes.length > 0 && (
+            <div className="flex flex-col gap-4 rounded-2xl bg-[#fbfcef] p-6 br-bold sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-bold text-primary">Fix {fixes.length === 1 ? "this" : "these"} in your resume</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-black/55">
+                  Opens {resume.source === "created" ? resume.name : `an editable copy of ${resume.name}`} and has the AI make the{" "}
+                  {fixes.length === 1 ? "fix" : `${fixes.length} fixes`} above in your own lines. It counts as one ask, and Undo takes it all back.
+                </p>
+              </div>
+              <StickerButton variant="primary" size="md" className="flex-none" onClick={fixInEditor}>
+                <Sparkles className="h-4 w-4" />
+                Fix {fixes.length === 1 ? "it" : "these"} in my resume
+              </StickerButton>
+            </div>
           )}
         </>
       )}

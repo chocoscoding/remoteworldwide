@@ -58,5 +58,42 @@ export const apiPatch = <T,>(path: string, body?: unknown, options: { keepalive?
   request<T>("PATCH", path, { body, keepalive: options.keepalive });
 export const apiDelete = <T,>(path: string) => request<T>("DELETE", path);
 
+/**
+ * A multipart POST that reports how much of the body has gone out, 0 to 1.
+ *
+ * XHR rather than fetch: fetch has no upload progress. The answer is wrapped in
+ * a Response so it unwraps (and fails) exactly like every other call. A network
+ * fault rejects with a TypeError and an abort with an AbortError, as fetch does.
+ */
+export function apiUpload<T>(path: string, body: FormData, options: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {}): Promise<T> {
+  return new Promise<Response>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const abort = () => xhr.abort();
+    if (options.signal?.aborted) return reject(new DOMException("Upload cancelled", "AbortError"));
+    options.signal?.addEventListener("abort", abort, { once: true });
+    const done = () => options.signal?.removeEventListener("abort", abort);
+
+    xhr.open("POST", path);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader("accept", "application/json");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) options.onProgress?.(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      done();
+      resolve(new Response(xhr.responseText, { status: xhr.status, statusText: xhr.statusText, headers: { "content-type": "application/json" } }));
+    };
+    xhr.onerror = () => {
+      done();
+      reject(new TypeError("Network request failed"));
+    };
+    xhr.onabort = () => {
+      done();
+      reject(new DOMException("Upload cancelled", "AbortError"));
+    };
+    xhr.send(body);
+  }).then((res) => unwrapResponse<T>(res));
+}
+
 /** A POST whose answer's `message` matters too — see `unwrapEnvelope`. */
 export const apiPostWithMessage = async <T,>(path: string, body?: unknown) => unwrapEnvelope<T>(await send("POST", path, { body }));

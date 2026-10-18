@@ -13,7 +13,7 @@
 import { createContext, useContext, useMemo, type FC, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useDocumentsQuery } from "@/hooks/queries/useDocumentsQuery";
-import { useArchiveDocument, useDeleteDocument, useRenameDocument, useSetMasterDocument, useUploadDocument } from "@/hooks/mutations/useDocumentMutations";
+import { useArchiveDocument, useDeleteDocument, useRenameDocument, useSetMasterDocument, useUploadDocument, type UploadProgress } from "@/hooks/mutations/useDocumentMutations";
 import type { DocKind, DocSource, VaultDoc } from "@/app/lib/dashboard/types";
 
 // Re-exported so the vault, DocRow and the ATS screens keep importing their
@@ -99,7 +99,8 @@ interface DocumentsContextValue {
   docs: VaultDoc[];
   loading: boolean;
   /** Async now: an upload is a round trip. Returns the rows the server created. */
-  addUploads: (files: FileList | File[], opts?: { kind?: DocKind }) => Promise<VaultDoc[]>;
+  /** `onProgress` and `signal` apply to each file in turn (the ATS scorer sends one). */
+  addUploads: (files: FileList | File[], opts?: { kind?: DocKind } & UploadProgress) => Promise<VaultDoc[]>;
   rename: (id: string, name: string) => void;
   remove: (id: string) => void;
   toggleArchive: (id: string) => void;
@@ -119,14 +120,14 @@ export const DocumentsProvider: FC<{ children: ReactNode }> = ({ children }) => 
 
   const docs = useMemo(() => data ?? [], [data]);
 
-  async function addUploads(files: FileList | File[], opts?: { kind?: DocKind }): Promise<VaultDoc[]> {
+  async function addUploads(files: FileList | File[], opts?: { kind?: DocKind } & UploadProgress): Promise<VaultDoc[]> {
     const list = Array.from(files);
     // Sequential rather than parallel: a dropped folder of ten files should not
     // open ten concurrent uploads on someone's home connection.
     const created: VaultDoc[] = [];
     for (const file of list) {
       try {
-        created.push(await upload.mutateAsync({ file, kind: opts?.kind }));
+        created.push(await upload.mutateAsync({ file, kind: opts?.kind, onProgress: opts?.onProgress, signal: opts?.signal }));
       } catch {
         // useDocumentAction already surfaced the reason; keep going so one bad
         // file in a batch does not abandon the rest.

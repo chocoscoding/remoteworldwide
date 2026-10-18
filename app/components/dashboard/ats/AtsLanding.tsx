@@ -1,19 +1,23 @@
 "use client";
 
-import { FC, useRef, useState } from "react";
-import { FileText, Link2, ScanSearch, Search, Upload } from "lucide-react";
+import { FC, ReactNode, useRef, useState } from "react";
+import { BriefcaseBusiness, Check, FileText, ScanSearch, Search, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { sourceBadgeLabel } from "@/app/components/dashboard/documents/DocumentsProvider";
 import type { VaultDoc } from "@/app/components/dashboard/documents/DocumentsProvider";
-import { Lottie } from "lottie-react";
+import type { UploadProgress } from "@/hooks/mutations/useDocumentMutations";
 
 /**
- * The front door: pick which resume to scan, then choose how to scan it.
- * No toolbar, no half-filled results behind it — the choice IS the screen.
+ * The front door: choose how to scan, pick a resume, press Scan.
+ *
+ * Variant B of the 2026-10-18 canvas (owner-approved): the two ways to scan
+ * are tickets on top and the scan bar sits right under them, so nothing that
+ * matters is below the fold. Before this, the scan choices only appeared under
+ * the list after a pick, and the pick looked like it did nothing.
  *
  * The resumes are one list, not a grid of cards (owner, 2026-10-09): with
  * uploads and every resume built here side by side there can be dozens, so it
- * scrolls past about five rows and a search box filters it by name.
+ * scrolls past about five rows and a search box filters it by name. Uploading
+ * is the list's first row, and stays first while searching.
  */
 export interface AtsLandingProps {
   resumes: VaultDoc[];
@@ -28,174 +32,296 @@ export interface AtsLandingProps {
   scores: ReadonlyMap<string, number>;
   /**
    * A job already chosen for this visit, by a link from its own screen. The
-   * second card then names it, and `onScoreVsJob` scores against it instead
-   * of opening the picker. Null or absent: the card asks for one.
+   * job ticket then names it, and `onScoreVsJob` scores against it instead
+   * of opening the picker. Null or absent: the ticket asks for one.
    */
   job?: { company: string; role: string } | null;
-  /** Registers the upload and returns the new entry so it can be selected. */
-  onUpload: (file: File) => Promise<VaultDoc | null>;
+  /** Registers the upload, reporting progress, and returns the new entry so it can be selected. */
+  onUpload: (file: File, progress?: UploadProgress) => Promise<VaultDoc | null>;
   onScoreGeneral: (resumeId: string) => void;
   onScoreVsJob: (resumeId: string) => void;
 }
 
+type Mode = "general" | "job";
+
+/** A file on its way up: `fraction` is how much has gone out; at 1 the server is still reading it. */
+interface Uploading {
+  name: string;
+  fraction: number;
+}
+
 const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload, onScoreGeneral, onScoreVsJob }) => {
+  const [mode, setMode] = useState<Mode>(job ? "job" : "general");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [uploading, setUploading] = useState<Uploading | null>(null);
+  // The file just uploaded: shown first and marked, even before the list refetch brings it in.
+  const [recent, setRecent] = useState<VaultDoc | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const cancelRef = useRef<AbortController | null>(null);
 
   async function handleFile(file: File | undefined) {
-    if (!file) return;
+    if (!file || uploading) return;
     // Cleared straight away so picking the same file twice still fires a change.
     if (fileRef.current) fileRef.current.value = "";
-    const entry = await onUpload(file);
-    if (entry) setSelectedId(entry.id);
+    const controller = new AbortController();
+    cancelRef.current = controller;
+    setUploading({ name: file.name, fraction: 0 });
+    try {
+      const entry = await onUpload(file, {
+        signal: controller.signal,
+        onProgress: (fraction) => setUploading((u) => (u ? { ...u, fraction } : u)),
+      });
+      if (entry) {
+        setRecent(entry);
+        setSelectedId(entry.id);
+        // A search that would hide the new file is cleared, so the pick is visible.
+        setQuery("");
+      }
+    } finally {
+      cancelRef.current = null;
+      setUploading(null);
+    }
   }
 
+  const listed = recent && !resumes.some((r) => r.id === recent.id) ? [recent, ...resumes] : resumes;
+  const ordered = recent ? [...listed.filter((r) => r.id === recent.id), ...listed.filter((r) => r.id !== recent.id)] : listed;
   const needle = query.trim().toLowerCase();
-  const shown = needle ? resumes.filter((r) => r.name.toLowerCase().includes(needle)) : resumes;
+  const shown = needle ? ordered.filter((r) => r.name.toLowerCase().includes(needle)) : ordered;
+  const selected = ordered.find((r) => r.id === selectedId) ?? null;
+
+  const jobLabel = job ? `${job.role} at ${job.company}` : null;
+  const plan = mode === "general" ? "General score" : jobLabel ? `Match with ${jobLabel}` : "Match with a job";
+  const against = jobLabel ?? "a job you pick next";
+
+  function scan() {
+    if (!selected) return;
+    if (mode === "general") onScoreGeneral(selected.id);
+    else onScoreVsJob(selected.id);
+  }
+
+  const pct = uploading ? Math.round(uploading.fraction * 100) : 0;
+  const reading = uploading != null && uploading.fraction >= 1;
 
   return (
-    <div className="mx-auto flex min-h-[440px] max-w-[680px] flex-col items-center justify-center text-center">
-      <span className="flex  items-center justify-center rounded-full">
-        <Lottie
-          src={`/Lottie/neobrutalism/View_Square_lottie.json`}
-          autoplay
-          loop
-          className=""
-          speed={0.63}
-          style={{ width: 340, height: 340 }}
-        />
-      </span>
-
-      <p className="mt-2 max-w-[500px] text-sm leading-relaxed text-black/50">
-        {/* This is how applicant tracking systems read your resume. <br /> */}
-        Pick one of your resume, then scan it on its own or against a specific job.
-      </p>
-
-      {/* Step 1 — which resume */}
-      <div className="mt-3 w-full text-left">
-        {/* Upload — any resume, whether or not it lives here. */}
-        <label
-          className={cn(
-            "flex cursor-pointer items-center gap-3 rounded-xl border-[1.5px] border-dashed border-black/20 bg-white px-3.5 py-2.5 text-left transition-colors hover:border-[#222325]",
-            resumes.length > 0 && "mt-2.5",
-          )}>
-          <span className="grid h-8 w-8 flex-none place-content-center rounded-lg bg-[#f0f0ea]">
-            <Upload className="h-4 w-4 text-primary" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold text-primary">Upload a resume</span>
-            <span className="block text-xs text-black/45">PDF, DOCX or TXT</span>
-          </span>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,.doc,.docx,.txt,.md"
-            className="sr-only"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-          />
-        </label>
-        <br />
-        {resumes.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-black/10 bg-white">
-            {/* Search shows once the list is long enough to need it. */}
-            {resumes.length > 4 && (
-              <label className="flex items-center gap-2 border-b border-black/8 px-3.5">
-                <Search aria-hidden className="h-4 w-4 flex-none text-black/35" />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={`Search ${resumes.length} resumes`}
-                  aria-label="Search your resumes"
-                  className="h-11 min-w-0 flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-black/35"
-                />
-              </label>
-            )}
-            <div role="listbox" aria-label="Your resumes" className="max-h-[300px] overflow-y-auto">
-              {shown.map((r) => {
-                const selected = r.id === selectedId;
-                const badge = sourceBadgeLabel(r.source);
-                const general = scores.get(r.id);
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    onClick={() => setSelectedId(r.id)}
-                    className={cn(
-                      "flex w-full cursor-pointer items-center gap-3 border-b border-black/6 px-3.5 py-2.5 text-left transition-colors last:border-b-0",
-                      selected ? "bg-[#f6faea]" : "hover:bg-[#fbfbf7]",
-                    )}>
-                    <span
-                      className={cn(
-                        "grid h-8 w-8 flex-none place-content-center rounded-lg",
-                        selected ? "bg-[#222325] text-[#e1f073]" : "bg-[#f0f0ea] text-primary",
-                      )}>
-                      <FileText className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-primary">{r.name}</span>
-                      <span className="flex items-center gap-1.5 text-xs text-black/45">
-                        {badge && <span className="font-semibold text-black/55">{badge}</span>}
-                        {badge && <span aria-hidden>·</span>}
-                        <span className="truncate">{r.updatedLabel}</span>
-                      </span>
-                    </span>
-                    <span className="flex-none text-right">
-                      {general == null ? (
-                        <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/30">Not scored</span>
-                      ) : (
-                        <>
-                          <span className="block text-base font-bold text-primary tabular-nums">{general}</span>
-                          <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">General</span>
-                        </>
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
-              {shown.length === 0 && <p className="px-3.5 py-4 text-sm text-black/45">No resume matches “{query.trim()}”.</p>}
-            </div>
-          </div>
-        )}
+    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-5 py-4 text-left">
+      <div>
+        <h2 className="text-2xl font-extrabold text-primary">What should we score?</h2>
+        <p className="mt-1 text-sm text-black/55">Choose how, pick a resume, and the scan button names both.</p>
       </div>
 
-      {/* Step 2 — how to scan it */}
-      {selectedId && (
-        <div className="mt-6 w-full">
-          <p className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.09em] text-black/40">Scan it</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => onScoreGeneral(selectedId)}
-              className="group rounded-2xl bg-[#222325] p-5 text-left text-white cursor-pointer br-shadow-press br-lime">
-              <span className="grid h-9 w-9 place-content-center rounded-lg bg-white/10">
-                <ScanSearch className="h-4 w-4 text-[#e1f073]" />
-              </span>
-              <span className="mt-3 block text-sm font-bold">General score</span>
-              <span className="mt-1 block text-xs leading-relaxed text-white/55">How it reads for your niche. No job needed.</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onScoreVsJob(selectedId)}
-              className="group rounded-2xl bg-white p-5 text-left cursor-pointer br-plain-press">
-              <span className="grid h-9 w-9 place-content-center rounded-lg bg-[#f0f0ea]">
-                <Link2 className="h-4 w-4 text-primary" />
-              </span>
-              <span className="mt-3 block text-sm font-bold text-primary">{job ? "Against this job" : "Against a job"}</span>
-              <span className="mt-1 block text-xs leading-relaxed text-black/50">
-                {job
-                  ? `${job.role} at ${job.company}. We score the match.`
-                  : "Pick a listing or paste any posting, and we score the match."}
-              </span>
-            </button>
-          </div>
+      {/* How to scan */}
+      <div role="radiogroup" aria-label="How to scan" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Ticket
+          checked={mode === "general"}
+          onSelect={() => setMode("general")}
+          icon={<ScanSearch className="h-5 w-5" />}
+          title="General score"
+          copy="How it reads on its own: structure, impact and length. No job needed."
+        />
+        <Ticket
+          checked={mode === "job"}
+          onSelect={() => setMode("job")}
+          icon={<BriefcaseBusiness className="h-5 w-5" />}
+          title={job ? "Against this job" : "Against a job"}
+          copy={jobLabel ? `${jobLabel}. We score the match.` : "Pick a saved listing or paste any posting, and we score the match."}
+        />
+      </div>
+
+      {/* What will be scanned */}
+      <div className="flex items-center gap-4 rounded-[14px] bg-white py-2.5 pl-4 pr-2.5 br-bold">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-black/50">{selected ? "Ready" : "Pick a resume below"}</p>
+          <p className="truncate text-[15px] font-bold text-primary">
+            {selected && mode === "general" ? (
+              <>
+                General score of <span className="font-extrabold">{selected.name}</span>
+              </>
+            ) : selected ? (
+              <>
+                <span className="font-extrabold">{selected.name}</span> against {against}
+              </>
+            ) : (
+              plan
+            )}
+          </p>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={scan}
+          disabled={!selected}
+          className="h-11 flex-none cursor-pointer rounded-[10px] bg-[#222325] px-6 text-[15px] font-extrabold text-[#e1f073] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35">
+          Scan
+        </button>
+      </div>
+
+      {/* Which resume */}
+      <div className="overflow-hidden rounded-[14px] border border-black/10 bg-white">
+        {/* Search shows past three resumes (owner, 2026-10-18). */}
+        {ordered.length > 3 && (
+          <label className="flex items-center gap-2 border-b border-black/8 px-4">
+            <Search aria-hidden className="h-4 w-4 flex-none text-black/35" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${ordered.length} resumes`}
+              aria-label="Search your resumes"
+              className="h-11 min-w-0 flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-black/35"
+            />
+          </label>
+        )}
+
+        {/* Upload: always the first row, searching or not. */}
+        {uploading ? (
+          <div className="flex flex-col gap-2 border-b border-black/8 bg-[#fbfbf7] px-4 py-3" aria-live="polite">
+            <div className="flex items-center gap-3">
+              <span className="grid h-[34px] w-[34px] flex-none place-content-center rounded-[9px] border-[1.5px] border-dashed border-black/35">
+                <Upload className="h-4 w-4 text-primary" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold text-primary">
+                  {reading ? "Reading" : "Uploading"} {uploading.name}
+                </span>
+                <span className="block text-xs text-black/50">
+                  {reading ? "Almost there. It joins your list when it's done." : `${pct}% · it joins your list when it's done`}
+                </span>
+              </span>
+              {!reading && (
+                <button
+                  type="button"
+                  onClick={() => cancelRef.current?.abort()}
+                  className="flex-none cursor-pointer text-[13px] font-bold text-primary underline underline-offset-[3px]">
+                  Cancel
+                </button>
+              )}
+            </div>
+            <div
+              role="progressbar"
+              aria-label={`Uploading ${uploading.name}`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={pct}
+              className="h-1.5 overflow-hidden rounded-full bg-[#ebebe4]">
+              <div
+                className={cn("h-full rounded-full bg-[#222325] transition-[width] duration-200", reading && "animate-pulse")}
+                style={{ width: `${Math.max(pct, 4)}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <label className="flex cursor-pointer items-center gap-3 border-b border-black/8 px-4 py-3 transition-colors hover:bg-[#fbfbf7]">
+            <span className="grid h-[34px] w-[34px] flex-none place-content-center rounded-[9px] border-[1.5px] border-dashed border-black/35">
+              <Upload className="h-4 w-4 text-primary" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-primary">Upload a resume</span>
+              <span className="block text-xs text-black/50">PDF, DOC or DOCX</span>
+            </span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              className="sr-only"
+              onChange={(e) => handleFile(e.target.files?.[0])}
+            />
+          </label>
+        )}
+
+        <div role="listbox" aria-label="Your resumes" className="max-h-[320px] overflow-y-auto">
+          {shown.map((r) => {
+            const isSelected = r.id === selectedId;
+            const isRecent = r.id === recent?.id;
+            const general = scores.get(r.id);
+            return (
+              <button
+                key={r.id}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => setSelectedId(r.id)}
+                className={cn(
+                  "flex w-full cursor-pointer items-center gap-3 border-b border-black/6 px-4 py-2.5 text-left transition-colors last:border-b-0",
+                  isSelected ? "bg-[#f6faea]" : "hover:bg-[#fbfbf7]",
+                )}>
+                <span
+                  className={cn(
+                    "grid h-[34px] w-[34px] flex-none place-content-center rounded-[9px]",
+                    isSelected ? "bg-[#222325] text-[#e1f073]" : "bg-[#f0f0ea] text-primary",
+                  )}>
+                  <FileText className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-primary">{r.name}</span>
+                  {isRecent ? (
+                    <span className="block text-xs font-semibold text-[#39390ec4]">Uploaded just now</span>
+                  ) : (
+                    <span className="block truncate text-xs text-black/50">{r.updatedLabel}</span>
+                  )}
+                </span>
+                <span className="flex-none text-right">
+                  {isSelected ? (
+                    <span aria-label="Selected" className="grid h-6 w-6 place-content-center rounded-full bg-[#0fbc0f]">
+                      <Check aria-hidden className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+                    </span>
+                  ) : general == null ? (
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/30">Not scored</span>
+                  ) : (
+                    <>
+                      <span className="block text-[15px] font-extrabold text-primary tabular-nums">{general}</span>
+                      <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/35">General</span>
+                    </>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+          {shown.length === 0 && needle && <p className="px-4 py-4 text-sm text-black/45">No resume matches “{query.trim()}”.</p>}
+        </div>
+      </div>
     </div>
   );
 };
+
+/** One way to scan, drawn as a ticket: an icon stub, a dashed tear line, the title and a radio dot. */
+const Ticket: FC<{ checked: boolean; onSelect: () => void; icon: ReactNode; title: string; copy: string }> = ({
+  checked,
+  onSelect,
+  icon,
+  title,
+  copy,
+}) => (
+  <button
+    type="button"
+    role="radio"
+    aria-checked={checked}
+    onClick={onSelect}
+    className={cn(
+      "flex overflow-hidden rounded-[14px] text-left",
+      checked ? "bg-[#222325] text-white br-bold br-lime" : "bg-white text-primary br-plain-press",
+    )}>
+    <span
+      className={cn(
+        "grid w-16 flex-none place-content-center border-r-2 border-dashed",
+        checked ? "border-white/25 text-[#e1f073]" : "border-black/15 text-primary",
+      )}>
+      {icon}
+    </span>
+    <span className="flex flex-1 flex-col gap-1 p-[18px]">
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-base font-extrabold">{title}</span>
+        <span
+          aria-hidden
+          className={cn(
+            "grid h-[18px] w-[18px] flex-none place-content-center rounded-full border-2",
+            checked ? "border-[#e1f073]" : "border-black/30",
+          )}>
+          {checked && <span className="h-2 w-2 rounded-full bg-[#e1f073]" />}
+        </span>
+      </span>
+      <span className={cn("text-[13px] leading-[1.45]", checked ? "text-white/65" : "text-black/55")}>{copy}</span>
+    </span>
+  </button>
+);
 
 export default AtsLanding;

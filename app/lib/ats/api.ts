@@ -19,7 +19,7 @@ import { PLANS_HREF } from "@/app/lib/settings/types";
 import { BackendError, apiMessage, signalPlanLimit } from "@/app/lib/api/core";
 import { createSseParser } from "@/app/lib/api/sse";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
-import { isPostingNote, type BulletRewrite, type ExtractedRequirements, type IngestedResume, type IngestedResumeDetail, type ScanInput, type ScanRecord, type ScanReport, type StoredScan } from "./types";
+import { isPostingNote, type BulletRewrite, type ExtractedRequirements, type IngestedResume, type IngestedResumeDetail, type ScanInput, type ScanAdvice, type ScanRecord, type ScanReport, type StoredScan } from "./types";
 
 export const ATS_PATH = "/api/ai/scan";
 const RESUMES_PATH = "/api/ai/resume";
@@ -239,15 +239,24 @@ function toReport(data: unknown): ScanReport | null {
   if (typeof data.scanId !== "string" || !isNumber(data.score)) return null;
   if (!Array.isArray(data.metrics) || !Array.isArray(data.gaps) || !Array.isArray(data.verdicts)) return null;
 
+  const listOf = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
   return {
     scanId: data.scanId,
     resumeVersion: isNumber(data.resumeVersion) ? data.resumeVersion : 0,
-    score: data.score,
+    // Nothing scores 100 (owner, 2026-10-18); a scan cached before the scorer said so still reads 99.
+    score: Math.max(0, Math.min(MAX_SCAN_SCORE, data.score)),
     metrics: data.metrics as ScanReport["metrics"],
     gaps: data.gaps as ScanReport["gaps"],
     verdicts: data.verdicts as ScanReport["verdicts"],
     degraded: data.degraded === true,
     degradedReason: typeof data.degradedReason === "string" ? data.degradedReason : null,
+    // The notes beside the score: dropped here before 2026-10-18, so a live scan never showed them.
+    eligibility: listOf(data.eligibility),
+    traits: listOf(data.traits),
+    needs: listOf<string>(data.needs).filter((need) => typeof need === "string"),
+    stuffing: listOf<string>(data.stuffing).filter((reason) => typeof reason === "string"),
+    stuffingPenalty: isNumber(data.stuffingPenalty) ? data.stuffingPenalty : 0,
+    advice: listOf<ScanAdvice>(data.advice).filter((item) => isRecord(item) && typeof item.title === "string" && typeof item.detail === "string"),
     explanation: typeof data.explanation === "string" ? data.explanation : null,
     rewrites: Array.isArray(data.rewrites) ? (data.rewrites as BulletRewrite[]) : [],
   };
@@ -431,6 +440,9 @@ export function describeScanFailure(error: unknown): ScanFailure {
  * asserts the two agree, so a band changed in one place and not the other is a
  * red build rather than two screens disagreeing about the same number.
  */
+/** The highest score any scan shows (owner, 2026-10-18): there is always something left to ask for. */
+export const MAX_SCAN_SCORE = 99;
+
 export function scanTier(score: number): { label: string; tone: "positive" | "neutral" | "urgent" } {
   if (score >= 85) return { label: "Strong match", tone: "positive" };
   if (score >= 65) return { label: "Good, not yet great", tone: "neutral" };

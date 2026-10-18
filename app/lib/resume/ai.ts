@@ -29,6 +29,7 @@ import type {
 } from "@/app/lib/dashboard/resume/ai-tools";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { SectionConfig } from "@/app/lib/dashboard/resume/design-types";
+import type { AskDesignSetting, AskTab } from "@/app/lib/dashboard/resume/ask-actions";
 
 export type { AskResult, KeywordInjection, QuantifySuggestion, RewriteVariant, ShortenResult, TailorResult, ToneResult };
 
@@ -100,6 +101,17 @@ export interface SuggestionInput {
   section?: ToneSection | null;
   /** Required by `ask`: what the user typed into the rewrite box. */
   instruction?: string | null;
+  /** `ask` only: the editor as it stands, so Ask can act in it (`app/lib/dashboard/resume/ask-actions.ts`). */
+  editor?: AskEditorState | null;
+  /** `ask` only: the ATS report's findings to fix, from "Fix these in my resume" (`app/lib/ats/fix-handoff.ts`). */
+  fixes?: string[] | null;
+}
+
+/** The editor as an ask sends it: the tab open, the design's current values, the sections by id. */
+export interface AskEditorState {
+  tab: AskTab;
+  settings: Partial<Record<AskDesignSetting, string | number>>;
+  sections: { id: string; label: string; visible: boolean }[];
 }
 
 /** The sections "Fix tone & grammar" can be pointed at, by section kind ("training" is the certifications). */
@@ -151,6 +163,11 @@ const run = <T,>(tool: SuggestionTool, input: SuggestionInput) =>
     bulletIndex: typeof input.bulletIndex === "number" ? input.bulletIndex : null,
     section: input.section ?? null,
     instruction: input.instruction ?? null,
+    // Shorten's "one page" (2026-10-18: it was never sent, so the button trimmed to 750 words instead).
+    target: input.target === "page" ? "page" : null,
+    editor: input.editor ?? null,
+    // `ask` only: the ATS report's findings, from "Fix these in my resume".
+    fixes: input.fixes && input.fixes.length > 0 ? input.fixes : null,
   });
 
 /** Rewrites the summary and skills towards one posting. Needs `jdText`. */

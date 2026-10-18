@@ -157,6 +157,12 @@ export interface AskResult {
   rejectedLines: number;
   /** Lines that grew far past their old length, held out of `content` until the person says keep them. */
   longer: AskLonger[];
+  /** Ask's answer in the chat, or a few words on what it did in the editor. Null when it only rewrote text. */
+  reply: string | null;
+  /** True when `reply` is the service's fixed help answer ("what can you do?"), which is free. */
+  help: boolean;
+  /** Things to do in the editor, checked again by `checkedAskAction` before they run. */
+  actions: unknown[];
 }
 
 /** One line Ask wrote much longer than it was. `at`: "summary", "<role>.<bullet>" or "c<section>.<point>". */

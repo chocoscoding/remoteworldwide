@@ -171,3 +171,91 @@ describe("the apply wizard keeps what a tool left out", () => {
     assert.deepEqual(state.proposal.placed, { renewals: ["Grew renewals by running quarterly reviews"] });
   });
 });
+
+const { fixHref, fixInstruction, fixesFor } = await import("../app/lib/ats/fix-handoff.ts");
+
+describe("Fix these in my resume (owner, 2026-10-18)", () => {
+  const verdict = (id, state, label, closest) => ({
+    requirement: { id, text: label, label, type: "required", category: "skill", weight: 4, proof: [] },
+    state,
+    score: 0.4,
+    resolvedBy: "rerank",
+    evidence: closest ? [{ chunkId: "c1", text: closest, section: "experience", role: "CSM", score: 0.5 }] : [],
+    confidence: "medium",
+  });
+  const report = {
+    scanId: "s1",
+    resumeVersion: 1,
+    score: 64,
+    metrics: [],
+    gaps: [],
+    verdicts: [
+      verdict("r1", "missing", "Gainsight", null),
+      verdict("r2", "partial", "Renewals", "Ran quarterly business reviews"),
+      verdict("r3", "satisfied", "HubSpot", "Ran HubSpot"),
+      { ...verdict("r4", "missing", "Candidates must be located in Europe", null), requirement: { ...verdict("r4", "missing", "x", null).requirement, category: "eligibility" } },
+    ],
+    degraded: false,
+    degradedReason: null,
+    explanation: null,
+    rewrites: [{ chunkId: "c1", before: "Onboarded accounts", after: "Onboarded 40 accounts a quarter", why: "Shows the scale" }],
+    stuffing: ["HubSpot appears 5 times"],
+    advice: [{ id: "results", metric: "impact-language", title: "Show a result in 3 bullets", detail: "Say what changed.", lines: ["Worked on support"] }],
+  };
+  const job = { company: "Pencil", role: "Account Manager", description: "..." };
+
+  it("hands over every correction: rewrites, the posting's gaps, advice and stuffing, never eligibility", () => {
+    const fixes = fixesFor(report, job);
+    assert.equal(fixes[0], 'Replace "Onboarded accounts" with "Onboarded 40 accounts a quarter" (Shows the scale).');
+    assert.ok(fixes.some((fix) => fix.includes('"Gainsight", not shown')));
+    assert.ok(fixes.some((fix) => fix.includes('"Renewals", partly shown. Reword "Ran quarterly business reviews"')));
+    assert.ok(!fixes.some((fix) => /HubSpot", (not|partly)/.test(fix)));
+    assert.ok(!fixes.some((fix) => /Europe/.test(fix)));
+    assert.ok(fixes.some((fix) => fix.startsWith("Show a result in 3 bullets. Say what changed.")));
+    assert.ok(fixes.some((fix) => fix.startsWith("It reads as stuffed: HubSpot appears 5 times.")));
+    assert.ok(fixes.every((fix) => fix.length <= 400 && !fix.includes("—")));
+  });
+
+  it("leaves a general report's verdicts alone and keeps the instruction short", () => {
+    assert.ok(!fixesFor(report, null).some((fix) => fix.includes("The posting asks")));
+    assert.ok(fixInstruction(job).length <= 500);
+    assert.equal(fixInstruction(null), "Fix what my ATS check found, in the lines I already have.");
+  });
+
+  it("opens a made-here resume itself and an upload's editable copy", () => {
+    assert.equal(fixHref({ id: "64b000000000000000000001", source: "created" }), "/dashboard/resume?doc=64b000000000000000000001&fix=1");
+    assert.equal(fixHref({ id: "up_12", source: "uploaded" }), "/dashboard/resume?from=up_12&fix=1");
+  });
+});
+
+const { askDesignSettings, checkedAskAction, designActionFor, panelOf } = await import("../app/lib/dashboard/resume/ask-actions.ts");
+
+describe("Ask's editor actions (owner, 2026-10-18: act within Customize and AI tools)", () => {
+  it("turns a design setting into the panel's own action, snapped to the slider's steps", () => {
+    assert.deepEqual(designActionFor("lineHeight", 1.43), { type: "spacing/set", key: "lineHeight", value: 1.4 });
+    assert.deepEqual(designActionFor("basePt", 30), { type: "fontSize/setBase", pt: 14 });
+    assert.deepEqual(designActionFor("headingSizePt", 3), { type: "fontSize/setOffset", key: "heading", pt: 3 });
+    assert.deepEqual(designActionFor("accent", "#1F4E79"), { type: "colors/setAccent", hex: "#1f4e79" });
+    assert.deepEqual(designActionFor("template", "meridian"), { type: "template/apply", id: "meridian" });
+    assert.equal(designActionFor("accent", "red"), null);
+    assert.equal(designActionFor("bodyFont", "comic-sans"), null);
+    assert.equal(panelOf("marginXmm"), "spacing");
+    assert.equal(panelOf("nameSizePt"), "font-size");
+  });
+
+  it("runs only actions it offers, on sections that exist", () => {
+    const ids = new Set(["summary", "experience"]);
+    assert.deepEqual(checkedAskAction({ do: "section", section: "experience" }, ids), { do: "section", section: "experience" });
+    assert.equal(checkedAskAction({ do: "section", section: "photos" }, ids), null);
+    assert.equal(checkedAskAction({ do: "tool", tool: "buy" }, ids), null);
+    assert.equal(checkedAskAction({ do: "design", set: "lineHeight", value: "tall" }, ids), null);
+    assert.equal(checkedAskAction({ do: "navigate", url: "https://example.com" }, ids), null);
+  });
+
+  it("reads the design's current values for the prompt", () => {
+    const settings = askDesignSettings(DEFAULT_DESIGN);
+    assert.equal(settings.lineHeight, DEFAULT_DESIGN.spacing.lineHeight);
+    assert.equal(settings.bodyFont, DEFAULT_DESIGN.font.body);
+    assert.equal("template" in settings, false);
+  });
+});

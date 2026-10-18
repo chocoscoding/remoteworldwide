@@ -57,6 +57,7 @@ import type { PickedJob } from "@/app/lib/jobs/fields";
 // index. It is an array update, it has to feel instant, and a round trip could
 // only make it slower and occasionally fail. Everything that needs judgment —
 // or a credit — now runs in the AI service through `app/lib/resume/ai.ts`.
+import { askDesignSettings, checkedAskAction, designActionFor } from "@/app/lib/dashboard/resume/ask-actions";
 import { applyQuantify, type AskLonger, type QuantifySuggestion, type RewriteVariant, type TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
 import { addSkills, hasSkill, reconcileGroups } from "@/app/lib/resume/skills";
 import {
@@ -75,6 +76,8 @@ import {
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
 import { useCheckResume } from "@/hooks/mutations/useCheckResume";
 import { STUFFING_ASK, applyBulletRewrite, deriveCheckSuggestions, pinnedLines, railCards, type CheckSuggestion } from "./check-suggestions";
+import { takeFixHandoff } from "@/app/lib/ats/fix-handoff";
+import { resumeContentToText } from "@/app/lib/resume/api";
 
 type DocTab = "overview" | "content" | "customize" | "ai";
 
@@ -934,8 +937,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
    * 2026-10-18: Quantify scrolls to each line as it steps through). Every page sheet holds the whole
    * resume and shows one window of it, so the line scrolled to is the copy its own sheet shows.
    */
-  const showOnPaper = (pointer: AiToolPointer) => {
-    setPointFocus(focusOfTool(pointer));
+  const showOnPaper = (pointer: AiToolPointer) => showFocusOnPaper(focusOfTool(pointer));
+
+  /** Frames `focus` on the paper and scrolls it into view; also what Ask's "section" action does. */
+  const showFocusOnPaper = (focus: PaperFocus | null) => {
+    setPointFocus(focus);
     // After the frame has painted on the paper.
     window.requestAnimationFrame(() =>
       window.requestAnimationFrame(() => {
@@ -1288,8 +1294,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
    * A failure keeps the instruction in the box, so it can be reworded or
    * retried; `useResumeSuggestion` has already toasted why.
    */
-  const handleAskSubmit = async () => {
-    const instruction = askInput.trim();
+  const handleAskSubmit = () => sendAsk(askInput.trim());
+
+  /** One ask. `fixes` are the ATS report's findings when "Fix these in my resume" sent them. */
+  const sendAsk = async (instruction: string, fixes?: string[]) => {
     if (!instruction || aiRunning) return;
     if (isBlank) {
       setAskError("Add a summary or some bullet points first, then say how you'd like them changed.");
@@ -1300,10 +1308,17 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     setAskError(null);
     setAskLonger(null);
     // A failure is said in the chat, in red, not as a toast (owner, 2026-10-18).
-    const result = await runSuggestion("ask", () => askForRewrite({ content: sent, instruction }), {
+    // The editor as it stands, so Ask can act in it: the tab, the design's values, the sections.
+    const editor = {
+      tab: docTab,
+      settings: askDesignSettings(design),
+      sections: sections.filter((section) => section.kind !== "page-break").map(({ id, label, visible }) => ({ id, label, visible })),
+    };
+    const result = await runSuggestion("ask", () => askForRewrite({ content: sent, instruction, editor, fixes }), {
       onError: (failure) => setAskError(failure.message),
     });
     if (!result) return;
+    const acted = runAskActions(result.actions ?? []);
 
     // Lines that grew far past themselves wait for a go-ahead (owner, 2026-10-18: warn, and if they
     // choose to continue, do it). Keeping them is applied here: no second run, no second credit.
@@ -1314,13 +1329,96 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     // for them to check by the "AI numbers" pill, beside Readability.
     const changed = changedLines(sent, result.content);
     setAskInput("");
-    if (changed.length === 0) return;
+    // An answer, or only things done in the editor: said in the chat, no text moves (owner, 2026-10-18).
+    if (changed.length === 0) {
+      setAskStatus(result.reply ?? (acted > 0 ? "Done. Like it? Reply to change it, or undo it." : null));
+      return;
+    }
     // The rewrite and what it says about itself are one undo step. One line, never the request read back.
     dispatch({
       type: "edit",
       content: (now) => withAiFigures(mergeRewrite(now, sent, result.content), changed),
       marks: { askStatus: askDone(changed) },
     });
+  };
+
+  // "Fix these in my resume" on the ATS report (owner, 2026-10-18): the report lands on this resume
+  // as its check, so the cards show what it found, and every fix goes to Ask as one ask (one credit,
+  // one Undo). Once per arrival: the hand-off is removed as it is read, and `fix` leaves the address.
+  const fixArrival = useRef(params.get("fix") === "1");
+  useEffect(() => {
+    if (!fixArrival.current) return;
+    fixArrival.current = false;
+    const next = new URLSearchParams(window.location.search);
+    next.delete("fix");
+    const query = next.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    const handoff = takeFixHandoff();
+    if (!handoff) return;
+    const docId = activeDocId;
+    const landed: ResumeCheck = {
+      report: handoff.report,
+      at: new Date(handoff.at),
+      job: handoff.job ? `${handoff.job.role} at ${handoff.job.company}` : null,
+      posting: handoff.job,
+      text: resumeContentToText(content),
+    };
+    // After this commit, not inside it: each of these sets state.
+    queueMicrotask(() => {
+      dispatch({ type: "learn", check: landed });
+      setDocuments((prev) => prev.map((d) => (d.id === docId ? { ...d, check: landed } : d)));
+      setAskInput(handoff.instruction);
+      void sendAsk(handoff.instruction, handoff.fixes);
+    });
+    // On arrival only: what it reads is the screen as it opened.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Does what Ask asked for in the editor (owner, 2026-10-18: change tabs, open a setting, point at
+   * a section, change the design, start a tool or a check "for them"). Each action is checked again
+   * here, and a tool or a check goes through its own button's handler, so a plan gate or a credit
+   * applies exactly as by hand. Returns how many ran.
+   */
+  const runAskActions = (rows: unknown[]): number => {
+    const ids = new Set(sections.map((section) => section.id));
+    let ran = 0;
+    for (const row of rows) {
+      const action = checkedAskAction(row, ids);
+      if (!action) continue;
+      ran += 1;
+      switch (action.do) {
+        case "tab":
+          setDocTab(action.tab);
+          break;
+        case "panel":
+          setDocTab("customize");
+          // After the Customize panels have mounted.
+          window.setTimeout(() => scrollToSetting(action.panel), 80);
+          break;
+        case "section": {
+          const config = sections.find((section) => section.id === action.section);
+          if (config && config.kind !== "page-break") {
+            showFocusOnPaper(config.kind === "custom" ? { section: "custom", customId: config.id } : { section: config.kind });
+          }
+          break;
+        }
+        case "design": {
+          const change = designActionFor(action.set, action.value);
+          if (change) dispatch(change);
+          break;
+        }
+        case "tool":
+          setDocTab("ai");
+          if (aiLocked) lockedAi();
+          else runAiTool(action.tool);
+          break;
+        case "check":
+          if (action.against === "general") checkGeneral();
+          else void pickJobFor("scan");
+          break;
+      }
+    }
+    return ran;
   };
 
   /** The one-line status after an Ask edit lands, with how many numbers the AI added to check. */

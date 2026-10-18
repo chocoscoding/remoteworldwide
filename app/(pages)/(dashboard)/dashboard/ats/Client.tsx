@@ -49,6 +49,7 @@ import { useCreatedDocumentAction, useCreatedResumes } from "@/hooks/queries/use
 import { getResumeDocument, importResumeContent } from "@/app/lib/resume/api";
 import type { ResumeDocumentSummary } from "@/app/lib/dashboard/types";
 import { useScanResume, type ScanStatus } from "@/hooks/mutations/useScanResume";
+import type { UploadProgress } from "@/hooks/mutations/useDocumentMutations";
 import AtsLanding from "@/app/components/dashboard/ats/AtsLanding";
 import AtsResults from "@/app/components/dashboard/ats/AtsResults";
 import AtsResumesTable from "@/app/components/dashboard/ats/AtsResumesTable";
@@ -254,8 +255,8 @@ const AtsScreen: FC = () => {
 
   /** Uploads land in the shared documents store (forced kind "resume", since
    *  this screen only scores resumes) — so My documents shows them too. */
-  async function handleUpload(file: File): Promise<ResumeEntry | null> {
-    const [entry] = await addUploads([file], { kind: "resume" });
+  async function handleUpload(file: File, progress?: UploadProgress): Promise<ResumeEntry | null> {
+    const [entry] = await addUploads([file], { kind: "resume", ...progress });
     return entry ?? null;
   }
 
