@@ -32,9 +32,10 @@ import {
   Hash,
   Loader2,
   Scissors,
+  TrendingDown,
   Sparkle,
-  Tag,
   Info,
+  Tag,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -64,6 +65,7 @@ const SUGGESTION_TOOL: Record<CheckSuggestion["kind"], SuggestionTool | null> =
     quantify: "quantify",
     shorten: "shorten",
     rewrite: null,
+    stuffing: null,
   };
 
 /** A row's button. */
@@ -75,6 +77,7 @@ const SUGGESTION_ACTION: Record<
   rewrite: () => "Use this line",
   quantify: () => "Suggest numbers",
   shorten: () => "Shorten",
+  stuffing: () => "Ask AI to trim it",
 };
 
 /** The badge a row that isn't a numbered rewrite wears. */
@@ -85,6 +88,7 @@ const SUGGESTION_ICON: Record<
   keywords: Tag,
   quantify: Hash,
   shorten: Scissors,
+  stuffing: TrendingDown,
 };
 
 const PHASE_COPY: Partial<Record<CheckStatus, string>> = {
@@ -127,13 +131,13 @@ export interface AiAssistRailProps {
   onAskSubmit: () => void;
   askStatus: string | null;
   onDismissAskStatus: () => void;
+  /** Why the last ask failed, shown in red in the chat itself rather than as a toast (owner, 2026-10-18). */
+  askError?: string | null;
+  onDismissAskError?: () => void;
   /** The job a check "against a job" would use now, as "Role at Company"; null opens the picker. */
   jobLabel?: string | null;
   /**
    * "rail" (docked in the right column) or "float" (inside the floating dock's panel over the
-  /** Why the last ask failed, shown in red in the chat itself rather than as a toast (owner, 2026-10-18). */
-  askError?: string | null;
-  onDismissAskError?: () => void;
    * preview). Floating, the dock carries its own ask box, so the rail's is left out, and the list
    * is held to the panel's height rather than the window's.
    */
@@ -197,12 +201,12 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   onAskSubmit,
   askStatus,
   onDismissAskStatus,
+  askError = null,
+  onDismissAskError,
   jobLabel = null,
   variant = "rail",
   header,
 }) => {
-  askError = null,
-  onDismissAskError,
   const floating = variant === "float";
   // Docked, the rail ends level with the foot of the resume page, so the ask box sits beside the
   // paper (owner, 2026-10-17), and never past the foot of the window, so it is always in view.
@@ -698,10 +702,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   // ── Ask for a rewrite (docked only) ─────────────────────────────────────────
   const ask = !floating && !isBlank && (
     <div className="flex flex-none flex-col gap-1.5 pb-1 pr-1">
-      {askStatus && (
-        <div className="flex items-start gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5">
-          <p className="flex-1 text-xs leading-relaxed text-black/65">
-            {askStatus}
       {askError && (
         <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#b23c26]/30 bg-[#fdf4f2] px-3.5 py-2.5">
           <p className="flex-1 text-xs font-semibold leading-relaxed text-[#b23c26]">{askError}</p>
@@ -712,6 +712,10 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           )}
         </div>
       )}
+      {askStatus && (
+        <div className="flex items-start gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5">
+          <p className="flex-1 text-xs leading-relaxed text-black/65">
+            {askStatus}
           </p>
           <button
             type="button"
@@ -749,10 +753,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           placeholder={asking ? "Rewriting your resume…" : "Ask AI"}
           className="h-8 min-w-0 flex-1 bg-transparent text-[13px] text-primary outline-none placeholder:text-[#8a8b85]"
         />
-        <button
-          type="button"
-          onClick={onAskSubmit}
-          disabled={!askInput.trim() || aiRunning !== null}
         {/* An icon with its label on hover (owner, 2026-10-18), not a line of text under the box. */}
         <span
           tabIndex={0}
@@ -762,6 +762,10 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
         >
           <Info className="h-3.5 w-3.5" />
         </span>
+        <button
+          type="button"
+          onClick={onAskSubmit}
+          disabled={!askInput.trim() || aiRunning !== null}
           aria-label={`Send · ${SUGGESTION_CREDITS} credit`}
           title={`Send · ${SUGGESTION_CREDITS} credit`}
           className={cn(

@@ -74,7 +74,7 @@ import {
 } from "@/app/lib/resume/ai";
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
 import { useCheckResume } from "@/hooks/mutations/useCheckResume";
-import { applyBulletRewrite, deriveCheckSuggestions, pinnedLines, railCards, type CheckSuggestion } from "./check-suggestions";
+import { STUFFING_ASK, applyBulletRewrite, deriveCheckSuggestions, pinnedLines, railCards, type CheckSuggestion } from "./check-suggestions";
 
 type DocTab = "overview" | "content" | "customize" | "ai";
 
@@ -884,7 +884,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     }
     // The terms are highlighted wherever they already stand in Skills, which after "Add them" is everywhere.
     if (suggestion.kind === "keywords") return { section: "skills", skills: suggestion.terms };
-    if (suggestion.kind === "quantify") return { section: "experience" };
+    if (suggestion.kind === "quantify" || suggestion.kind === "stuffing") return { section: "experience" };
     return null;
   };
 
@@ -1229,6 +1229,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     // Quantify proposes lines to review and shorten rewrites across the whole
     // document, so both run as the AI Tools tab's own tools — their results
     // and captions land there, where the proposals can be picked.
+    // Stuffing: the instruction goes in the ask box for the person to send, or not. Nothing runs.
+    if (suggestion.kind === "stuffing") {
+      setAskInput(STUFFING_ASK);
+      setAskError(null);
+      settle("Put a suggestion in the ask box. Send it if you want it.");
+      return;
+    }
+
     if (suggestion.kind === "quantify" || suggestion.kind === "shorten") {
       setDocTab("ai");
       runAiTool(suggestion.kind);
@@ -1328,6 +1336,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     onAskSubmit: () => void handleAskSubmit(),
     askStatus,
     onDismissAskStatus: () => setAskStatus(null),
+    askError,
+    onDismissAskError: () => setAskError(null),
     jobLabel,
   };
 
@@ -1336,8 +1346,6 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       {/* Header */}
       <header className="sticky top-0 z-20 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         {/* No back button (owner, 2026-10-04): the landing is the sidebar's link, or the browser's Back.
-    askError,
-    onDismissAskError: () => setAskError(null),
             The tabs are a sand track with the open tab in a dark pill that slides between them
             (owner, 2026-10-04), the same switch the Customize panels use. */}
         <nav aria-label="Resume editor" ref={tabGroupRef} className="relative flex items-center gap-1 rounded-xl bg-[#f0f0ea] p-1">

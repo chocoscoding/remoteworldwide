@@ -26,7 +26,10 @@ import { keywordLabel, missingGaps, scanTier } from "@/app/lib/ats/api";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { ResumeCheck } from "./resume-document";
 
-export type CheckSuggestionKind = "keywords" | "rewrite" | "quantify" | "shorten";
+export type CheckSuggestionKind = "keywords" | "rewrite" | "quantify" | "shorten" | "stuffing";
+
+/** What the stuffing card puts in the ask box for the person to send, or not (owner, 2026-10-18: their call). */
+export const STUFFING_ASK = "Say each keyword once, next to the work that proves it, and keep only the numbers that matter most.";
 
 export interface CheckSuggestion {
   /** Scoped to the scan, so a fresh check never inherits an old card's "applied". */
@@ -235,6 +238,19 @@ export function deriveCheckSuggestions(check: ResumeCheck | null, content: Resum
       kind: "shorten",
       title: `Runs to ${pageCount} pages`,
       detail: `Length & format scored ${length}/100 on your check. Tighten wordy bullets and drop the lowest-impact ones towards a single page.`,
+    });
+  }
+
+  // 5 · Stuffing (owner, 2026-10-18): a few points came off because recruiters may skim past repeated
+  // keywords or lines packed with numbers. A suggestion only: keeping it is the person's call.
+  const reasons = report.stuffing ?? [];
+  const points = report.stuffingPenalty ?? 0;
+  if (reasons.length > 0 && points > 0) {
+    out.push({
+      id: `${scope}:stuffing`,
+      kind: "stuffing",
+      title: `${points} ${plural(points, "point", "points")} off: reads as stuffed`,
+      detail: `${reasons.join("; ")}. Recruiters may skim past it. Keep it if you want; it's your call.`,
     });
   }
 

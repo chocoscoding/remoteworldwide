@@ -31,7 +31,7 @@ import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import AddToPlanButton from "@/app/components/dashboard/plan/AddToPlanButton";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
-import { ATS_BILLING_HREF, coveredKeywords, scanTier, unmetRequirements, type ScanFailure } from "@/app/lib/ats/api";
+import { ATS_BILLING_HREF, STUFFING_ADVICE, coveredKeywords, scanTier, stuffingHeadline, unmetRequirements, type ScanFailure } from "@/app/lib/ats/api";
 import { ATS_REPORT_CSS, atsReportHtml, atsReportToDocx, atsReportToMarkdown } from "@/app/lib/export/ats-report";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
 import type { ScanReport } from "@/app/lib/ats/types";
@@ -101,8 +101,7 @@ const PostingNotes: FC<{ report: ScanReport; company: string | null }> = ({ repo
     <DashCard className="flex flex-col gap-4 p-6">
       {stuffing.length > 0 && (
         <p className="rounded-lg border border-dashed border-[#b23c26]/35 px-3.5 py-2.5 text-[13px] leading-relaxed text-black/70">
-          <span className="font-semibold text-[#b23c26]">Held below Strong match.</span> This reads as keyword-stuffed: {stuffing.join("; ")}. Say each thing
-          once, next to the work that proves it.
+          <span className="font-semibold text-[#b23c26]">{stuffingHeadline(report.stuffingPenalty)}</span> {stuffing.join("; ")}. {STUFFING_ADVICE}
         </p>
       )}
       {needs.length > 0 && (

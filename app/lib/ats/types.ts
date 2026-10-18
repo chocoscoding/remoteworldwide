@@ -103,8 +103,10 @@ export interface ScanReport {
   traits?: PostingNote[];
   /** The 2 to 4 problems the employer is hiring to solve. */
   needs?: string[];
-  /** Why the resume reads as keyword-stuffed; when present the score is held at 84. */
+  /** Why the resume reads as keyword- or number-stuffed. A suggestion: nothing is refused. */
   stuffing?: string[];
+  /** The points those reasons took off the score (0 to 4). */
+  stuffingPenalty?: number;
   explanation: string | null;
   rewrites: BulletRewrite[];
 }

@@ -16,7 +16,7 @@
 // file of the same scan can never disagree about what it said.
 
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
-import { coveredKeywords, missingGaps, scanTier, unmetRequirements } from "@/app/lib/ats/api";
+import { STUFFING_ADVICE, coveredKeywords, missingGaps, scanTier, stuffingHeadline, unmetRequirements } from "@/app/lib/ats/api";
 import type { ScanReport } from "@/app/lib/ats/types";
 
 export interface AtsReportInput {
@@ -80,7 +80,7 @@ function modelOf({ report, resumeName, job, scannedAt }: AtsReportInput): Report
     missing: missingGaps(report).map((g) => g.label),
     rewrites: report.rewrites.map((r) => ({ before: r.before, after: r.after, why: r.why })),
     notes: [
-      ...(report.stuffing ?? []).length > 0 ? [`Held below Strong match: this reads as keyword-stuffed (${(report.stuffing ?? []).join("; ")}).`] : [],
+      ...(report.stuffing ?? []).length > 0 ? [`${stuffingHeadline(report.stuffingPenalty)} ${(report.stuffing ?? []).join("; ")}. ${STUFFING_ADVICE}`] : [],
       ...(report.needs ?? []).map((need) => `What they need solved: ${need}.`),
       ...(report.eligibility ?? []).map((note) => `This role needs: ${note.text}. Check you meet it; it never goes on your resume and isn't in the score.`),
       ...(report.traits ?? []).map((note) => `Show in your cover letter or interview: ${note.label || note.text}.`),

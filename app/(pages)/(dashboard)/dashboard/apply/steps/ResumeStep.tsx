@@ -60,7 +60,7 @@ import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { changeCaption, changeCount, resumeChanges } from "@/app/lib/apply/changes";
 import { noteParts, scoreColor, withoutEmDashes } from "@/app/lib/apply/score";
 import { sendingResumeId, type ApplyProposal, type ApplyState, type ResumeToolId } from "@/app/lib/apply/state";
-import { ATS_BILLING_HREF, SCAN_CREDITS, missingGaps, prepareResumeForDoc, scanTier } from "@/app/lib/ats/api";
+import { ATS_BILLING_HREF, SCAN_CREDITS, STUFFING_ADVICE, missingGaps, prepareResumeForDoc, scanTier, stuffingHeadline } from "@/app/lib/ats/api";
 import type { CoverageState, IngestedResumeDetail, RequirementVerdict, ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { qk } from "@/app/lib/query/keys";
@@ -690,7 +690,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
                 {report.degraded && (
                   <ScoringNote text={report.degradedReason ?? "Scored on a reduced path, so treat it as a rough read."} />
                 )}
-                {(report.stuffing ?? []).length > 0 && <StuffingNote reasons={report.stuffing ?? []} />}
+                {(report.stuffing ?? []).length > 0 && <StuffingNote reasons={report.stuffing ?? []} points={report.stuffingPenalty} />}
               </div>
             </div>
             {(gaps.length > 0 || (report.eligibility ?? []).length > 0 || (report.needs ?? []).length > 0) && (
@@ -1061,11 +1061,10 @@ const TwoStages: FC<{ report: ScanReport }> = ({ report }) => {
   );
 };
 
-/** Why the score is held below "Strong match": the resume reads as keyword-stuffed (RWW/ATS-QUALITY-PLAN.md, 13.4). */
-const StuffingNote: FC<{ reasons: string[] }> = ({ reasons }) => (
+/** The few points stuffing took off, and why: a suggestion, never a refusal (owner, 2026-10-18). */
+const StuffingNote: FC<{ reasons: string[]; points?: number }> = ({ reasons, points }) => (
   <p className="max-w-xl rounded-lg border border-dashed border-[#b23c26]/35 px-3 py-2 text-[13px] leading-relaxed text-black/70">
-    <span className="font-semibold text-[#b23c26]">Held below Strong match.</span> This reads as keyword-stuffed: {reasons.join("; ")}. Say each thing once, next to the
-    work that proves it.
+    <span className="font-semibold text-[#b23c26]">{stuffingHeadline(points)}</span> {reasons.join("; ")}. {STUFFING_ADVICE}
   </p>
 );
 

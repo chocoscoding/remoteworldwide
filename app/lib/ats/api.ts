@@ -437,6 +437,18 @@ export function scanTier(score: number): { label: string; tone: "positive" | "ne
   return { label: "Needs work", tone: "urgent" };
 }
 
+/**
+ * The stuffing note's lead, the same on every surface (owner, 2026-10-18): a few points off,
+ * said plainly, never a refusal. Scans from before the deduction carry no count.
+ */
+export function stuffingHeadline(points: number | undefined): string {
+  if (!points) return "Reads as stuffed.";
+  return `${points} ${points === 1 ? "point" : "points"} off.`;
+}
+
+/** What follows the reasons: why the points came off, and that keeping it is the person's call. */
+export const STUFFING_ADVICE = "Recruiters may skim past it. Saying each thing once, next to the work that proves it, wins them back. Keep it if you want.";
+
 /** Missing keywords, highest impact first — what the gap list draws. */
 /**
  * The gaps to offer for fixing. An eligibility line or a trait is never one (owner, 2026-10-18: "Located
