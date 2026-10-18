@@ -31,7 +31,7 @@ registerHooks({
 });
 
 const { changeCaption, resumeChanges } = await import("../app/lib/apply/changes.ts");
-const { addedFigures, clearAiFigures, pendingAiFigures, withAiFigures } = await import("../app/lib/dashboard/resume/ai-figures.ts");
+const { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures } = await import("../app/lib/dashboard/resume/ai-figures.ts");
 const { readabilityFlags } = await import("../app/lib/dashboard/resume/readability.ts");
 const { DEFAULT_DESIGN, DEFAULT_SECTIONS } = await import("../app/lib/dashboard/resume/design-defaults.ts");
 const { readApplyState } = await import("../app/lib/apply/state.ts");
@@ -98,6 +98,20 @@ describe("the AI's numbers", () => {
     const later = withAiFigures({ ...checked, experience: [{ ...checked.experience[0], bullets: [quantified.after, again.after] }] }, [again]);
     assert.equal(later.aiFiguresCleared, false);
     assert.deepEqual(pendingAiFigures(later).map((figure) => figure.figure), ["12"]);
+  });
+});
+
+describe("numbers Ask adds when asked (owner, 2026-10-18: do what the person asks, mark it to check)", () => {
+  it("records the numbers in every line an edit changed, the summary included", () => {
+    const before = content({ summary: "Customer Success Manager." });
+    const after = content({
+      summary: "Customer Success Manager with 4+ years.",
+      experience: [{ ...before.experience[0], bullets: ["Ran quarterly business reviews for 120 accounts", "Onboarded new accounts"] }],
+    });
+    const pairs = changedLines(before, after);
+    assert.equal(pairs.length, 2);
+    const next = withAiFigures(after, pairs);
+    assert.deepEqual(pendingAiFigures(next).map((figure) => figure.figure), ["4+", "120"]);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  Info,
   Loader2,
   PanelRightOpen,
   RotateCw,
@@ -257,13 +258,20 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
       {ask && (
         <div className="pointer-events-auto flex w-[560px] max-w-[calc(100vw-48px)] animate-in fade-in slide-in-from-bottom-1 flex-col gap-2 rounded-2xl border-[1.5px] border-[#222325] bg-white p-2.5 br-shadow">
           <span className="flex items-center gap-1.5 text-xs text-[#5f6062]">
-            Rewriting{" "}
-            <span className="rounded-full bg-[#eef6ad] px-2 py-px font-bold text-primary">
-              Summary and bullets
+            {/* The AI mark leads the box (owner, 2026-10-18), the same one the dock's Ask AI wears. */}
+            <span className="flex items-center gap-1.5 rounded-full bg-[#eef6ad] py-px pl-1.5 pr-2 font-bold text-primary">
+              <Sparkle className="h-3.5 w-3.5" strokeWidth={2} />
+              Ask AI
             </span>
             <span className="flex-1" />
-            <span className="text-[11px] text-[#8a8b85]">
-              From facts on your resume
+            {/* An icon with its label on hover (owner, 2026-10-18), not a line of text on the box. */}
+            <span
+              tabIndex={0}
+              aria-label="Uses what's on your resume. Numbers it adds for you are marked on the page to check."
+              title="Uses what's on your resume. Numbers it adds for you are marked on the page to check."
+              className="grid h-6 w-6 cursor-help place-content-center text-[#8a8b85] hover:text-primary"
+            >
+              <Info className="h-3.5 w-3.5" />
             </span>
             <button
               type="button"
@@ -274,6 +282,21 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
               <X className="h-3.5 w-3.5" />
             </button>
           </span>
+          {props.askError && (
+            <div role="alert" className="flex items-start gap-2 rounded-lg border border-[#b23c26]/30 bg-[#fdf4f2] px-3 py-2">
+              <p className="flex-1 text-xs font-semibold leading-relaxed text-[#b23c26]">{props.askError}</p>
+              {props.onDismissAskError && (
+                <button
+                  type="button"
+                  onClick={props.onDismissAskError}
+                  aria-label="Dismiss"
+                  className="flex-none cursor-pointer text-[#b23c26]/60 hover:text-[#b23c26]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
           {props.askStatus && (
             <div className="flex items-start gap-2 rounded-lg bg-[#f6f6f6] px-3 py-2">
               <p className="flex-1 text-xs leading-relaxed text-black/65">
@@ -455,7 +478,7 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
                 className="h-3.5 w-3.5 flex-none text-primary"
                 strokeWidth={2}
               />
-              <span className="flex-1">Ask for a rewrite…</span>
+              <span className="flex-1 font-semibold text-primary">Ask AI</span>
               <span className="rounded-[5px] border border-[#222325]/20 px-1.5 py-px text-[11px] font-bold">
                 /
               </span>

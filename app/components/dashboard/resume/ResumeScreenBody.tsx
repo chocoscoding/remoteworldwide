@@ -42,7 +42,7 @@ import CustomizePanelsRail from "./CustomizePanelsRail";
 import AtsFloatingDock, { type AtsToolsProps } from "./AtsFloatingDock";
 import AtsDockedRail from "./AtsDockedRail";
 import { AiFiguresPill, ReadabilityPill } from "./AtsSidePills";
-import { clearAiFigures, pendingAiFigures, withAiFigures } from "@/app/lib/dashboard/resume/ai-figures";
+import { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures } from "@/app/lib/dashboard/resume/ai-figures";
 import { readabilityFlags, type ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
@@ -382,6 +382,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   const [askInput, setAskInput] = useState("");
   const askStatus = marks.askStatus;
   const setAskStatus = (text: string | null) => dispatch({ type: "learn", askStatus: text });
+  // Why the last ask failed, said in the chat. Not part of the undo history: it describes nothing on the page.
+  const [askError, setAskError] = useState<string | null>(null);
 
   const [activeCustomizeItem, setActiveCustomizeItem] = useState("templates");
   const [flashCustomizeItem, setFlashCustomizeItem] = useState<string | null>(null);
@@ -1252,29 +1254,28 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     const instruction = askInput.trim();
     if (!instruction || aiRunning) return;
     if (isBlank) {
-      setAskStatus("Add a summary or some bullet points first, then say how you'd like them changed.");
+      setAskError("Add a summary or some bullet points first, then say how you'd like them changed.");
       return;
     }
     const sent = content;
     setAskStatus(null);
-    const result = await runSuggestion("ask", () => askForRewrite({ content: sent, instruction }));
+    setAskError(null);
+    // A failure is said in the chat, in red, not as a toast (owner, 2026-10-18).
+    const result = await runSuggestion("ask", () => askForRewrite({ content: sent, instruction }), {
+      onError: (failure) => setAskError(failure.message),
+    });
     if (!result) return;
 
-    const parts = [
-      result.summaryChanged ? "your Summary" : null,
-      result.bulletsChanged > 0 ? `${result.bulletsChanged} bullet${result.bulletsChanged === 1 ? "" : "s"}` : null,
-    ].filter(Boolean);
-    const held =
-      result.rejectedLines > 0
-        ? ` ${result.rejectedLines} proposed line${result.rejectedLines === 1 ? "" : "s"} would have added details your resume doesn't have, so ${result.rejectedLines === 1 ? "it was" : "they were"} left as you wrote ${result.rejectedLines === 1 ? "it" : "them"}.`
-        : "";
-    // The rewrite and what it says about itself are one undo step.
+    // The person asked for it, so it goes in (owner, 2026-10-18); any number the AI added is marked
+    // for them to check by the "AI numbers" pill, beside Readability.
+    const changed = changedLines(sent, result.content);
+    const added = changed.reduce((count, { before, after }) => count + addedFigures(before, after).length, 0);
+    const toCheck = added > 0 ? ` ${added} new number${added === 1 ? "" : "s"} to check: see AI numbers.` : "";
+    // The rewrite and what it says about itself are one undo step. One line, never the request read back.
     dispatch({
       type: "edit",
-      content: (now) => mergeRewrite(now, sent, result.content),
-      marks: {
-        askStatus: `Rewrote ${parts.join(" and ")} to “${instruction}”.${held} Not quite right? Say what to change next, or edit it directly.`,
-      },
+      content: (now) => withAiFigures(mergeRewrite(now, sent, result.content), changed),
+      marks: { askStatus: `Done.${toCheck} Like it? Reply to change it, or edit it directly.` },
     });
     setAskInput("");
   };
@@ -1335,6 +1336,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       {/* Header */}
       <header className="sticky top-0 z-20 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         {/* No back button (owner, 2026-10-04): the landing is the sidebar's link, or the browser's Back.
+    askError,
+    onDismissAskError: () => setAskError(null),
             The tabs are a sand track with the open tab in a dark pill that slides between them
             (owner, 2026-10-04), the same switch the Customize panels use. */}
         <nav aria-label="Resume editor" ref={tabGroupRef} className="relative flex items-center gap-1 rounded-xl bg-[#f0f0ea] p-1">

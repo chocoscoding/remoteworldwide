@@ -18,11 +18,34 @@ export const addedFigures = (before: string, after: string): string[] => {
   return [...new Set(figuresOf(after).filter((figure) => !had.has(figure)))];
 };
 
-/** Every line the AI's numbers can be in: bullets and custom sections' points. */
+/** Every line the AI's numbers can be in: the summary, bullets and custom sections' points. */
 const linesOf = (content: ResumeContent): string[] => [
+  content.summary,
   ...content.experience.flatMap((entry) => entry.bullets),
   ...(content.customSections ?? []).flatMap((section) => section.items),
 ];
+
+/**
+ * The lines one AI edit changed, each with what it was: the summary, a role's bullets by their
+ * place, a custom section's points by theirs. For recording the numbers an edit like Ask added.
+ */
+export const changedLines = (before: ResumeContent, after: ResumeContent): Array<{ before: string; after: string }> => {
+  const pairs: Array<{ before: string; after: string }> = [];
+  if (after.summary !== before.summary) pairs.push({ before: before.summary, after: after.summary });
+  after.experience.forEach((entry) => {
+    const was = before.experience.find((old) => old.id === entry.id)?.bullets ?? [];
+    entry.bullets.forEach((bullet, index) => {
+      if (bullet !== was[index]) pairs.push({ before: was[index] ?? "", after: bullet });
+    });
+  });
+  (after.customSections ?? []).forEach((section) => {
+    const was = (before.customSections ?? []).find((old) => old.id === section.id)?.items ?? [];
+    section.items.forEach((item, index) => {
+      if (item !== was[index]) pairs.push({ before: was[index] ?? "", after: item });
+    });
+  });
+  return pairs;
+};
 
 const wordsOf = (value: string): string[] => value.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 2);
 

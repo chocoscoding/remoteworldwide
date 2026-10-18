@@ -56,7 +56,7 @@ export function useResumeSuggestion() {
    * whether a credit was spent.
    */
   const run = useCallback(
-    async <T,>(tool: SuggestionTool, call: () => Promise<T>): Promise<T | null> => {
+    async <T,>(tool: SuggestionTool, call: () => Promise<T>, options: { onError?: (failure: SuggestionFailure) => void } = {}): Promise<T | null> => {
       runIdRef.current += 1;
       const runId = runIdRef.current;
       const current = () => runId === runIdRef.current;
@@ -79,10 +79,11 @@ export function useResumeSuggestion() {
         setRunning(null);
         const described = describe(error);
         setFailure(described);
-        // A toast as well as the inline caption: the rail can be scrolled past
-        // the tool that failed, and a run that silently does nothing reads as a
-        // broken button.
-        toast.error(described.message);
+        // A caller that shows the failure where it happened (the ask chat, owner, 2026-10-18: "the
+        // error is going to be in the chat") takes it; everyone else gets a toast as well as the
+        // inline caption, since the rail can be scrolled past the tool that failed.
+        if (options.onError) options.onError(described);
+        else toast.error(described.message);
         return null;
       }
     },

@@ -34,6 +34,7 @@ import {
   Scissors,
   Sparkle,
   Tag,
+  Info,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -130,6 +131,9 @@ export interface AiAssistRailProps {
   jobLabel?: string | null;
   /**
    * "rail" (docked in the right column) or "float" (inside the floating dock's panel over the
+  /** Why the last ask failed, shown in red in the chat itself rather than as a toast (owner, 2026-10-18). */
+  askError?: string | null;
+  onDismissAskError?: () => void;
    * preview). Floating, the dock carries its own ask box, so the rail's is left out, and the list
    * is held to the panel's height rather than the window's.
    */
@@ -197,6 +201,8 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   variant = "rail",
   header,
 }) => {
+  askError = null,
+  onDismissAskError,
   const floating = variant === "float";
   // Docked, the rail ends level with the foot of the resume page, so the ask box sits beside the
   // paper (owner, 2026-10-17), and never past the foot of the window, so it is always in view.
@@ -696,6 +702,16 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
         <div className="flex items-start gap-2 rounded-xl border border-black/10 bg-white px-3.5 py-2.5">
           <p className="flex-1 text-xs leading-relaxed text-black/65">
             {askStatus}
+      {askError && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#b23c26]/30 bg-[#fdf4f2] px-3.5 py-2.5">
+          <p className="flex-1 text-xs font-semibold leading-relaxed text-[#b23c26]">{askError}</p>
+          {onDismissAskError && (
+            <button type="button" onClick={onDismissAskError} aria-label="Dismiss" className="flex-none cursor-pointer text-[#b23c26]/60 hover:text-[#b23c26]">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
           </p>
           <button
             type="button"
@@ -730,13 +746,22 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           maxLength={MAX_ASK_INSTRUCTION_CHARS}
           disabled={asking}
           aria-label="Ask for a rewrite"
-          placeholder={asking ? "Rewriting your resume…" : "Ask for a rewrite…"}
+          placeholder={asking ? "Rewriting your resume…" : "Ask AI"}
           className="h-8 min-w-0 flex-1 bg-transparent text-[13px] text-primary outline-none placeholder:text-[#8a8b85]"
         />
         <button
           type="button"
           onClick={onAskSubmit}
           disabled={!askInput.trim() || aiRunning !== null}
+        {/* An icon with its label on hover (owner, 2026-10-18), not a line of text under the box. */}
+        <span
+          tabIndex={0}
+          aria-label="Uses what's on your resume. Numbers it adds for you are marked on the page to check."
+          title="Uses what's on your resume. Numbers it adds for you are marked on the page to check."
+          className="grid h-6 w-6 flex-none cursor-help place-content-center text-[#8a8b85] hover:text-primary"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </span>
           aria-label={`Send · ${SUGGESTION_CREDITS} credit`}
           title={`Send · ${SUGGESTION_CREDITS} credit`}
           className={cn(
@@ -753,9 +778,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           )}
         </button>
       </div>
-      <span className="px-1 text-[11px] text-[#8a8b85]">
-        Summary and bullets only, from facts on your resume
-      </span>
     </div>
   );
 
