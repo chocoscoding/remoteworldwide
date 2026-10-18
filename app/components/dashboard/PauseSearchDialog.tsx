@@ -35,8 +35,8 @@ const PauseSearchDialog: FC<PauseSearchDialogProps> = ({ open, onOpenChange }) =
             <DialogTitle className="text-lg font-bold text-primary">Pause your search</DialogTitle>
           </div>
           <DialogDescription className="text-sm leading-relaxed text-black/55">
-            Your {current}-day streak is held exactly where it is. No prompts, no goals, nothing to keep up with. It&apos;s all
-            here when you come back.
+            Your weekly goal, prompts and reminders go quiet while you&apos;re away. Your {current}-day streak doesn&apos;t pause:
+            a day with nothing logged uses a freeze if you have one, and a second missed day ends it.
           </DialogDescription>
 
           <p className="mt-5 mb-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40">For how long</p>
@@ -72,9 +72,6 @@ const PauseSearchDialog: FC<PauseSearchDialogProps> = ({ open, onOpenChange }) =
               Not now
             </button>
           </div>
-          <p className="mt-4 text-[11px] leading-relaxed text-black/45">
-            Nothing logged today? A pause covers today once every 14 days. Otherwise it starts tomorrow.
-          </p>
         </div>
       </DialogContent>
     </Dialog>

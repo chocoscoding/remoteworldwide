@@ -112,6 +112,7 @@ const HomeClient: FC = () => {
     addHabit,
     updateHabit,
     removeHabit,
+    resumeSearch,
   } = useActivity();
   const habitsDone = habitsToday.filter((h) => h.done).length;
 
@@ -243,9 +244,20 @@ const HomeClient: FC = () => {
               <div className="flex items-start justify-between gap-4 mb-4">
                 <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-secondary">Weekly goal</p>
                 {goalsKnown ? (
-                  <p className="text-xs text-white/45 text-right">
-                    {goals.paused ? "Paused. Nothing is expected until you're back." : math.sentence}
-                  </p>
+                  goals.paused ? (
+                    // A pause (one from "I got the job" included) can end right here.
+                    <p className="text-xs text-white/45 text-right">
+                      Paused. Your goal is off; your streak still counts days.{" "}
+                      <button
+                        type="button"
+                        onClick={resumeSearch}
+                        className="font-semibold text-secondary underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer">
+                        Resume
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-white/45 text-right">{math.sentence}</p>
+                  )
                 ) : (
                   <span aria-hidden className="h-3 w-40 animate-pulse rounded bg-white/10" />
                 )}

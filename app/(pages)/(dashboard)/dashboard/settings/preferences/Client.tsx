@@ -43,7 +43,7 @@ const PreferencesClient: FC = () => {
   const { preferences, setPreferences } = useSettings();
   // Weekly target and pause live in ActivityProvider because the streak panel
   // and sidebar read them too — this screen edits them, it doesn't own them.
-  const { goals, setWeeklyTarget, pauseSearch, resumeSearch, pausedDaysLeft } = useActivity();
+  const { goals, setWeeklyTarget, pauseSearch, resumeSearch, pausedDaysLeft, hired } = useActivity();
   const [roleDraft, setRoleDraft] = useState("");
 
   function addRole(e: FormEvent) {
@@ -155,11 +155,17 @@ const PreferencesClient: FC = () => {
         <SettingsRow
           label="Pause the search"
           hint={
-            pausedDaysLeft !== null
-              ? `Paused, ${pausedDaysLeft} day${pausedDaysLeft === 1 ? "" : "s"} left. Your streak is held, not lost.`
-              : "Holds your streak, goals and reminders. Nothing resets."
+            // Any pause shows here, not only a dated one: "I got the job" pauses with no end date,
+            // and that pause used to read as "not paused" with no way to resume from here.
+            !goals.paused
+              ? "Quiets your goals and reminders. Your streak keeps counting days."
+              : pausedDaysLeft !== null
+                ? `Paused, ${pausedDaysLeft} day${pausedDaysLeft === 1 ? "" : "s"} left. Goals and reminders are off; your streak still needs a day's action.`
+                : hired
+                  ? "Paused since you logged that you got the job. Resume to switch your goal and reminders back on."
+                  : "Paused until you resume. Goals and reminders are off; your streak still needs a day's action."
           }>
-          {pausedDaysLeft !== null ? (
+          {goals.paused ? (
             <button type="button" className={BUTTON_OUTLINE} onClick={resumeSearch}>
               Resume now
             </button>

@@ -26,6 +26,8 @@ import { qk } from "@/app/lib/query/keys";
  */
 export function refreshStreak(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: qk.activity.streak() });
+  // Any action ends a pause on the server, so the goals (paused or not) are read again too.
+  void queryClient.invalidateQueries({ queryKey: qk.activity.goals() });
   void queryClient.invalidateQueries({ queryKey: qk.activity.gifts() });
   void queryClient.invalidateQueries({ queryKey: qk.pod.overview() });
 }

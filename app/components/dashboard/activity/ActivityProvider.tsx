@@ -324,7 +324,7 @@ interface ActivityContextValue extends StreakState {
   toggleRestDay: (index: number) => void;
   setHuntHour: (h: number) => void;
   setPaused: (p: boolean) => void;
-  /** Pauses the search for N days: streak held, prompts silenced. */
+  /** Pauses the search for N days: goals and prompts silenced. The streak is not held. */
   pauseSearch: (days: number) => void;
   resumeSearch: () => void;
   /** Days remaining on a pause, or null when not paused or paused with no end date. */
@@ -797,9 +797,9 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
       // A pause is not a break: the count is held exactly where it is, and
       // every prompt goes quiet. People take time off; punishing that is how
       // you lose them for good. The end day is saved with the pause, so every
-      // device knows how long it runs, and the server holds the streak for it.
+      // device knows how long it runs. The streak is not held (owner, 2026-10-18): empty days are misses.
       writeGoals(() => ({ paused: true, pauseEndsOn: dayKey(addDays(fromDayKey(todayKey), days)) }));
-      toast.success(`Search paused for ${days} days.`, { description: `Your ${current}-day streak is held.` });
+      toast.success(`Search paused for ${days} days.`, { description: "Goals and reminders are off. Your streak still needs a day's action." });
     },
     resumeSearch: () => {
       writeGoals(() => ({ paused: false, pauseEndsOn: null }));
