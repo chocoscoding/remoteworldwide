@@ -184,11 +184,13 @@ const pointing = (
 
 /**
  * A word-level diff of a tone fix, as the design shows it: what goes out struck in red, what comes
- * in on lime, the rest as it was. Longest common subsequence over words and the spaces between.
+ * in on lime, the rest as it was. Longest common subsequence over words, the spaces between and
+ * punctuation on its own, so an added full stop shows as just "." rather than the whole last word.
  */
+const DIFF_TOKENS = /(\s+|[.,;:!?()[\]"'“”])/;
 function wordDiff(before: string, after: string): ReactNode[] {
-  const a = before.split(/(\s+)/);
-  const b = after.split(/(\s+)/);
+  const a = before.split(DIFF_TOKENS).filter(Boolean);
+  const b = after.split(DIFF_TOKENS).filter(Boolean);
   const n = a.length;
   const m = b.length;
   // Long lines are rare here; past this size the full table isn't worth it, so show before → after.
