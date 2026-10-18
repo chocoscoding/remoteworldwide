@@ -11,10 +11,10 @@
 // Three credits, charged only when a resume comes back, and the dialog says so
 // on the button that spends them.
 
-import { useMemo, useState, type FC } from "react";
+import { useMemo, useState, type FC, type ReactNode } from "react";
 import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import Link from "next/link";
-import { Briefcase, Loader2, Sparkles, X } from "lucide-react";
+import { Briefcase, ChevronDown, Loader2, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
@@ -31,7 +31,20 @@ const SENIORITIES = ["Entry level", "Mid level", "Senior", "Lead", "Principal"] 
 const BUILD_JOB_SPEC = "company, role, description?";
 type BuildJob = PickedJob<typeof BUILD_JOB_SPEC>;
 
-const FIELD = "rounded-xl border border-black/12 bg-[#fbfbf7] px-4 py-2.5 text-sm text-primary placeholder:text-black/35 outline-none focus:border-black/30 transition-colors";
+const FIELD = "rounded-md border border-black/12 bg-[#fbfbf7] px-4 py-2.5 text-sm text-primary placeholder:text-black/35 outline-none focus:border-black/30 transition-colors";
+
+/**
+ * A select in the dialog's field look, with its own chevron: the browser's arrow sits hard against
+ * the edge whatever the padding, so it is hidden and this one sits 16px in (owner, 2026-10-18).
+ */
+const SelectField: FC<{ value: string; onChange: (value: string) => void; children: ReactNode }> = ({ value, onChange, children }) => (
+  <span className="relative flex">
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={cn(FIELD, "w-full cursor-pointer appearance-none pr-10")}>
+      {children}
+    </select>
+    <ChevronDown aria-hidden className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" strokeWidth={2.2} />
+  </span>
+);
 
 export interface BuildResumeDialogProps {
   open: boolean;
@@ -43,14 +56,19 @@ export interface BuildResumeDialogProps {
 const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onBuilt }) => {
   const { pickJob } = useJobPicker();
   const { data: ingested } = useIngestedResumesQuery();
-  // The newest resume that parsed — the one they are most likely applying with.
-  const source = useMemo(() => (ingested ?? []).find((row) => row.status === "ready") ?? null, [ingested]);
+  // Every imported resume that parsed, newest first: any of them can be the one it writes from
+  // (owner, 2026-10-18). None is picked to begin with: it builds from the general profile unless
+  // they choose a resume.
+  const sources = useMemo(() => (ingested ?? []).filter((row) => row.status === "ready"), [ingested]);
+  // "": the general profile; else that resume.
+  const [sourceId, setSourceId] = useState("");
+  const source = sources.find((row) => row.resumeId === sourceId) ?? null;
 
   const [targetRole, setTargetRole] = useState("");
   const [seniority, setSeniority] = useState("");
-  const [template, setTemplate] = useState("");
+  // Atlas unless they pick another (owner, 2026-10-18): no "let the AI choose".
+  const [template, setTemplate] = useState("atlas");
   const [job, setJob] = useState<BuildJob | null>(null);
-  const [useSource, setUseSource] = useState(true);
   const [building, setBuilding] = useState(false);
   const [failure, setFailure] = useState<{ message: string; credits: boolean } | null>(null);
 
@@ -76,10 +94,10 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
       const built = await buildResume({
         targetRole: role,
         seniority: seniority || null,
-        template: template || null,
+        template,
         jdText: job?.description ?? null,
         jobId: job?.id ?? null,
-        fromResumeId: useSource && source ? source.resumeId : null,
+        fromResumeId: source ? source.resumeId : null,
       });
       if (!built.document) {
         setFailure({ message: "Your resume was built but couldn't be saved. Please try again.", credits: false });
@@ -105,7 +123,7 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
             <DialogTitle className="text-[17px] font-bold text-primary leading-none">Build a resume with AI</DialogTitle>
           </div>
           <p className="text-xs text-black/50 mb-5 pl-[52px]">
-            Written from {source && useSource ? "your imported resume" : "your profile"}, nothing it doesn&apos;t already know about you.
+            Written from {source ? "the resume you pick" : "your profile"}, nothing it doesn&apos;t already know about you.
           </p>
 
           <label className="flex flex-col gap-1.5 mb-4">
@@ -127,25 +145,24 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
           <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold text-black/55">Seniority</span>
-              <select value={seniority} onChange={(e) => setSeniority(e.target.value)} className={cn(FIELD, "cursor-pointer")}>
+              <SelectField value={seniority} onChange={setSeniority}>
                 <option value="">Any</option>
                 {SENIORITIES.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold text-black/55">Template</span>
-              <select value={template} onChange={(e) => setTemplate(e.target.value)} className={cn(FIELD, "cursor-pointer")}>
-                <option value="">Let the AI choose</option>
+              <SelectField value={template} onChange={setTemplate}>
                 {TEMPLATE_OPTIONS.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           </div>
 
@@ -170,12 +187,18 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
             )}
           </div>
 
-          {source && (
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-black/10 px-4 py-3">
-              <input type="checkbox" checked={useSource} onChange={(e) => setUseSource(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#222325]" />
-              <span className="text-xs leading-relaxed text-black/60">
-                Build from <span className="font-semibold text-primary">{source.fileName}</span>, the resume you imported last. Untick to use your profile only.
-              </span>
+          {sources.length > 0 && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-black/55">Build from</span>
+              <SelectField value={sourceId} onChange={setSourceId}>
+                <option value="">General profile</option>
+                {sources.map((row, i) => (
+                  <option key={row.resumeId} value={row.resumeId}>
+                    {row.fileName}
+                    {i === 0 ? " (imported last)" : ""}
+                  </option>
+                ))}
+              </SelectField>
             </label>
           )}
 
