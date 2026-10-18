@@ -1166,3 +1166,13 @@ body {
 #jd .ql-editor {
   padding: 0px !important;
 }
+
+/* The AI Tools panel's running line: a short bar that keeps sweeping, with no fake percentage. */
+@keyframes ai-tool-progress {
+  from {
+    left: -40%;
+  }
+  to {
+    left: 100%;
+  }
+}

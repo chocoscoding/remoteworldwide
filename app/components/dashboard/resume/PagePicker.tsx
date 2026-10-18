@@ -141,12 +141,15 @@ const PagePicker: FC<PagePickerProps> = ({ kinds, label, onHover, onPick, onCanc
     let hovered = "";
 
     const onMove = (event: PointerEvent) => {
-      const target = targetOf(event.target instanceof Element ? event.target : null, latest.current.kinds);
+      const element = event.target instanceof Element ? event.target : null;
+      const target = targetOf(element, latest.current.kinds);
       if (keyOf(target) !== hovered) {
         hovered = keyOf(target);
         latest.current.onHover(target);
       }
-      setPointer({ x: event.clientX, y: event.clientY, target });
+      // The label rides the cursor only over the paper (owner, 2026-10-17): over the tools rails
+      // and the header the pointer is the ordinary one, with nothing following it.
+      setPointer(element?.closest(SELECTOR.resume) ? { x: event.clientX, y: event.clientY, target } : null);
     };
     // Capture, so the pick lands before anything the paper would do with the click.
     const onClick = (event: MouseEvent) => {

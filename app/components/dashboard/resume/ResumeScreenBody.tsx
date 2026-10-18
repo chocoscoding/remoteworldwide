@@ -39,7 +39,8 @@ import { quantifyKey } from "./editor-state";
 import ContentForm from "./content/ContentForm";
 import CustomizeNav from "./CustomizeNav";
 import CustomizePanelsRail from "./CustomizePanelsRail";
-import AiAssistRail from "./AiAssistRail";
+import AtsFloatingDock, { type AtsToolsProps } from "./AtsFloatingDock";
+import AtsDockedRail from "./AtsDockedRail";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
 import { applyToneFix, pinToneFixes, proposalState, type ToneProposal } from "@/app/lib/resume/tone-fixes";
@@ -96,6 +97,49 @@ const tabFrom = (value: string | null): DocTab | null => (DOC_TABS.some((tab) =>
 // 2026-10-04: "use this space for the left and right side"): on a wide screen
 // they grow into what used to be empty margin beside the page, and on a
 // laptop they hold their minimum while the preview scales to fit.
+//
+// Where the ATS check sits changes the grid too (owner, 2026-10-17). Floating — the default — it
+// is a toolbar over the preview, so there is no right column on Overview, Content and AI Tools,
+// and the left column takes a bigger share. Docked and collapsed, the right column is the 56px
+// strip. Customize keeps its settings rail whatever the ATS does.
+type AtsPlace = "float" | "dock" | "strip";
+
+const GRID_COLS_FLOAT = (collapsed: boolean): Record<DocTab, string> =>
+  collapsed
+    ? {
+        overview: "grid-cols-[minmax(0,1fr)]",
+        content: "grid-cols-[minmax(480px,1.3fr)_minmax(0,2fr)]",
+        customize: "grid-cols-[155px_minmax(0,2.2fr)_minmax(475px,1fr)]",
+        ai: "grid-cols-[minmax(430px,1.2fr)_minmax(0,2.2fr)]",
+      }
+    : {
+        overview: "grid-cols-[minmax(0,1fr)]",
+        content: "grid-cols-[minmax(440px,1.25fr)_minmax(0,2fr)]",
+        customize: "grid-cols-[163px_minmax(0,2.2fr)_minmax(429px,1fr)]",
+        ai: "grid-cols-[minmax(400px,1.15fr)_minmax(0,2.2fr)]",
+      };
+
+const GRID_COLS_STRIP = (collapsed: boolean): Record<DocTab, string> =>
+  collapsed
+    ? {
+        overview: "grid-cols-[minmax(0,1fr)_56px]",
+        content: "grid-cols-[minmax(460px,1.25fr)_minmax(0,2fr)_56px]",
+        customize: "grid-cols-[155px_minmax(0,2.2fr)_minmax(475px,1fr)]",
+        ai: "grid-cols-[minmax(410px,1.15fr)_minmax(0,2.2fr)_56px]",
+      }
+    : {
+        overview: "grid-cols-[minmax(0,1fr)_56px]",
+        content: "grid-cols-[minmax(420px,1.2fr)_minmax(0,2fr)_56px]",
+        customize: "grid-cols-[163px_minmax(0,2.2fr)_minmax(429px,1fr)]",
+        ai: "grid-cols-[minmax(380px,1.1fr)_minmax(0,2.2fr)_56px]",
+      };
+
+const gridCols = (place: AtsPlace, collapsed: boolean, tab: DocTab) =>
+  (place === "float" ? GRID_COLS_FLOAT : place === "strip" ? GRID_COLS_STRIP : GRID_COLS_CLASS)(collapsed)[tab];
+
+/** The browser remembers where the ATS check was put. Only a convenience: it may be unavailable. */
+const ATS_PLACE_KEY = "rww.resume.atsPlace";
+
 const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
   collapsed
     ? {
@@ -104,13 +148,13 @@ const GRID_COLS_CLASS = (collapsed: boolean): Record<DocTab, string> =>
         // reserved-but-empty column.
         overview: "grid-cols-[minmax(0,2.4fr)_minmax(360px,1fr)]",
         content: "grid-cols-[minmax(410px,1.1fr)_minmax(0,2fr)_minmax(335px,1fr)]",
-        customize: "grid-cols-[180px_minmax(0,2.2fr)_minmax(450px,1fr)]",
+        customize: "grid-cols-[155px_minmax(0,2.2fr)_minmax(475px,1fr)]",
         ai: "grid-cols-[minmax(330px,1fr)_minmax(0,2.2fr)_minmax(330px,1fr)]",
       }
     : {
         overview: "grid-cols-[minmax(0,2.4fr)_minmax(340px,1fr)]",
         content: "grid-cols-[minmax(372px,1.1fr)_minmax(0,2fr)_minmax(305px,1fr)]",
-        customize: "grid-cols-[188px_minmax(0,2.2fr)_minmax(404px,1fr)]",
+        customize: "grid-cols-[163px_minmax(0,2.2fr)_minmax(429px,1fr)]",
         ai: "grid-cols-[minmax(338px,1fr)_minmax(0,2.2fr)_minmax(340px,1fr)]",
       };
 
@@ -226,6 +270,26 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     next.set("tab", tab);
     window.history.replaceState(null, "", `${window.location.pathname}?${next.toString()}`);
   };
+  // Where the ATS check sits: floating over the preview (the default) or docked in the right
+  // column, open or collapsed to a strip. Read back from the browser after mount, so the server's
+  // render and the first client render agree.
+  const [atsPlace, setAtsPlaceState] = useState<AtsPlace>("float");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(ATS_PLACE_KEY);
+      if (saved === "dock" || saved === "strip") setAtsPlaceState(saved);
+    } catch {
+      // Storage blocked: floating it is.
+    }
+  }, []);
+  const setAtsPlace = (place: AtsPlace) => {
+    setAtsPlaceState(place);
+    try {
+      window.localStorage.setItem(ATS_PLACE_KEY, place);
+    } catch {
+      // Not remembered this time; the choice still holds on this page.
+    }
+  };
   const [downloadOpen, setDownloadOpen] = useState(false);
   // Free has the builder without its AI: the tools show a lock and open the upgrade popup instead.
   // The AI service enforces the same, so this only saves a refused request. (A new resume is
@@ -279,6 +343,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   const jobInContext: CheckPosting | null =
     pickedJob ?? (tailorPreset?.status === "ready" ? postingOf(tailorPreset.job) : null) ?? (check?.job ? check.posting : null);
   const jobLabel = jobInContext ? `${jobInContext.role} at ${jobInContext.company}` : null;
+  // What the Quantify row says before it runs: experience bullets with no number in them.
+  const linesWithoutNumber = useMemo(
+    () => content.experience.flatMap((entry) => entry.bullets).filter((bullet) => bullet.trim() && !/\d/.test(bullet)).length,
+    [content.experience],
+  );
   // "Add missing keywords" proposals. Whether each is in is read off Skills and the marks, so Undo moves it back.
   const [keywordProposals, setKeywordProposals] = useState<string[] | null>(null);
   const keywordRows = (keywordProposals ?? [])
@@ -594,6 +663,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     return `Worked in ${parts.filter(Boolean).join(" and ")}.${left}`;
   };
 
+
   const runAiTool = (id: string) => {
     // A link's job still loading: Run waits for it rather than asking for another.
     if (id === "tailor" && !jobInContext && tailorPreset?.status === "loading") return;
@@ -757,14 +827,15 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
    * Every reason starts from the same pick; cancelling it leaves the document as it was. The job
    * picked becomes the job in context, which Tailor and keywords use from then on without asking.
    */
-  const pickJobFor = async (use: "tailor" | "keywords" | "scan") => {
+  const pickJobFor = async (use: "tailor" | "keywords" | "scan" | "pick") => {
     const result = await pickJob(RESUME_JOB_SPEC);
     if (result.status !== "picked") return;
     const job = postingOf(result.job);
     setPickedJob(job);
     if (use === "scan") checkAgainstJob(job);
     else if (use === "keywords") await handleKeywordsJob(job);
-    else await handleTailorJob(job);
+    else if (use === "tailor") await handleTailorJob(job);
+    // "pick": the AI Tools job row only sets the job in context.
   };
 
   /**
@@ -1064,6 +1135,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     });
   };
 
+
   const acceptSummarySuggestion = () => {
     if (!suggestions) return;
     const { text } = suggestions.summary;
@@ -1184,6 +1256,33 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     [pointFocus, docTab, pinned, underlines],
   );
 
+  // The ATS check and the ask box, the same wherever they sit (floating dock or docked rail).
+  const atsTools: AtsToolsProps = {
+    isBlank,
+    cards,
+    dismissedCount: checkSuggestions.filter((suggestion) => marks.dismissed.includes(suggestion.id)).length,
+    check,
+    stale: checkIsStale,
+    checkStatus: checker.status,
+    checkFailure: checker.failure,
+    onRemoveCheck: removeCheck,
+    onCheckGeneral: checkGeneral,
+    onCheckAgainstJob: () => void pickJobFor("scan"),
+    onRecheck: recheck,
+    onDismissCheckFailure: checker.clearFailure,
+    suggestionOutcomes,
+    onRunSuggestion: (suggestion) => void runCheckSuggestion(suggestion),
+    onDismissSuggestion: dismissCheckSuggestion,
+    onPointAt: (suggestion) => setPointFocus(focusOfSuggestion(suggestion)),
+    aiRunning,
+    askInput,
+    onAskInputChange: setAskInput,
+    onAskSubmit: () => void handleAskSubmit(),
+    askStatus,
+    onDismissAskStatus: () => setAskStatus(null),
+    jobLabel,
+  };
+
   return (
     <div className={cn("min-h-screen bg-[#f6f6f6]", ALL_FONT_VARS)}>
       {/* Header */}
@@ -1231,7 +1330,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
 
       <main className="px-6 py-7 pb-14 max-w-[2200px] mx-auto">
         {banner && <div className="mb-4">{banner}</div>}
-        <div className={cn("grid gap-4 items-start", GRID_COLS_CLASS(sidebarCollapsed)[docTab])}>
+        <div className={cn("grid gap-4 items-start", gridCols(atsPlace, sidebarCollapsed, docTab))}>
           {/* LEFT SIDEBAR — Overview has none; its old "N pages · N roles ·
               last edited" line moved to a small caption above the preview
               (below), shown on every tab instead of parked in a rail only
@@ -1274,6 +1373,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   onRun={aiLocked ? lockedAi : runAiTool}
                   tailorFor={jobLabel ? { status: "ready", label: jobLabel } : tailorPreset}
                   onPickTailorJob={() => void pickJobFor("tailor")}
+                  job={jobInContext ? { role: jobInContext.role, company: jobInContext.company } : null}
+                  onPickJob={() => void pickJobFor("pick")}
                   keywordsFor={jobLabel}
                   onPickKeywordsJob={() => void pickJobFor("keywords")}
                   rewriteVariants={rewriteOptions}
@@ -1294,6 +1395,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   onRejectKeyword={rejectKeyword}
                   onAcceptAllKeywords={acceptAllKeywords}
                   pageCount={pageCount}
+                  linesWithoutNumber={linesWithoutNumber}
                   onPointAt={(pointer) => setPointFocus(focusOfTool(pointer))}
                 />
               )}
@@ -1397,7 +1499,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 </div>
               </div>
 
-              <div ref={matRef} className="rounded-md bg-[#f0f0ea] p-1 overflow-x-auto overflow-y-hidden">
+              <div ref={matRef} data-resume-mat className="rounded-md bg-[#f0f0ea] p-1 overflow-x-auto overflow-y-hidden">
                 {/*
                 Fit-to-width sizer/scaler pair — the one other place in this
                 feature that needs inline `style={}` beyond `ResumePaper`,
@@ -1440,44 +1542,45 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 </div>
               </div>
 
-              {/* The continuous paper the PDF export prints (see `printPaperRef`), out of sight. */}
-              <div ref={printPaperRef} aria-hidden className="pointer-events-none fixed left-[-10000px] top-0">
-                <ResumePaper design={design} sections={sections} content={content} chrome={design.chrome} />
-              </div>
+              {/* The floating ATS dock, pinned to the foot of the window over the preview while the
+                  page scrolls (owner, 2026-10-17: floating is the default). */}
+              {atsPlace === "float" && docTab !== "customize" && (
+                <div className="pointer-events-none sticky bottom-4 z-10 -mt-14 pt-2">
+                  <AtsFloatingDock
+                    {...atsTools}
+                    onDock={() => setAtsPlace("dock")}
+                  />
+                </div>
+              )}
+
+              {/* The continuous paper the PDF export prints (see `printPaperRef`), out of sight. Only
+                  while the download dialog is open: otherwise it is one more whole resume to render
+                  on every slider step and keystroke, for nobody. */}
+              {downloadOpen && (
+                <div ref={printPaperRef} aria-hidden className="pointer-events-none fixed left-[-10000px] top-0">
+                  <ResumePaper design={design} sections={sections} content={content} chrome={design.chrome} />
+                </div>
+              )}
             </section>
           </PaperHighlightProvider>
 
-          {/* RIGHT RAIL */}
-          <aside className="sticky top-[88px]">
-            {docTab === "customize" ? (
+          {/* RIGHT RAIL — Customize's settings, or the ATS check when it is docked. */}
+          {docTab === "customize" ? (
+            <aside className="sticky top-[88px]">
               <CustomizePanelsRail flashItem={flashCustomizeItem} registerRef={registerCustomizeRef} />
-            ) : (
-              <AiAssistRail
-                isBlank={isBlank}
-                cards={cards}
-                dismissedCount={checkSuggestions.filter((suggestion) => marks.dismissed.includes(suggestion.id)).length}
-                check={check}
-                stale={checkIsStale}
-                checkStatus={checker.status}
-                checkFailure={checker.failure}
-                onRemoveCheck={removeCheck}
-                onCheckGeneral={checkGeneral}
-                onCheckAgainstJob={() => void pickJobFor("scan")}
-                onRecheck={recheck}
-                onDismissCheckFailure={checker.clearFailure}
-                suggestionOutcomes={suggestionOutcomes}
-                onRunSuggestion={(suggestion) => void runCheckSuggestion(suggestion)}
-                onDismissSuggestion={dismissCheckSuggestion}
-                onPointAt={(suggestion) => setPointFocus(focusOfSuggestion(suggestion))}
-                aiRunning={aiRunning}
-                askInput={askInput}
-                onAskInputChange={setAskInput}
-                onAskSubmit={() => void handleAskSubmit()}
-                askStatus={askStatus}
-                onDismissAskStatus={() => setAskStatus(null)}
-              />
-            )}
-          </aside>
+            </aside>
+          ) : (
+            atsPlace !== "float" && (
+              <aside className="sticky top-[88px]">
+                <AtsDockedRail
+                  {...atsTools}
+                  open={atsPlace === "dock"}
+                  onToggle={() => setAtsPlace(atsPlace === "dock" ? "strip" : "dock")}
+                  onFloat={() => setAtsPlace("float")}
+                />
+              </aside>
+            )
+          )}
         </div>
       </main>
 
