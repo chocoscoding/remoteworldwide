@@ -28,7 +28,7 @@ export interface EntryHeaderProps {
  * entry kind (Experience's bullets, Education's detail line, Projects' link)
  * is rendered by that section component AFTER this, not here.
  */
-const EntryHeader: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, dates: storedDates, location, locationBelow = false, design }) => {
+const EntryHeaderBody: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, dates: storedDates, location, locationBelow = false, design }) => {
   const { entries } = design;
   const dates = displayDates(storedDates, design.doc.dateFormat);
   const showDates = entries.showDates && Boolean(dates);
@@ -118,6 +118,17 @@ const EntryHeader: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, date
     </div>
   );
 };
+
+/**
+ * The header held to what follows it (owner, 2026-10-18): a page never breaks straight after an
+ * entry's title, so a title is never left alone at the foot of a page with its lines on the next.
+ * PagedResume and the PDF print both read `data-resume-keep-with-next`.
+ */
+const EntryHeader: FC<EntryHeaderProps> = (props) => (
+  <div data-resume-keep-with-next>
+    <EntryHeaderBody {...props} />
+  </div>
+);
 
 export default EntryHeader;
 

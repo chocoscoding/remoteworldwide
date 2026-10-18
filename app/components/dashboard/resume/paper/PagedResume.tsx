@@ -44,6 +44,8 @@ const FLOW_CLASS = cn(
   "absolute top-[var(--r-my)] h-[calc(var(--r-page-h)-2*var(--r-my))] w-[var(--r-page-w)]",
   "[column-fill:auto] [column-gap:48px] [column-width:var(--r-page-w)]",
   "[&_li]:break-inside-avoid",
+  // A title (an entry's or a section's) goes to the next page with its first line, never alone.
+  "[&_[data-resume-keep-with-next]]:[break-after:avoid] [&_[data-resume-keep-with-next]]:break-inside-avoid",
   "[&_[data-resume-page-break]]:invisible [&_[data-resume-page-break]]:h-0 [&_[data-resume-page-break]]:overflow-hidden [&_[data-resume-page-break]]:[break-after:column]",
 );
 

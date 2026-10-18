@@ -31,7 +31,7 @@ const CAPS_CLASS: Record<CapsMode, string> = {
  * never special-cases `spec.box` — it only branches on `spec.rule`, which
  * decides where the separate rule element goes relative to the label.
  */
-const SectionHeading: FC<SectionHeadingProps> = ({ config, design }) => {
+const SectionHeadingBody: FC<SectionHeadingProps> = ({ config, design }) => {
   const spec = HEADING_STYLES[design.headings.style];
   const Icon = SECTION_ICONS[config.kind];
   const showIcon = design.headings.icons !== "none" && Icon !== undefined;
@@ -67,5 +67,12 @@ const SectionHeading: FC<SectionHeadingProps> = ({ config, design }) => {
     </div>
   );
 };
+
+/** Held to what follows it, like an entry's title: a section's heading never ends a page alone (see EntryHeader). */
+const SectionHeading: FC<SectionHeadingProps> = (props) => (
+  <div data-resume-keep-with-next>
+    <SectionHeadingBody {...props} />
+  </div>
+);
 
 export default SectionHeading;
