@@ -1,6 +1,6 @@
 "use client";
 
-import type { FC } from "react";
+import { useMemo, type FC } from "react";
 import { LabeledSelect, type LabeledSelectOption } from "../controls";
 import { useResumeDesign } from "../useResumeDesign";
 import { FONT_OPTIONS } from "@/app/lib/dashboard/resume/fonts";
@@ -15,25 +15,28 @@ const FONT_SELECT_OPTIONS: LabeledSelectOption<FontId>[] = FONT_OPTIONS.map((fon
 
 const FontPanel: FC = () => {
   const { design, dispatch } = useResumeDesign();
+  const { body, name } = design.font;
 
-  return (
+  // Two long menus, each row in its own face: rebuilt only when a font changes, not on every
+  // slider step elsewhere in Customize (owner, 2026-10-17: the preview should follow a drag faster).
+  return useMemo(() => (
     <div className="flex flex-col gap-5">
       <LabeledSelect
         label="Body Font"
         orientation="stacked"
         options={FONT_SELECT_OPTIONS}
-        value={design.font.body}
+        value={body}
         onChange={(id) => dispatch({ type: "font/set", slot: "body", id })}
       />
       <LabeledSelect
         label="Name Font"
         orientation="stacked"
         options={FONT_SELECT_OPTIONS}
-        value={design.font.name}
+        value={name}
         onChange={(id) => dispatch({ type: "font/set", slot: "name", id })}
       />
     </div>
-  );
+  ), [body, name, dispatch]);
 };
 
 export default FontPanel;

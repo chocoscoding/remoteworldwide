@@ -1,8 +1,8 @@
 "use client";
 
-import { type FC } from "react";
+import { startTransition, type FC } from "react";
 import { cn } from "@/lib/utils";
-import { Slider } from "@/components/ui/slider";
+import WakeSlider from "./WakeSlider";
 
 /**
  * Discrete stepped slider — the workhorse of the Font Size and Spacing
@@ -102,7 +102,8 @@ const StepperSlider: FC<StepperSliderProps> = ({
   const emitTransient = (nextIndex: number) => {
     const next = steps[nextIndex];
     if (next === undefined) return;
-    onChange(next, { transient: true });
+    // Low priority: the preview re-renders the whole resume, and a fast drag should never wait on it.
+    startTransition(() => onChange(next, { transient: true }));
   };
 
   const emitCommit = (nextIndex: number) => {
@@ -124,16 +125,20 @@ const StepperSlider: FC<StepperSliderProps> = ({
       {description && <p className="-mt-1 text-[11px] text-black/45">{description}</p>}
 
       <div className="relative min-w-0">
-        <Slider
-          value={[safeIndex]}
+        {/* The wake slider (owner, 2026-10-17): bars that rise behind the handle, the value's own
+            bar standing taller at rest. Same index space and the same transient/commit pair. */}
+        <WakeSlider
+          value={safeIndex}
           min={0}
           max={Math.max(count - 1, 0)}
           step={1}
+          bars={40}
           disabled={inert}
-          aria-label={label}
-          onValueChange={(next) => emitTransient(next[0])}
-          onValueCommit={(next) => emitCommit(next[0])}
-          className={cn("relative z-10", inert && "pointer-events-none opacity-45")}
+          ariaLabel={label}
+          formatValue={(i) => (format ? format(steps[i] ?? value) : String(steps[i] ?? value))}
+          onChange={emitTransient}
+          onCommit={emitCommit}
+          className="relative z-10"
         />
         {showTicks && count > 1 && (
           <div

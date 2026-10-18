@@ -22,7 +22,7 @@
 // `ResumePaper`): the sheets are sized by the design's own `--r-*` variables,
 // and each column is shifted by its page number, a runtime value.
 
-import { useEffect, useRef, useState, type CSSProperties, type FC } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties, type FC } from "react";
 import { designToCssVars } from "@/app/lib/dashboard/resume/design-to-css";
 import { cn } from "@/lib/utils";
 import ResumePaper, { type ResumePaperProps } from "./ResumePaper";
@@ -115,4 +115,6 @@ const PagedResume: FC<PagedResumeProps> = ({ design, sections, content, chrome, 
   );
 };
 
-export default PagedResume;
+// Memoised: the editor re-renders for many reasons the paper does not care about (the preview
+// fitting itself after a resize, the page count, a hover), and every sheet is a whole resume.
+export default memo(PagedResume);

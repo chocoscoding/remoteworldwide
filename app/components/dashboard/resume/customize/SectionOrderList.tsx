@@ -1,6 +1,6 @@
 "use client";
 
-import type { FC } from "react";
+import { useMemo, type FC } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -116,7 +116,10 @@ const SectionOrderList: FC = () => {
     dispatch({ type: "sections/setColumn", id, column });
   };
 
-  return (
+  // Rebuilt only when the sections or the columns change, not on every slider step elsewhere in
+  // Customize (owner, 2026-10-17: the preview should follow a drag faster). The drag list is costly.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => (
     <div className="flex flex-col gap-2">
       {personal && (
         <div className="flex items-center gap-2 rounded-xl border border-black/10 bg-[#f6f6f6] px-2.5 py-2">
@@ -143,7 +146,7 @@ const SectionOrderList: FC = () => {
         </SortableContext>
       </DndContext>
     </div>
-  );
+  ), [sections, showColumnToggle, sensors, dispatch]);
 };
 
 export default SectionOrderList;

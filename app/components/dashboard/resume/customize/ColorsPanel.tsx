@@ -1,6 +1,6 @@
 "use client";
 
-import type { FC } from "react";
+import { useMemo, type FC } from "react";
 import { ColorWheelPopover, SegmentedControl, SwatchGrid, ToggleRow, type SegmentedControlOption } from "../controls";
 import { useResumeDesign } from "../useResumeDesign";
 import { ACCENT_SWATCH_HEXES, ACCENT_TARGETS } from "@/app/lib/dashboard/resume/palette";
@@ -35,7 +35,9 @@ const ColorsPanel: FC = () => {
   const { design, dispatch } = useResumeDesign();
   const { colors } = design;
 
-  return (
+  // Rebuilt only when the colours change, not on every slider step elsewhere in Customize
+  // (owner, 2026-10-17: the preview should follow a drag faster).
+  return useMemo(() => (
     <div className="flex flex-col gap-5">
       <SegmentedControl
         label="Application Area"
@@ -126,7 +128,7 @@ const ColorsPanel: FC = () => {
         ))}
       </div>
     </div>
-  );
+  ), [colors, dispatch]);
 };
 
 export default ColorsPanel;

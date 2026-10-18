@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FC } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useResumeDesign } from "../useResumeDesign";
@@ -75,15 +75,11 @@ const TemplatesPanel: FC = () => {
   const arrow =
     "grid h-8 w-8 cursor-pointer place-content-center rounded-full border border-[#222325] bg-white text-primary transition-opacity duration-150 disabled:cursor-default disabled:opacity-30";
 
-  return (
-    <div className="flex flex-col gap-2">
-      <div
-        ref={trackRef}
-        role="group"
-        aria-label="Templates"
-        onScroll={readEdges}
-        className="-mx-1 flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto px-1 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {TEMPLATE_OPTIONS.map((tpl) => {
+  // The thumbnails are rebuilt only when the ticked template changes, not on every slider step
+  // elsewhere in Customize (owner, 2026-10-17: the preview should follow a drag faster).
+  const cards = useMemo(
+    () =>
+        TEMPLATE_OPTIONS.map((tpl) => {
           const selected = tpl.id === lastAppliedId;
           return (
             <button
@@ -114,7 +110,20 @@ const TemplatesPanel: FC = () => {
               )}
             </button>
           );
-        })}
+        }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lastAppliedId, dispatch],
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        ref={trackRef}
+        role="group"
+        aria-label="Templates"
+        onScroll={readEdges}
+        className="-mx-1 flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto px-1 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {cards}
       </div>
 
       <div className="flex justify-center gap-2">
