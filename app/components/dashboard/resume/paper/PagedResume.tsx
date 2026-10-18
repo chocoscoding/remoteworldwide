@@ -104,6 +104,7 @@ const PagedResume: FC<PagedResumeProps> = ({ design, sections, content, chrome, 
           key={page}
           // Every sheet holds the whole resume; only the first is read out, the rest show the same words further on.
           aria-hidden={page > 0 ? true : undefined}
+          data-resume-sheet={page + 1}
           className={cn("relative h-[var(--r-page-h)] w-[var(--r-page-w)] flex-none overflow-hidden bg-[color:var(--r-page-bg)]", sheetClassName)}>
           <div
             ref={page === 0 ? firstFlow : undefined}

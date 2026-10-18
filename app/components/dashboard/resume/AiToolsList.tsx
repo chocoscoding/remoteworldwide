@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Hash,
+  Info,
   PenLine,
   Plus,
   RotateCw,
@@ -166,6 +167,8 @@ export interface AiToolsListProps {
   pageCount?: number;
   /** What the pointer or focus is on, so the preview can frame it; null when it leaves. */
   onPointAt?: (pointer: AiToolPointer) => void;
+  /** Frames a proposal on the paper and scrolls the window to its line (Quantify, as it steps through). */
+  onShowOnPaper?: (pointer: AiToolPointer) => void;
 }
 
 /** Pointer handlers for one block: enter or focus points at it, leaving (pointer and focus both) lets go. */
@@ -366,6 +369,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
   onApplyAllFixes,
   pageCount = 1,
   onPointAt,
+  onShowOnPaper,
 }) => {
   // Only one result card open at a time: the tool that last finished, until it is collapsed.
   const [openTool, setOpenTool] = useState<ToolId | null>(null);
@@ -383,7 +387,38 @@ const AiToolsList: FC<AiToolsListProps> = ({
   const [leftOut, setLeftOut] = useState<ReadonlySet<string>>(() => new Set());
   useEffect(() => setTake(0), [rewriteVariants]);
   useEffect(() => setQAt(0), [quantify]);
+  // Quantify steps through its lines one at a time: each one it lands on is framed and scrolled to
+  // on the paper (owner, 2026-10-18).
+  const quantifyShown = openTool === "quantify" && quantify && quantify.length > 0 ? Math.min(qAt, quantify.length - 1) : null;
+  useEffect(() => {
+    if (quantifyShown !== null) onShowOnPaper?.({ quantify: quantifyShown });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantifyShown, quantify]);
   useEffect(() => setLeftOut(new Set()), [keywordProposals?.length]);
+
+  // A card closes once its last item is dealt with (owner, 2026-10-18: "once I'm done, it should
+  // close"), after a beat for its "Done ✓" to be seen. Only on that change: a finished card opened
+  // again stays open, and Undo bringing an item back leaves it for the row to reopen.
+  const finished =
+    openTool === "tone"
+      ? !!toneFixes && toneFixes.length > 0 && !toneFixes.some((row) => row.state === "pending")
+      : openTool === "keywords"
+        ? !!keywordProposals && keywordProposals.length > 0 && !keywordProposals.some((row) => row.state === "pending")
+        : openTool === "quantify"
+          ? !!quantify && quantify.length > 0 && quantify.every((_, i) => quantifyApplied.has(i))
+          : openTool === "rewrite"
+            ? !!captions.rewrite
+            : false;
+  const wasFinished = useRef({ tool: openTool, done: finished });
+  useEffect(() => {
+    const was = wasFinished.current;
+    wasFinished.current = { tool: openTool, done: finished };
+    // Another card just opened, or this one was already done: nothing finished just now.
+    if (!openTool || !finished || was.tool !== openTool || was.done) return;
+    const tool = openTool;
+    const timer = window.setTimeout(() => setOpenTool((now) => (now === tool ? null : now)), 900);
+    return () => window.clearTimeout(timer);
+  }, [finished, openTool]);
 
   const busy = aiRunning !== null;
   const hasJob = job !== null || tailorFor?.status === "ready";
@@ -744,8 +779,26 @@ const AiToolsList: FC<AiToolsListProps> = ({
             {...pointing(onPointAt, { quantify: at })}
             className="flex flex-col gap-1"
           >
-            <span className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#5f6062]">
-              {q.role}
+            <span className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#5f6062]">
+                {q.role}
+              </span>
+              {/* The caution, as an icon with its words on hover or focus (owner, 2026-10-18). */}
+              <span className="group/info relative flex-none">
+                <button
+                  type="button"
+                  aria-label="Check the number is real before you apply it, or edit it on the Content tab."
+                  className="grid h-5 w-5 cursor-help place-content-center rounded-full text-[#5f6062] hover:text-primary focus-visible:text-primary"
+                >
+                  <Info className="h-3.5 w-3.5" strokeWidth={2.2} />
+                </button>
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute right-0 top-6 z-20 w-56 rounded-lg bg-[#222325] px-2.5 py-2 text-xs normal-case leading-snug tracking-normal text-white opacity-0 transition-opacity duration-150 group-hover/info:opacity-100 group-focus-within/info:opacity-100"
+                >
+                  Check the number is real before you apply it, or edit it on the Content tab.
+                </span>
+              </span>
             </span>
             <span className="text-[11.5px] leading-snug text-[#8a8b85] line-through">
               {q.before}
@@ -754,10 +807,6 @@ const AiToolsList: FC<AiToolsListProps> = ({
               {q.after}
             </span>
           </div>
-          <span className="text-xs text-[#5f6062]">
-            Check the number is real before you apply it, or edit it on the
-            Content tab.
-          </span>
         </ResultCard>
       );
     }
@@ -1020,7 +1069,8 @@ const AiToolsList: FC<AiToolsListProps> = ({
             disabled={busy || (id === "tailor" && jobLoading)}
             className={RUN_BUTTON}
           >
-            {aiDone.has(id) ? "Again" : "Run"}
+            {/* Always "Run" (owner, 2026-10-18); the result card has its own Run again. */}
+            Run
           </button>
         </div>
         {result}

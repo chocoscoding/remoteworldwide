@@ -927,6 +927,29 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     return null;
   };
 
+  /**
+   * Frames what a proposal is about and scrolls the window so its line sits mid-screen (owner,
+   * 2026-10-18: Quantify scrolls to each line as it steps through). Every page sheet holds the whole
+   * resume and shows one window of it, so the line scrolled to is the copy its own sheet shows.
+   */
+  const showOnPaper = (pointer: AiToolPointer) => {
+    setPointFocus(focusOfTool(pointer));
+    // After the frame has painted on the paper.
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => {
+        const marked = matRef.current?.querySelectorAll<HTMLElement>("[data-resume-highlight]") ?? [];
+        const shown = Array.from(marked).find((el) => {
+          const sheet = el.closest<HTMLElement>("[data-resume-sheet]");
+          if (!sheet) return false;
+          const line = el.getBoundingClientRect();
+          const page = sheet.getBoundingClientRect();
+          return line.height > 0 && line.top >= page.top - 1 && line.bottom <= page.bottom + 1 && line.left >= page.left - 1 && line.right <= page.right + 1;
+        });
+        shown?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }),
+    );
+  };
+
   const removeCheck = () => {
     dispatch({ type: "edit", removeCheck: true });
     checker.clearFailure();
@@ -1460,6 +1483,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   pageCount={pageCount}
                   linesWithoutNumber={linesWithoutNumber}
                   onPointAt={(pointer) => setPointFocus(focusOfTool(pointer))}
+                  onShowOnPaper={showOnPaper}
                 />
               )}
             </aside>
