@@ -1,11 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, Crown, Gift, Infinity as InfinityIcon, Plus, RefreshCcw, Rocket, Sparkle, Sprout, Zap, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Crown,
+  Gift,
+  Infinity as InfinityIcon,
+  Plus,
+  RefreshCcw,
+  Rocket,
+  Sparkle,
+  Sprout,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { absoluteUrl } from "@/app/lib/seo";
 import PlanCta from "@/app/components/pricing/PlanCta";
 import CreditEstimator from "@/app/components/pricing/CreditEstimator";
-import PlanComparison from "@/app/components/pricing/PlanComparison";
 import FaqList from "@/app/components/pricing/FaqList";
 import CheckChip from "@/app/components/marketing/CheckChip";
 import Eyebrow from "@/app/components/marketing/Eyebrow";
@@ -32,7 +44,13 @@ export const metadata: Metadata = {
   title: "Pricing",
   description: DESCRIPTION,
   alternates: { canonical: "/pricing" },
-  openGraph: { type: "website", url: absoluteUrl("/pricing"), title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
+  openGraph: {
+    type: "website",
+    url: absoluteUrl("/pricing"),
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [absoluteUrl("/api/og/job")],
+  },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
 };
 
@@ -47,7 +65,12 @@ const TAGLINES: Record<string, string> = {
 const PLAN_ICONS: Record<string, LucideIcon> = { free: Sprout, basic: Zap, pro: Rocket, ultra: Crown };
 
 /** Three plans or four, from the catalogue: four columns on desktop, two by two on a tablet, one on a phone. */
-const PLAN_GRID: Record<number, string> = { 1: "md:grid-cols-1", 2: "md:grid-cols-2", 3: "md:grid-cols-3", 4: "sm:grid-cols-2 lg:grid-cols-4" };
+const PLAN_GRID: Record<number, string> = {
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "sm:grid-cols-2 lg:grid-cols-4",
+};
 
 const FAQ: { q: string; a: React.ReactNode }[] = [
   {
@@ -82,7 +105,11 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     q: "Is the job board still free?",
     a: (
       <>
-        Always. Searching, saving and applying to <Link href="/jobs" className="font-bold underline decoration-secondary2 decoration-2 underline-offset-2 hover:decoration-primary">vetted remote roles</Link> costs nothing and needs no plan. Plans are for the AI tools.
+        Always. Searching, saving and applying to{" "}
+        <Link href="/jobs" className="font-bold underline decoration-secondary2 decoration-2 underline-offset-2 hover:decoration-primary">
+          vetted remote roles
+        </Link>{" "}
+        costs nothing and needs no plan. Plans are for the AI tools.
       </>
     ),
   },
@@ -90,7 +117,13 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     q: "How do I get started?",
     a: (
       <>
-        We&apos;re letting people in from the <Link href="/waitlist" className="font-bold underline decoration-secondary2 decoration-2 underline-offset-2 hover:decoration-primary">waitlist</Link> in batches. Join, and when your spot opens you&apos;ll pick a plan and we&apos;ll walk you through the rest.
+        We&apos;re letting people in from the{" "}
+        <Link
+          href="/waitlist"
+          className="font-bold underline decoration-secondary2 decoration-2 underline-offset-2 hover:decoration-primary">
+          waitlist
+        </Link>{" "}
+        in batches. Join, and when your spot opens you&apos;ll pick a plan and we&apos;ll walk you through the rest.
       </>
     ),
   },
@@ -112,20 +145,22 @@ function PlanCard({ plan }: { plan: PricingPlan }) {
   const features = plan.features.filter((feature) => !HIDDEN_FEATURE.test(feature));
   const Icon = PLAN_ICONS[plan.key] ?? Sparkle;
   return (
-    <div
-      className={cn(
-        "flex flex-col rounded-[20px] p-6 text-primary",
-        featured ? "bg-secondary" : "border border-primary/10 bg-white",
-      )}>
+    <div className={cn("flex flex-col rounded-[20px] p-6 text-primary", featured ? "bg-secondary" : "border border-primary/10 bg-white")}>
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-2.5 text-lg font-bold">
-          <span className={cn("grid h-9 w-9 flex-none place-content-center rounded-[10px]", featured ? "bg-primary text-secondary" : "border border-primary/10 bg-primary2 text-primary")}>
+          <span
+            className={cn(
+              "grid h-9 w-9 flex-none place-content-center rounded-[10px]",
+              featured ? "bg-primary text-secondary" : "border border-primary/10 bg-primary2 text-primary",
+            )}>
             <Icon className="h-[18px] w-[18px]" aria-hidden />
           </span>
           {plan.name}
         </p>
         {featured ? (
-          <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-secondary">Recommended</span>
+          <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-secondary">
+            Recommended
+          </span>
         ) : null}
       </div>
 
@@ -165,7 +200,10 @@ export default async function PricingPage() {
           <h1 className="isolate mx-auto mt-5 max-w-[760px] text-balance text-[2.5rem] font-bold leading-[1.04] tracking-tight sm:text-6xl">
             Pick a plan.{" "}
             <span className="relative inline-block whitespace-nowrap">
-              <span className="absolute inset-x-[-0.12em] bottom-[0.06em] top-[0.5em] -z-10 -rotate-1 rounded-md bg-secondary" aria-hidden />
+              <span
+                className="absolute inset-x-[-0.12em] bottom-[0.06em] top-[0.5em] -z-10 -rotate-1 rounded-md bg-secondary"
+                aria-hidden
+              />
               Land the job.
             </span>
           </h1>
@@ -196,25 +234,51 @@ export default async function PricingPage() {
 
           <div className="mt-5 flex flex-col items-start justify-between gap-3 rounded-[20px] border border-primary/10 bg-white px-6 py-4 sm:flex-row sm:items-center">
             <p className="text-sm text-primary/75">
-              <span className="font-bold text-primary">Just browsing?</span> The job board is free, always. Search and apply to vetted remote roles without a plan.
+              <span className="font-bold text-primary">Just browsing?</span> The job board is free, always. Search and apply to vetted
+              remote roles without a plan.
             </p>
-            <Link href="/jobs" className="group inline-flex min-h-[44px] flex-none items-center gap-1.5 text-sm font-bold underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary">
+            <Link
+              href="/jobs"
+              className="group inline-flex min-h-[44px] flex-none items-center gap-1.5 text-sm font-bold underline decoration-secondary2 decoration-2 underline-offset-4 hover:decoration-primary">
               Browse remote jobs
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
           </div>
         </section>
 
-        {/* Comparison */}
-        <section className="mx-auto max-w-[1180px] px-4 pt-24 md:pt-28" aria-labelledby="compare-heading">
-          <div className="mx-auto mb-10 max-w-[620px] text-center">
-            <Eyebrow>Comparison</Eyebrow>
-            <h2 id="compare-heading" className="mt-4 text-3xl font-bold tracking-tight md:text-[2.75rem] md:leading-[1.1]">
-              Compare our plans
-            </h2>
-            <p className="mt-3 text-balance text-base text-primary/70">Every tool, plan by plan. Prices follow the Monthly / Yearly switch above.</p>
+        {/* Top-ups */}
+        <section className="mx-auto max-w-[1180px] px-4 pt-24" aria-labelledby="topups-heading">
+          <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.6fr]">
+            <div>
+              <Eyebrow>Top-ups</Eyebrow>
+              <h2 id="topups-heading" className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">
+                Big week? Add credits.
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-primary/70">
+                Packs never expire and are only used after your monthly allowance runs out. A plan is always the cheaper way to buy credits.
+              </p>
+              <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white px-3 py-1.5 text-xs font-semibold">
+                <Gift className="h-3.5 w-3.5" aria-hidden />
+                Or earn {CREDITS_PER_INVITE} credits for every friend who subscribes
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {creditPacks.map((pack) => (
+                <div
+                  key={pack.key}
+                  className="rounded-[20px] border border-primary/10 bg-white p-5 transition-colors duration-150 hover:border-primary/30">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-primary/75">
+                    <Plus className="h-4 w-4" aria-hidden />
+                    <span className="tabular-nums">{pack.credits}</span> credits
+                  </p>
+                  <p className="mt-3 text-3xl font-bold tabular-nums">{money(pack.priceCents)}</p>
+                  <p className="mt-1 text-xs font-medium text-primary/65 tabular-nums">
+                    {perCredit(pack.priceCents, pack.credits)} per credit
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-          <PlanComparison plans={plans} />
         </section>
 
         {/* Estimator */}
@@ -284,37 +348,6 @@ export default async function PricingPage() {
         </section>
         */}
 
-        {/* Top-ups */}
-        <section className="mx-auto max-w-[1180px] px-4 pt-24 md:pt-28" aria-labelledby="topups-heading">
-          <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.6fr]">
-            <div>
-              <Eyebrow>Top-ups</Eyebrow>
-              <h2 id="topups-heading" className="mt-4 text-3xl font-bold tracking-tight md:text-4xl">
-                Big week? Add credits.
-              </h2>
-              <p className="mt-3 text-sm leading-relaxed text-primary/70">
-                Packs never expire and are only used after your monthly allowance runs out. A plan is always the cheaper way to buy credits.
-              </p>
-              <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white px-3 py-1.5 text-xs font-semibold">
-                <Gift className="h-3.5 w-3.5" aria-hidden />
-                Or earn {CREDITS_PER_INVITE} credits for every friend who subscribes
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              {creditPacks.map((pack) => (
-                <div key={pack.key} className="rounded-[20px] border border-primary/10 bg-white p-5 transition-colors duration-150 hover:border-primary/30">
-                  <p className="flex items-center gap-1.5 text-sm font-semibold text-primary/75">
-                    <Plus className="h-4 w-4" aria-hidden />
-                    <span className="tabular-nums">{pack.credits}</span> credits
-                  </p>
-                  <p className="mt-3 text-3xl font-bold tabular-nums">{money(pack.priceCents)}</p>
-                  <p className="mt-1 text-xs font-medium text-primary/65 tabular-nums">{perCredit(pack.priceCents, pack.credits)} per credit</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* FAQ */}
         <section className="mx-auto max-w-[820px] px-4 pt-24 md:pt-28" aria-labelledby="faq-heading">
           <div className="text-center">
@@ -329,12 +362,17 @@ export default async function PricingPage() {
         {/* Closing CTA */}
         <section className="mx-auto max-w-[1180px] px-4 py-24 md:py-28">
           <div className="relative overflow-hidden rounded-[28px] bg-primary px-6 py-14 text-center text-white md:px-12 md:py-20">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.1)_1px,transparent_1px)] bg-[length:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" aria-hidden />
+            <div
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(225,240,115,0.1)_1px,transparent_1px)] bg-[length:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+              aria-hidden
+            />
             <div className="relative">
               <h2 className="text-balance text-3xl font-bold tracking-tight md:text-5xl">
                 Not ready to pick? <span className="text-secondary">Save your spot.</span>
               </h2>
-              <p className="mx-auto mt-4 max-w-[520px] text-white/75">Joining the waitlist is free. We&apos;ll email you when your spot opens. Then choose a plan, or don&apos;t.</p>
+              <p className="mx-auto mt-4 max-w-[520px] text-white/75">
+                Joining the waitlist is free. We&apos;ll email you when your spot opens. Then choose a plan, or don&apos;t.
+              </p>
               <Link
                 href="/waitlist"
                 className="group mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-secondary px-7 text-sm font-bold text-primary transition-colors duration-150 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
