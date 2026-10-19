@@ -100,6 +100,20 @@ export function stampStep(history: ApplyHistoryStep[], at: number, version: numb
   ).history;
 }
 
+/**
+ * A tool's change that came back scoring lower (50-job run, 2026-10-19): the index of the step undo
+ * goes back to, or null to keep it. The change is found by its step's id, never by where it was
+ * pushed (a full history drops one step, so it does not land at "at + 1"), and only while the draft
+ * is still at it: any later step is the person's own. It is measured against the score of the step
+ * undo restores, by today's formula, never a partly checked scan's (review, 2026-10-19).
+ */
+export function undoIfWorse(history: ApplyHistoryStep[], at: number, changeId: string, report: ScanReport): number | null {
+  const index = history.findIndex((step) => step.id === changeId);
+  if (index <= 0 || index !== at || report.degraded || !isCurrentScore(report)) return null;
+  const before = history[index - 1].score;
+  return before !== null && Math.round(report.score) < before ? index - 1 : null;
+}
+
 /** A step's id: unique enough for one application's list. */
 export const stepId = (now: number = Date.now()): string => `s${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 

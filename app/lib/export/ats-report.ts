@@ -47,7 +47,6 @@ interface ReportModel {
   /** Each check as the report prints it: "88%", or "Not checked" when the scan could not measure it. */
   metrics: { label: string; value: string }[];
   /** How the metrics make the score, printed under them so a forwarded report adds up (owner, 2026-10-19). */
-  scoreNote: string | null;
   explanation: string | null;
   gaps: ReportGap[];
   covered: string[];
@@ -69,7 +68,7 @@ function modelOf({ report, resumeName, job, scannedAt }: AtsReportInput): Report
   const coverage = job ? scanCoverage(report) : null;
   const partial = coverage?.partial ?? false;
   // Worded by the same helper as the screen, so the two cannot drift.
-  const makeup = scoreMakeup(report, { keywordChecked: Boolean(job) && !coverage?.keywordUnchecked, checked: coverage?.checked ?? 0 });
+  const makeup = scoreMakeup(report, { keywordChecked: Boolean(job) && !coverage?.keywordUnchecked });
   return {
     resumeName: resumeName.trim() || "Resume",
     subject: job ? `Scored against ${job.company} · ${job.role}` : "General score: how the resume reads on its own",
@@ -88,7 +87,6 @@ function modelOf({ report, resumeName, job, scannedAt }: AtsReportInput): Report
         label: m.label,
         value: isUnchecked(m) || m.value === null || (m.id === KEYWORD_METRIC && coverage?.keywordUnchecked) ? "Not checked" : `${m.value}%`,
       })),
-    scoreNote: makeup.recipe,
     explanation: report.explanation?.trim() || null,
     gaps: unmetRequirements(report).map((verdict) => ({
       text: verdict.requirement.text,
@@ -132,7 +130,6 @@ export function atsReportToMarkdown(input: AtsReportInput): string {
     lines.push("## Metrics", "", "| Metric | Score |", "| --- | --- |");
     for (const metric of m.metrics) lines.push(`| ${md(metric.label)} | ${metric.value} |`);
     lines.push("");
-    if (m.scoreNote) lines.push(`_${md(m.scoreNote)}_`, "");
   }
 
   if (m.explanation) lines.push("## What this comes down to", "", md(m.explanation), "");
@@ -196,7 +193,6 @@ export async function atsReportToDocx(input: AtsReportInput): Promise<Blob> {
   if (m.metrics.length > 0) {
     children.push(heading("Metrics"));
     for (const metric of m.metrics) children.push(body([new TextRun({ text: `${metric.label}: `, bold: true }), new TextRun(metric.value)], 60));
-    if (m.scoreNote) children.push(body([new TextRun({ text: m.scoreNote, italics: true, color: MUTED, size: 20 })]));
   }
 
   if (m.explanation) {
@@ -278,7 +274,6 @@ export function atsReportHtml(input: AtsReportInput): string {
 
   if (m.metrics.length > 0) {
     parts.push(`<h2>Metrics</h2><table>${m.metrics.map((x) => `<tr><td>${esc(x.label)}</td><td class="v">${esc(x.value)}</td></tr>`).join("")}</table>`);
-    if (m.scoreNote) parts.push(`<p class="recipe">${esc(m.scoreNote)}</p>`);
   }
   if (m.explanation) parts.push(`<h2>What this comes down to</h2><p>${esc(m.explanation)}</p>`);
   if (m.notes.length > 0) parts.push(`<h2>Notes from the posting</h2><ul>${m.notes.map((note) => `<li>${esc(note)}</li>`).join("")}</ul>`);
@@ -332,7 +327,6 @@ export const ATS_REPORT_CSS = [
   ".rww-report table{border-collapse:collapse;width:100%;}",
   ".rww-report td{padding:3pt 0;border-bottom:1px solid #eee;}",
   ".rww-report td.v{text-align:right;font-weight:700;}",
-  ".rww-report .recipe{margin-top:6pt;font-size:9.5pt;color:#666;}",
   ".rww-report ul{margin:0;padding-left:16pt;}",
   ".rww-report li{margin:0 0 6pt;break-inside:avoid;}",
   ".rww-report .rw{margin:0 0 8pt;break-inside:avoid;}",

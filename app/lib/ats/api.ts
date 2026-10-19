@@ -27,12 +27,11 @@ import {
   isUnchecked,
   projectedLifts,
   scoreMakeup,
-  scoreRecipe,
 } from "./score";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
 import { isPostingNote, type BulletRewrite, type ExtractedRequirements, type IngestedResume, type IngestedResumeDetail, type ScanInput, type ScanAdvice, type ScanRecord, type ScanReport, type StoredScan } from "./types";
 
-export { HEADLINE_SHARES, MAX_SCAN_SCORE, STUFFING_FROM_SCORE, expectedScore, isCurrentScore, isUnchecked, projectedLifts, scoreMakeup, scoreRecipe };
+export { HEADLINE_SHARES, MAX_SCAN_SCORE, STUFFING_FROM_SCORE, expectedScore, isCurrentScore, isUnchecked, projectedLifts, scoreMakeup };
 
 export const ATS_PATH = "/api/ai/scan";
 const RESUMES_PATH = "/api/ai/resume";

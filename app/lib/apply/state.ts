@@ -71,10 +71,30 @@ export interface ApplyResumeState {
   sendDraft: boolean;
   /** The resume creator's copy of the draft, reused so opening it again doesn't make another. */
   creatorDocId: string | null;
+  /**
+   * What that copy said when the wizard last wrote or read it (`textPrint` of its text). Only a
+   * change made in the creator since is brought back: a stale copy never overwrites a later change
+   * made here (review, 2026-10-19). Null before any, and for sessions saved before it was kept.
+   */
+  creatorSeen: string | null;
   /** Every change to the draft, oldest first (owner's design, 2026-10-19): what undo, redo and the history list walk. */
   history: ApplyHistoryStep[];
   /** Which step of `history` the draft is at now; later steps are what redo brings back. */
   historyAt: number;
+  /**
+   * The keywords the AI already worked in for this application, each with the lines it put it in
+   * ("Skills" for the list). Never offered again while those lines stand: the scan may still call
+   * one partly shown, and adding it again added nothing (50-job run, 2026-10-19). Undo takes the
+   * lines away, and the chip comes back. One it tried and could place nowhere is `[TRIED, ...the
+   * places tried]` (fixes.ts): hidden only while the same places are picked, since undo goes back
+   * to the very words it was tried on. Emptied when another base resume is picked.
+   */
+  worked: WorkedTerm[];
+}
+
+export interface WorkedTerm {
+  label: string;
+  lines: string[];
 }
 
 export interface ApplyCoverState {
@@ -119,7 +139,19 @@ export interface ApplyState {
 export const EMPTY_QUESTION: ApplyQuestion = { id: "q-0", question: "", answer: "", drafted: null, edited: false };
 
 export const EMPTY_APPLY_STATE: ApplyState = {
-  resume: { baseId: null, baseName: null, draftId: null, draftName: null, draftFromId: null, sendDraft: false, creatorDocId: null, history: [], historyAt: 0 },
+  resume: {
+    baseId: null,
+    baseName: null,
+    draftId: null,
+    draftName: null,
+    draftFromId: null,
+    sendDraft: false,
+    creatorDocId: null,
+    creatorSeen: null,
+    history: [],
+    historyAt: 0,
+    worked: [],
+  },
   scan: null,
   proposal: null,
   cover: { letter: "", html: "", design: DEFAULT_LETTER_DESIGN, skipped: false, tone: "warm", shown: null, drafts: {}, writtenFrom: null },
@@ -160,6 +192,27 @@ function readBasis(value: unknown): ScoreBasis | null {
     metrics: value.metrics.filter(isRecord) as unknown as AtsMetric[],
     stuffingPenalty: typeof value.stuffingPenalty === "number" ? value.stuffingPenalty : 0,
   };
+}
+
+/** The most worked-in keywords kept, and lines per keyword (room for `TRIED` and the three places), and characters per line. */
+const MAX_WORKED = 60;
+const MAX_WORKED_LINES = 4;
+// The AI writes summaries up to 900 characters, and a term placed there is kept with the whole summary.
+const MAX_WORKED_LINE_CHARS = 1_000;
+
+function readWorked(value: unknown): WorkedTerm[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is { label: string; lines: unknown } => isRecord(item) && typeof item.label === "string" && item.label.trim() !== "")
+    .map((item) => ({
+      label: item.label.slice(0, 120),
+      lines: (Array.isArray(item.lines) ? item.lines : [])
+        .filter((line): line is string => typeof line === "string" && line.trim() !== "")
+        .slice(0, MAX_WORKED_LINES)
+        .map((line) => line.slice(0, MAX_WORKED_LINE_CHARS)),
+    }))
+    .filter((item) => item.lines.length > 0)
+    .slice(-MAX_WORKED);
 }
 
 /**
@@ -212,19 +265,17 @@ function readDesign(value: unknown): LetterDesign {
 }
 
 function readQuestions(value: unknown): ApplyQuestion[] {
-  const rows = (Array.isArray(value) ? value : []).filter(isRecord).map(
-    (row, index): ApplyQuestion => ({
-      id: str(row.id) ?? `q-${index}`,
-      question: str(row.question) ?? "",
-      answer: str(row.answer) ?? "",
-      drafted:
-        isRecord(row.drafted) && typeof row.drafted.confidence === "number" && typeof row.drafted.cat === "string"
-          ? { confidence: row.drafted.confidence, cat: row.drafted.cat }
-          : null,
-      edited: row.edited === true,
-      ...(row.answeredBefore === true ? { answeredBefore: true } : {}),
-    }),
-  );
+  const rows = (Array.isArray(value) ? value : []).filter(isRecord).map((row, index): ApplyQuestion => ({
+    id: str(row.id) ?? `q-${index}`,
+    question: str(row.question) ?? "",
+    answer: str(row.answer) ?? "",
+    drafted:
+      isRecord(row.drafted) && typeof row.drafted.confidence === "number" && typeof row.drafted.cat === "string"
+        ? { confidence: row.drafted.confidence, cat: row.drafted.cat }
+        : null,
+    edited: row.edited === true,
+    ...(row.answeredBefore === true ? { answeredBefore: true } : {}),
+  }));
   return rows.length > 0 ? rows : [EMPTY_QUESTION];
 }
 
@@ -252,7 +303,9 @@ export function readApplyState(raw: unknown): ApplyState {
       draftFromId: str(resume.draftFromId),
       sendDraft: resume.sendDraft === true && typeof resume.draftId === "string",
       creatorDocId: str(resume.creatorDocId),
+      creatorSeen: str(resume.creatorSeen),
       ...readHistory(resume.history, resume.historyAt),
+      worked: readWorked(resume.worked),
     },
     scan:
       scan && report && typeof scan.resumeId === "string" && typeof scan.version === "number"
@@ -323,6 +376,19 @@ export function scanBaseline(last: ApplyState["scan"], resumeId: string, version
     previousStates: Object.fromEntries(last.report.verdicts.map((verdict) => [verdict.requirement.id, verdict.state])),
     previousMetrics: metricValues(last.report),
   };
+}
+
+/**
+ * A short fingerprint of a text (FNV-1a, with its length): enough to tell whether the resume
+ * creator's copy changed (`ApplyResumeState.creatorSeen`) without keeping the whole text in the session.
+ */
+export function textPrint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${text.length.toString(36)}.${(hash >>> 0).toString(36)}`;
 }
 
 /** The resume that goes out with the application: the draft once its version is in use, else the base. */

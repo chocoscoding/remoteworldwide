@@ -33,11 +33,25 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useDocuments } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { changeCount, resumeChanges } from "@/app/lib/apply/changes";
-import { LANGUAGE_LEVELS, keepProof, languageAsk, namesLanguage, onlyInSkills, unbackedSkills, workingItems } from "@/app/lib/apply/fixes";
-import { impactMisses, openingWord } from "@/app/lib/apply/impact";
+import {
+  IMPACT_WORTH_FIXING_BELOW,
+  LANGUAGE_LEVELS,
+  keepProof,
+  languageAsk,
+  matchesEnough,
+  namesLanguage,
+  provedIn,
+  TRIED,
+  workedIn,
+  onlyInSkills,
+  unbackedSkills,
+  workingItems,
+  worthGapChip,
+} from "@/app/lib/apply/fixes";
+import { impactMisses } from "@/app/lib/apply/impact";
 import { editBullet, editSummary, type LineEdit } from "@/app/lib/apply/edits";
-import { hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, stepId } from "@/app/lib/apply/history";
-import { scanBaseline, sendingResumeId, type ApplyState } from "@/app/lib/apply/state";
+import { hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, stepId, undoIfWorse } from "@/app/lib/apply/history";
+import { scanBaseline, sendingResumeId, textPrint, type ApplyState } from "@/app/lib/apply/state";
 import { ATS_BILLING_HREF, isCurrentScore, missingGaps, prepareResumeForDoc, scanCoverage } from "@/app/lib/ats/api";
 import type { IngestedResumeDetail } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
@@ -92,26 +106,25 @@ const PULL_GAP_MS = 5_000;
 const HIDE_SAVE_DELAY_MS = 1_200;
 /** How long before a failed draft save is tried once more. */
 const RETRY_SAVE_MS = 1_500;
+/** A keyword run that changed nothing: already there, or no line took it. Asked again, it would do the same. */
+const NO_LINE_TOOK = "No line took that cleanly. If you've done it, click the line and say it there.";
 
 const withoutExtension = (name: string) => name.replace(/\.[a-z0-9]{1,5}$/i, "");
-
-/** The Impact row's line: "4 open with a weak verb (Held, Acted, Collaborated, Took) and 7 have no number." */
-const impactDetail = (weak: string[], bare: number): string => {
-  const names = [...new Set(weak.map(openingWord).filter(Boolean))].slice(0, 4);
-  const parts = [
-    weak.length > 0
-      ? `${weak.length} ${weak.length === 1 ? "opens" : "open"} with a weak verb${names.length > 0 ? ` (${names.join(", ")})` : ""}`
-      : null,
-    bare > 0 ? `${bare} ${bare === 1 ? "has" : "have"} no number` : null,
-  ].filter(Boolean);
-  return `${parts.join(" and ")}.`;
-};
 
 /** What a failed save says: never a provider's own words ("Voyage embed timed out after 3000ms"). */
 const changeMessage = (error: unknown): string =>
   error instanceof BackendError && error.status >= 500
     ? "Couldn't save that change just now, so nothing changed. Please try again."
     : apiMessage(error);
+
+/** A change that went into the draft: its history step, and the version it was saved as. */
+interface CommittedStep {
+  stepId: string;
+  resumeId: string;
+  version: number;
+  /** The same text as the version being sent: nothing new to score. */
+  unchanged: boolean;
+}
 
 /** The draft cache entry the wizard reads (`useIngestedResumeQuery`), from a save's answer. */
 const asDetail = (saved: ImportedResume): IngestedResumeDetail => ({
@@ -308,8 +321,23 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
 
   // ---- Edits made in the resume creator come back -----------------------------------------------
   // Read when this tab is shown again, and once on load, so the preview and the score follow them.
+  // Only what changed THERE since this page last wrote or read the copy (review, 2026-10-19: a copy
+  // left stale by a later tool, edit or eye here was brought back over it as "your edits").
   const pulling = useRef(false);
   const lastPull = useRef(0);
+  const creatorSeen = useRef(resume.creatorSeen);
+  /** The creator's copy now says this: kept for the next read, and in the session for after a reload. */
+  function sawInCreator(text: string) {
+    const seen = textPrint(text);
+    creatorSeen.current = seen;
+    update((s) => ({ ...s, resume: { ...s.resume, creatorSeen: seen } }));
+  }
+  // The latest render's `commitChange`, for the listener below: the one it subscribed with saw the
+  // draft before it loaded, and turned every pull after a reload away (review, 2026-10-19).
+  const commitLatest = useRef<typeof commitChange | null>(null);
+  useEffect(() => {
+    commitLatest.current = commitChange;
+  });
   useEffect(() => {
     const docId = resume.creatorDocId;
     const draftId = resume.draftId;
@@ -321,13 +349,24 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       pulling.current = true;
       try {
         const copy = await getResumeDocument(docId);
+        const text = resumeContentToText(copy.content);
+        // Unchanged in the creator. A session from before this was kept has nothing to tell by, and
+        // compares with the draft as it did.
+        if (creatorSeen.current !== null && textPrint(text) === creatorSeen.current) return;
         const current = queryClient.getQueryData<IngestedResumeDetail>(qk.ats.resume(draftId))?.content;
-        if (!current || resumeContentToText(copy.content) === resumeContentToText(current)) return;
-        await commitChange("Edited in the resume creator", copy.content);
-        toast.success("Brought in your edits from the resume creator.");
+        if (!current) return;
+        if (text !== resumeContentToText(current)) {
+          const commit = commitLatest.current;
+          if (!commit || !(await commit("Edited in the resume creator", copy.content))) return;
+          toast.success("Brought in your edits from the resume creator.");
+        }
+        sawInCreator(text);
       } catch (error) {
         // The copy is gone: the next "Open in editor" makes a new one.
-        if (error instanceof BackendError && error.status === 404) update((s) => ({ ...s, resume: { ...s.resume, creatorDocId: null } }));
+        if (error instanceof BackendError && error.status === 404) {
+          creatorSeen.current = null;
+          update((s) => ({ ...s, resume: { ...s.resume, creatorDocId: null, creatorSeen: null } }));
+        }
       } finally {
         pulling.current = false;
       }
@@ -340,13 +379,18 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       document.removeEventListener("visibilitychange", onShow);
       window.removeEventListener("focus", onShow);
     };
-    // `commitChange` reads the latest state through `update`; re-subscribing on every render would re-read on every keystroke.
+    // `commitLatest` holds the latest `commitChange`, so this need not re-subscribe (and re-read the copy) on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editable, resume.creatorDocId, resume.draftId, queryClient, update]);
 
   // ---- Picking the base ----------------------------------------------------------------------
   function setBase(picked: PickedResume) {
-    update((s) => ({ ...s, proposal: null, resume: { ...s.resume, baseId: picked.resumeId, baseName: picked.name, sendDraft: false } }));
+    // What the AI worked in, or could not place, was for the other resume's words (review, 2026-10-19).
+    update((s) => ({
+      ...s,
+      proposal: null,
+      resume: { ...s.resume, baseId: picked.resumeId, baseName: picked.name, sendDraft: false, worked: [] },
+    }));
   }
 
   async function upload(file: File) {
@@ -410,19 +454,32 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     return stampStep(s.resume.history, s.resume.historyAt, versionNow, s.scan.report);
   }
 
+  // A tool's change waiting for its score, to be undone if it scores lower (the effect under "The
+  // fixes"): the step it made, and the draft version that step was saved as.
+  const worseGuard = useRef<{ stepId: string; resumeId: string; version: number } | null>(null);
+  // Changes begun on the draft, any kind: a tool whose run saw one start lands over words it never
+  // read, so it changes nothing (`runAndCommit`).
+  const commits = useRef(0);
+
   /**
    * One change: the words go into the draft, the change becomes the latest step of the history (any
-   * steps undone before it are cleared), and the new version is scored. True once it is in.
+   * steps undone before it are cleared), and the new version is scored. The step it made once it is
+   * in, else null.
    */
-  async function commitChange(label: string, words: ResumeContent): Promise<boolean> {
+  async function commitChange(label: string, words: ResumeContent): Promise<CommittedStep | null> {
     const before = content;
-    if (!before) return false;
+    if (!before) return null;
+    // Any change is made over a tool's change still waiting for its score: that one is kept. A tool's
+    // own change is watched again once it is in (`runAndCommit`).
+    worseGuard.current = null;
+    commits.current += 1;
     setChangeError(null);
     const versionNow = draftVersionNow(resume.draftId);
     try {
       const saved = await writeDraft(words);
       queryClient.setQueryData(qk.ats.resume(saved.resumeId), asDetail(saved));
       const at = new Date().toISOString();
+      const id = stepId();
       const unchanged = saved.resumeId === sendingId && saved.version === version;
       update((s) => {
         let steps = leaving(s, versionNow);
@@ -443,7 +500,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           index = 0;
         }
         const pushed = pushStep(steps, index, {
-          id: stepId(),
+          id,
           label,
           at,
           content: words,
@@ -465,17 +522,24 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           },
         };
       });
-      return true;
+      return { stepId: id, resumeId: saved.resumeId, version: saved.version, unchanged };
     } catch (error) {
       setChangeError(changeMessage(error));
-      return false;
+      return null;
     }
   }
 
-  /** Undo, redo or a jump in the history: that step's words go back into the draft, with its score if it has one. */
-  async function jumpTo(index: number) {
+  /**
+   * Undo, redo or a jump in the history: that step's words go back into the draft, with its score if
+   * it has one. True once the draft is at that step.
+   */
+  async function jumpTo(index: number): Promise<boolean> {
     const step = history[index];
-    if (!step || index === historyAt || busy) return;
+    if (!step || index === historyAt || busy) return false;
+    // The person's own move: a tool's change still waiting for its score is no longer watched, so a
+    // redo is never undone again (review, 2026-10-19).
+    worseGuard.current = null;
+    commits.current += 1;
     setBusy("Going back to that step…");
     setChangeError(null);
     const versionNow = draftVersionNow(resume.draftId);
@@ -501,8 +565,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             ? { resumeId: saved.resumeId, version: saved.version, report: step.report, previousScore: null }
             : s.scan,
       }));
+      return true;
     } catch (error) {
       setChangeError(changeMessage(error));
+      return false;
     } finally {
       setBusy(null);
     }
@@ -577,12 +643,37 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       : undefined;
 
   // ---- The fixes ---------------------------------------------------------------------------------
-  const gapChips: GapChip[] = gaps.map((gap) => ({
+  // What the cards read: the resume as it goes, without what is hidden for this job (owner,
+  // 2026-10-19: nothing is suggested for, or done to, a hidden part).
+  const visible = useMemo(() => (content ? visibleContent({ ...content, hiddenParts: shownHidden }) : null), [content, shownHidden]);
+
+  // Only what is worth adding, and nothing at all once the resume matches enough (owner, 2026-10-19:
+  // "Western market experience ... Personalized communication ... that's so cheesy" for a senior at 93).
+  const done = report ? matchesEnough(report) : false;
+  // What the AI already worked in, still where it put it on the resume as sent: never offered again
+  // (50-job run, 2026-10-19: half the picks stayed partly shown, and adding them again added nothing).
+  // A term on a line hidden since is gone from what is scored, so its chip comes back (review, 2026-10-19).
+  // "Prove" always works in bullets, so what it could not place is read against Bullets alone.
+  const worked = visible ? workedIn(state.resume.worked ?? [], visible, places) : new Set<string>();
+  const proved = visible ? provedIn(state.resume.worked ?? [], visible) : new Set<string>();
+  const worthGaps = done ? [] : gaps.filter((gap) => worthGapChip(verdictById.get(gap.id)) && !worked.has(gap.label.toLowerCase()));
+  const gapChips: GapChip[] = worthGaps.map((gap) => ({
     id: gap.id,
     label: gap.label,
     wants: verdictById.get(gap.id)?.requirement.text ?? gap.label,
   }));
-  const proofChips: GapChip[] = (report?.verdicts ?? []).filter(onlyInSkills).map((verdict) => ({
+  // A skill only in Skills is worth proving in a line only while the scan counts it partly: one Skills
+  // already satisfies gains nothing from a bullet (50-job run, 2026-10-19: "Prove" moved no score).
+  const proofChips: GapChip[] = (
+    done
+      ? []
+      : (report?.verdicts ?? []).filter(
+          (verdict) =>
+            onlyInSkills(verdict) &&
+            verdict.state === "partial" &&
+            !proved.has((verdict.requirement.label?.trim() || verdict.requirement.text).toLowerCase()),
+        )
+  ).map((verdict) => ({
     id: verdict.requirement.id,
     label: verdict.requirement.label?.trim() || verdict.requirement.text,
     wants: verdict.requirement.text,
@@ -590,21 +681,59 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const working = report ? workingItems(report, content) : [];
   const toolsIdle = editable && Boolean(content) && tools.running === null && !busy;
 
-  /** Runs a tool, then puts what it wrote into the draft as one change. */
-  async function runAndCommit(label: string, busyText: string, run: () => Promise<{ content: ResumeContent } | null>): Promise<boolean> {
+  // A tool's change that comes back scoring lower than the step before it is undone, and the person
+  // told so (50-job run, 2026-10-19: a rewrite for Impact or keywords could cost keyword match). The
+  // step stays in the history, so redo brings it back. Never a change the person made by hand: any
+  // other change, undo or jump disarms it (review, 2026-10-19), and it waits while an eye's choice or
+  // another tool is on its way, so it never says "undone" of a change it could not take back.
+  useEffect(() => {
+    const pending = worseGuard.current;
+    if (!pending) return;
+    if (!editable || !sendingDraft) {
+      // Tracked, or the Original picked to send: undo would switch the person back to the draft.
+      worseGuard.current = null;
+      return;
+    }
+    // Decided once this version's own score is in.
+    if (!stored || stored.resumeId !== pending.resumeId || stored.version !== pending.version) return;
+    if (busy || tools.running !== null || pendingHidden !== null) return;
+    worseGuard.current = null;
+    const back = undoIfWorse(history, historyAt, pending.stepId, stored.report);
+    if (back === null) return;
+    void jumpTo(back).then((undone) => {
+      if (undone) toast("That change lowered your score, so it was undone.");
+    });
+    // jumpTo reads the state it is called with; the guard fires once per tool change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editable, sendingDraft, stored, history, historyAt, busy, tools.running, pendingHidden]);
+
+  /** Runs a tool, then puts what it wrote into the draft as one change. `nothing` says why, when that is nothing. */
+  async function runAndCommit(
+    label: string,
+    busyText: string,
+    run: () => Promise<{ content: ResumeContent } | null>,
+    nothing = "Nothing on your resume changed that time. Try again, or click a line to say it yourself.",
+  ): Promise<boolean> {
     if (!toolsIdle) return false;
     setBusy(busyText);
     setChangeError(null);
+    const startedAt = commits.current;
     try {
       const result = await run();
       if (!result || !content) return false;
+      // A line retyped, an eye or the creator's edits came in while it ran: the tool's words were
+      // made from the resume before that, and would put it back (review, 2026-10-19).
+      if (commits.current !== startedAt) {
+        setChangeError("Your resume changed while that ran, so nothing was changed. Try again.");
+        return false;
+      }
       // Never at the cost of what proves a requirement: a line the scan quotes as proof, rewritten so
       // it no longer says it, goes back as it was (owner, 2026-10-19), and the person is told which.
       const guarded = report ? keepProof(content, reconcileGroups(result.content), report) : { content: reconcileGroups(result.content), kept: [] };
       // Nothing new on the page: said plainly, never a history step that claims a change (owner,
       // 2026-10-19: "no matter the times I add this thing, it does not change anything").
       if (changeCount(resumeChanges(content, guarded.content)) === 0 && guarded.kept.length === 0) {
-        setChangeError("Nothing on your resume changed that time. Try again, or click a line to say it yourself.");
+        setChangeError(nothing);
         return false;
       }
       if (guarded.kept.length > 0) {
@@ -612,7 +741,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           `Kept ${guarded.kept.length === 1 ? "a line" : "some lines"} as ${guarded.kept.length === 1 ? "it was" : "they were"}: ${guarded.kept.length === 1 ? "it proves" : "they prove"} ${guarded.kept.join(", ")}.`,
         );
       }
-      return await commitChange(label, guarded.content);
+      // Undo goes back to the words this tool started from only on the draft being sent, or on the
+      // first change, whose step before it is where the draft started (review, 2026-10-19).
+      const undoable = sendingDraft || history.length === 0;
+      const made = await commitChange(label, guarded.content);
+      // Watched until it is scored: a tool's change that costs points is undone (above).
+      if (made && undoable && !made.unchanged) worseGuard.current = { stepId: made.stepId, resumeId: made.resumeId, version: made.version };
+      return made !== null;
     } finally {
       setBusy(null);
     }
@@ -623,14 +758,22 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   function tailor(words: ResumeContent | null = content, allowed: ResumePlace[] = places) {
     if (!words) return;
     const tailorPlaces = allowed.filter((place) => place === "summary" || place === "skills");
-    void runAndCommit("Tailored summary & skills", "Tailoring your summary and skills…", async () => {
+    const summary = tailorPlaces.includes("summary");
+    const skills = tailorPlaces.includes("skills");
+    if (!summary && !skills) return;
+    // Said as what it may touch, never Skills when only the summary goes (review, 2026-10-19).
+    // "Tailored" leads every label: `tailoredAlready` reads it.
+    const label = summary && skills ? "Tailored summary & skills" : summary ? "Tailored summary" : "Tailored skills";
+    const busyText = summary && skills ? "Tailoring your summary and skills…" : summary ? "Writing your summary…" : "Tailoring your skills…";
+    void runAndCommit(label, busyText, async () => {
       const result = await tools.run("tailor", () =>
         tailorToJob({
           content: words,
           jdText: job.description,
           company: job.company,
           role: job.role,
-          keywords: keywordsFor(gaps.map((gap) => gap.label)),
+          // Only what the chips call worth adding: never the nice-to-haves they hide (review, 2026-10-19).
+          keywords: keywordsFor(worthGaps.map((gap) => gap.label)),
           places: tailorPlaces,
         }),
       );
@@ -659,22 +802,30 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     if (places.includes("bullets") || places.includes("summary")) {
       const where = places.includes("bullets") ? "your experience" : "your summary";
       let outcome: KeywordInjection | null = null;
-      void runAndCommit(`Worked ${n} ${noun} into ${where}`, `Working ${n} ${noun} into ${where}…`, async () => {
-        const result = await tools.run("keywords", () =>
-          injectKeywords({
-            content,
-            jdText: job.description,
-            company: job.company,
-            role: job.role,
-            keywords: labels,
-            places,
-            insist: true,
-            hints,
-          }),
-        );
-        outcome = result;
-        return result ? { content: result.content } : null;
-      }).then((made) => {
+      void runAndCommit(
+        `Worked ${n} ${noun} into ${where}`,
+        `Working ${n} ${noun} into ${where}…`,
+        async () => {
+          const result = await tools.run("keywords", () =>
+            injectKeywords({
+              content,
+              jdText: job.description,
+              company: job.company,
+              role: job.role,
+              keywords: labels,
+              places,
+              insist: true,
+              hints,
+            }),
+          );
+          outcome = result;
+          return result ? { content: result.content } : null;
+        },
+        NO_LINE_TOOK,
+      ).then((made) => {
+        // Kept even when nothing changed: what it found already there, or could place nowhere, is
+        // never offered again to change nothing (50-job run, 2026-10-19).
+        if (outcome) rememberWorked(outcome, places);
         if (!made) return;
         setPicked(new Set());
         if (outcome) tellKeywords(outcome);
@@ -682,11 +833,37 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       return;
     }
     const words = addSkills(content, labels);
+    // Every one listed already: nothing would change, so no step says it did (review, 2026-10-19).
+    if (words === content) {
+      setChangeError("Already in your Skills.");
+      return;
+    }
     setBusy(`Adding ${labels.length} ${labels.length === 1 ? "keyword" : "keywords"} and rescoring…`);
     void commitChange(`Added ${labels.length} ${labels.length === 1 ? "keyword" : "keywords"} to Skills`, words).then((made) => {
       if (made) setPicked(new Set());
       setBusy(null);
     });
+  }
+
+  /**
+   * Keeps the keywords this run worked in, with where, so they are not offered again while they
+   * stand; and what it tried and could place nowhere, with the places it tried (`tried`): asked again
+   * there it would add nothing, but another place may take it (review, 2026-10-19).
+   */
+  function rememberWorked(outcome: KeywordInjection, tried: readonly ResumePlace[]) {
+    // One no line took went into Skills for now: the lines it was tried in would not take it either.
+    const lineTried = tried.filter((place) => place !== "skills");
+    const placed = [
+      ...Object.entries(outcome.placed ?? {}).map(([label, lines]) => ({ label, lines })),
+      ...[...outcome.missed, ...(outcome.notShown ?? []).map((note) => note.term)].map((label) => ({ label, lines: [TRIED, ...tried] })),
+      ...(lineTried.length > 0 ? (outcome.skillsOnly ?? []).map((label) => ({ label, lines: [TRIED, ...lineTried] })) : []),
+    ];
+    if (placed.length === 0) return;
+    const labels = new Set(placed.map((term) => term.label.toLowerCase()));
+    update((s) => ({
+      ...s,
+      resume: { ...s.resume, worked: [...(s.resume.worked ?? []).filter((term) => !labels.has(term.label.toLowerCase())), ...placed] },
+    }));
   }
 
   /**
@@ -717,6 +894,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
    */
   function prove(terms: string[] = proofChips.map((chip) => chip.label)) {
     if (!content || terms.length === 0) return;
+    let outcome: KeywordInjection | null = null;
     void runAndCommit(
       `Worked ${terms.length} ${terms.length === 1 ? "skill" : "skills"} into your experience`,
       "Working them into your experience…",
@@ -732,9 +910,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             insist: true,
           }),
         );
+        outcome = result;
         return result ? { content: result.content } : null;
       },
-    );
+      NO_LINE_TOOK,
+    ).then(() => {
+      if (outcome) rememberWorked(outcome, ["bullets"]);
+    });
   }
 
   /**
@@ -768,10 +950,6 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     });
   }
 
-  // What the cards read: the resume as it goes, without what is hidden for this job (owner,
-  // 2026-10-19: nothing is suggested for, or done to, a hidden part).
-  const visible = useMemo(() => (content ? visibleContent({ ...content, hiddenParts: shownHidden }) : null), [content, shownHidden]);
-
   /** "Show in resume": these lines brought into view and lit leaf green for a moment. */
   function showOnPage(texts: string[], fallback: string | null = null) {
     if (texts.length > 0) setFlash({ texts, key: Date.now() });
@@ -783,18 +961,18 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const misses = visible ? impactMisses(visible) : null;
   const summaryHidden = shownHidden.includes("summary");
   const summaryText = visible?.summary.trim() ?? "";
-  // A summary worth tailoring: shown, and naming none of what the posting still misses, and not
-  // tailored already in this draft's history (owner, 2026-10-19: the button left the bottom row).
-  const tailoredAlready = history.slice(0, historyAt + 1).some((step) => step.label.startsWith("Tailored"));
-  const summaryUntailored =
-    Boolean(visible) &&
-    !summaryHidden &&
-    !tailoredAlready &&
-    gaps.length > 0 &&
-    !gaps.some((gap) => summaryText.toLowerCase().includes(gap.label.toLowerCase()));
-  // A language the posting asks for and the resume never states: the person picks their level, and
-  // it goes into Skills as one plain line the scorer reads ("English: fluent (C1)").
-  const language = report && visible && !shownHidden.includes("skills") ? languageAsk(report, visible) : null;
+  // A summary to write: none yet, shown, something worth adding, and not written already in this
+  // draft's history. Never "tailor the one you have": across 50 jobs it helped 3 times in 21, failed
+  // the writing rules 8 and changed nothing 9 (2026-10-19). A summary hidden for this job is the
+  // person's choice, so it gets no row either (review, 2026-10-19: "Summary is hidden. Tailor it" ran
+  // that same tailor, and kept "Nothing left to add" from showing at 90 and over).
+  // Any written for this draft, undone or not: one the score took back is never offered again at once.
+  const tailoredAlready = history.some((step) => step.label.startsWith("Tailored"));
+  const summaryMissing = Boolean(visible) && !summaryHidden && !tailoredAlready && !summaryText && worthGaps.length > 0;
+  // A language the posting asks for and the resume never states, only one worth adding as the chips
+  // are (`languageAsk`): the person picks their level, and it goes into Skills as one plain line the
+  // scorer reads ("English: fluent (C1)").
+  const language = !done && report && visible && !shownHidden.includes("skills") ? languageAsk(report, visible) : null;
   function addLanguage(level: string) {
     if (!content || !language || !toolsIdle) return;
     const line = `${language.language}: ${level}`;
@@ -812,7 +990,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     isLanguageChip(chip)
       ? {
           ...chip,
-          choices: { title: language?.level ? `The posting asks for ${language.level}. Your level:` : "Your level:", options: levelChoices },
+          choices: { title: language?.level ? `Asks for ${language.level}. Yours:` : "Your level:", options: levelChoices },
         }
       : chip,
   );
@@ -822,22 +1000,20 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       ? [
           {
             id: "language",
-            title: `Your resume doesn't say your ${language.language} level.`,
-            detail: language.level ? `The posting asks for ${language.level}. Pick yours:` : "The posting asks for it. Pick yours:",
+            title: `Add your ${language.language} level.`,
             action: "",
             icon: "tailor" as const,
             choices: levelChoices,
           },
         ]
       : []),
-    // Every line that loses Impact points, and why (owner, 2026-10-19: "show me what impact language
-    // looks at"): its weak openings named, a click lights them all, "Fix them" mends both halves.
-    ...(impact !== undefined && impact !== null && misses && misses.lines.length > 0
+    // The lines Impact language marks down, only while it reads low (owner, 2026-10-19: "show me what
+    // impact language looks at", then "three bullets, bruh" at 89): a click lights them, "Fix them" mends them.
+    ...(impact !== undefined && impact !== null && impact < IMPACT_WORTH_FIXING_BELOW && misses && misses.lines.length > 0
       ? [
           {
             id: "impact",
-            title: `${misses.lines.length} ${misses.lines.length === 1 ? "bullet loses" : "bullets lose"} Impact points.`,
-            detail: impactDetail(misses.weakOpeners, misses.noNumber.length),
+            title: `${misses.lines.length} ${misses.lines.length === 1 ? "bullet" : "bullets"} could hit harder.`,
             action: "Fix them",
             icon: "quantify" as const,
             onClick: () => strengthen(),
@@ -845,28 +1021,15 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           },
         ]
       : []),
-    ...(summaryUntailored && content
+    ...(summaryMissing && content
       ? [
           {
             id: "tailor",
-            title: summaryText ? "Summary isn't tailored to this job." : "No summary yet.",
-            detail: summaryText ? "It names none of what the posting asks for." : "A short one aimed at this job is what recruiters read first.",
-            action: summaryText ? "Tailor it" : "Write one",
+            title: "No summary yet.",
+            action: "Write one",
             icon: "tailor" as const,
-            onClick: () => tailor(content, ["summary", "skills"]),
-            ...(summaryText ? { onShow: () => showOnPage([summaryText], "summary") } : {}),
-          },
-        ]
-      : []),
-    ...(summaryHidden && content
-      ? [
-          {
-            id: "summary",
-            title: "Summary is hidden.",
-            detail: "Recruiters skim it first: a tailored one helps here.",
-            action: "Tailor it",
-            icon: "tailor" as const,
-            onClick: () => tailor({ ...content, hiddenParts: shownHidden.filter((key) => key !== "summary") }, ["summary", "skills"]),
+            // The summary only: a run that also rewrote Skills could cost the score (50-job run, 2026-10-19).
+            onClick: () => tailor(content, ["summary"]),
           },
         ]
       : []),
@@ -935,6 +1098,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         const id = made.id;
         update((s) => ({ ...s, resume: { ...s.resume, creatorDocId: id } }));
       }
+      // What the copy says now: a later change here is never overwritten by it.
+      sawInCreator(resumeContentToText(words));
       const href = `/dashboard/resume?doc=${encodeURIComponent(docId)}`;
       if (tab) tab.location.href = href;
       else window.open(href, "_blank");
@@ -1003,7 +1168,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             )
           )
         ) : (
-          <div className="flex flex-col gap-2.5 md:flex-row">
+          <div className="flex flex-col gap-2.5 lg:flex-row">
+            {/* Side by side only once each card has room for a file name; stacked beside the sidebar on a tablet. */}
             {resume.draftId && (
               <ResumeCard
                 name={draftName}
@@ -1013,7 +1179,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
                   ) : draft.isError ? (
                     "Couldn't open it just now"
                   ) : (
-                    `The one draft for this job · ${changes} ${changes === 1 ? "change" : "changes"}`
+                    `Draft for this job · ${changes} ${changes === 1 ? "change" : "changes"}`
                   )
                 }
                 selected={resume.sendDraft}
@@ -1052,7 +1218,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
                 ) : base.data?.status === "failed" ? (
                   (base.data.error ?? "Couldn't be read")
                 ) : (
-                  "The original, kept as it is"
+                  "Original"
                 )
               }
               selected={!resume.sendDraft}
@@ -1098,7 +1264,6 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           report={shownReport}
           previousScore={stored?.previousScore ?? null}
           previousMetrics={stored?.previousMetrics}
-          company={job.company}
           creditsHref={ATS_BILLING_HREF}
           onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
         />
@@ -1146,10 +1311,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
                       hiddenLines > 0 ? `${hiddenLines} ${hiddenLines === 1 ? "line" : "lines"}` : null,
                     ]
                       .filter(Boolean)
-                      .join(" and ")} hidden. Click a line to edit it. Your saved resume is untouched.`
+                      .join(" and ")} hidden.`
                   : editable
-                    ? "Click a line to edit it, or use an eye to hide it for this job. Your saved resume is untouched."
-                    : "Your saved resume is untouched."}
+                    ? "Click a line to edit it."
+                    : null}
               </span>
             </span>
             {content && <DownloadButton onDownload={(format) => download({ ...content, hiddenParts: shownHidden }, sendingName, format)} />}
@@ -1164,7 +1329,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
               </button>
             )}
           </div>
-          <div ref={paperRef} className="bg-[#ecece6] px-4 py-7 sm:px-7">
+          {/* A line being retyped is the person's own work: the undo for a tool's change would re-render it and wipe the typing (review, 2026-10-19). */}
+          <div
+            ref={paperRef}
+            onFocusCapture={() => {
+              worseGuard.current = null;
+            }}
+            className="bg-[#ecece6] px-4 py-7 sm:px-7">
             {sending.isPending || sending.data?.status === "pending" ? (
               <Loading label="Opening the resume">
                 <PaperSkeleton />
@@ -1306,7 +1477,8 @@ const ResumeCard: FC<{
 }> = ({ name, meta, selected, disabled, onSelect, menu }) => (
   <div
     className={cn(
-      "flex min-h-[60px] flex-1 items-center gap-3 rounded-xl bg-white pl-3.5 pr-2.5",
+      // min-w-0: side by side, a long file name truncates instead of pushing "Sending" and the menu off the card.
+      "flex min-h-[60px] min-w-0 flex-1 items-center gap-3 rounded-xl bg-white pl-3.5 pr-2.5",
       selected ? "border-[1.5px] border-[#222325] shadow-[2px_2px_0_0_#e1f073]" : "border border-[#222325]/14",
     )}>
     <button

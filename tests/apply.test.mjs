@@ -33,14 +33,31 @@ registerHooks({
   },
 });
 
-const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, scanBaseline, sendingResumeId } = await import("../app/lib/apply/state.ts");
+const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, scanBaseline, sendingResumeId, textPrint } = await import("../app/lib/apply/state.ts");
 const { INTERVIEW_ADVICE, excerpt, stepsForGap } = await import("../app/lib/apply/gapSteps.ts");
 const { changeCount, highlightTexts, resumeChanges } = await import("../app/lib/apply/changes.ts");
 const { noteParts, quantityParts, scoreColor, withoutEmDashes } = await import("../app/lib/apply/score.ts");
 const { editBullet, editSummary } = await import("../app/lib/apply/edits.ts");
-const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep } = await import("../app/lib/apply/history.ts");
-const { bareBullets, keepProof, languageAsk, bulletsWithoutResult, fixFirstId, matchMoves, onlyInSkills, scoreHue, skillsOnlyNames, unbackedSkills, workingItems } =
-  await import("../app/lib/apply/fixes.ts");
+const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, undoIfWorse } = await import("../app/lib/apply/history.ts");
+const {
+  TRIED,
+  bareBullets,
+  keepProof,
+  languageAsk,
+  matchesEnough,
+  provedIn,
+  workedIn,
+  worthAdding,
+  worthGapChip,
+  bulletsWithoutResult,
+  fixFirstId,
+  matchMoves,
+  onlyInSkills,
+  scoreHue,
+  skillsOnlyNames,
+  unbackedSkills,
+  workingItems,
+} = await import("../app/lib/apply/fixes.ts");
 const { impactMisses, openingWord } = await import("../app/lib/apply/impact.ts");
 
 const content = (overrides = {}) => ({
@@ -90,8 +107,10 @@ describe("reading a session's state", () => {
         draftFromId: "b1",
         sendDraft: true,
         creatorDocId: null,
+        creatorSeen: null,
         history: [],
         historyAt: 0,
+        worked: [],
       },
       scan: { resumeId: "d1", version: 2, report, previousScore: 54 },
       proposal: null,
@@ -696,5 +715,229 @@ describe("scores made by an older formula", () => {
     assert.deepEqual(scanBaseline(last(oldReport, { previousScore: 61 }), "d1", 2), { previousScore: null });
     assert.deepEqual(scanBaseline(last({ ...newReport, degraded: true }, { previousScore: 61 }), "d1", 3), { previousScore: null });
     assert.deepEqual(scanBaseline(null, "d1", 3), { previousScore: null });
+  });
+});
+
+describe("what is worth a chip (owner, 2026-10-19: \"nothing left to add, move on\")", () => {
+  const verdict = (state, type = "required", weight = 4) => ({ state, requirement: { id: "r", text: "x", type, category: "skill", weight } });
+
+  it("asks for a required requirement that is missing, or partly shown and weighty", () => {
+    assert.equal(worthAdding(verdict("missing")), true);
+    assert.equal(worthAdding(verdict("missing", "required", 2)), true);
+    assert.equal(worthAdding(verdict("partial", "required", 4)), true);
+  });
+
+  it("never asks for a nice-to-have, or a lighter one the work already partly shows", () => {
+    assert.equal(worthAdding(verdict("partial", "preferred", 2)), false);
+    assert.equal(worthAdding(verdict("missing", "preferred", 5)), false);
+    assert.equal(worthAdding(verdict("partial", "required", 3)), false);
+  });
+
+  it("asks for nothing once keyword match reaches 90", () => {
+    const at = (value, extra = {}) => ({ metrics: [{ id: "keyword-match", label: "Keyword match", value, ...extra }] });
+    assert.equal(matchesEnough(at(93)), true);
+    assert.equal(matchesEnough(at(90)), true);
+    assert.equal(matchesEnough(at(89)), false);
+    assert.equal(matchesEnough(at(null, { checked: false })), false);
+  });
+});
+
+describe("keywords the AI already worked in (50-job run, 2026-10-19)", () => {
+  const draft = content({
+    experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Managed 100+ premium enterprise accounts.", "Ran QBRs."] }],
+    skills: ["Figma", "Multichannel communication"],
+  });
+
+  it("are not offered again while their lines stand, in a line or in Skills", () => {
+    const worked = [
+      { label: "Premium segment experience", lines: ["Managed 100+ premium enterprise accounts"] },
+      { label: "Multichannel communication", lines: ["Skills"] },
+      { label: "Churn prevention", lines: ["Cut churn to 2% across 80 accounts."] },
+    ];
+    assert.deepEqual([...workedIn(worked, draft)].sort(), ["multichannel communication", "premium segment experience"]);
+  });
+
+  it("count when the tool found them already there, whatever the hyphen, and when it could place them nowhere", () => {
+    const there = content({
+      experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Worked with an agency on 3 launches.", "Ran QBRs."] }],
+      skills: ["Cross-functional collaboration"],
+    });
+    const worked = [
+      { label: "Cross‑functional collaboration", lines: ["Skills"] },
+      { label: "Agency experience", lines: ["Skills"] },
+      { label: "Rapid AI prototyping", lines: [TRIED, "bullets"] },
+      { label: "Pipeline generation", lines: ["Skills"] },
+    ];
+    assert.deepEqual([...workedIn(worked, there, ["bullets"])].sort(), ["agency experience", "cross‑functional collaboration", "rapid ai prototyping"]);
+  });
+
+  // 50-job run, 2026-10-19: the AI read "Senior Product Designer ... design systems" as carrying the
+  // term, the page did not, and the chip came back to change nothing.
+  it("count one the AI found already there when one line or one skill has every word of it", () => {
+    const there = content({
+      summary: "Senior Product Designer with extensive experience in fintech, specializing in design systems.",
+      experience: [{ id: "x1", role: "Designer", company: "Kite", dates: "", bullets: ["Led research for 3 products.", "Shipped the mobile app."] }],
+      skills: ["Figma"],
+    });
+    const worked = [
+      { label: "Senior product design experience", lines: ["Skills"] },
+      { label: "Mobile app design", lines: ["Skills"] },
+      { label: "Experience in user research", lines: ["Skills"] },
+    ];
+    // "Mobile app design": "mobile" and "app" are in a bullet, "design" only in another line.
+    assert.deepEqual([...workedIn(worked, there)].sort(), ["senior product design experience"]);
+  });
+
+  // Review, 2026-10-19: a raw substring let a short skill stand for almost any term.
+  it("count in Skills only as whole words, never inside another word or as a heading", () => {
+    const listed = content({
+      experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Ran QBRs."] }],
+      skills: ["AI", "C", "Go", "JavaScript", "Email marketing (HubSpot)"],
+      skillGroups: [{ id: "g1", title: "Tools", skills: ["AI", "C", "Go", "JavaScript", "Email marketing (HubSpot)"] }],
+    });
+    const worked = [
+      { label: "Google Ads", lines: ["Skills"] },
+      { label: "Customer success", lines: ["Skills"] },
+      { label: "Java", lines: ["Skills"] },
+      { label: "Sales tools", lines: ["Skills"] },
+      { label: "Email marketing", lines: ["Skills"] },
+    ];
+    assert.deepEqual([...workedIn(worked, listed)], ["email marketing"]);
+  });
+
+  // Review, 2026-10-19: one missed in a Bullets-only run was hidden for good.
+  it("hide one the AI could not place only while the same places are picked, never for Skills alone", () => {
+    const worked = [{ label: "Churn modelling", lines: [TRIED, "bullets"] }];
+    assert.deepEqual([...workedIn(worked, draft, ["bullets"])], ["churn modelling"]);
+    assert.deepEqual([...workedIn(worked, draft, ["bullets", "skills"])], []);
+    assert.deepEqual([...workedIn(worked, draft, ["summary"])], []);
+    assert.deepEqual([...workedIn(worked, draft, ["skills"])], []);
+    // Tried with Skills on too: a Bullets-only run would not place it either.
+    assert.deepEqual([...workedIn([{ label: "Churn modelling", lines: [TRIED, "bullets", "skills"] }], draft, ["bullets"])], ["churn modelling"]);
+    // Saved before the places were kept: shown again.
+    assert.deepEqual([...workedIn([{ label: "Churn modelling", lines: [TRIED] }], draft, ["bullets"])], []);
+  });
+
+  // Review, 2026-10-19: one that went into Skills for now, from a run without Bullets, had no chip at all.
+  it("hide a proof chip only for one put in a line or tried in Bullets, never for Skills alone", () => {
+    const listed = content({
+      experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Ran QBRs."] }],
+      skills: ["Churn modelling"],
+    });
+    assert.deepEqual([...provedIn([{ label: "Churn modelling", lines: ["Skills"] }], listed)], []);
+    assert.deepEqual([...provedIn([{ label: "Churn modelling", lines: ["Skills"] }, { label: "Churn modelling", lines: [TRIED, "summary"] }], listed)], []);
+    assert.deepEqual([...provedIn([{ label: "Churn modelling", lines: ["Skills"] }, { label: "Churn modelling", lines: [TRIED, "bullets"] }], listed)], ["churn modelling"]);
+    assert.deepEqual([...provedIn([{ label: "Churn modelling", lines: ["Ran QBRs."] }], listed)], ["churn modelling"]);
+  });
+
+  // Review, 2026-10-19: a summary is up to 900 characters, and a line cut at 400 never matched it again.
+  it("keep a long summary they went into whole through a reload", () => {
+    const summary = `${"Customer success lead who runs renewals and expansion for enterprise accounts. ".repeat(9)}`.trim();
+    assert.ok(summary.length > 700);
+    const long = content({ summary, experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Ran QBRs."] }] });
+    const state = readApplyState({ resume: { worked: [{ label: "Expansion", lines: [summary] }] } });
+    assert.deepEqual([...workedIn(state.resume.worked, long)], ["expansion"]);
+  });
+
+  it("keep the places tried through a reload", () => {
+    const state = readApplyState({ resume: { worked: [{ label: "Churn", lines: [TRIED, "bullets", "summary", "skills"] }] } });
+    assert.deepEqual(state.resume.worked, [{ label: "Churn", lines: [TRIED, "bullets", "summary", "skills"] }]);
+  });
+
+  it("are kept in the session as they were saved, and nothing else", () => {
+    const state = readApplyState({ resume: { worked: [{ label: "Premium", lines: ["A line."] }, { label: "", lines: ["x"] }, { label: "No lines", lines: [] }, "junk"] } });
+    assert.deepEqual(state.resume.worked, [{ label: "Premium", lines: ["A line."] }]);
+    assert.deepEqual(readApplyState({}).resume.worked, []);
+  });
+});
+
+describe("chips that would add nothing (review, 2026-10-19)", () => {
+  const verdict = (state, sections, type = "required", weight = 5) => ({
+    requirement: { id: "r", text: "Multichannel communication", label: "Multichannel communication", type, category: "skill", weight },
+    state,
+    evidence: sections.map((section) => ({ section, text: `Multichannel communication in ${section}` })),
+  });
+
+  it("never shows a requirement only Skills shows as a Missing chip too: it is a proof chip", () => {
+    assert.equal(worthGapChip(verdict("partial", ["skills"])), false);
+    assert.equal(worthGapChip(verdict("partial", ["experience"])), true);
+    assert.equal(worthGapChip(verdict("missing", [])), true);
+    assert.equal(worthGapChip(verdict("missing", [], "preferred")), false);
+    assert.equal(worthGapChip(undefined), true);
+  });
+
+  it("never asks for the level of a nice-to-have language, nor lets one take the ask from a required one", () => {
+    const language = (id, text, type, weight = 5) => ({
+      requirement: { id, text, label: text, category: "skill", type, weight },
+      state: "missing",
+      evidence: [],
+    });
+    assert.equal(languageAsk({ verdicts: [language("es", "Spanish is a plus", "preferred")] }, content()), null);
+    assert.equal(languageAsk({ verdicts: [{ ...language("es", "Spanish", "required", 3), state: "partial" }] }, content()), null);
+    assert.deepEqual(
+      languageAsk({ verdicts: [language("es", "Spanish is a plus", "preferred"), language("en", "English at C1", "required")] }, content()),
+      { language: "English", level: "C1" },
+    );
+  });
+});
+
+describe("a tool's change that scores lower (review, 2026-10-19)", () => {
+  const scored = (score) => ({ ...report, score });
+  const steps = (...scores) => scores.map((score, i) => step(`s${i}`, { version: i + 1, score }));
+
+  it("goes back to the step before it, measured against that step's score", () => {
+    const history = steps(70, 72);
+    assert.equal(undoIfWorse(history, 1, "s1", scored(65)), 0);
+    assert.equal(undoIfWorse(history, 1, "s1", scored(70)), null);
+    assert.equal(undoIfWorse(history, 1, "s1", scored(71)), null);
+  });
+
+  it("never undoes once the draft has moved off it, by undo or by a change of the person's own", () => {
+    const history = steps(70, 72, 60);
+    // A hand edit made after it, now at step 2.
+    assert.equal(undoIfWorse(history, 2, "s1", scored(50)), null);
+    // Undone already: the draft is at step 0.
+    assert.equal(undoIfWorse(history, 0, "s1", scored(50)), null);
+    assert.equal(undoIfWorse(history, 1, "gone", scored(50)), null);
+  });
+
+  it("finds the change by its step once the history is full, where it does not land at at + 1", () => {
+    let history = [step("start", { score: 70 })];
+    let at = 0;
+    for (let i = 1; i < MAX_HISTORY_STEPS; i += 1) ({ history, at } = pushStep(history, at, step(`s${i}`, { score: 70 })));
+    const before = at;
+    ({ history, at } = pushStep(history, at, step("tool")));
+    assert.equal(at, before);
+    assert.equal(undoIfWorse(history, at, "tool", scored(60)), at - 1);
+  });
+
+  it("decides nothing from a partly checked scan, an older formula's, or a step with no score", () => {
+    const history = steps(70, 72);
+    assert.equal(undoIfWorse(history, 1, "s1", { ...scored(40), degraded: true }), null);
+    // Today's formula makes 69 of these checks: 40 is another formula's number.
+    const old = {
+      ...report,
+      score: 40,
+      metrics: [
+        { id: "keyword-match", label: "Keyword match", value: 80 },
+        { id: "impact-language", label: "Impact language", value: 20 },
+        { id: "parseability", label: "Parseability", value: 70 },
+        { id: "length-format", label: "Length & format", value: 60 },
+      ],
+    };
+    assert.equal(undoIfWorse(history, 1, "s1", old), null);
+    assert.equal(undoIfWorse(steps(null, 72), 1, "s1", scored(40)), null);
+  });
+});
+
+describe("edits made in the resume creator (review, 2026-10-19)", () => {
+  it("tell a changed copy from an unchanged one by a short fingerprint kept in the session", () => {
+    const text = "Ada Obi\nProduct Designer\n\nSUMMARY\nDesigner with six years in fintech.";
+    assert.equal(textPrint(text), textPrint(`${text}`));
+    assert.notEqual(textPrint(text), textPrint(`${text} Ships design systems.`));
+    assert.notEqual(textPrint("ab"), textPrint("ba"));
+    assert.ok(textPrint(text.repeat(50)).length < 20);
+    assert.equal(readApplyState({ resume: { creatorSeen: textPrint(text) } }).resume.creatorSeen, textPrint(text));
+    assert.equal(readApplyState({ resume: { creatorSeen: 4 } }).resume.creatorSeen, null);
   });
 });

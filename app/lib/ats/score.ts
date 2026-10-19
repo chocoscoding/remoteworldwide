@@ -64,50 +64,24 @@ export function isCurrentScore(report: Pick<ScanReport, "score" | "metrics" | "s
 }
 
 /**
- * How the score is made, said under the numbers so the person can add it up: "Your score is 70%
- * Keyword match, 15% Impact language, 10% Parseability and 5% Length & format, less 2 for stuffing."
- * A scan that could not check keyword match scores the other three alone.
- */
-export function scoreRecipe(report: Pick<ScanReport, "metrics" | "stuffingPenalty">): string {
-  const keyword = metricOf(report, "keyword-match");
-  const off = report.stuffingPenalty ? `, less ${report.stuffingPenalty} for stuffing` : "";
-  if (!keyword || isUnchecked(keyword)) return `Your score is the average of Impact language, Parseability and Length & format${off}.`;
-  return `Your score is ${HEADLINE_SHARES["keyword-match"]}% Keyword match, ${HEADLINE_SHARES["impact-language"]}% Impact language, ${HEADLINE_SHARES.parseability}% Parseability and ${HEADLINE_SHARES["length-format"]}% Length & format${off}.`;
-}
-
-/**
- * What a scan's number is made of, said the same on the report screen and in the downloaded report
- * so the two cannot drift. `keywordChecked` is false for a general scan and for one whose keyword
- * match could not be checked; `checked` is how many requirements were.
+ * What a scan's number says about itself, the same on the report screen and in the downloaded
+ * report. Never its recipe (owner, 2026-10-19: "70% keyword match" read as a keyword matcher).
+ * `keywordChecked` is false for a general scan and for one whose keyword match could not be checked.
  *
- * - `partial` follows partialLine on a partly checked scan. With keyword match checked the score is
- *   still the blend, over the requirements that were checked; without it, the resume on its own.
- * - `current` is false for a scan scored before 2026-10-19, when the score was keyword match alone;
- *   `recipe` and `partial` then say so instead of a recipe that would not add up. `recipe` is null
- *   when the report lacks the metrics to make one from.
+ * - `partial` follows partialLine on a partly checked scan.
+ * - `current` is false for a scan scored before 2026-10-19, when the score was keyword match alone:
+ *   a rescore gives today's number, and nothing is projected from the old one.
  */
 export function scoreMakeup(
   report: Pick<ScanReport, "score" | "metrics" | "stuffingPenalty">,
-  { keywordChecked, checked }: { keywordChecked: boolean; checked: number },
-): { partial: string; current: boolean; recipe: string | null } {
+  { keywordChecked }: { keywordChecked: boolean },
+): { partial: string; current: boolean } {
   // A general scan's stored keyword match (a 0 before it could say "not checked") is not in its score.
   const shown = keywordChecked ? report : { ...report, metrics: report.metrics.filter((metric) => metric.id !== "keyword-match") };
   const expected = expectedScore(shown);
-  const share = HEADLINE_SHARES["keyword-match"];
-  const current = expected === null || expected === report.score;
   return {
-    partial: !keywordChecked
-      ? "Until a rescore checks the rest, the score shows how the resume reads on its own."
-      : current
-        ? `For now the score is ${share}% the match on the ${checked} checked and ${100 - share}% how the resume reads. A rescore checks the rest.`
-        : `For now the score is the match on the ${checked} checked. A rescore checks the rest.`,
-    current,
-    recipe:
-      expected === null
-        ? null
-        : current
-          ? scoreRecipe(shown)
-          : "Scanned before the score counted how the resume reads, so this number is Keyword match alone. Scan again to update it.",
+    partial: keywordChecked ? "A rescore checks the rest." : "Until then, the score shows how the resume reads.",
+    current: expected === null || expected === report.score,
   };
 }
 

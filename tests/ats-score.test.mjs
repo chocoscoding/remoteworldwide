@@ -29,7 +29,7 @@ registerHooks({
   },
 });
 
-const { expectedScore, isCurrentScore, projectedLifts, scoreRecipe } = await import("../app/lib/ats/score.ts");
+const { expectedScore, isCurrentScore, projectedLifts, scoreMakeup } = await import("../app/lib/ats/score.ts");
 
 const metrics = (keyword, impact, parse, length) => [
   keyword === null ? { id: "keyword-match", label: "Keyword match", value: null, checked: false } : { id: "keyword-match", label: "Keyword match", value: keyword },
@@ -55,13 +55,11 @@ describe("the ATS score's recipe", () => {
     assert.equal(isCurrentScore({ score: 60, metrics: [{ id: "keyword-match", label: "Keyword match", value: 60 }] }), true);
   });
 
-  it("says how the score is made, with any stuffing taken off", () => {
-    assert.equal(
-      scoreRecipe({ metrics: metrics(86, 69, 100, 100) }),
-      "Your score is 70% Keyword match, 15% Impact language, 10% Parseability and 5% Length & format.",
-    );
-    assert.match(scoreRecipe({ metrics: metrics(100, 100, 100, 100), stuffingPenalty: 2 }), /, less 2 for stuffing\.$/);
-    assert.equal(scoreRecipe({ metrics: metrics(null, 60, 90, 90) }), "Your score is the average of Impact language, Parseability and Length & format.");
+  it("never says the score's recipe on the page (owner, 2026-10-19: it read as a keyword matcher)", () => {
+    const made = scoreMakeup({ score: 86, metrics: metrics(86, 69, 100, 100) }, { keywordChecked: true });
+    assert.equal(made.current, true);
+    assert.doesNotMatch(JSON.stringify(made), /%|keyword match/i);
+    assert.equal(scoreMakeup({ score: 75, metrics: metrics(75, 69, 100, 100) }, { keywordChecked: true }).current, false);
   });
 });
 

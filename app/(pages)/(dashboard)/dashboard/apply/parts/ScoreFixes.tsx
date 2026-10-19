@@ -10,7 +10,6 @@ import { AlertCircle, ArrowDown, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { METRIC_GROUPS, fixFirstId, scoreColorOf, type WorkingItem } from "@/app/lib/apply/fixes";
-import { isCurrentScore, scoreRecipe } from "@/app/lib/ats/api";
 import type { ScanReport } from "@/app/lib/ats/types";
 import type { ResumePlace } from "@/app/lib/resume/ai";
 
@@ -110,15 +109,14 @@ const Ring: FC<{ score: number | null; previous: number | null; state: ScoreStat
 const SMALL_BUTTON =
   "flex h-7 flex-none cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold text-primary";
 
-/** The left of the score row: the ring, "ATS score", where it stands, and the job it is against. */
+/** The left of the score row: the ring, "ATS score" and where it stands. The job is in the page's header. */
 const ScoreSide: FC<{
   state: ScoreState;
   score: number | null;
   previous: number | null;
-  company: string;
   onRescore?: () => void;
   creditsHref: string;
-}> = ({ state, score, previous, company, onRescore, creditsHref }) => {
+}> = ({ state, score, previous, onRescore, creditsHref }) => {
   const shown = state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? score : null;
   const delta = state.kind === "ready" && shown !== null && previous !== null ? Math.round(shown) - Math.round(previous) : 0;
   return (
@@ -126,13 +124,8 @@ const ScoreSide: FC<{
       <Ring score={shown} previous={state.kind === "ready" ? previous : null} state={state.kind} />
       <span className="flex min-w-0 flex-col gap-1">
         <span className="text-base font-extrabold text-primary">ATS score</span>
-        {state.kind === "none" && <span className="text-xs text-[#5f6062]">Pick a resume above to see how it reads to an ATS.</span>}
-        {state.kind === "scoring" && (
-          <>
-            <span className="text-xs font-bold text-[#55564f]">Reading it like an ATS would…</span>
-            <span className="text-xs text-[#8a8b85]">about 10 seconds</span>
-          </>
-        )}
+        {state.kind === "none" && <span className="text-xs text-[#5f6062]">Pick a resume above.</span>}
+        {state.kind === "scoring" && <span className="text-xs font-bold text-[#55564f]">Scoring…</span>}
         {state.kind === "ready" && delta === 0 && (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#6c7a1e]">
             <span className="h-[7px] w-[7px] rounded-full bg-[#6c7a1e]" />
@@ -140,22 +133,16 @@ const ScoreSide: FC<{
           </span>
         )}
         {state.kind === "ready" && delta > 0 && (
-          <>
-            <span className="flex items-center gap-1.5 text-xs font-extrabold text-[#6c7a1e]">
-              <ArrowUp className="h-3 w-3" strokeWidth={3} />
-              Up {delta} since last change
-            </span>
-            <span className="text-xs text-[#8a8b85]">was {Math.round(previous ?? 0)}</span>
-          </>
+          <span className="flex items-center gap-1.5 text-xs font-extrabold text-[#6c7a1e]">
+            <ArrowUp className="h-3 w-3" strokeWidth={3} />
+            Up {delta} since last change
+          </span>
         )}
         {state.kind === "ready" && delta < 0 && (
-          <>
-            <span className="flex items-center gap-1.5 text-xs font-extrabold text-[#b23c26]">
-              <ArrowDown className="h-3 w-3" strokeWidth={3} />
-              Down {-delta} since last change
-            </span>
-            <span className="text-xs text-[#8a8b85]">was {Math.round(previous ?? 0)}</span>
-          </>
+          <span className="flex items-center gap-1.5 text-xs font-extrabold text-[#b23c26]">
+            <ArrowDown className="h-3 w-3" strokeWidth={3} />
+            Down {-delta} since last change
+          </span>
         )}
         {state.kind === "stale" && (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#8a8b85]">
@@ -170,9 +157,7 @@ const ScoreSide: FC<{
               Partly checked
             </span>
             <span className="text-xs text-[#8a8b85]">
-              {state.total > 0
-                ? `Only ${state.checked} of ${state.total} ${state.total === 1 ? "keyword" : "keywords"} could be checked just now.`
-                : "Part of this scan couldn't run just now."}
+              {state.total > 0 ? `${state.checked} of ${state.total} checked` : "Part of it couldn't run"}
             </span>
           </>
         )}
@@ -185,9 +170,6 @@ const ScoreSide: FC<{
             <span className="text-xs text-[#8a8b85]">{state.credits ? state.message : "Nothing was charged."}</span>
           </>
         )}
-        <span className="text-xs text-[#5f6062]">
-          Against <strong className="text-primary">{company}</strong>
-        </span>
         {(state.kind === "stale" || state.kind === "partial") && onRescore && (
           <button
             type="button"
@@ -230,10 +212,7 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
     <>
       {METRIC_GROUPS.map((group) => (
         <div key={group.title} className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl bg-[#f6f6f6] px-4 py-3.5">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#5f6062]">{group.title}</span>
-            <span className="text-xs text-[#8a8b85]">{group.hint}</span>
-          </div>
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#5f6062]">{group.title}</span>
           {group.ids.map((id) => {
             const metric = byId.get(id);
             const label =
@@ -286,35 +265,19 @@ export const ScoreRow: FC<{
   report: ScanReport | null;
   previousScore: number | null;
   previousMetrics?: Record<string, number>;
-  company: string;
   onRescore?: () => void;
   creditsHref: string;
-}> = ({ state, report, previousScore, previousMetrics, company, onRescore, creditsHref }) => {
-  // How the number is made, so the bars add up to it (owner, 2026-10-19: "the ATS is meant to be more
-  // than a keyword matcher"). Never under a score an older formula made, which it would not explain.
-  const recipe = report && (state.kind === "ready" || state.kind === "stale") && isCurrentScore(report) ? scoreRecipe(report) : null;
-  return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex flex-col items-stretch gap-4 lg:flex-row">
-        <ScoreSide
-          state={state}
-          score={report ? report.score : null}
-          previous={previousScore}
-          company={company}
-          onRescore={onRescore}
-          creditsHref={creditsHref}
-        />
-        <StagePanels
-          report={state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? report : null}
-          previousMetrics={state.kind === "ready" ? previousMetrics : undefined}
-          partial={state.kind === "partial"}
-        />
-      </div>
-      {/* Under the bars it sums up: past the score side (280px and the row's gap) on a wide screen. */}
-      {recipe && <p className="m-0 text-xs text-[#8a8b85] lg:pl-[296px]">{recipe}</p>}
-    </div>
-  );
-};
+}> = ({ state, report, previousScore, previousMetrics, onRescore, creditsHref }) => (
+  // Never the score's recipe under it (owner, 2026-10-19: "70% keyword match" read as a keyword matcher).
+  <div className="flex flex-col items-stretch gap-4 lg:flex-row">
+    <ScoreSide state={state} score={report ? report.score : null} previous={previousScore} onRescore={onRescore} creditsHref={creditsHref} />
+    <StagePanels
+      report={state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? report : null}
+      previousMetrics={state.kind === "ready" ? previousMetrics : undefined}
+      partial={state.kind === "partial"}
+    />
+  </div>
+);
 
 // ---- Points taken off ----------------------------------------------------------------------
 
@@ -456,7 +419,7 @@ export interface GapChip {
 export interface Suggestion {
   id: string;
   title: string;
-  detail: string;
+  detail?: string;
   action: string;
   icon: "quantify" | "tailor";
   onClick?: () => void;
@@ -468,12 +431,6 @@ export interface Suggestion {
 
 const PLACE_LABELS: Record<ResumePlace, string> = { summary: "Summary", bullets: "Bullets", skills: "Skills" };
 const PLACES: ResumePlace[] = ["summary", "bullets", "skills"];
-
-/** "Bullets & Skills", "Summary, Bullets & Skills": where "Add N keywords" puts them. */
-export const placesText = (places: ResumePlace[]): string => {
-  const names = PLACES.filter((place) => places.includes(place)).map((place) => PLACE_LABELS[place]);
-  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
-};
 
 const TOOL_BUTTON =
   "flex h-[38px] flex-none cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:cursor-default";
@@ -545,37 +502,17 @@ export const FixesTabs: FC<{
                   on ? "bg-white font-extrabold text-primary shadow-[0_0_0_1px_#222325]" : "font-bold text-[#5f6062]",
                 )}>
                 {id === "missing" ? "Missing" : "Working"}
-                <span className={cn("rounded-full px-1.5 text-[11px]", id === "missing" ? "bg-[#b23c26] text-white" : "bg-[#e4e4dd] text-primary")}>
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 text-[11px]",
+                    id === "missing" && missingCount > 0 ? "bg-[#b23c26] text-white" : "bg-[#e4e4dd] text-primary",
+                  )}>
                   {id === "missing" ? missingCount : working.length}
                 </span>
               </button>
             );
           })}
         </div>
-        {tab === "missing" && !busy && missingCount > 0 && skillsOnly.length === 0 && (
-          <span className="flex-1 text-xs text-[#5f6062]">Hover a keyword to see what it needs. Pick only what your work really shows.</span>
-        )}
-        {tab === "missing" && !busy && skillsOnly.length > 0 && (
-          <>
-            <span className="flex-1" />
-            <span className="flex flex-wrap items-center gap-3.5 text-xs text-[#5f6062]">
-              <span className="flex items-center gap-[5px]">
-                <span className="grid h-3 w-3 place-content-center rounded-full border border-dashed border-black/40" />
-                not on resume
-              </span>
-              <span className="flex items-center gap-[5px]">
-                <span className="grid h-3 w-3 place-content-center rounded-full bg-[#222325]">
-                  <Check className="h-2 w-2 text-[#e1f073]" strokeWidth={4} />
-                </span>
-                picked to add
-              </span>
-              <span className="flex items-center gap-[5px]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d99a00]" />
-                only in Skills, needs proof
-              </span>
-            </span>
-          </>
-        )}
       </div>
 
       {tab === "missing" && busy && (
@@ -588,12 +525,7 @@ export const FixesTabs: FC<{
       {tab === "missing" && !busy && unchecked > 0 && (
         <div className="flex min-h-10 items-center gap-2.5 rounded-[10px] bg-[#fff7e6] px-3 py-1.5 text-[13px]">
           <AlertCircle className="h-3.5 w-3.5 flex-none text-[#a06f00]" strokeWidth={2.4} />
-          <span className="flex-1">
-            <strong>
-              {unchecked} {unchecked === 1 ? "keyword" : "keywords"} couldn&apos;t be checked this time.
-            </strong>{" "}
-            <span className="text-[#55564f]">Rescore to see which are missing.</span>
-          </span>
+          <strong className="flex-1">{unchecked} couldn&apos;t be checked.</strong>
           {onRescore && (
             <button type="button" onClick={onRescore} className={ROW_BUTTON}>
               <RotateCw className="h-3 w-3" strokeWidth={2.6} />
@@ -603,24 +535,18 @@ export const FixesTabs: FC<{
         </div>
       )}
 
-      {tab === "missing" && !busy && missingCount === 0 && unchecked === 0 && (
+      {/* Owner, 2026-10-19: "there should be a point where it's like, nothing left to add, move on". */}
+      {tab === "missing" && !busy && missingCount === 0 && unchecked === 0 && suggestions.length === 0 && !note && (
         <div className="flex items-center gap-2.5 rounded-xl bg-[#f4f9c9] px-3.5 py-3 text-[13px]">
           <span className="grid h-[22px] w-[22px] flex-none place-content-center rounded-full border-[1.5px] border-[#222325] bg-[#e1f073]">
             <Check className="h-3 w-3 text-primary" strokeWidth={3} />
           </span>
-          <span className="flex-1">
-            <strong>Every keyword is matched in your experience.</strong>{" "}
-            <span className="text-[#55564f]">Nothing left to add for this posting.</span>
-          </span>
+          <strong className="flex-1">Nothing left to add. You&apos;re good to move on.</strong>
         </div>
       )}
 
       {tab === "missing" && !busy && missingCount > 0 && (
         <div className="flex flex-col gap-2">
-          <span className="flex items-center gap-2 text-[13px] font-extrabold">
-            {missingCount} {missingCount === 1 ? "keyword" : "keywords"} from the posting
-            {pickedCount > 0 && <span className="text-xs font-semibold text-[#5f6062]">· {pickedCount} picked</span>}
-          </span>
           <div className="flex flex-wrap gap-2">
             {skillsOnly.map((chip) => (
               <Chip key={chip.id} chip={chip} tone="proof" />
@@ -655,7 +581,8 @@ export const FixesTabs: FC<{
               )}>
               <span className="h-1.5 w-1.5 flex-none rounded-full bg-[#d99a00]" />
               <span className="flex-1 text-[13px]">
-                <strong>{row.title}</strong> <span className="text-[#5f6062]">{row.detail}</span>
+                <strong>{row.title}</strong>
+                {row.detail && <span className="text-[#5f6062]"> {row.detail}</span>}
               </span>
               {row.onShow && <ShowInResume onClick={row.onShow} />}
               {row.choices?.map((choice) => (
@@ -695,7 +622,7 @@ export const FixesTabs: FC<{
 
       {tab === "working" && (
         <div className="flex flex-col gap-1.5">
-          {working.length === 0 && <p className="text-[13px] text-[#5f6062]">Nothing stands out yet. The fixes on Missing are where to start.</p>}
+          {working.length === 0 && <p className="text-[13px] text-[#5f6062]">Nothing yet.</p>}
           {working.map((row) => (
             <div key={row.title} className="flex min-h-10 items-center gap-2.5 rounded-[10px] bg-[#f6f6f6] px-3">
               <span className="grid h-[18px] w-[18px] flex-none place-content-center rounded-full bg-[#e1f073]">
@@ -720,65 +647,59 @@ export const FixesTabs: FC<{
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2.5 border-t border-[#222325]/10 pt-3">
-        <span className="text-xs font-bold text-[#5f6062]">Apply changes to</span>
-        {PLACES.map((place) => {
-          const on = places.includes(place);
-          return (
+      {tab === "missing" && (gaps.some((gap) => !gap.choices) || prove) && (
+        <div className="flex flex-wrap items-center gap-2.5 border-t border-[#222325]/10 pt-3">
+          <span className="text-xs font-bold text-[#5f6062]">Add to</span>
+          {PLACES.map((place) => {
+            const on = places.includes(place);
+            return (
+              <button
+                key={place}
+                type="button"
+                aria-pressed={on}
+                disabled={disabled}
+                onClick={() => togglePlace(place)}
+                className={cn(
+                  "flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-xs font-bold disabled:cursor-default",
+                  on ? "border-[#222325] bg-[#eef6ad] text-primary" : "border-[#222325]/20 bg-white text-[#8a8b85]",
+                )}>
+                {on ? <Check className="h-[11px] w-[11px]" strokeWidth={3} /> : <X className="h-2.5 w-2.5" strokeWidth={2.6} />}
+                {PLACE_LABELS[place]}
+              </button>
+            );
+          })}
+          {(pickedCount > 0 || prove) && <span aria-hidden className="mx-1 h-6 w-px bg-[#222325]/15" />}
+          {pickedCount > 0 ? (
+            <>
+              <button
+                type="button"
+                disabled={disabled || Boolean(busy) || places.length === 0}
+                title={places.length > 0 ? undefined : "Turn on a part under Add to"}
+                onClick={onAddPicked}
+                className={cn(
+                  TOOL_BUTTON,
+                  "br-plain br-lime border-[1.5px] !border-[#222325] bg-[#e1f073] text-primary shadow-[2px_2px_0_0_#222325] disabled:opacity-50",
+                )}>
+                Add {pickedCount} {pickedCount === 1 ? "keyword" : "keywords"}
+              </button>
+              <button type="button" onClick={onClear} className={cn(TOOL_BUTTON, "px-1.5 text-[#55564f]")}>
+                Clear
+              </button>
+            </>
+          ) : null}
+          {prove && (
             <button
-              key={place}
               type="button"
-              aria-pressed={on}
-              disabled={disabled}
-              onClick={() => togglePlace(place)}
-              className={cn(
-                "flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-xs font-bold disabled:cursor-default",
-                on ? "border-[#222325] bg-[#eef6ad] text-primary" : "border-[#222325]/20 bg-white text-[#8a8b85]",
-              )}>
-              {on ? <Check className="h-[11px] w-[11px]" strokeWidth={3} /> : <X className="h-2.5 w-2.5" strokeWidth={2.6} />}
-              {PLACE_LABELS[place]}
+              disabled={disabled || Boolean(busy) || !bulletsOn}
+              title={bulletsOn ? undefined : "Turn on Bullets under Add to"}
+              onClick={onProve}
+              className={cn(TOOL_BUTTON, "border-[1.5px] border-[#222325] bg-[#222325] text-white disabled:opacity-50")}>
+              <Plus className="h-[13px] w-[13px]" strokeWidth={2.6} />
+              Prove the {skillsOnly.length} in a bullet
             </button>
-          );
-        })}
-        <span aria-hidden className="mx-1 h-6 w-px bg-[#222325]/15" />
-        {pickedCount > 0 ? (
-          <>
-            <button
-              type="button"
-              disabled={disabled || Boolean(busy) || places.length === 0}
-              title={places.length > 0 ? undefined : "Turn on a part under Apply changes to"}
-              onClick={onAddPicked}
-              className={cn(
-                TOOL_BUTTON,
-                "br-plain br-lime border-[1.5px] !border-[#222325] bg-[#e1f073] text-primary shadow-[2px_2px_0_0_#222325] disabled:opacity-50",
-              )}>
-              Add {pickedCount} {pickedCount === 1 ? "keyword" : "keywords"}
-              {places.length > 0 && ` to ${placesText(places)}`}
-            </button>
-            <button type="button" onClick={onClear} className={cn(TOOL_BUTTON, "px-1.5 text-[#55564f]")}>
-              Clear
-            </button>
-          </>
-        ) : (
-          missingCount > 0 &&
-          gaps.length > 0 && (
-            <button type="button" disabled className={cn(TOOL_BUTTON, "border border-[#222325]/22 bg-white text-primary opacity-50")}>
-              Pick keywords to add
-            </button>
-          )
-        )}
-        {prove && (
-          <button
-            type="button"
-            disabled={disabled || Boolean(busy) || !bulletsOn}
-            title={bulletsOn ? undefined : "Turn on Bullets under Apply changes to"}
-            onClick={onProve}
-            className={cn(TOOL_BUTTON, "border-[1.5px] border-[#222325] bg-[#222325] text-white disabled:opacity-50")}>
-            <Plus className="h-[13px] w-[13px]" strokeWidth={2.6} />
-            Prove the {skillsOnly.length} in a bullet
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -861,9 +782,6 @@ const Chip: FC<{ chip: GapChip; tone: "open" | "picked" | "proof"; onClick?: () 
       className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[260px] flex-col gap-1.5 rounded-xl bg-[#222325] p-3 text-left font-medium text-white group-focus-within:flex group-hover:flex">
       <span className="text-xs font-extrabold text-[#e1f073]">{tone === "proof" ? "Only in your Skills list" : "What the posting wants"}</span>
       <span className="text-xs leading-[1.45] text-white/80">{chip.wants}</span>
-      <span className="text-[11px] text-white/55">
-        {tone === "proof" ? "Say it once in the role where you did the work." : "Pick it only if your work really shows it."}
-      </span>
     </span>
   </span>
 );

@@ -34,7 +34,6 @@ import AddToPlanButton from "@/app/components/dashboard/plan/AddToPlanButton";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import {
   ATS_BILLING_HREF,
-  HEADLINE_SHARES,
   MAX_SCAN_SCORE,
   STUFFING_ADVICE,
   coveredKeywords,
@@ -194,7 +193,7 @@ const AtsResults: FC<AtsResultsProps> = ({
   const metrics = (report?.metrics ?? []).filter((m) => !(m.id === KEYWORD_METRIC && !job));
   const keywordChecked = Boolean(job) && !coverage?.keywordUnchecked;
   // What the number is made of, worded as the downloaded report words it.
-  const makeup = report ? scoreMakeup(report, { keywordChecked, checked: coverage?.checked ?? 0 }) : null;
+  const makeup = report ? scoreMakeup(report, { keywordChecked }) : null;
 
   const base = report?.score ?? 0;
   // Nothing scores 100 (owner, 2026-10-18), the projection included, so no fix is worth more than the room left.
@@ -261,9 +260,7 @@ const AtsResults: FC<AtsResultsProps> = ({
           {keywordChecked ? "One more thing that moves the number" : advice.length === 1 ? "One thing to fix first" : "Two things to fix first"}
         </p>
         <p className="mt-0.5 text-xs text-black/45">
-          {keywordChecked
-            ? `How your resume reads is ${100 - HEADLINE_SHARES["keyword-match"]}% of your score. This is where it reads weakest.`
-            : `From the ${advice.length === 1 ? "section" : "sections"} scoring lowest. These move the number most.`}
+          {keywordChecked ? "Where it reads weakest." : `From the ${advice.length === 1 ? "section" : "sections"} scoring lowest.`}
         </p>
         <ol className="mt-4 flex flex-col gap-4">
           {advice.map((item, index) => (
@@ -396,14 +393,14 @@ const AtsResults: FC<AtsResultsProps> = ({
                         {tier.label}
                       </Pill>
                       <p className="max-w-md text-[15px] leading-relaxed text-black/70">
-                        {/* A job score is mostly the match, not only it (owner, 2026-10-19); an older scan was the match alone. */}
+                        {/* Never the score's recipe (owner, 2026-10-19: it read as a keyword matcher). */}
                         {!job
-                          ? "How it reads on its own: structure, impact and length. Add a job to score the match."
+                          ? "How it reads on its own. Add a job to score the match."
                           : !keywordChecked
-                            ? "Nothing in the posting could be scored, so the number shows how it reads on its own: structure, impact and length."
+                            ? "Nothing in the posting could be scored, so this is how it reads on its own."
                             : makeup?.current === false
-                              ? `Against ${requirementCount(report.verdicts.length)} read from the posting.`
-                              : `${HEADLINE_SHARES["keyword-match"]}% how you cover the ${requirementCount(report.verdicts.length)} read from the posting, ${100 - HEADLINE_SHARES["keyword-match"]}% how it reads: impact, structure and length.`}
+                              ? "Scored before the latest update. Scan again to refresh it."
+                              : `Against ${requirementCount(report.verdicts.length)} from the posting.`}
                       </p>
                     </>
                   )}
@@ -446,8 +443,6 @@ const AtsResults: FC<AtsResultsProps> = ({
               })}
             </div>
           )}
-          {/* How the tiles make the ring, so the person can add it up (owner, 2026-10-19). */}
-          {metrics.length > 0 && makeup?.recipe && <p className="-mt-2 px-1 text-xs leading-relaxed text-black/50">{makeup.recipe}</p>}
 
           {!keywordChecked && adviceCard}
 

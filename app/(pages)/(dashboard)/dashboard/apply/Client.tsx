@@ -577,7 +577,7 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
   const savedJob = useSavedJobQuery(job.savedJobId);
   const saveTrouble = status === "active" && !closedElsewhere && saveStatus !== "saved";
   // The steps that edit a draft get the header's second line (owner's design, 2026-10-19).
-  const draftLine = step === 2 ? "Resume · one draft for this job" : step === 3 ? "Cover letter · one letter for this job" : null;
+  const draftLine = step === 2 ? "Draft for this job" : step === 3 ? "Letter for this job" : null;
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">

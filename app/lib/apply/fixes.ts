@@ -5,6 +5,7 @@
 
 import type { ChunkSection, CoverageState, RequirementVerdict, ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+import type { ResumePlace } from "@/app/lib/resume/ai";
 
 export type ScoreHue = "low" | "mid" | "high";
 
@@ -15,10 +16,118 @@ export const HUE_COLOR: Record<ScoreHue, string> = { low: "#e02d2d", mid: "#d99a
 
 export const scoreColorOf = (value: number): string => HUE_COLOR[scoreHue(value)];
 
-export const METRIC_GROUPS: Array<{ title: string; hint: string; ids: string[] }> = [
-  { title: "Pass the AI", hint: "what the filter reads", ids: ["keyword-match", "parseability"] },
-  { title: "Pass the human", hint: "what the recruiter reads", ids: ["impact-language", "length-format"] },
+export const METRIC_GROUPS: Array<{ title: string; ids: string[] }> = [
+  { title: "Pass the AI", ids: ["keyword-match", "parseability"] },
+  { title: "Pass the human", ids: ["impact-language", "length-format"] },
 ];
+
+/**
+ * Keyword match from which nothing more is asked for (owner, 2026-10-19: "there should be a point
+ * where it's like, nothing left to add, move on"). A senior already this close is not shown
+ * "Personalized communication" to add.
+ */
+export const ENOUGH_KEYWORD_MATCH = 90;
+
+/** Impact language under which its row shows; above it, three bullets without a number are no reason to nag. */
+export const IMPACT_WORTH_FIXING_BELOW = 80;
+
+/**
+ * Whether a requirement the scan did not find in full is worth a chip: one the posting requires,
+ * missing outright, or partly shown and weighted 4 or 5. Never a nice-to-have ("Western market
+ * experience is a plus"), and never a lighter one the resume already partly shows, which its work
+ * answers to anyone reading it.
+ */
+export const worthAdding = (verdict: Pick<RequirementVerdict, "state" | "requirement">): boolean =>
+  verdict.requirement.type !== "preferred" && (verdict.state === "missing" || (verdict.state === "partial" && verdict.requirement.weight >= 4));
+
+/** Letters and digits only, lowercased: "Cross‑functional" with a non-breaking hyphen is "cross functional". */
+const fold = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/** Words a posting's label adds that no resume says ("Agency experience" is "agency"). */
+const LABEL_FILLER =
+  /\b(?:experience|expertise|skills?|knowledge|proficiency|ability|abilities|background|familiarity|exposure|execution|understanding)\b/g;
+const coreOf = (label: string): string => fold(label).replace(LABEL_FILLER, " ").replace(/\s+/g, " ").trim() || fold(label);
+
+/** A plural and its singular are one word, as the AI reads them: "microservices" says "microservice". */
+const stemWord = (word: string): string => (word.length > 3 && word.endsWith("s") && !word.endsWith("ss") ? word.slice(0, -1) : word);
+const wordSet = (folded: string): Set<string> => new Set(folded.split(" ").filter(Boolean).map(stemWord));
+/** Words that carry no meaning of a term ("Experience in Employee Support" is "employee support"). */
+const LINK_WORDS = new Set(["a", "an", "and", "or", "of", "in", "on", "for", "with", "to", "the", "at", "by", "as"]);
+const termWords = (folded: string): string[] => [
+  ...new Set(
+    folded
+      .split(" ")
+      .filter((word) => word.length > 1 && !LINK_WORDS.has(word))
+      .map(stemWord),
+  ),
+];
+
+/**
+ * A keyword the AI tried and could place nowhere (`ApplyResumeState.worked`), kept as `[TRIED,
+ * ...the places it tried]`: asked again in those places it adds nothing either.
+ */
+export const TRIED = "(tried)";
+
+/**
+ * The keywords the AI worked in that are still where it put them (`ApplyResumeState.worked`), by
+ * label, lowercased: never offered again as a chip while they stand. A line edited away, or a step
+ * undone, brings the chip back. "Skills" is one entry of the list, or one line, that still has every
+ * word of it, as the AI reads it already there (50-job run, 2026-10-19: "Senior Product Designer ...
+ * design systems" carried "Senior product design experience" for the AI, not for a phrase match, and
+ * the chip came back to change nothing; review, 2026-10-19: a raw substring let "AI" or "Go" in Skills
+ * stand for "Email marketing" or "Google Ads").
+ *
+ * One it tried and could place nowhere (`TRIED`) stands only while `places`, where the next run
+ * would go, are all places it tried: never once another place is on, and never for Skills alone,
+ * which adds it with no AI (review, 2026-10-19: a Bullets-only miss hid the chip for good).
+ * `content` is the resume as it is sent, hidden parts out: a term on a hidden line is gone.
+ */
+export function workedIn(
+  worked: ReadonlyArray<{ label: string; lines: string[] }>,
+  content: ResumeContent,
+  places: readonly ResumePlace[] = [],
+): Set<string> {
+  const said = [content.summary, ...content.experience.flatMap((entry) => entry.bullets)].filter(Boolean).map(fold);
+  const lines = new Set(said);
+  // The flat list is what is shown: an entry's sub skills, else its name. A heading over sub skills
+  // ("Tools", "Soft Skills") is not a skill of its own. Each one, and each line, by its words.
+  const wordsIn = [...content.skills.map(fold).filter(Boolean), ...said].map(wordSet);
+  const triedAgain = places.some((place) => place !== "skills");
+  const out = new Set<string>();
+  for (const term of worked) {
+    const core = termWords(coreOf(term.label));
+    const stands = term.lines.includes(TRIED)
+      ? triedAgain && places.every((place) => term.lines.includes(place))
+      : term.lines.some((line) =>
+          line === "Skills" ? core.length > 0 && wordsIn.some((words) => core.every((word) => words.has(word))) : lines.has(fold(line)),
+        );
+    if (stands) out.add(term.label.toLowerCase());
+  }
+  return out;
+}
+
+/**
+ * The skills already worked into a line, or tried in Bullets and placed nowhere: no "Prove" chip for
+ * them. A term that went into Skills for now was never put in a line, so Skills alone never hides
+ * its chip (review, 2026-10-19: a Summary-only run left the term with no chip at all).
+ */
+export function provedIn(worked: ReadonlyArray<{ label: string; lines: string[] }>, content: ResumeContent): Set<string> {
+  const inLines = worked.flatMap((term) => {
+    const lines = term.lines.filter((line) => line !== "Skills");
+    return lines.length > 0 ? [{ ...term, lines }] : [];
+  });
+  return workedIn(inLines, content, ["bullets"]);
+}
+
+/** Whether the resume already matches enough of the posting that nothing more is suggested for it. */
+export const matchesEnough = (report: Pick<ScanReport, "metrics">): boolean => {
+  const keyword = report.metrics.find((metric) => metric.id === "keyword-match");
+  return typeof keyword?.value === "number" && keyword.checked !== false && keyword.value >= ENOUGH_KEYWORD_MATCH;
+};
 
 /** The checks the scan could measure, with their numbers: one it could not ("not checked") is never 0. */
 const measured = (report: Pick<ScanReport, "metrics">): Array<{ id: string; value: number }> =>
@@ -60,6 +169,13 @@ export const onlyInSkills = (verdict: RequirementVerdict): boolean =>
   verdict.state !== "undetermined" &&
   verdict.evidence.length > 0 &&
   verdict.evidence.every((evidence) => evidence.section === "skills");
+
+/**
+ * Whether a gap is worth a "Missing" chip: worth adding, and not one only Skills shows, which is a
+ * proof chip instead (review, 2026-10-19: the same requirement showed as both, and adding it to
+ * Skills again changed nothing). A gap with no verdict to read is shown.
+ */
+export const worthGapChip = (verdict: RequirementVerdict | undefined): boolean => !verdict || (worthAdding(verdict) && !onlyInSkills(verdict));
 
 /** The keywords matched only in Skills, by name. */
 export const skillsOnlyNames = (report: Pick<ScanReport, "verdicts">): string[] => [...new Set(report.verdicts.filter(onlyInSkills).map(nameOf))];
@@ -296,11 +412,6 @@ export interface LanguageAsk {
   level: string | null;
 }
 
-/**
- * A language the posting asks for that the resume never states and the scan did not find met (owner,
- * 2026-10-19: a fluent English speaker lost a weight-5 requirement for not writing "English"
- * anywhere). Null when there is none.
- */
 /** Whether a text names the language ("English: fluent", "English proficiency"). */
 export const namesLanguage = (text: string, language: string): boolean => new RegExp(`\\b${language}\\b`, "i").test(text);
 
@@ -311,11 +422,18 @@ const STATES_LEVEL =
 /** The levels the person picks from, as they go on the resume ("English: fluent (C1)"). */
 export const LANGUAGE_LEVELS = ["native", "fluent (C1)", "upper intermediate (B2)"] as const;
 
+/**
+ * A language the posting asks for that the resume never states and the scan did not find met (owner,
+ * 2026-10-19: a fluent English speaker lost a weight-5 requirement for not writing "English"
+ * anywhere). Only one worth adding (`worthAdding`), as the chips are: a nice-to-have ("Spanish is a
+ * plus") is never asked for, nor takes the ask from a required one (review, 2026-10-19). Null when
+ * there is none.
+ */
 export function languageAsk(report: Pick<ScanReport, "verdicts">, content: ResumeContent): LanguageAsk | null {
   const named = new RegExp(`\\b(${LANGUAGES})\\b`, "i");
   for (const verdict of report.verdicts) {
     // Not met, or only inferred from other lines ("4.8/5 on onboarding calls" read as English): an ATS looks for the language named.
-    if (verdict.state === "satisfied") continue;
+    if (!worthAdding(verdict)) continue;
     const said = `${verdict.requirement.label ?? ""} ${verdict.requirement.text}`;
     const match = named.exec(said);
     if (!match) continue;
