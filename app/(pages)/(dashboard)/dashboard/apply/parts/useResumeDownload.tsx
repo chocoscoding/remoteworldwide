@@ -17,6 +17,7 @@ import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { resumePrintSpec } from "@/app/lib/export/print-css";
 import { resumeToDocx } from "@/app/lib/export/resume";
 import { printDocument, safeFileName, saveBlob } from "@/app/lib/export/save";
+import { visibleContent } from "@/app/lib/resume/api";
 import { cn } from "@/lib/utils";
 
 export type ResumeDownloadFormat = "pdf" | "docx";
@@ -62,7 +63,9 @@ export function useResumeDownload(): {
     return () => cancelAnimationFrame(frame);
   }, [printing]);
 
-  function download(content: ResumeContent, name: string, format: ResumeDownloadFormat) {
+  function download(whole: ResumeContent, name: string, format: ResumeDownloadFormat) {
+    // What is hidden for this application (the step's eyes) never goes into the file.
+    const content = visibleContent(whole);
     const title = fileBase(name);
     if (format === "pdf") {
       setPrinting({ content, title });

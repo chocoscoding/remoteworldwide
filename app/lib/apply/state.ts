@@ -12,6 +12,7 @@ import type { TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
 import type { CoverTone } from "@/app/lib/cover/api";
 import { DEFAULT_LETTER_DESIGN, LETTERHEAD_OPTIONS, LETTER_FONT_OPTIONS, SPACING_OPTIONS, THEME_OPTIONS } from "@/app/lib/cover/presentation";
 import type { LetterDesign, ResumeContent } from "@/app/lib/dashboard/types";
+import type { ApplyHistoryStep } from "./history";
 
 /** Mirrors `COVER_TONES` in app/lib/cover/api.ts, which this module cannot import at runtime. */
 const TONES: readonly CoverTone[] = ["warm", "formal", "story", "short"];
@@ -68,6 +69,10 @@ export interface ApplyResumeState {
   sendDraft: boolean;
   /** The resume creator's copy of the draft, reused so opening it again doesn't make another. */
   creatorDocId: string | null;
+  /** Every change to the draft, oldest first (owner's design, 2026-10-19): what undo, redo and the history list walk. */
+  history: ApplyHistoryStep[];
+  /** Which step of `history` the draft is at now; later steps are what redo brings back. */
+  historyAt: number;
 }
 
 export interface ApplyCoverState {
@@ -100,6 +105,8 @@ export interface ApplyState {
     previousScore: number | null;
     /** Each requirement's state on the version scored before, by id: what "Up 15" is explained from. */
     previousStates?: Record<string, CoverageState>;
+    /** Each check's value on the version scored before, by metric id: the small "+18" beside a check. */
+    previousMetrics?: Record<string, number>;
   } | null;
   proposal: ApplyProposal | null;
   cover: ApplyCoverState;
@@ -110,7 +117,7 @@ export interface ApplyState {
 export const EMPTY_QUESTION: ApplyQuestion = { id: "q-0", question: "", answer: "", drafted: null, edited: false };
 
 export const EMPTY_APPLY_STATE: ApplyState = {
-  resume: { baseId: null, baseName: null, draftId: null, draftName: null, draftFromId: null, sendDraft: false, creatorDocId: null },
+  resume: { baseId: null, baseName: null, draftId: null, draftName: null, draftFromId: null, sendDraft: false, creatorDocId: null, history: [], historyAt: 0 },
   scan: null,
   proposal: null,
   cover: { letter: "", html: "", design: DEFAULT_LETTER_DESIGN, skipped: false, tone: "warm", shown: null, drafts: {}, writtenFrom: null },
@@ -140,6 +147,31 @@ function readReport(value: unknown): ScanReport | null {
 }
 
 /** Enough of a resume to render and send back: every list the tools and the paper map over. */
+/** A stored map of metric id to its value; anything else is dropped. */
+const readNumbers = (value: Record<string, unknown>): Record<string, number> =>
+  Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])));
+
+/** The draft's change history, each step read whole or dropped, and where it stands. */
+function readHistory(value: unknown, at: unknown): { history: ApplyHistoryStep[]; historyAt: number } {
+  const history: ApplyHistoryStep[] = (Array.isArray(value) ? value : []).filter(isRecord).flatMap((row) => {
+    const content = readContent(row.content);
+    if (!content || typeof row.id !== "string" || typeof row.label !== "string" || typeof row.at !== "string") return [];
+    return [
+      {
+        id: row.id,
+        label: row.label,
+        at: row.at,
+        content,
+        version: typeof row.version === "number" ? row.version : null,
+        score: typeof row.score === "number" ? row.score : null,
+        report: readReport(row.report),
+      },
+    ];
+  });
+  const index = typeof at === "number" && Number.isInteger(at) ? at : history.length - 1;
+  return { history, historyAt: Math.max(0, Math.min(index, history.length - 1)) };
+}
+
 function readContent(value: unknown): ResumeContent | null {
   if (!isRecord(value)) return null;
   const lists = ["links", "experience", "education", "projects", "certifications", "skills"] as const;
@@ -199,6 +231,7 @@ export function readApplyState(raw: unknown): ApplyState {
       draftFromId: str(resume.draftFromId),
       sendDraft: resume.sendDraft === true && typeof resume.draftId === "string",
       creatorDocId: str(resume.creatorDocId),
+      ...readHistory(resume.history, resume.historyAt),
     },
     scan:
       scan && report && typeof scan.resumeId === "string" && typeof scan.version === "number"
@@ -208,6 +241,7 @@ export function readApplyState(raw: unknown): ApplyState {
             report,
             previousScore: typeof scan.previousScore === "number" ? scan.previousScore : null,
             ...(isRecord(scan.previousStates) ? { previousStates: readStates(scan.previousStates) } : {}),
+            ...(isRecord(scan.previousMetrics) ? { previousMetrics: readNumbers(scan.previousMetrics) } : {}),
           }
         : null,
     proposal:

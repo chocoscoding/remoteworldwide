@@ -125,7 +125,31 @@ export async function importResume(file: File): Promise<ImportedResume> {
  * exists and is not embedded again — which is what makes checking an unedited
  * resume a second time cheap, and a re-scan of it free.
  */
-export function resumeContentToText(content: ResumeContent): string {
+/**
+ * The resume without the parts hidden for this application (`hiddenParts`, the apply wizard's
+ * eyes): what is scored, written from, downloaded and sent. Mirrors `visibleContent` in the AI
+ * service's src/lib/resumeText.ts, so both texts of one resume stay identical.
+ */
+export function visibleContent(content: ResumeContent): ResumeContent {
+  const hidden = new Set(content.hiddenParts ?? []);
+  if (hidden.size === 0) return content;
+  return {
+    ...content,
+    summary: hidden.has("summary") ? "" : content.summary,
+    skills: hidden.has("skills") ? [] : content.skills,
+    ...(content.skillGroups && hidden.has("skills") ? { skillGroups: [] } : {}),
+    education: hidden.has("education") ? [] : content.education,
+    projects: hidden.has("projects") ? [] : content.projects,
+    certifications: hidden.has("certifications") ? [] : content.certifications,
+    experience: content.experience
+      .filter((entry) => !hidden.has(`exp:${entry.id}`))
+      .map((entry) => ({ ...entry, bullets: entry.bullets.filter((_, index) => !hidden.has(`exp:${entry.id}:${index}`)) })),
+    hiddenParts: [],
+  };
+}
+
+export function resumeContentToText(whole: ResumeContent): string {
+  const content = visibleContent(whole);
   const lines: string[] = [];
   const push = (...values: Array<string | undefined>) => {
     for (const value of values) if (value !== undefined) lines.push(value);

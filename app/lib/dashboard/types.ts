@@ -230,6 +230,13 @@ export interface ResumeContent {
   aiFigures?: ResumeAiFigure[];
   /** The person said they checked the AI's numbers ("I've checked them"). */
   aiFiguresCleared?: boolean;
+  /**
+   * Parts hidden for one application (the apply wizard's eyes, owner 2026-10-18): kept on the
+   * document, left out of what is scored, written from, downloaded and sent (`visibleContent`).
+   * Keys: "summary", "skills", "education", "projects", "certifications", "exp:<entry id>" and
+   * "exp:<entry id>:<bullet index>". Mirrors the AI service's ResumeContent.
+   */
+  hiddenParts?: string[];
 }
 
 /** One number the AI suggested: the figure, and the line as Quantify wrote it (RWW/ATS-QUALITY-PLAN.md, 13.8). */

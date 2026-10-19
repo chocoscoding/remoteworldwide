@@ -33,11 +33,11 @@ import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState, type R
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Cloud, CloudOff, Repeat } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { Bone, LinesSkeleton, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
-import LogoMini from "@/app/components/svg/LogoMini";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
@@ -67,8 +67,10 @@ import {
   type ApplyStepNum,
 } from "@/app/lib/apply/state";
 import { qk } from "@/app/lib/query/keys";
-import { keepDraftResume } from "@/app/lib/resume/api";
+import { keepDraftResume, updateDraftResume, visibleContent } from "@/app/lib/resume/api";
+import type { IngestedResumeDetail } from "@/app/lib/ats/types";
 import { useDuplicateApplication } from "@/hooks/queries/useApplicationsQuery";
+import { useSavedJobQuery } from "@/hooks/queries/useJobQueries";
 import { useIngestedResumeQuery } from "@/hooks/queries/useAtsQueries";
 import { createdApplicationId, useCreateApplication, useUpdateApplication } from "@/hooks/mutations/useApplicationMutations";
 import StartApplication from "./StartApplication";
@@ -312,6 +314,8 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
   // The step, the visited steps and the whole state go up together, a moment after the last change,
   // one save at a time and in order; leaving the page sends the last word.
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  // The step tracker's right end, where step 2 puts its undo, redo and history (owner's design, 2026-10-19).
+  const [stepActions, setStepActions] = useState<HTMLElement | null>(null);
   const latest = useRef({ step, visited, state });
   useEffect(() => {
     latest.current = { step, visited, state };
@@ -450,11 +454,14 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
     if (state.resume.sendDraft && state.resume.draftId) {
       const draftId = state.resume.draftId;
       const name = state.resume.draftName ?? `Resume for ${job.company}`;
-      void keepDraftResume(draftId, name)
+      // What was hidden for this application (the resume step's eyes) is not part of the version
+      // that went out: kept without it. Its text is unchanged, so this costs no new version.
+      const draftContent = queryClient.getQueryData<IngestedResumeDetail>(qk.ats.resume(draftId))?.content ?? null;
+      const stripped = draftContent && (draftContent.hiddenParts ?? []).length > 0 ? visibleContent(draftContent) : null;
+      void (stripped ? updateDraftResume(draftId, stripped) : Promise.resolve(null))
+        .then(() => keepDraftResume(draftId, name))
         .then(() => queryClient.invalidateQueries({ queryKey: qk.ats.ingested() }))
-        .catch(() =>
-          toast.warning("The tailored resume wasn't added to your resumes", { description: "It's still recorded on the application." }),
-        );
+        .catch(() => toast.warning("The tailored resume wasn't added to your resumes", { description: "It's still recorded on the application." }));
     }
 
     if (alreadyTracked && prior) {
@@ -518,7 +525,7 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
       case 1:
         return <RoleStep job={job} duplicate={duplicate.data} alreadyTracked={alreadyTracked} />;
       case 2:
-        return <ResumeStep job={job} state={state} update={update} editable={editable} scan={scan} />;
+        return <ResumeStep job={job} state={state} update={update} editable={editable} scan={scan} actionsSlot={step === 2 ? stepActions : null} />;
       case 3:
         return (
           <CoverStep
@@ -562,40 +569,32 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
           ? "This application is finished."
           : null;
 
+  const retrySave = () => {
+    dirty.current = true;
+    void save();
+  };
+  // The posting's own logo for the header, from the saved job the session names.
+  const savedJob = useSavedJobQuery(job.savedJobId);
+  const saveTrouble = status === "active" && !closedElsewhere && saveStatus !== "saved";
+  // The steps that edit a draft get the header's second line (owner's design, 2026-10-19).
+  const draftLine = step === 2 ? "Resume · one draft for this job" : step === 3 ? "Cover letter · one letter for this job" : null;
+
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-white/85 backdrop-blur-sm">
-        <div className="flex h-16 items-center justify-between gap-4 px-8">
-          <div className="flex min-w-0 items-center gap-3">
-            <LogoMini className="h-6 w-6 flex-none" />
-            <h1 className="truncate text-[17px] font-bold text-primary">
-              {job.role} at {job.company}
+      {/* Header (owner's design, 2026-10-19): the job and its menu, the steps as dots, Continue; and
+          on the steps that edit a draft, a second line for that draft: Saved, undo, redo, history. */}
+      <header className="sticky top-0 z-10 border-b border-black/10 border-t-4 border-t-[#e1f073] bg-white">
+        <div className="flex h-16 items-center gap-4 px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <CompanyLogo company={job.company} logo={savedJob.data?.companyLogo ?? null} />
+            <h1 className="min-w-0 truncate text-[17px] font-extrabold text-primary">
+              {job.role} <span className="font-medium text-black/45">at</span> {job.company}
             </h1>
-            <span className="hidden text-sm text-black/30 lg:inline">·</span>
-            <span className="hidden whitespace-nowrap text-sm text-black/45 lg:inline">Step {step} of 5</span>
-            <SaveNote
-              status={status === "active" && !closedElsewhere ? saveStatus : null}
-              onRetry={() => {
-                dirty.current = true;
-                void save();
-              }}
-            />
+            <JobMenu onChangeJob={onLeave} />
+            {!draftLine && <SaveNote compact status={status === "active" && !closedElsewhere ? saveStatus : null} onRetry={retrySave} />}
           </div>
-          <div className="flex flex-none items-center gap-3">
-            <StickerButton variant="outline" size="md" onClick={onLeave}>
-              Change job
-            </StickerButton>
-            <StickerButton variant="primary" size="md" disabled={step === 5} onClick={() => go(Math.min(5, step + 1) as ApplyStepNum)}>
-              Continue
-            </StickerButton>
-            <NotificationBell />
-          </div>
-        </div>
 
-        {/* Step tracker */}
-        <div className="overflow-x-auto px-8 pb-4">
-          <div className="flex min-w-max items-center gap-2">
+          <nav aria-label="Steps" className="hidden flex-none items-center gap-2 md:flex">
             {APPLY_STEPS.map((n, idx) => {
               const isDone = n < step;
               const isActive = n === step;
@@ -604,33 +603,51 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
                   <button
                     type="button"
                     aria-current={isActive ? "step" : undefined}
+                    aria-label={`${n}. ${APPLY_STEP_LABELS[n]}`}
+                    title={APPLY_STEP_LABELS[n]}
                     onClick={() => go(n)}
-                    className="group flex cursor-pointer items-center gap-2.5">
+                    className="group flex cursor-pointer items-center gap-2">
                     <span
                       className={cn(
-                        "flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold transition-colors",
-                        isDone
-                          ? "bg-primary/90 text-secondary"
-                          : isActive
-                            ? "bg-primary/90 text-white"
-                            : "bg-[#f0f0ea] text-black/40 group-hover:bg-[#e7e7df]",
+                        "flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full text-xs font-extrabold transition-colors",
+                        isDone || isActive ? "bg-[#222325] text-white" : "bg-[#f0f0ea] text-[#8a8b85] group-hover:bg-[#e7e7df]",
                       )}>
-                      {isDone ? <Check className="h-3 w-3" /> : n}
+                      {isDone ? <Check className="h-3 w-3 text-[#e1f073]" strokeWidth={3.2} /> : n}
                     </span>
-                    <span
-                      className={cn(
-                        "whitespace-nowrap text-sm",
-                        isActive ? "font-bold text-primary" : isDone ? "font-semibold text-black/60" : "font-medium text-black/40",
-                      )}>
-                      {APPLY_STEP_LABELS[n]}
-                    </span>
+                    {isActive && <span className="whitespace-nowrap text-sm font-extrabold text-primary">{APPLY_STEP_LABELS[n]}</span>}
                   </button>
-                  {idx < APPLY_STEPS.length - 1 && <span className="h-px w-10 flex-none bg-black/10" />}
+                  {idx < APPLY_STEPS.length - 1 && <span aria-hidden className="h-px w-4 flex-none bg-black/15" />}
                 </div>
               );
             })}
+          </nav>
+
+          <div className="flex flex-1 items-center justify-end gap-3">
+            <StickerButton variant="primary" size="md" disabled={step === 5} onClick={() => go(Math.min(5, step + 1) as ApplyStepNum)}>
+              Continue
+              <ChevronRight className="h-4 w-4" strokeWidth={2.6} />
+            </StickerButton>
+            <NotificationBell />
           </div>
         </div>
+
+        {draftLine && (
+          <div className="flex h-12 items-center gap-4 border-t border-black/8 bg-[#fbfbf3] px-8">
+            <span className="min-w-0 flex-1 truncate text-xs text-[#5f6062]">{draftLine}</span>
+            {/* "Saved" is not said (owner, 2026-10-19): the pill speaks only while saving or when a save failed. */}
+            {(step === 2 || saveTrouble) && (
+              <span className="flex flex-none items-center gap-1 rounded-full border border-[#222325]/12 bg-white p-[3px]">
+                {saveTrouble && (
+                  <span className="px-2.5">
+                    <SaveNote compact status={saveStatus} onRetry={retrySave} />
+                  </span>
+                )}
+                {saveTrouble && step === 2 && <span aria-hidden className="h-5 w-px bg-black/12" />}
+                {step === 2 && <span ref={setStepActions} className="flex items-center" />}
+              </span>
+            )}
+          </div>
+        )}
       </header>
 
       {/* The whole width the dashboard gives it (owner, 2026-10-03). */}
@@ -665,19 +682,94 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
 };
 
 /** Whether the latest changes are on the server: quiet when they are, a retry when they aren't. */
-const SaveNote: FC<{ status: SaveStatus | null; onRetry: () => void }> = ({ status, onRetry }) => {
-  if (status === null) return null;
+/**
+ * Where the application's saving stands. In the draft line's pill it always shows ("Saved" in
+ * green); beside the title (`compact`, the steps without a draft line) only while saving or when
+ * a save failed.
+ */
+const SaveNote: FC<{ status: SaveStatus | null; onRetry: () => void; compact?: boolean }> = ({ status, onRetry, compact = false }) => {
+  if (status === null || (compact && status === "saved")) return null;
   if (status === "error") {
     return (
       <button
         type="button"
         onClick={onRetry}
-        className="hidden cursor-pointer whitespace-nowrap text-xs font-semibold text-[#b23c26] underline decoration-dotted underline-offset-2 lg:inline">
-        Not saved. Retry
+        className="flex flex-none cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs font-bold text-[#b23c26] underline decoration-dotted underline-offset-2">
+        <CloudOff className="h-3.5 w-3.5" strokeWidth={2.2} />
+        Couldn&apos;t save · Retry
       </button>
     );
   }
-  return <span className="hidden whitespace-nowrap text-xs text-black/40 lg:inline">{status === "saving" ? "Saving…" : "Saved"}</span>;
+  return (
+    <span
+      className={cn(
+        "flex flex-none items-center gap-1.5 whitespace-nowrap text-xs font-bold",
+        status === "saving" ? "text-[#8a8b85]" : "text-[#6c7a1e]",
+      )}>
+      <Cloud className="h-3.5 w-3.5" strokeWidth={2.2} />
+      {status === "saving" ? "Saving…" : "Saved"}
+    </span>
+  );
+};
+
+/** The company's logo when the posting has one; its initials on ink when not, or when the image fails. */
+const CompanyLogo: FC<{ company: string; logo: string | null }> = ({ company, logo }) => {
+  const [broken, setBroken] = useState(false);
+  const src = logo && /^https?:\/\//i.test(logo) ? logo : null;
+  if (src && !broken) {
+    return (
+      // A plain <img>: logos come from whatever host a posting names (as in the job picker).
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        onError={() => setBroken(true)}
+        className="h-8 w-8 flex-none rounded-full border border-black/10 bg-white object-contain p-0.5"
+      />
+    );
+  }
+  const initials =
+    company
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+  return (
+    <span aria-hidden className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[#222325] text-[11px] font-extrabold text-white">
+      {initials}
+    </span>
+  );
+};
+
+/** The ▾ beside the job's name: what is done to the job itself (Change job). */
+const JobMenu: FC<{ onChangeJob: () => void }> = ({ onChangeJob }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Job options"
+          title="Job options"
+          className="grid h-[26px] w-[26px] flex-none cursor-pointer place-content-center rounded-md bg-[#f0f0ea] text-primary transition-colors hover:bg-[#e7e7df]">
+          <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.6} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={6} className="br-bold w-48 overflow-hidden rounded-xl border-2 border-black bg-white p-0">
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            onChangeJob();
+          }}
+          className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left text-xs font-semibold text-primary hover:bg-[#fbfbf7]">
+          <Repeat className="h-3.5 w-3.5 flex-none text-black/55" />
+          Change job
+        </button>
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 export default ApplyClient;

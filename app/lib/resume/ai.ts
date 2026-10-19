@@ -80,6 +80,11 @@ export interface SuggestionInput {
   keywords?: string[] | null;
   /** `keywords` only: list the posting's missing keywords to tick in (`proposeKeywords`), rather than work terms in. */
   propose?: boolean;
+  /**
+   * `keywords` only: the person picked these and wants each one in (owner, 2026-10-19). With bullets
+   * allowed, each must land in a line, never only in Skills.
+   */
+  insist?: boolean;
   /** `shorten` only: "page" cuts to one page; absent trims to at most 750 words (owner, 2026-10-18). */
   target?: "page" | null;
   /**
@@ -103,11 +108,20 @@ export interface SuggestionInput {
   instruction?: string | null;
   /** `ask` only: the editor as it stands, so Ask can act in it (`app/lib/dashboard/resume/ask-actions.ts`). */
   editor?: AskEditorState | null;
+  /**
+   * `tailor` and `keywords`: where they may write (the apply wizard's "AI may change", owner
+   * 2026-10-18). Absent: everywhere.
+   */
+  places?: ResumePlace[] | null;
   /** `ask` only: the ATS report's findings to fix, from "Fix these in my resume" (`app/lib/ats/fix-handoff.ts`). */
   fixes?: string[] | null;
 }
 
 /** The editor as an ask sends it: the tab open, the design's current values, the sections by id. */
+/** The parts of a resume Tailor and keywords may be kept to. Mirrors RESUME_PLACES in the AI service. */
+export const RESUME_PLACES = ["summary", "bullets", "skills"] as const;
+export type ResumePlace = (typeof RESUME_PLACES)[number];
+
 export interface AskEditorState {
   tab: AskTab;
   settings: Partial<Record<AskDesignSetting, string | number>>;
@@ -150,7 +164,7 @@ export interface KeywordProposals {
   terms: string[];
 }
 
-const run = <T,>(tool: SuggestionTool, input: SuggestionInput) =>
+const run = <T>(tool: SuggestionTool, input: SuggestionInput) =>
   apiPost<T>(`${SUGGESTIONS_PATH}/${tool}`, {
     content: input.content,
     jdText: input.jdText ?? null,
@@ -158,6 +172,7 @@ const run = <T,>(tool: SuggestionTool, input: SuggestionInput) =>
     role: input.role ?? null,
     keywords: input.keywords ?? null,
     propose: input.propose === true ? true : null,
+    insist: input.insist === true ? true : null,
     entryIndex: typeof input.entryIndex === "number" ? input.entryIndex : null,
     customId: input.customId || null,
     bulletIndex: typeof input.bulletIndex === "number" ? input.bulletIndex : null,
@@ -168,6 +183,7 @@ const run = <T,>(tool: SuggestionTool, input: SuggestionInput) =>
     editor: input.editor ?? null,
     // `ask` only: the ATS report's findings, from "Fix these in my resume".
     fixes: input.fixes && input.fixes.length > 0 ? input.fixes : null,
+    places: input.places && input.places.length > 0 ? input.places : null,
   });
 
 /** Rewrites the summary and skills towards one posting. Needs `jdText`. */

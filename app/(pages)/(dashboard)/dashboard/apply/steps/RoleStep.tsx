@@ -11,6 +11,8 @@
 // applicant count, and a contact list is not the same thing as a warm path in.
 
 import { useState, type FC, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { extractRequirements } from "@/app/lib/ats/api";
 import { AlertCircle, ArrowUpRight, Check, CopyCheck, MapPin } from "lucide-react";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
 import Pill from "@/app/components/dashboard/ui/Pill";
@@ -53,6 +55,22 @@ const RoleStep: FC<RoleStepProps> = ({ job, duplicate, alreadyTracked = false })
   const facts = [job.location, job.remoteType ? REMOTE_WORDS[job.remoteType] : null, job.employmentType].filter(
     (fact): fact is string => Boolean(fact),
   );
+  // What the posting asks for, read free (no resume, no credit) and cached by the service, which the
+  // score then reads from too. Only its eligibility lines are shown here.
+  const requirements = useQuery({
+    queryKey: ["ats", "requirements", job.savedJobId ?? job.description ?? ""],
+    queryFn: () => extractRequirements(job.description ?? "", job.savedJobId),
+    enabled: Boolean(job.description),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const eligibility = [
+    ...new Set(
+      (requirements.data?.requirements ?? [])
+        .filter((requirement) => requirement.category === "eligibility")
+        .map((requirement) => requirement.text.trim().replace(/^./, (first) => first.toUpperCase())),
+    ),
+  ].filter(Boolean);
 
   return (
     <div className="flex flex-col gap-5">
@@ -123,6 +141,22 @@ const RoleStep: FC<RoleStepProps> = ({ job, duplicate, alreadyTracked = false })
           </div>
         )}
       </DashCard>
+
+      {/* Where the candidate must live or may work, from the posting (owner, 2026-10-18: it belongs
+          with the role, not on the resume step). A short note, never anything to pick. */}
+      {eligibility.length > 0 && (
+        <section
+          aria-label="This role needs"
+          className="w-full self-start rounded-[14px] border border-[#b26a00]/30 bg-[#fff8ec] px-4 py-3 sm:w-1/2 sm:min-w-[300px]">
+          <h3 className="mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#8a5200]">This role needs</h3>
+          <ul className="list-disc pl-[18px] text-sm leading-relaxed text-primary">
+            {eligibility.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-xs text-black/55">Check you meet it. It never goes on your resume.</p>
+        </section>
+      )}
 
       {duplicate && <DuplicateNote duplicate={duplicate} alreadyTracked={alreadyTracked} />}
 

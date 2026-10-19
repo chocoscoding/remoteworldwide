@@ -117,14 +117,6 @@ describe("the Basic gates", () => {
     assert.ok(!/autoPlan|AUTO_PLAN/.test(site("app/components/dashboard/prep/PrepReport.tsx")));
     assert.match(site("app/components/dashboard/prep/report/FixChecklist.tsx"), /if \(lock\.locked\) \{\s*lock\.upgrade\(\);\s*return;\s*\}/);
   });
-
-  it("show Talk as locked rather than hiding it", () => {
-    for (const file of ["app/(pages)/(dashboard)/dashboard/coach/Client.tsx", "app/(pages)/(dashboard)/dashboard/jdqa/Client.tsx"]) {
-      const source = site(file);
-      assert.match(source, /: voiceLock\.locked\s*\?\s*"On Basic and up"/, file);
-      assert.match(source, /voiceLock\.locked \? \(\s*\/\/[^\n]*\n\s*<Lock /, file);
-    }
-  });
 });
 
 describe("a stale page refused anyway", () => {

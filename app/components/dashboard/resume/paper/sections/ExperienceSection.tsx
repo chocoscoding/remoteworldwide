@@ -22,7 +22,8 @@ const ExperienceSection: FC<ExperienceSectionProps> = ({ content, design }) => {
     <div className="flex flex-col gap-[var(--r-gap)]">
       {shown.map((exp) => (
         // `data-resume-entry` is what the AI tools' pick mode reads a clicked role by (PagePicker).
-        <div key={exp.id} data-resume-entry={exp.id} className="relative">
+        // `group/entry`: hovering a role shows its lines' eyes on the apply wizard's paper (highlight.tsx).
+        <div key={exp.id} data-resume-entry={exp.id} className="group/entry relative">
           <EntryFrame entryId={exp.id} />
           <EntryHeader primary={exp.role} secondary={exp.company} dates={exp.dates} location={exp.location} locationBelow design={design} />
           <EntryBullets items={exp.bullets} design={design} entryId={exp.id} />

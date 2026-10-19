@@ -46,7 +46,11 @@ export const subSkillText = (skills: string[]): string => skills.join(", ");
 
 /** An entry's id from its name, unique among `taken` (which it joins). Deterministic, so an updater run twice agrees. */
 function entryIdFor(name: string, taken: Set<string>): string {
-  const base = `skl-${key(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x"}`;
+  const base = `skl-${
+    key(name)
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "x"
+  }`;
   let id = base;
   for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`;
   taken.add(id);
@@ -140,8 +144,7 @@ export function reconcileGroups<C extends Pick<ResumeContent, "skills" | "skillG
 }
 
 /** Whether the resume lists this skill already, whatever its case. */
-export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string): boolean =>
-  content.skills.some((have) => key(have) === key(skill));
+export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string): boolean => content.skills.some((have) => key(have) === key(skill));
 
 /**
  * The content with these skills added to the end of the list, each as an entry
@@ -152,6 +155,18 @@ export function addSkills(content: ResumeContent, skills: string[]): ResumeConte
   const fresh = flattenGroups(skills.map((skill) => ({ id: "", title: skill, skills: [] }))).filter((skill) => !hasSkill(content, skill));
   if (fresh.length === 0) return content;
   return reconcileGroups({ ...content, skills: [...content.skills, ...fresh] });
+}
+
+/**
+ * The content without these skills, whatever their case: a sub skill leaves its
+ * entry, a named entry goes, and an entry left with no sub skills goes too.
+ * Returns the same object when none of them was listed.
+ */
+export function removeSkills(content: ResumeContent, skills: string[]): ResumeContent {
+  const gone = new Set(skills.map(key));
+  const kept = content.skills.filter((skill) => !gone.has(key(skill)));
+  if (kept.length === content.skills.length) return content;
+  return reconcileGroups({ ...content, skills: kept });
 }
 
 /**

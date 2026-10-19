@@ -18,6 +18,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FC } from "react";
 import { PagedResume } from "@/app/components/dashboard/resume/paper";
+import { PaperHighlightProvider, type PaperEdits, type PaperEyes } from "@/app/components/dashboard/resume/paper/highlight";
 import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
@@ -25,6 +26,9 @@ import { highlightTexts, resumeChanges, type ResumeChanges } from "@/app/lib/app
 import { cn } from "@/lib/utils";
 
 const HIGHLIGHT = "rww-resume-change";
+/** "Show in resume": the lines a card means, leaf green over the change marks, for `FLASH_MS`. */
+const FLASH = "rww-resume-flash";
+const FLASH_MS = 2_600;
 
 /** The paper's own width at 96dpi: Letter is 8.5in, A4 210mm. */
 const PAGE_WIDTH_PX = { letter: 816, a4: 794 } as const;
@@ -89,9 +93,15 @@ export interface ChangesPaperProps {
   /** The resume it was made from; what differs is highlighted. Pass `content` itself to mark nothing. */
   before: ResumeContent | null;
   className?: string;
+  /** The show/hide eyes beside each section, role and line (the resume step); absent: a plain paper. */
+  eyes?: PaperEyes;
+  /** Click-to-edit lines (the resume step); absent: read only. */
+  edits?: PaperEdits;
+  /** Lines to bring into view and light up for a moment ("Show in resume"); a new `key` lights them again. */
+  flash?: { texts: string[]; key: number } | null;
 }
 
-const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className }) => {
+const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className, eyes, edits, flash = null }) => {
   const paperRef = useRef<HTMLDivElement | null>(null);
   const changes = useMemo(() => resumeChanges(before, content), [before, content]);
   const texts = useMemo(() => highlightTexts(changes), [changes]);
@@ -126,20 +136,51 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className }) => 
     };
   }, [texts, pages]);
 
+  // "Show in resume": the first place on a sheet's visible part is scrolled to, and every place lit.
+  const flashKey = flash?.key ?? null;
+  const flashTexts = flash?.texts;
+  useEffect(() => {
+    const registry = highlightRegistry();
+    if (flashKey === null || !flashTexts || flashTexts.length === 0 || !paperRef.current) return;
+    const ranges = changeRanges(paperRef.current, flashTexts);
+    // Each sheet holds the whole resume and clips it: the range to scroll to is one its sheet shows.
+    const shown = ranges.find((range) => {
+      const sheet = range.startContainer.parentElement?.closest("[data-resume-sheet]");
+      if (!sheet) return false;
+      const box = range.getBoundingClientRect();
+      const frame = sheet.getBoundingClientRect();
+      return (
+        box.width > 0 && box.left >= frame.left - 1 && box.right <= frame.right + 1 && box.top >= frame.top - 1 && box.bottom <= frame.bottom + 1
+      );
+    });
+    shown?.startContainer.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!registry || ranges.length === 0) return;
+    const lit = new Highlight(...ranges);
+    lit.priority = 1;
+    registry.set(FLASH, lit);
+    const timer = window.setTimeout(() => registry.delete(FLASH), FLASH_MS);
+    return () => {
+      window.clearTimeout(timer);
+      registry.delete(FLASH);
+    };
+  }, [flashKey, flashTexts]);
+
   return (
     <div ref={setBox} className={cn("w-full", className)}>
       {!canHighlight && texts.length > 0 && <ChangeList changes={changes} />}
       <div ref={paperRef} style={{ zoom: fit }} className={cn("mx-auto w-fit", ALL_FONT_VARS)}>
         {/* The gap is zoomed with the paper, so it's divided by the zoom to stay 25px on screen. */}
-        <PagedResume
-          design={DEFAULT_DESIGN}
-          sections={withContentSections(DEFAULT_SECTIONS, content)}
-          content={content}
-          chrome={DEFAULT_DESIGN.chrome}
-          gap={25 / fit}
-          sheetClassName="shadow-[0_2px_18px_rgba(0,0,0,0.12)]"
-          onPageCountChange={setPages}
-        />
+        <PaperHighlightProvider value={{ focus: null, marks: [], eyes, edits }}>
+          <PagedResume
+            design={DEFAULT_DESIGN}
+            sections={withContentSections(DEFAULT_SECTIONS, content)}
+            content={content}
+            chrome={DEFAULT_DESIGN.chrome}
+            gap={25 / fit}
+            sheetClassName="shadow-[0_2px_18px_rgba(0,0,0,0.12)]"
+            onPageCountChange={setPages}
+          />
+        </PaperHighlightProvider>
       </div>
     </div>
   );

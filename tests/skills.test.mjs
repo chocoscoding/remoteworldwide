@@ -20,6 +20,7 @@ const {
   printableGroups,
   printableSkills,
   reconcileGroups,
+  removeSkills,
   skillLine,
   subSkillText,
   withEntries,
@@ -115,5 +116,21 @@ describe("printing", () => {
     assert.equal(skillLine(["React", "Go"], "comma"), "React, Go");
     assert.equal(skillLine(["React", "Go"], "bullet"), "React • Go");
     assert.equal(skillLine(["React", "Go"], "star"), "React ★ Go");
+  });
+});
+
+describe("removeSkills", () => {
+  it("takes skills out of the list and the entries, whatever their case", () => {
+    const content = withEntries({ skills: [], skillGroups: [] }, [
+      { id: "a", title: "Tools", skills: ["Okta", "Jamf"] },
+      { id: "b", title: "MDM rollout", skills: [] },
+    ]);
+    const out = removeSkills(content, ["okta", "mdm rollout"]);
+    assert.deepEqual(out.skills, ["Jamf"]);
+    assert.deepEqual(
+      out.skillGroups.map((group) => [group.title, group.skills]),
+      [["Tools", ["Jamf"]]],
+    );
+    assert.equal(removeSkills(content, ["Go"]), content);
   });
 });

@@ -37,6 +37,10 @@ const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, sendingResumeI
 const { INTERVIEW_ADVICE, excerpt, stepsForGap } = await import("../app/lib/apply/gapSteps.ts");
 const { changeCount, highlightTexts, resumeChanges } = await import("../app/lib/apply/changes.ts");
 const { noteParts, quantityParts, scoreColor, withoutEmDashes } = await import("../app/lib/apply/score.ts");
+const { editBullet, editSummary } = await import("../app/lib/apply/edits.ts");
+const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreStep, stampStep } = await import("../app/lib/apply/history.ts");
+const { bareBullets, bulletsWithoutResult, fixFirstId, matchMoves, onlyInSkills, scoreHue, skillsOnlyNames, unbackedSkills, workingItems } =
+  await import("../app/lib/apply/fixes.ts");
 
 const content = (overrides = {}) => ({
   name: "Ada Obi",
@@ -55,7 +59,18 @@ const content = (overrides = {}) => ({
   ...overrides,
 });
 
-const report = { scanId: "s1", resumeVersion: 2, score: 61, metrics: [], gaps: [], verdicts: [], degraded: false, degradedReason: null, explanation: null, rewrites: [] };
+const report = {
+  scanId: "s1",
+  resumeVersion: 2,
+  score: 61,
+  metrics: [],
+  gaps: [],
+  verdicts: [],
+  degraded: false,
+  degradedReason: null,
+  explanation: null,
+  rewrites: [],
+};
 
 describe("reading a session's state", () => {
   it("answers the defaults for nothing, or for something that isn't an object", () => {
@@ -66,7 +81,17 @@ describe("reading a session's state", () => {
 
   it("reads back what the wizard wrote", () => {
     const written = {
-      resume: { baseId: "b1", baseName: "cv.pdf", draftId: "d1", draftName: "cv — Acme", draftFromId: "b1", sendDraft: true, creatorDocId: null },
+      resume: {
+        baseId: "b1",
+        baseName: "cv.pdf",
+        draftId: "d1",
+        draftName: "cv — Acme",
+        draftFromId: "b1",
+        sendDraft: true,
+        creatorDocId: null,
+        history: [],
+        historyAt: 0,
+      },
       scan: { resumeId: "d1", version: 2, report, previousScore: 54 },
       proposal: null,
       cover: {
@@ -173,7 +198,10 @@ describe("the steps behind a gap", () => {
   it("keeps every pill short, and each one a different thing to do", () => {
     for (const category of ["skill", "experience", "education", "responsibility", "leadership"]) {
       for (const state of ["missing", "partial"]) {
-        const help = stepsForGap(verdict(category, state, [{ chunkId: "c1", text: "Ran ECS", section: "experience", role: "Kite", score: 0.5 }]), "Docker");
+        const help = stepsForGap(
+          verdict(category, state, [{ chunkId: "c1", text: "Ran ECS", section: "experience", role: "Kite", score: 0.5 }]),
+          "Docker",
+        );
         for (const action of help.actions) assert.ok(action.label.split(" ").length <= 5, action.label);
         // The posting's wording is said once, inside the step it belongs to (owner, 2026-10-03).
         const wording = help.actions.filter((action) => /posting/.test(action.label) || /posting/.test(action.how));
@@ -206,7 +234,10 @@ describe("the steps behind a gap", () => {
   it("never uses an em dash", () => {
     for (const category of ["skill", "experience", "education", "responsibility", "leadership"]) {
       for (const state of ["missing", "partial"]) {
-        const help = stepsForGap(verdict(category, state, [{ chunkId: "c1", text: "Ran ECS", section: "experience", role: "Kite", score: 0.5 }]), "Docker");
+        const help = stepsForGap(
+          verdict(category, state, [{ chunkId: "c1", text: "Ran ECS", section: "experience", role: "Kite", score: 0.5 }]),
+          "Docker",
+        );
         for (const line of [...help.actions.flatMap((action) => [action.label, action.how]), help.advice ?? ""]) assert.ok(!line.includes("—"), line);
       }
     }
@@ -291,7 +322,10 @@ describe("the score card", () => {
   });
 
   it("picks out quantities with their units, but not years, codes or time zones", () => {
-    const picked = (text) => quantityParts(text).filter((part) => part.quantity).map((part) => part.text);
+    const picked = (text) =>
+      quantityParts(text)
+        .filter((part) => part.quantity)
+        .map((part) => part.text);
     assert.deepEqual(picked("5+ years of experience building and scaling SaaS products"), ["5+ years"]);
     assert.deepEqual(picked("Routes 2M messages a day, cutting latency by 40% in 3 weeks"), ["2M", "40%", "3 weeks"]);
     assert.deepEqual(picked("Software Engineer [IC3], UTC-8 to UTC+2, since 2019"), []);
@@ -309,5 +343,186 @@ describe("the score card", () => {
     assert.equal(withoutEmDashes("— framed —"), "framed");
     assert.equal(withoutEmDashes("Ends on a dash —."), "Ends on a dash.");
     assert.equal(withoutEmDashes("Kite, 2020 – 2024"), "Kite, 2020 – 2024");
+  });
+});
+
+const step = (id, extra = {}) => ({ id, label: id, at: "2026-10-19T10:00:00.000Z", content: content(), version: null, score: null, ...extra });
+
+describe("the draft's change history", () => {
+  it("adds a change after the current step and clears the undone ones", () => {
+    const three = [step("a"), step("b"), step("c")];
+    const pushed = pushStep(three, 0, step("d"));
+    assert.deepEqual(
+      pushed.history.map((row) => row.id),
+      ["a", "d"],
+    );
+    assert.equal(pushed.at, 1);
+    assert.equal(pushStep(three, 2, step("e")).at, 3);
+  });
+
+  it("keeps the starting point and the latest steps, and reports on the latest few only", () => {
+    let history = [step("start", { report })];
+    let at = 0;
+    for (let i = 1; i <= MAX_HISTORY_STEPS + 3; i += 1) ({ history, at } = pushStep(history, at, step(`s${i}`, { report })));
+    assert.equal(history.length, MAX_HISTORY_STEPS);
+    assert.equal(history[0].id, "start");
+    assert.equal(history.at(-1).id, `s${MAX_HISTORY_STEPS + 3}`);
+    assert.equal(at, MAX_HISTORY_STEPS - 1);
+    assert.equal(history.filter((row) => row.report).length, REPORTS_KEPT);
+  });
+
+  it("gives a scanned version's step its score", () => {
+    const history = [step("a", { version: 1 }), step("b", { version: 2 })];
+    const scored = scoreStep(history, 2, { ...report, score: 72.4 });
+    assert.equal(scored[1].score, 72);
+    assert.equal(scored[0].score, null);
+    assert.equal(scoreStep(history, 9, report), history);
+  });
+
+  it("says what changing the hidden parts did", () => {
+    const words = content();
+    assert.equal(hiddenLabel([], ["summary"], words), "Hid Summary for this job");
+    assert.equal(hiddenLabel(["skills"], [], words), "Showed Skills again");
+    assert.equal(hiddenLabel([], ["exp:x1:0"], words), "Hid a line at Kite for this job");
+    assert.equal(hiddenLabel([], ["exp:x1"], words), "Hid Kite for this job");
+    assert.equal(hiddenLabel([], ["summary", "skills"], words), "Changed what's hidden for this job");
+  });
+});
+
+describe("the score card's fixes", () => {
+  const verdict = (id, state, sections) => ({
+    requirement: { id, text: `Wants ${id}`, label: id, category: "skill", importance: "required" },
+    state,
+    evidence: sections.map((section) => ({ section, text: `${id} in ${section}` })),
+  });
+
+  it("colours a score by the design's bands", () => {
+    assert.equal(scoreHue(49), "low");
+    assert.equal(scoreHue(50), "mid");
+    assert.equal(scoreHue(70), "high");
+  });
+
+  it("picks the lowest check to fix first, while it is under 65", () => {
+    const metrics = (values) => values.map(([id, value]) => ({ id, value }));
+    assert.equal(
+      fixFirstId({
+        metrics: metrics([
+          ["keyword-match", 80],
+          ["impact-language", 41],
+        ]),
+      }),
+      "impact-language",
+    );
+    assert.equal(
+      fixFirstId({
+        metrics: metrics([
+          ["keyword-match", 80],
+          ["impact-language", 70],
+        ]),
+      }),
+      null,
+    );
+  });
+
+  it("finds keywords matched only in Skills", () => {
+    const verdicts = [
+      verdict("Docker", "satisfied", ["skills"]),
+      verdict("Go", "satisfied", ["skills", "experience"]),
+      verdict("AWS", "missing", []),
+    ];
+    assert.deepEqual(
+      verdicts.filter(onlyInSkills).map((v) => v.requirement.id),
+      ["Docker"],
+    );
+    assert.deepEqual(skillsOnlyNames({ verdicts }), ["Docker"]);
+  });
+
+  it("says what a change newly matched", () => {
+    const now = { verdicts: [verdict("Docker", "satisfied", ["experience"]), verdict("Go", "satisfied", ["skills"])] };
+    const moves = matchMoves(now, { Docker: "missing", Go: "satisfied" });
+    assert.equal(moves.length, 1);
+    assert.equal(moves[0].name, "Docker");
+    assert.equal(moves[0].up, true);
+    assert.equal(moves[0].where, "Experience");
+    assert.deepEqual(matchMoves(now, undefined), []);
+  });
+
+  it("counts bullets with no result and lists what is working", () => {
+    const words = content({
+      experience: [{ id: "x1", role: "Designer", company: "Kite", dates: "", bullets: ["Grew signups 40%", "Ran research", " "] }],
+    });
+    assert.equal(bulletsWithoutResult(words), 1);
+    const items = workingItems({ metrics: [{ id: "parseability", value: 91 }], verdicts: [] }, words);
+    assert.deepEqual(
+      items.map((item) => item.title),
+      ["Reads cleanly.", "Numbers on 1 bullet."],
+    );
+  });
+});
+
+describe("the points-off note", () => {
+  it("names the posting's skills in Skills that no role or project mentions", () => {
+    const req = (label, category = "skill") => ({
+      requirement: { id: label, text: label, label, category, importance: "required" },
+      state: "satisfied",
+      evidence: [],
+    });
+    const words = content({
+      skills: ["Figma", "Okta", "MDM rollout", "Jamf"],
+      experience: [{ id: "x1", role: "IT lead", company: "Kite", dates: "", bullets: ["Rolled out Okta to 300 staff"] }],
+      projects: [{ id: "p1", name: "Fleet", detail: "Moved laptops to Jamf" }],
+    });
+    assert.deepEqual(unbackedSkills(words, { verdicts: [req("Okta"), req("MDM rollout"), req("Jamf"), req("Terraform")] }), ["MDM rollout"]);
+  });
+});
+
+describe("stamping the step the draft is at", () => {
+  it("gives the current step this score, whatever version it was recorded with", () => {
+    const history = [step("a", { version: 1, score: 31 }), step("b", { version: 4, score: 31 })];
+    const stamped = stampStep(history, 1, 7, { ...report, score: 45 });
+    assert.equal(stamped[1].score, 45);
+    assert.equal(stamped[1].version, 7);
+    assert.equal(stamped[0].score, 31);
+    assert.equal(stampStep([], 0, 7, report).length, 0);
+  });
+});
+
+describe("editing lines on the page", () => {
+  it("retypes a line, and says where", () => {
+    const edit = editBullet(content(), "x1", 1, "Ran research with 12 users");
+    assert.equal(edit.label, "Edited a line at Kite");
+    assert.deepEqual(edit.content.experience[0].bullets, ["Led the checkout redesign", "Ran research with 12 users"]);
+    assert.equal(editBullet(content(), "x1", 1, " Ran research "), null);
+    assert.equal(editBullet(content(), "nope", 0, "x"), null);
+  });
+
+  it("deletes an emptied line and moves the hidden marks after it up one", () => {
+    const words = content({
+      experience: [{ id: "x1", role: "Designer", company: "Kite", dates: "", bullets: ["a", "b", "c"] }],
+      hiddenParts: ["exp:x1:0", "exp:x1:2", "summary"],
+    });
+    const edit = editBullet(words, "x1", 0, "  ");
+    assert.equal(edit.label, "Deleted a line at Kite");
+    assert.deepEqual(edit.content.experience[0].bullets, ["b", "c"]);
+    assert.deepEqual(edit.content.hiddenParts, ["exp:x1:1", "summary"]);
+  });
+
+  it("retypes the summary", () => {
+    assert.equal(editSummary(content(), "New words.").label, "Edited the Summary");
+    assert.equal(editSummary(content(), content().summary), null);
+  });
+});
+
+describe("cards never point at what is hidden", () => {
+  it("leaves hidden roles and lines out of the bullets with no result", () => {
+    const words = content({
+      experience: [
+        { id: "x1", role: "Designer", company: "Kite", dates: "", bullets: ["Ran research", "Led the redesign", "Grew signups 40%"] },
+        { id: "x2", role: "Intern", company: "Owl", dates: "", bullets: ["Made coffee"] },
+      ],
+      hiddenParts: ["exp:x1:1", "exp:x2"],
+    });
+    assert.deepEqual(bareBullets(words), ["Ran research"]);
+    assert.equal(bulletsWithoutResult(words), 1);
   });
 });

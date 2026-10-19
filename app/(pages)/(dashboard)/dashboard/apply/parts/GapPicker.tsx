@@ -21,8 +21,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { INTERVIEW_ADVICE_LABEL, stepsForGap, type GapSteps } from "@/app/lib/apply/gapSteps";
 import { quantityParts } from "@/app/lib/apply/score";
-import type { AtsKeyword, PostingNote, RequirementVerdict } from "@/app/lib/ats/types";
-import { SUGGESTION_CREDITS } from "@/app/lib/resume/ai";
+import type { AtsKeyword, RequirementVerdict } from "@/app/lib/ats/types";
 import { cn } from "@/lib/utils";
 
 /** A chip's label is a window on the requirement: one that stops short of its end gets an ellipsis. */
@@ -117,34 +116,14 @@ const GapDetail: FC<{ help: GapSteps; interactive: boolean }> = ({ help, interac
 export interface GapPickerProps {
   gaps: AtsKeyword[];
   verdictById: ReadonlyMap<string, RequirementVerdict>;
-  /** Works the picked gaps in, one credit for all of them; true once a proposal is in. Absent while the tools can't run. */
+  /** Works the picked gaps in, one run for all of them; true once a proposal is in. Absent while the tools can't run. */
   onFix?: (labels: string[]) => Promise<boolean>;
   fixing: boolean;
   /** Why the last fix started here failed, said beside its button. */
   fixError?: string | null;
-  /** The employer, for "What Pencil needs solved". */
-  company?: string;
-  /** The problems the employer is hiring to solve (RWW/ATS-QUALITY-PLAN.md, 13.6). */
-  needs?: string[];
-  /** Where the candidate must live or may work: a notice, never a gap to pick (1.2). */
-  eligibility?: PostingNote[];
-  /** Personal qualities: for the cover letter or interview, never a gap to pick (1.3). */
-  traits?: PostingNote[];
 }
 
-/** One plain notice row: a title and the posting's items, never pickable. */
-const Notice: FC<{ title: string; items: string[]; tone?: "warn" | "plain" }> = ({ title, items, tone = "plain" }) => (
-  <div className={cn("rounded-lg border px-3.5 py-2.5", tone === "warn" ? "border-[#b26a00]/30 bg-[#fff8ec]" : "border-black/10 bg-white")}>
-    <p className={cn("text-[11px] font-bold uppercase tracking-[0.08em]", tone === "warn" ? "text-[#8a5200]" : "text-black/45")}>{title}</p>
-    <ul className="mt-1 flex flex-col gap-0.5 text-[13px] leading-relaxed text-black/75">
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  </div>
-);
-
-const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixError = null, company, needs = [], eligibility = [], traits = [] }) => {
+const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixError = null }) => {
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -215,10 +194,8 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
 
   return (
     <div className="flex flex-col gap-4">
-      {needs.length > 0 && <Notice title={company ? `What ${company} needs solved` : "What they need solved"} items={needs} />}
-      {eligibility.length > 0 && (
-        <Notice tone="warn" title="This role needs" items={eligibility.map((note) => `${note.text}. Check you meet it; it never goes on your resume.`)} />
-      )}
+      {/* "What they need solved" and "This role needs" left this step (owner, 2026-10-18): the role's
+          eligibility is on step 1, and the rest was more to read than to act on. */}
       {gaps.length > 0 && (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -238,9 +215,7 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
           )}
         </div>
       </div>
-      <p className="mt-1 text-sm text-black/55">
-        Hover one to see what it needs. Pick the ones your work really shows. You don&apos;t need every one: resumes covering about half of a posting&apos;s skills did best.
-      </p>
+      <p className="mt-1 text-sm text-black/55">Hover one to see what it needs. Pick the ones your work really shows.</p>
 
       <div className="mt-3.5 flex flex-wrap gap-2">
         {gaps.map((gap) => {
@@ -305,8 +280,9 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
       {chosen.length > 0 && (
         <>
           {/* The summary: secondary, so a lighter dark, and small until a line is opened. */}
-          <div className="mt-4 rounded-xl bg-[#3a3b3f] p-1.5 text-white">
-            <ul className={cn("scrollbar-neo-dark overflow-y-auto overscroll-contain", opened ? "max-h-[360px]" : "max-h-[88px]")}>
+          {/* Taller by default (owner, 2026-10-18): about one and a half more rows than before. */}
+          <div className={cn("mt-4 rounded-xl bg-[#3a3b3f] p-1.5 text-white", opened ? "h-[360px]" : "h-[154px]")}>
+            <ul className="scrollbar-neo-dark h-full overflow-y-auto overscroll-contain">
               {chosen.map((gap) => {
                 const help = helpFor(gap);
                 const open = opened === gap.id;
@@ -348,9 +324,9 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <StickerButton variant="primary" size="sm" disabled={!onFix || fixing} onClick={fix}>
               <Sparkles className="h-3.5 w-3.5" />
-              {chosen.length === 1 ? "Fix it with AI" : `Fix all ${chosen.length} with AI`} · {SUGGESTION_CREDITS} credit
+              {chosen.length === 1 ? "Fix it with AI" : `Fix all ${chosen.length} with AI`}
             </StickerButton>
-            <span className="text-xs text-black/50">One credit for all of them. Nothing changes until you use the new version.</span>
+            <span className="text-xs text-black/50">Nothing changes until you use the new version.</span>
           </div>
           {fixError && !fixing && (
             <p role="alert" className="mt-2 text-sm text-[#b23c26]">
@@ -360,9 +336,6 @@ const GapPicker: FC<GapPickerProps> = ({ gaps, verdictById, onFix, fixing, fixEr
         </>
       )}
     </div>
-      )}
-      {traits.length > 0 && (
-        <Notice title="Show these in your cover letter or interview" items={traits.map((note) => note.label || note.text)} />
       )}
     </div>
   );

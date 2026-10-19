@@ -1155,12 +1155,18 @@ body {
 
 /* The apply wizard's resume preview: what tailoring changed, marked on the real paper with the CSS
    Custom Highlight API (no DOM is rewritten, so the resume renderer stays untouched). */
+/* What changed for this job: 10% lighter than it was (owner, 2026-10-19). */
 ::highlight(rww-resume-change) {
-  background-color: #eef7b8;
+  background-color: #f0f8bf;
   text-decoration: underline;
-  text-decoration-color: #9aab1f;
+  text-decoration-color: #a4b335;
   text-decoration-thickness: 2px;
   text-underline-offset: 2px;
+}
+
+/* "Show in resume": the lines a card means, lit leaf green over everything else for a moment. */
+::highlight(rww-resume-flash) {
+  background-color: #b6df8a;
 }
 
 #jd .ql-editor {

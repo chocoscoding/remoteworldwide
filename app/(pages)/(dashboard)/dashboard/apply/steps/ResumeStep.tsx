@@ -1,70 +1,47 @@
 "use client";
 
-// Step 2: the resume this application goes out with.
+// Step 2: the resume this application goes out with (owner's design, 2026-10-19, "AI apply resume
+// step").
 //
-// It starts from one resume (the master by default, or one uploaded or picked
-// with "Select resume") and keeps ONE working copy for this application (owner,
-// 2026-10-03): the tools' proposals are used into that same draft, updated in
-// place, instead of filing a new resume every time. The original is never
-// touched, and the draft stays out of every resume list until the application
-// is tracked, when it is kept as the version that was sent.
+// It starts from one resume (the master by default, or one uploaded or picked) and keeps ONE
+// working copy for this application (owner, 2026-10-03): the original is never touched, and the
+// draft stays out of every resume list until the application is tracked, when it is kept as the
+// version that was sent.
 //
-// The resume marked "Sending this" is what is scored, what the letter is written
-// from and what is recorded. It is scored automatically, and again after every
-// change (owner's choice: always current, a credit per version; a repeat of the
-// same version and posting is served from the scan cache for free). The gaps the
-// score finds can be picked, each with what to do about it, and fixed together
-// for one credit; the two tools work every gap in at once. They add what is
-// asked: a term nothing on the resume backs up comes with advice to be ready to
-// back it up in an interview, never a refusal (owner).
+// Three cards, top to bottom: which resume goes, the score and the fixes together, and the resume
+// itself with an eye beside each section, role and line.
 //
-// One column, top to bottom (owner, 2026-10-03): which resume, the score, the
-// tools, then the resume itself, whole, collapsed at the bottom until "Preview"
-// or its own header opens it. It stays open until the user closes it.
+// Every change goes straight into the draft as a step of its history: a tool's rewrite, keywords
+// added to Skills, a part hidden for this job. There is no "use this version" step any more; undo,
+// redo and the history list (top right of the wizard) are how a change is taken back, and the
+// score jumps with them without a re-score. Each new version is scored (always current, a credit a
+// version; a repeat of the same version and posting comes from the scan cache, free), and "What
+// your last change did" says which keywords it matched.
 //
-// "Open in resume creator" edits a copy there; coming back to this tab brings
-// those edits into the draft as its next version, which is scored like any
-// other change, so the preview and the score follow what was edited.
-//
-// Everything here (the picks, the draft, the score, a proposal that cost a
-// credit) lives in the application's session, so a refresh loses none of it.
+// Everything here (the picks of the resume, the draft, its history, the score) lives in the
+// application's session, so a refresh loses none of it.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FC, type ReactNode } from "react";
-import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  Check,
-  ChevronDown,
-  Download,
-  ExternalLink,
-  Eye,
-  FileText,
-  Library,
-  MoreHorizontal,
-  RotateCw,
-  Sparkles,
-  Upload,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { Check, Download, ExternalLink, Eye, Layers, MoreHorizontal, RotateCw, Upload, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import DashCard from "@/app/components/dashboard/ui/DashCard";
-import Pill from "@/app/components/dashboard/ui/Pill";
-import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
+import { Bone, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { Bone, LinesSkeleton, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import { useDocuments } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
-import { changeCaption, changeCount, resumeChanges } from "@/app/lib/apply/changes";
-import { noteParts, scoreColor, withoutEmDashes } from "@/app/lib/apply/score";
-import { sendingResumeId, type ApplyProposal, type ApplyState, type ResumeToolId } from "@/app/lib/apply/state";
-import { ATS_BILLING_HREF, SCAN_CREDITS, STUFFING_ADVICE, missingGaps, prepareResumeForDoc, scanTier, stuffingHeadline } from "@/app/lib/ats/api";
-import type { CoverageState, IngestedResumeDetail, RequirementVerdict, ScanReport } from "@/app/lib/ats/types";
+import { changeCount, resumeChanges } from "@/app/lib/apply/changes";
+import { bareBullets, metricValues, onlyInSkills, unbackedSkills, workingItems } from "@/app/lib/apply/fixes";
+import { editBullet, editSummary, type LineEdit } from "@/app/lib/apply/edits";
+import { hiddenLabel, pushStep, scoreStep, stampStep, stepId } from "@/app/lib/apply/history";
+import { sendingResumeId, type ApplyState } from "@/app/lib/apply/state";
+import { ATS_BILLING_HREF, missingGaps, prepareResumeForDoc } from "@/app/lib/ats/api";
+import type { IngestedResumeDetail } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { qk } from "@/app/lib/query/keys";
-import { SUGGESTION_CREDITS, injectKeywords, tailorToJob } from "@/app/lib/resume/ai";
+import { askForRewrite, injectKeywords, tailorToJob, type ResumePlace } from "@/app/lib/resume/ai";
 import {
   RESUME_ACCEPT,
   createDraftResume,
@@ -75,18 +52,21 @@ import {
   resumeContentToText,
   saveResumeDocument,
   updateDraftResume,
+  visibleContent,
   type ImportedResume,
 } from "@/app/lib/resume/api";
+import { addSkills, reconcileGroups, removeSkills } from "@/app/lib/resume/skills";
 import { useIngestedResumeQuery, useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
+import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
 import type { StartedJob } from "../job";
 import type { useApplyScan } from "../useApplyScan";
 import ChangesPaper from "../parts/ChangesPaper";
-import GapPicker from "../parts/GapPicker";
+import DraftHistory from "../parts/DraftHistory";
 import ResumePreviewDialog, { DownloadButton } from "../parts/ResumePreviewDialog";
-import { useResumeDownload } from "../parts/useResumeDownload";
+import { FixesTabs, ScoreRow, StuffingNote, type GapChip, type ScoreState, type StuffingNoteView, type Suggestion } from "../parts/ScoreFixes";
 import SelectResumeDialog, { type PickedResume } from "../parts/SelectResumeDialog";
-import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
+import { useResumeDownload } from "../parts/useResumeDownload";
 
 export interface ResumeStepProps {
   job: StartedJob;
@@ -96,15 +76,32 @@ export interface ResumeStepProps {
   /** False once the application is tracked: nothing here changes, and nothing is scored. */
   editable: boolean;
   scan: ReturnType<typeof useApplyScan>;
+  /** The wizard header's slot for this step's undo, redo and history; null while another step shows. */
+  actionsSlot?: HTMLElement | null;
 }
 
-/** The service's cap on a tool's want-list: every gap the panel shows fits. */
+/** The service's cap on a tool's want-list. */
 const MAX_TOOL_GAPS = 20;
 
 /** The least time between two reads of the resume creator's copy: focus and visibility both fire on a tab switch. */
 const PULL_GAP_MS = 5_000;
 
+/** How long the eyes wait after the last click before saving: a few clicks make one version, and one score. */
+const HIDE_SAVE_DELAY_MS = 1_200;
+/** How long before a failed draft save is tried once more. */
+const RETRY_SAVE_MS = 1_500;
+
+/** What "Quantify them" asks for: a result on every bullet that has none, marked for the person to check. */
+const QUANTIFY_INSTRUCTION =
+  "Add a specific, measurable result to every bullet that has no number yet, keeping what each bullet says. Leave bullets that already have a number as they are.";
+
 const withoutExtension = (name: string) => name.replace(/\.[a-z0-9]{1,5}$/i, "");
+
+/** What a failed save says: never a provider's own words ("Voyage embed timed out after 3000ms"). */
+const changeMessage = (error: unknown): string =>
+  error instanceof BackendError && error.status >= 500
+    ? "Couldn't save that change just now, so nothing changed. Please try again."
+    : apiMessage(error);
 
 /** The draft cache entry the wizard reads (`useIngestedResumeQuery`), from a save's answer. */
 const asDetail = (saved: ImportedResume): IngestedResumeDetail => ({
@@ -116,27 +113,32 @@ const asDetail = (saved: ImportedResume): IngestedResumeDetail => ({
   error: null,
 });
 
-const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan }) => {
+const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, actionsSlot = null }) => {
   const queryClient = useQueryClient();
   const { docs, loading: docsLoading } = useDocuments();
   const ingested = useIngestedResumesQuery();
   const tools = useResumeSuggestion();
   const { download, printer } = useResumeDownload();
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const toolsRef = useRef<HTMLDivElement | null>(null);
   const paperRef = useRef<HTMLDivElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectOpen, setSelectOpen] = useState(false);
-  const [using, setUsing] = useState(false);
-  const [useError, setUseError] = useState<string | null>(null);
-  // The popup preview: a proposal not used yet, or either resume from its row's menu.
-  const [previewing, setPreviewing] = useState<"proposal" | "draft" | "base" | null>(null);
+  const [previewing, setPreviewing] = useState<"draft" | "base" | null>(null);
   const [openingCreator, setOpeningCreator] = useState(false);
-  const [paperOpen, setPaperOpen] = useState(false);
-  // Where the last tool run was started, so its failure is said there: the gaps' fix button, or the tools card.
-  const [toolFrom, setToolFrom] = useState<"gaps" | "tools" | "proposal">("tools");
-  const scrollOnOpen = useRef(false);
+  // The fixes: the keywords picked to add, where AI changes may go, and what is being done now.
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  const [places, setPlaces] = useState<ResumePlace[]>(["bullets", "skills"]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [changeError, setChangeError] = useState<string | null>(null);
+  // The −1 pt note set aside ("Keep as is") for this score.
+  const [keptStuffing, setKeptStuffing] = useState<string | null>(null);
+  // "Show in resume": the lines lit on the page now, and a key so the same lines light again.
+  const [flash, setFlash] = useState<{ texts: string[]; key: number } | null>(null);
+  // The eyes' choice while it waits to be saved (shown at once), and its save timer.
+  const [pendingHidden, setPendingHidden] = useState<string[] | null>(null);
+  const hideTimer = useRef<number | null>(null);
+  const flushHidden = useRef<(() => void) | null>(null);
 
   const { resume } = state;
   const sendingId = sendingResumeId(resume);
@@ -146,13 +148,17 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   // What the draft's words were built from, for the preview's marks.
   const draftFrom = useIngestedResumeQuery(resume.draftFromId);
 
-  const content = sending.data?.content ?? null;
+  // Skills a tool added to the flat list only are brought into the entries the page prints, so what
+  // is shown is what is scored.
+  const sendingContent = sending.data?.content ?? null;
+  const content = useMemo(() => (sendingContent ? reconcileGroups(sendingContent) : null), [sendingContent]);
   const version = sending.data?.version ?? null;
   const sendingReady = sending.data?.status === "ready";
 
   // A resume that couldn't be opened (the AI service restarting, say) is said, with a way to try
   // again, rather than left looking like it is still being read (owner, 2026-10-03: "I am stuck").
-  const resumeFailed = (sendingId !== null && sending.isError) || (resume.baseId !== null && base.isError) || (resume.draftId !== null && draft.isError);
+  const resumeFailed =
+    (sendingId !== null && sending.isError) || (resume.baseId !== null && base.isError) || (resume.draftId !== null && draft.isError);
   function retryResumes() {
     if (sendingId && sending.isError) void sending.refetch();
     if (resume.baseId && base.isError) void base.refetch();
@@ -166,17 +172,18 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
     // Both lists first: deciding before My documents is in would skip the master.
     if (!editable || resume.baseId || !ingested.data || docsLoading || masterResume.isPending) return;
     const ready = ingested.data.filter((row) => row.status === "ready");
+    const pick = (resumeId: string, baseName: string) =>
+      update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: resumeId, baseName } }));
+    const newest = () => {
+      if (ready[0]) pick(ready[0].resumeId, ready[0].fileName);
+    };
     const built = masterResume.data?.source === "built" ? masterResume.data : null;
     if (built && !masterImport.current) {
       // The master is a resume made here: read from its content (deduped by the service when unedited).
       masterImport.current = true;
       void parsedResumeOfBuilt(built.id)
-        .then((prepared) => update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: prepared.resumeId, baseName: built.name } })))
-        .catch(() => {
-          const newest = ready[0];
-          if (newest)
-            update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: newest.resumeId, baseName: newest.fileName } }));
-        });
+        .then((prepared) => pick(prepared.resumeId, built.name))
+        .catch(newest);
       return;
     }
     if (built) return;
@@ -184,36 +191,36 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
     const masterName = master ? (master.ext ? `${master.name}.${master.ext}` : master.name) : null;
     const linked = master?.aiResumeId ? ready.find((row) => row.resumeId === master.aiResumeId) : undefined;
     if (master && linked && masterName) {
-      update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: linked.resumeId, baseName: masterName } }));
+      pick(linked.resumeId, masterName);
       return;
     }
     if (master && masterName && !masterImport.current) {
       // The master was never read for scoring: read it now (free, and remembered on the file).
       masterImport.current = true;
       void prepareResumeForDoc(master.id)
-        .then((prepared) =>
-          update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: prepared.resumeId, baseName: masterName } })),
-        )
-        .catch(() => {
-          const newest = ready[0];
-          if (newest)
-            update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: newest.resumeId, baseName: newest.fileName } }));
-        });
+        .then((prepared) => pick(prepared.resumeId, masterName))
+        .catch(newest);
       return;
     }
-    if (!master && ready[0]) {
-      const newest = ready[0];
-      update((s) => (s.resume.baseId ? s : { ...s, resume: { ...s.resume, baseId: newest.resumeId, baseName: newest.fileName } }));
-    }
+    if (!master) newest();
   }, [editable, resume.baseId, ingested.data, docs, docsLoading, masterResume.isPending, masterResume.data, update]);
 
   // ---- The score: automatic, and again after every change ---------------------------------------
   const stored = state.scan && state.scan.resumeId === sendingId && state.scan.version === version ? state.scan : null;
   const live = scan.resumeId !== null && scan.resumeId === sendingId ? scan : null;
-  const report = live?.report ?? stored?.report ?? null;
+  // The stored score of this exact version first: after an undo the scanner still holds the newer version's report.
+  const report = stored?.report ?? live?.report ?? null;
   const scoring = live?.status === "scoring";
   const scoreKey = sendingId && version !== null ? `${sendingId}:${version}` : null;
   const triedKey = useRef<string | null>(null);
+  // The last score of this resume, even of an older version: "Edited since this score".
+  const anyScore = state.scan && state.scan.resumeId === sendingId ? state.scan : null;
+
+  /** The draft's version as it is now, from the cache every save writes to. */
+  const draftVersionNow = useCallback(
+    (draftId: string | null) => (draftId ? queryClient.getQueryData<IngestedResumeDetail>(qk.ats.resume(draftId))?.version : undefined),
+    [queryClient],
+  );
 
   const { run: runScan } = scan;
   const runScore = useCallback(
@@ -223,18 +230,41 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
         update((s) => {
           // Measured against the last version scored; a re-run of the same version keeps what it was measured against.
           const same = s.scan?.resumeId === resumeId && s.scan.version === scoredVersion;
-          const previousScore = same ? (s.scan?.previousScore ?? null) : (s.scan?.report.score ?? null);
-          // Each requirement's state before this version, so "Up 15" can say what moved it.
+          // A partly checked scan is never what a later one is measured against: its numbers are not the resume's.
+          const before = s.scan && !s.scan.report.degraded ? s.scan : null;
+          const previousScore = same ? (s.scan?.previousScore ?? null) : (before?.report.score ?? null);
+          // Each requirement's state and each check's value before this version: what "Now matched" and "+18" are read from.
           const previousStates = same
             ? s.scan?.previousStates
-            : s.scan
-              ? Object.fromEntries(s.scan.report.verdicts.map((verdict) => [verdict.requirement.id, verdict.state]))
+            : before
+              ? Object.fromEntries(before.report.verdicts.map((verdict) => [verdict.requirement.id, verdict.state]))
               : undefined;
-          return { ...s, scan: { resumeId, version: scoredVersion, report: finished, previousScore, ...(previousStates ? { previousStates } : {}) } };
+          const previousMetrics = same ? s.scan?.previousMetrics : before ? metricValues(before.report) : undefined;
+          // The history step this version belongs to takes its score: the step the draft is at, when this is the draft as it is now.
+          // A partly checked scan is shown, never kept as a step's score (owner, 2026-10-19): going back rescores.
+          const isDraft = resumeId === s.resume.draftId;
+          const history =
+            !isDraft || finished.degraded
+              ? s.resume.history
+              : draftVersionNow(resumeId) === scoredVersion
+                ? stampStep(s.resume.history, s.resume.historyAt, scoredVersion, finished)
+                : scoreStep(s.resume.history, scoredVersion, finished);
+          return {
+            ...s,
+            resume: { ...s.resume, history },
+            scan: {
+              resumeId,
+              version: scoredVersion,
+              report: finished,
+              previousScore,
+              ...(previousStates ? { previousStates } : {}),
+              ...(previousMetrics ? { previousMetrics } : {}),
+            },
+          };
         });
       });
     },
-    [runScan, job.description, job.savedJobId, update],
+    [runScan, job.description, job.savedJobId, update, draftVersionNow],
   );
 
   // Once per resume version: a version already scored (here or before a refresh) is shown, not re-run.
@@ -245,42 +275,37 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
     runScore(sendingId, version);
   }, [editable, scoreKey, sendingId, version, sendingReady, stored, runScore]);
 
-  // How much the latest change moved the score: what makes progress visible from one version to the next.
-  const scoreChange = stored && stored.previousScore !== null ? Math.round(stored.report.score) - Math.round(stored.previousScore) : null;
+  const scoreState: ScoreState = !sendingId
+    ? { kind: "none" }
+    : scoring || (!report && (sending.isPending || sending.data?.status === "pending" || !live?.failure))
+      ? { kind: "scoring" }
+      : live?.failure && !report
+        ? { kind: "failed", message: live.failure.message, retryable: live.failure.retryable, credits: live.failure.kind === "credits" }
+        : report && stored && report.degraded
+          ? {
+              kind: "partial",
+              checked: report.verdicts.filter((verdict) => verdict.state !== "undetermined").length,
+              total: report.verdicts.length,
+            }
+          : report && stored
+            ? { kind: "ready" }
+            : { kind: "stale" };
+  const shownReport = report ?? (scoreState.kind === "stale" ? (anyScore?.report ?? null) : null);
 
   const gaps = report ? missingGaps(report) : [];
-  const verdictById = new Map((report?.verdicts ?? []).map((verdict) => [verdict.requirement.id, verdict]));
+  const verdictById = useMemo(() => new Map((report?.verdicts ?? []).map((verdict) => [verdict.requirement.id, verdict])), [report]);
 
   // ---- The resume, whole, at the bottom ---------------------------------------------------------
   const sendingDraft = resume.sendDraft && resume.draftId !== null && sendingId === resume.draftId;
-  const draftContent = draft.data?.content ?? null;
+  const draftData = draft.data?.content ?? null;
+  const draftContent = useMemo(() => (draftData ? reconcileGroups(draftData) : null), [draftData]);
   const draftBase = draftFrom.data?.content ?? base.data?.content ?? null;
-  // Sending the draft: what tailoring changed is marked (once what it was made from is in). Sending the original: nothing is.
+  // Sending the draft: what changed for this job is marked (once what it was made from is in). Sending the original: nothing is.
   const paperBefore = sendingDraft && draftBase ? draftBase : content;
-  const paperChanges = useMemo(
-    () => (content && paperBefore ? changeCount(resumeChanges(paperBefore, content)) : 0),
-    [content, paperBefore],
-  );
-
-  /** "Preview": opens the resume at the bottom and takes the page there (`scroll-mt-40` clears the wizard's 128px sticky header). */
-  function showPaper() {
-    if (paperOpen) {
-      paperRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-    scrollOnOpen.current = true;
-    setPaperOpen(true);
-  }
-
-  useEffect(() => {
-    if (!paperOpen || !scrollOnOpen.current) return;
-    scrollOnOpen.current = false;
-    paperRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [paperOpen]);
+  const paperChanges = useMemo(() => (content && paperBefore ? changeCount(resumeChanges(paperBefore, content)) : 0), [content, paperBefore]);
 
   // ---- Edits made in the resume creator come back -----------------------------------------------
-  // Without this the creator's copy drifted from the draft, and neither the preview nor the score
-  // ever saw those edits (owner, 2026-10-03). Read when this tab is shown again, and once on load.
+  // Read when this tab is shown again, and once on load, so the preview and the score follow them.
   const pulling = useRef(false);
   const lastPull = useRef(0);
   useEffect(() => {
@@ -296,13 +321,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
         const copy = await getResumeDocument(docId);
         const current = queryClient.getQueryData<IngestedResumeDetail>(qk.ats.resume(draftId))?.content;
         if (!current || resumeContentToText(copy.content) === resumeContentToText(current)) return;
-        const saved = await updateDraftResume(draftId, copy.content);
-        queryClient.setQueryData(qk.ats.resume(saved.resumeId), asDetail(saved));
-        // Edited for this application, so it is what goes out.
-        update((s) => ({ ...s, proposal: null, resume: { ...s.resume, sendDraft: true } }));
+        await commitChange("Edited in the resume creator", copy.content);
         toast.success("Brought in your edits from the resume creator.");
       } catch (error) {
-        // The copy is gone: the next "Open in resume creator" makes a new one.
+        // The copy is gone: the next "Open in editor" makes a new one.
         if (error instanceof BackendError && error.status === 404) update((s) => ({ ...s, resume: { ...s.resume, creatorDocId: null } }));
       } finally {
         pulling.current = false;
@@ -316,6 +338,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
       document.removeEventListener("visibilitychange", onShow);
       window.removeEventListener("focus", onShow);
     };
+    // `commitChange` reads the latest state through `update`; re-subscribing on every render would re-read on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editable, resume.creatorDocId, resume.draftId, queryClient, update]);
 
   // ---- Picking the base ----------------------------------------------------------------------
@@ -338,110 +362,434 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
     }
   }
 
-  // ---- The tools -------------------------------------------------------------------------------
-  /**
-   * Runs a tool against the resume being sent; true once its proposal is in. With `onto`, the
-   * keywords tool works that proposal's missed terms into the proposal itself, so what already
-   * went in stays and the two runs read as one.
-   */
-  async function runTool(tool: ResumeToolId, only?: string[], onto?: ApplyProposal): Promise<boolean> {
-    if (!sendingId || !content) return false;
-    setToolFrom(onto ? "proposal" : only ? "gaps" : "tools");
-    // Started from the gaps above: the tools card, where the result takes shape, comes into view.
-    if (only && !onto) requestAnimationFrame(() => toolsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
-    const forResumeId = sendingId;
-    const wanted = only ?? gaps.map((gap) => gap.label).slice(0, MAX_TOOL_GAPS);
-    const input = {
-      content: onto?.content ?? content,
-      jdText: job.description,
-      company: job.company,
-      role: job.role,
-      keywords: wanted.length > 0 ? wanted : null,
-    };
-    // A gap the score found a close line for isn't "unbacked", whatever the tool's own check says:
-    // the steps above showed that line, and the two must agree.
-    const closeOnResume = new Set(
-      gaps
-        .filter((gap) => {
-          const verdict = verdictById.get(gap.id);
-          return verdict?.state === "partial" && verdict.evidence.length > 0;
-        })
-        .map((gap) => gap.label),
-    );
-    setUseError(null);
-    let proposal: ApplyProposal | null = null;
-    if (tool === "tailor") {
-      const result = await tools.run("tailor", () => tailorToJob(input));
-      if (result) proposal = { tool, forResumeId, content: result.content, terms: result.woven, unbacked: [], missed: [], notShown: result.notShown ?? [], placed: {} };
-    } else {
-      const result = await tools.run("keywords", () => injectKeywords(input));
-      if (result) {
-        const unbacked = result.unbacked.filter((term) => !closeOnResume.has(term));
-        // `missed` is absent from a service that predates it, which worked every term in or failed.
-        const missed = result.missed ?? [];
-        const notShown = result.notShown ?? [];
-        const placed = result.placed ?? {};
-        proposal = onto
-          ? {
-              ...onto,
-              content: result.content,
-              terms: [...onto.terms, ...result.added],
-              unbacked: [...onto.unbacked, ...unbacked],
-              missed,
-              notShown: [...onto.notShown, ...notShown],
-              placed: { ...onto.placed, ...placed },
-            }
-          : { tool, forResumeId, content: result.content, terms: result.added, unbacked, missed, notShown, placed };
-      }
-    }
-    if (!proposal) return false;
-    const made = proposal;
-    update((s) => ({ ...s, proposal: made }));
-    // A fix started from the gaps above lands in the tools card: bring it into view.
-    requestAnimationFrame(() => toolsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
-    return true;
-  }
-
-  const proposal = state.proposal && state.proposal.forResumeId === sendingId ? state.proposal : null;
+  // ---- Changes: every one goes into the draft as a step of its history ----------------------------
   const draftLabel = `${withoutExtension(resume.baseName ?? "Resume")} for ${job.company}`;
+  const history = resume.history;
+  const historyAt = resume.historyAt;
 
-  /** "Use this version": into the application's one draft, made the first time and updated in place after. */
-  async function adoptProposal() {
-    if (!proposal || using) return;
-    setUsing(true);
-    setUseError(null);
-    try {
-      let saved: ImportedResume;
+  /** Writes words into this application's one draft: made the first time, updated in place after. A provider hiccup is tried once more. */
+  async function writeDraft(words: ResumeContent): Promise<ImportedResume> {
+    const write = async (): Promise<ImportedResume> => {
       try {
-        saved = resume.draftId
-          ? await updateDraftResume(resume.draftId, proposal.content, draftLabel)
-          : await createDraftResume(proposal.content, draftLabel);
+        return resume.draftId ? await updateDraftResume(resume.draftId, words, draftLabel) : await createDraftResume(words, draftLabel);
       } catch (error) {
         // The draft is gone (removed elsewhere): start a new one rather than fail.
         if (!(resume.draftId && error instanceof BackendError && error.status === 404)) throw error;
-        saved = await createDraftResume(proposal.content, draftLabel);
+        return createDraftResume(words, draftLabel);
       }
+    };
+    try {
+      return await write();
+    } catch (error) {
+      if (!(error instanceof BackendError && error.status >= 500)) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, RETRY_SAVE_MS));
+      return write();
+    }
+  }
+
+  /**
+   * The step being left keeps the score its words had: the current score, when it is of the draft as
+   * it is now (read before the draft is written again). A score that was lost along the way (a reload
+   * mid-score, say) is put back here rather than shown wrong after an undo.
+   */
+  function leaving(s: ApplyState, versionNow: number | undefined) {
+    const draftId = s.resume.draftId;
+    if (!s.scan || s.scan.report.degraded || !draftId || s.scan.resumeId !== draftId || versionNow === undefined || s.scan.version !== versionNow)
+      return s.resume.history;
+    return stampStep(s.resume.history, s.resume.historyAt, versionNow, s.scan.report);
+  }
+
+  /**
+   * One change: the words go into the draft, the change becomes the latest step of the history (any
+   * steps undone before it are cleared), and the new version is scored. True once it is in.
+   */
+  async function commitChange(label: string, words: ResumeContent): Promise<boolean> {
+    const before = content;
+    if (!before) return false;
+    setChangeError(null);
+    const versionNow = draftVersionNow(resume.draftId);
+    try {
+      const saved = await writeDraft(words);
+      queryClient.setQueryData(qk.ats.resume(saved.resumeId), asDetail(saved));
+      const at = new Date().toISOString();
+      const unchanged = saved.resumeId === sendingId && saved.version === version;
+      update((s) => {
+        let steps = leaving(s, versionNow);
+        let index = s.resume.historyAt;
+        if (steps.length === 0) {
+          // The first change: where the draft started is the first step, with the score it had.
+          steps = [
+            {
+              id: stepId(),
+              label: `Started from ${s.resume.baseName ?? "your resume"}`,
+              at,
+              content: before,
+              version: null,
+              score: report && !report.degraded ? Math.round(report.score) : null,
+              report: report && !report.degraded ? report : null,
+            },
+          ];
+          index = 0;
+        }
+        const pushed = pushStep(steps, index, {
+          id: stepId(),
+          label,
+          at,
+          content: words,
+          version: saved.version,
+          // The same text is the same version: it keeps the score it has, and nothing is re-scored.
+          score: unchanged && report && !report.degraded ? Math.round(report.score) : null,
+          report: unchanged && report && !report.degraded ? report : null,
+        });
+        return {
+          ...s,
+          proposal: null,
+          resume: {
+            ...s.resume,
+            draftId: saved.resumeId,
+            draftName: saved.fileName,
+            draftFromId: s.resume.sendDraft && s.resume.draftId ? s.resume.draftFromId : s.resume.baseId,
+            sendDraft: true,
+            history: pushed.history,
+            historyAt: pushed.at,
+          },
+        };
+      });
+      return true;
+    } catch (error) {
+      setChangeError(changeMessage(error));
+      return false;
+    }
+  }
+
+  /** Undo, redo or a jump in the history: that step's words go back into the draft, with its score if it has one. */
+  async function jumpTo(index: number) {
+    const step = history[index];
+    if (!step || index === historyAt || busy) return;
+    setBusy("Going back to that step…");
+    setChangeError(null);
+    const versionNow = draftVersionNow(resume.draftId);
+    try {
+      const saved = await writeDraft(step.content);
       queryClient.setQueryData(qk.ats.resume(saved.resumeId), asDetail(saved));
       update((s) => ({
         ...s,
         proposal: null,
-        resume: { ...s.resume, draftId: saved.resumeId, draftName: saved.fileName, draftFromId: s.resume.baseId, sendDraft: true },
+        resume: {
+          ...s.resume,
+          draftId: saved.resumeId,
+          draftName: saved.fileName,
+          sendDraft: true,
+          history: leaving(s, versionNow).map((row, i) => (i === index ? { ...row, version: saved.version } : row)),
+          historyAt: index,
+        },
+        // The score jumps with it: the step's own report, read for the version it was just saved as.
+        // Nothing is measured against the step left: a jump is not a change, so the card just says "Up to date".
+        scan:
+          step.report && !step.report.degraded
+            ? { resumeId: saved.resumeId, version: saved.version, report: step.report, previousScore: null }
+            : s.scan,
       }));
     } catch (error) {
-      // A provider timing out on the way ("Voyage embed timed out…") is ours to retry, not the user's to read.
-      setUseError(
-        error instanceof BackendError && error.status >= 500
-          ? "That version couldn't be saved just now. Try again in a moment."
-          : apiMessage(error),
-      );
+      setChangeError(changeMessage(error));
     } finally {
-      setUsing(false);
+      setBusy(null);
     }
   }
 
+  // Ctrl+Z / Ctrl+Shift+Z walk the history while this step shows, outside a text field.
+  useEffect(() => {
+    if (!actionsSlot || !editable) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      event.preventDefault();
+      void jumpTo(event.shiftKey ? historyAt + 1 : historyAt - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // ---- The eyes: parts hidden for this application only ---------------------------------------
+  // Owner, 2026-10-18: hide a section, a role or one line without leaving the flow. What is hidden
+  // stays on the page, washed out, and is left out of what is scored, written from and sent.
+  const savedHidden = useMemo(() => content?.hiddenParts ?? [], [content]);
+  const shownHidden = pendingHidden ?? savedHidden;
+
+  function toggleHidden(key: string) {
+    if (!content) return;
+    const next = shownHidden.includes(key) ? shownHidden.filter((part) => part !== key) : [...shownHidden, key];
+    setPendingHidden(next);
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    const words = content;
+    const was = savedHidden;
+    const save = () => {
+      void commitChange(hiddenLabel(was, next, words), { ...words, hiddenParts: next }).finally(() => setPendingHidden(null));
+    };
+    flushHidden.current = save;
+    hideTimer.current = window.setTimeout(() => {
+      hideTimer.current = null;
+      flushHidden.current = null;
+      save();
+    }, HIDE_SAVE_DELAY_MS);
+  }
+
+  // Leaving the step with a choice still waiting: it is saved, not dropped.
+  useEffect(
+    () => () => {
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+      flushHidden.current?.();
+    },
+    [],
+  );
+
+  // ---- Click-to-edit lines on the page ------------------------------------------------------------
+  // Owner, 2026-10-19: "click it and edit its text ... delete the line, change the number". Each
+  // edit is one change of the draft (undo takes it back); an eye's choice still waiting goes with it.
+  function commitEdit(edit: LineEdit | null) {
+    if (!edit || !editable) return;
+    if (hideTimer.current !== null) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+      flushHidden.current = null;
+    }
+    void commitChange(edit.label, edit.content).finally(() => setPendingHidden(null));
+  }
+  const paperEdits =
+    editable && content
+      ? {
+          onSummary: (text: string) => commitEdit(editSummary({ ...content, hiddenParts: shownHidden }, text)),
+          onBullet: (entryId: string, index: number, text: string) =>
+            commitEdit(editBullet({ ...content, hiddenParts: shownHidden }, entryId, index, text)),
+        }
+      : undefined;
+
+  // ---- The fixes ---------------------------------------------------------------------------------
+  const gapChips: GapChip[] = gaps.map((gap) => ({
+    id: gap.id,
+    label: gap.label,
+    wants: verdictById.get(gap.id)?.requirement.text ?? gap.label,
+  }));
+  const proofChips: GapChip[] = (report?.verdicts ?? []).filter(onlyInSkills).map((verdict) => ({
+    id: verdict.requirement.id,
+    label: verdict.requirement.label?.trim() || verdict.requirement.text,
+    wants: verdict.requirement.text,
+  }));
+  const working = report ? workingItems(report, content) : [];
+  const toolsIdle = editable && Boolean(content) && tools.running === null && !busy;
+
+  /** Runs a tool, then puts what it wrote into the draft as one change. */
+  async function runAndCommit(label: string, busyText: string, run: () => Promise<{ content: ResumeContent } | null>): Promise<boolean> {
+    if (!toolsIdle) return false;
+    setBusy(busyText);
+    setChangeError(null);
+    try {
+      const result = await run();
+      return result ? await commitChange(label, reconcileGroups(result.content)) : false;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const keywordsFor = (terms: string[]) => (terms.length > 0 ? terms.slice(0, MAX_TOOL_GAPS) : null);
+
+  function tailor(words: ResumeContent | null = content, allowed: ResumePlace[] = places) {
+    if (!words) return;
+    const tailorPlaces = allowed.filter((place) => place === "summary" || place === "skills");
+    void runAndCommit("Tailored summary & skills", "Tailoring your summary and skills…", async () => {
+      const result = await tools.run("tailor", () =>
+        tailorToJob({
+          content: words,
+          jdText: job.description,
+          company: job.company,
+          role: job.role,
+          keywords: keywordsFor(gaps.map((gap) => gap.label)),
+          places: tailorPlaces,
+        }),
+      );
+      return result ? { content: result.content } : null;
+    });
+  }
+
   /**
-   * "Open in resume creator": a copy there, in a new tab, made once and refreshed with the draft's
-   * words on every later open, so opening it again never adds another resume.
+   * "Add N keywords to …": where "Apply changes to" says (owner, 2026-10-19: "it's only adding to
+   * skills"). With Bullets or Summary on, the AI works each one into a line there (and Skills, when
+   * on), insisted: the person picked them. Skills alone is straight into Skills, no AI.
+   */
+  function addPicked() {
+    if (!content || !toolsIdle) return;
+    const labels = gapChips.filter((chip) => picked.has(chip.id)).map((chip) => chip.label);
+    if (labels.length === 0) return;
+    const n = labels.length;
+    const noun = n === 1 ? "keyword" : "keywords";
+    if (places.includes("bullets") || places.includes("summary")) {
+      const where = places.includes("bullets") ? "your experience" : "your summary";
+      void runAndCommit(`Worked ${n} ${noun} into ${where}`, `Working ${n} ${noun} into ${where}…`, async () => {
+        const result = await tools.run("keywords", () =>
+          injectKeywords({
+            content,
+            jdText: job.description,
+            company: job.company,
+            role: job.role,
+            keywords: labels,
+            places,
+            insist: true,
+          }),
+        );
+        return result ? { content: result.content } : null;
+      }).then((made) => made && setPicked(new Set()));
+      return;
+    }
+    const words = addSkills(content, labels);
+    setBusy(`Adding ${labels.length} ${labels.length === 1 ? "keyword" : "keywords"} and rescoring…`);
+    void commitChange(`Added ${labels.length} ${labels.length === 1 ? "keyword" : "keywords"} to Skills`, words).then((made) => {
+      if (made) setPicked(new Set());
+      setBusy(null);
+    });
+  }
+
+  /**
+   * "Prove the N in a bullet" and "Show them in experience": the keywords only in Skills (or the ones
+   * the note names), each worked into a line of experience. Insisted: Skills already lists them, and
+   * that must not count as done (owner, 2026-10-19: "it does not add anything to work experience").
+   */
+  function prove(terms: string[] = proofChips.map((chip) => chip.label)) {
+    if (!content || terms.length === 0) return;
+    void runAndCommit(
+      `Worked ${terms.length} ${terms.length === 1 ? "skill" : "skills"} into your experience`,
+      "Working them into your experience…",
+      async () => {
+        const result = await tools.run("keywords", () =>
+          injectKeywords({
+            content,
+            jdText: job.description,
+            company: job.company,
+            role: job.role,
+            keywords: terms,
+            places: ["bullets"],
+            insist: true,
+          }),
+        );
+        return result ? { content: result.content } : null;
+      },
+    );
+  }
+
+  function quantify(count: number) {
+    if (!content) return;
+    void runAndCommit(`Added results to ${count} ${count === 1 ? "bullet" : "bullets"}`, "Adding results to your bullets…", async () => {
+      const result = await tools.run("ask", () => askForRewrite({ content, instruction: QUANTIFY_INSTRUCTION }));
+      return result ? { content: result.content } : null;
+    });
+  }
+
+  // What the cards read: the resume as it goes, without what is hidden for this job (owner,
+  // 2026-10-19: nothing is suggested for, or done to, a hidden part).
+  const visible = useMemo(() => (content ? visibleContent({ ...content, hiddenParts: shownHidden }) : null), [content, shownHidden]);
+
+  /** "Show in resume": these lines brought into view and lit leaf green for a moment. */
+  function showOnPage(texts: string[], fallback: string | null = null) {
+    if (texts.length > 0) setFlash({ texts, key: Date.now() });
+    else showSection(fallback);
+  }
+
+  const impact = report?.metrics.find((metric) => metric.id === "impact-language")?.value;
+  const bare = visible ? bareBullets(visible) : [];
+  const summaryHidden = shownHidden.includes("summary");
+  const summaryText = visible?.summary.trim() ?? "";
+  // A summary worth tailoring: shown, and naming none of what the posting still misses, and not
+  // tailored already in this draft's history (owner, 2026-10-19: the button left the bottom row).
+  const tailoredAlready = history.slice(0, historyAt + 1).some((step) => step.label.startsWith("Tailored"));
+  const summaryUntailored =
+    Boolean(visible) &&
+    !summaryHidden &&
+    !tailoredAlready &&
+    gaps.length > 0 &&
+    !gaps.some((gap) => summaryText.toLowerCase().includes(gap.label.toLowerCase()));
+  const suggestions: Suggestion[] = [
+    ...(impact !== undefined && impact < 65 && bare.length > 0
+      ? [
+          {
+            id: "quantify",
+            title: `${bare.length} ${bare.length === 1 ? "bullet has" : "bullets have"} no result.`,
+            detail: `Impact language reads ${Math.round(impact)}.`,
+            action: "Quantify them",
+            icon: "quantify" as const,
+            onClick: () => quantify(bare.length),
+            onShow: () => showOnPage(bare, "experience"),
+          },
+        ]
+      : []),
+    ...(summaryUntailored && content
+      ? [
+          {
+            id: "tailor",
+            title: summaryText ? "Summary isn't tailored to this job." : "No summary yet.",
+            detail: summaryText ? "It names none of what the posting asks for." : "A short one aimed at this job is what recruiters read first.",
+            action: summaryText ? "Tailor it" : "Write one",
+            icon: "tailor" as const,
+            onClick: () => tailor(content, ["summary", "skills"]),
+            ...(summaryText ? { onShow: () => showOnPage([summaryText], "summary") } : {}),
+          },
+        ]
+      : []),
+    ...(summaryHidden && content
+      ? [
+          {
+            id: "summary",
+            title: "Summary is hidden.",
+            detail: "Recruiters skim it first: a tailored one helps here.",
+            action: "Tailor it",
+            icon: "tailor" as const,
+            onClick: () => tailor({ ...content, hiddenParts: shownHidden.filter((key) => key !== "summary") }, ["summary", "skills"]),
+          },
+        ]
+      : []),
+  ];
+
+  // The points-off note, until it is kept as is for this score. The skills it is about are named
+  // here from the resume (the scorer's own line only says how many), so each can be acted on.
+  const UNBACKED_REASON = /appear nowhere in your experience$/;
+  const unbacked = report && visible && (report.stuffing ?? []).some((reason) => UNBACKED_REASON.test(reason)) ? unbackedSkills(visible, report) : [];
+  const stuffingNote: StuffingNoteView | null =
+    report && (report.stuffingPenalty ?? 0) > 0 && (report.stuffing ?? []).length > 0 && keptStuffing !== report.scanId
+      ? {
+          points: report.stuffingPenalty ?? 0,
+          unbacked,
+          others: (report.stuffing ?? []).filter((reason) => unbacked.length === 0 || !UNBACKED_REASON.test(reason)),
+        }
+      : null;
+
+  /** "Remove from Skills": the unbacked skills out of this job's draft; no AI, so no credit for the change. */
+  function removeUnbacked() {
+    if (!content || !toolsIdle || unbacked.length === 0) return;
+    const n = unbacked.length;
+    setBusy(`Removing ${n} ${n === 1 ? "skill" : "skills"} and rescoring…`);
+    void commitChange(`Removed ${n} ${n === 1 ? "skill" : "skills"} from Skills`, removeSkills(content, unbacked)).finally(() => setBusy(null));
+  }
+
+  /** A section on the page, brought into view: where "Show in resume" goes when it has no lines to light. */
+  function showSection(section: string | null) {
+    const kind = section === "certifications" ? "training" : section;
+    const target = kind ? paperRef.current?.querySelector<HTMLElement>(`[data-resume-section="${kind}"]`) : null;
+    (target ?? paperRef.current)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  const stuffingView = stuffingNote ? (
+    <StuffingNote
+      note={stuffingNote}
+      onProve={toolsIdle ? () => prove(unbacked) : undefined}
+      onRemove={toolsIdle ? removeUnbacked : undefined}
+      onShowWhere={() => showOnPage(unbacked, unbacked.length > 0 ? "skills" : "experience")}
+      onKeep={() => setKeptStuffing(report?.scanId ?? null)}
+    />
+  ) : null;
+
+  // ---- The resume creator -----------------------------------------------------------------------
+  /**
+   * "Open in editor": a copy in the resume creator, in a new tab, made once and refreshed with the
+   * draft's words on every later open, so opening it again never adds another resume.
    */
   async function openInCreator(words: ResumeContent, label: string) {
     // Opened inside the click: a tab opened after an await is a popup a blocker may refuse.
@@ -474,447 +822,263 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
     }
   }
 
-  const canTailor = Boolean(job.description);
-  const canKeywords = Boolean(job.description) || gaps.length > 0;
-  const fromOtherBase = Boolean(resume.draftId && resume.draftFromId && resume.draftFromId !== resume.baseId);
-  const toolsIdle = editable && Boolean(content) && tools.running === null;
-  const sendingName = sendingDraft ? (resume.draftName ?? draftLabel) : (resume.baseName ?? base.data?.fileName ?? "Your resume");
-
-  // The two buttons say what they do; a line under them only when one can't run (owner, 2026-10-03: "it's just two buttons").
-  const toolsBlocked = !sendingId
-    ? "Pick a resume first."
-    : !content
-      ? sending.isError
-        ? "The resume couldn't be opened just now. Try again above."
-        : sending.isPending
-          ? null
-          : "It can be worked on once it has been read."
-      : !canTailor
-        ? "Tailoring needs the job's description."
-        : null;
   const draftName = resume.draftName ?? draftLabel;
   const baseName = resume.baseName ?? base.data?.fileName ?? "Your resume";
+  const sendingName = sendingDraft ? draftName : baseName;
+  const changes = Math.max(0, history.length > 0 ? historyAt : paperChanges);
+  const hiddenSections = shownHidden.filter((key) => !key.startsWith("exp:") || !/:\d+$/.test(key)).length;
+  const hiddenLines = shownHidden.length - hiddenSections;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
+      {actionsSlot &&
+        createPortal(
+          <DraftHistory history={history} at={historyAt} onJump={(index) => void jumpTo(index)} disabled={!editable || Boolean(busy)} />,
+          actionsSlot,
+        )}
+
       {/* Which resume */}
-      <DashCard className="p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-base font-bold text-primary">Which resume goes with it?</p>
-            <p className="mt-0.5 text-sm text-black/55">
-              The one marked “Sending this” is what&apos;s scored, what the letter is written from, and what&apos;s recorded.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StickerButton variant="outline" size="sm" disabled={!editable || uploading} onClick={() => fileRef.current?.click()}>
-              <Upload className="h-3.5 w-3.5" />
-              Upload
-            </StickerButton>
-            <StickerButton variant="outline" size="sm" disabled={!editable} onClick={() => setSelectOpen(true)}>
-              <Library className="h-3.5 w-3.5" />
-              Select resume
-            </StickerButton>
-            <input
-              ref={fileRef}
-              type="file"
-              accept={RESUME_ACCEPT}
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void upload(file);
-              }}
-            />
-          </div>
+      <section className="flex flex-col gap-3 rounded-2xl border border-[#222325]/8 bg-white p-[18px]">
+        <div className="flex items-center gap-2">
+          <h2 className="m-0 flex-1 text-base font-extrabold text-primary">Which resume goes with it?</h2>
+          <button type="button" disabled={!editable || uploading} onClick={() => fileRef.current?.click()} className={OUTLINE_BUTTON}>
+            <Upload className="h-[13px] w-[13px]" strokeWidth={2.4} />
+            Upload
+          </button>
+          <button type="button" disabled={!editable} onClick={() => setSelectOpen(true)} className={OUTLINE_BUTTON}>
+            <Layers className="h-[13px] w-[13px]" strokeWidth={2.4} />
+            From my resumes
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept={RESUME_ACCEPT}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload(file);
+            }}
+          />
         </div>
-
-        {uploadError && <p className="mt-3 text-sm text-[#b23c26]">{uploadError}</p>}
-
-        <div className="mt-4 flex flex-col gap-2">
-          {uploading && (
-            <Loading label="Reading your upload">
+        {uploadError && <p className="text-sm text-[#b23c26]">{uploadError}</p>}
+        {uploading && (
+          <Loading label="Reading your upload">
+            <RowsSkeleton rows={1} />
+          </Loading>
+        )}
+        {!resume.baseId ? (
+          ingested.isPending ? (
+            <Loading label="Finding your resume">
               <RowsSkeleton rows={1} />
             </Loading>
-          )}
-          {using && !resume.draftId && (
-            <Loading label="Saving this version">
-              <RowsSkeleton rows={1} />
-            </Loading>
-          )}
-          {!resume.baseId ? (
-            ingested.isPending ? (
-              <Loading label="Finding your resume">
-                <RowsSkeleton rows={1} />
-              </Loading>
-            ) : (
-              !uploading && (
-                <p className="text-sm leading-relaxed text-black/55">
-                  No resume picked yet. Upload one (PDF, DOCX, TXT or MD) or select one you already have.
-                </p>
-              )
-            )
           ) : (
-            <>
-              {resume.draftId && (
-                <ResumeRow
-                  icon={<Sparkles className="h-4 w-4 flex-none text-[#6c7a1e]" aria-hidden />}
-                  name={resume.draftName ?? `Tailored for ${job.company}`}
-                  meta={
-                    draft.isPending ? (
-                      <Bone className="mt-1 h-2.5 w-40" />
-                    ) : draft.isError ? (
-                      "Couldn't open it just now"
-                    ) : (
-                      [
-                        "Draft for this application",
-                        draft.data ? `version ${draft.data.version}` : null,
-                        fromOtherBase ? "made from an earlier pick" : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")
-                    )
-                  }
-                  selected={resume.sendDraft}
-                  disabled={!editable}
-                  onSelect={() => update((s) => ({ ...s, resume: { ...s.resume, sendDraft: true } }))}
-                  menu={
-                    draftContent
-                      ? [
-                          {
-                            id: "creator",
-                            label: "Open in resume creator",
-                            icon: ExternalLink,
-                            busy: openingCreator,
-                            onSelect: () => void openInCreator(draftContent, draftName),
-                          },
-                          { id: "preview", label: "Preview", icon: Eye, onSelect: () => setPreviewing("draft") },
-                          { id: "pdf", label: "Download as PDF", icon: Download, onSelect: () => download(draftContent, draftName, "pdf") },
-                          { id: "docx", label: "Download as DOCX", icon: Download, onSelect: () => download(draftContent, draftName, "docx") },
-                        ]
-                      : undefined
-                  }
-                />
-              )}
-              <ResumeRow
-                icon={<FileText className="h-4 w-4 flex-none text-black/40" aria-hidden />}
-                name={resume.baseName ?? base.data?.fileName ?? "Your resume"}
+            !uploading && (
+              <p className="text-sm leading-relaxed text-black/55">
+                No resume picked yet. Upload one (PDF, DOCX, TXT or MD) or pick one you already have.
+              </p>
+            )
+          )
+        ) : (
+          <div className="flex flex-col gap-2.5 md:flex-row">
+            {resume.draftId && (
+              <ResumeCard
+                name={draftName}
                 meta={
-                  base.isPending || base.data?.status === "pending" ? (
+                  draft.isPending ? (
                     <Bone className="mt-1 h-2.5 w-40" />
-                  ) : base.isError ? (
+                  ) : draft.isError ? (
                     "Couldn't open it just now"
-                  ) : base.data?.status === "failed" ? (
-                    (base.data.error ?? "Couldn't be read")
-                  ) : resume.draftId ? (
-                    "The original, kept as it is"
                   ) : (
-                    "Your resume, as it is"
+                    `The one draft for this job · ${changes} ${changes === 1 ? "change" : "changes"}`
                   )
                 }
-                selected={!resume.sendDraft}
-                // Pickable unless it is known not to be readable: one still loading, or that failed to load, can still be chosen.
-                disabled={!editable || (base.data !== undefined && base.data.status !== "ready")}
-                onSelect={() => update((s) => ({ ...s, resume: { ...s.resume, sendDraft: false } }))}
+                selected={resume.sendDraft}
+                disabled={!editable}
+                onSelect={() => update((s) => ({ ...s, resume: { ...s.resume, sendDraft: true } }))}
                 menu={
-                  base.data?.content
+                  draftContent
                     ? [
-                        { id: "preview", label: "Preview", icon: Eye, onSelect: () => setPreviewing("base") },
-                        { id: "pdf", label: "Download as PDF", icon: Download, onSelect: () => base.data?.content && download(base.data.content, baseName, "pdf") },
+                        {
+                          id: "creator",
+                          label: "Open in editor",
+                          icon: ExternalLink,
+                          busy: openingCreator,
+                          onSelect: () => void openInCreator(draftContent, draftName),
+                        },
+                        { id: "preview", label: "Preview", icon: Eye, onSelect: () => setPreviewing("draft") },
+                        { id: "pdf", label: "Download as PDF", icon: Download, onSelect: () => download(draftContent, draftName, "pdf") },
                         {
                           id: "docx",
                           label: "Download as DOCX",
                           icon: Download,
-                          onSelect: () => base.data?.content && download(base.data.content, baseName, "docx"),
+                          onSelect: () => download(draftContent, draftName, "docx"),
                         },
                       ]
                     : undefined
                 }
               />
-            </>
-          )}
-          {resumeFailed && (
-            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-[#b23c26]/20 bg-[#fdf4f2] px-3.5 py-2.5">
-              <p className="min-w-0 flex-1 text-sm text-[#b23c26]">Your resume couldn&apos;t be opened just now.</p>
-              <StickerButton variant="outline" size="sm" onClick={retryResumes}>
-                <RotateCw className="h-3.5 w-3.5" />
-                Try again
-              </StickerButton>
-            </div>
-          )}
-        </div>
-      </DashCard>
-
-      {/* The score */}
-      <DashCard className="flex flex-col gap-6 p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-bold text-primary">ATS score</p>
-            <p className="mt-0.5 text-sm text-black/55">
-              {job.description
-                ? "How well the resume you're sending matches this posting."
-                : "No description on file, so this is a general score."}{" "}
-              Scored again after every change, {SCAN_CREDITS} credit a version.
-            </p>
-          </div>
-          <StickerButton variant="outline" size="sm" disabled={!content} onClick={showPaper}>
-            <Eye className="h-3.5 w-3.5" />
-            Preview resume
-          </StickerButton>
-        </div>
-
-        {!sendingId ? (
-          <p className="text-[15px] text-black/60">Pick or upload a resume. It&apos;s scored as soon as there is one.</p>
-        ) : scoring ? (
-          <Loading label={state.scan ? "Scoring your latest version" : "Scoring against the posting"}>
-            <ScoreSkeleton />
-          </Loading>
-        ) : report ? (
-          <>
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-7">
-              <ScoreRing value={report.score} size={128} fillColor={scoreColor(report.score)} />
-              <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <Pill variant={scanTier(report.score).tone}>{scanTier(report.score).label}</Pill>
-                  {scoreChange !== null && <ScoreChange delta={scoreChange} />}
-                </div>
-                {scoreChange !== null && scoreChange !== 0 && stored?.previousStates && (
-                  <ScoreMoves report={report} before={stored.previousStates} />
-                )}
-                <TwoStages report={report} />
-                {live?.status === "explaining" && (
-                  <Loading label="Writing up why" className="w-full max-w-xl">
-                    <LinesSkeleton lines={2} />
-                  </Loading>
-                )}
-                {report.explanation && <p className="text-[15px] leading-relaxed text-black/75">{withoutEmDashes(report.explanation)}</p>}
-                {report.degraded && (
-                  <ScoringNote text={report.degradedReason ?? "Scored on a reduced path, so treat it as a rough read."} />
-                )}
-                {(report.stuffing ?? []).length > 0 && <StuffingNote reasons={report.stuffing ?? []} points={report.stuffingPenalty} />}
-              </div>
-            </div>
-            {(gaps.length > 0 || (report.eligibility ?? []).length > 0 || (report.needs ?? []).length > 0) && (
-              <div className="border-t border-black/8 pt-5">
-                <GapPicker
-                  gaps={gaps}
-                  verdictById={verdictById}
-                  fixing={tools.running === "keywords"}
-                  onFix={toolsIdle ? (labels) => runTool("keywords", labels) : undefined}
-                  fixError={toolFrom === "gaps" ? (tools.failure?.message ?? null) : null}
-                  company={job.company}
-                  needs={report.needs ?? []}
-                  eligibility={report.eligibility ?? []}
-                  traits={report.traits ?? []}
-                />
-              </div>
             )}
-          </>
-        ) : live?.failure ? (
-          <div className="flex flex-col gap-2.5" role="alert">
-            <p className="text-[15px] text-[#b23c26]">{withoutEmDashes(live.failure.message)}</p>
-            <div className="flex flex-wrap gap-2">
-              {live.failure.retryable && version !== null && (
-                <StickerButton variant="outline" size="sm" onClick={() => runScore(sendingId, version)}>
-                  <RotateCw className="h-3.5 w-3.5" />
-                  Try again
-                </StickerButton>
-              )}
-              {live.failure.kind === "credits" && (
-                <Link href={ATS_BILLING_HREF} target="_blank" rel="noopener noreferrer">
-                  <StickerButton variant="primary" size="sm">
-                    Get more credits
-                  </StickerButton>
-                </Link>
-              )}
-            </div>
+            <ResumeCard
+              name={baseName}
+              meta={
+                base.isPending || base.data?.status === "pending" ? (
+                  <Bone className="mt-1 h-2.5 w-40" />
+                ) : base.isError ? (
+                  "Couldn't open it just now"
+                ) : base.data?.status === "failed" ? (
+                  (base.data.error ?? "Couldn't be read")
+                ) : (
+                  "The original, kept as it is"
+                )
+              }
+              selected={!resume.sendDraft}
+              disabled={!editable || (base.data !== undefined && base.data.status !== "ready")}
+              onSelect={() => update((s) => ({ ...s, resume: { ...s.resume, sendDraft: false } }))}
+              menu={
+                base.data?.content
+                  ? [
+                      { id: "preview", label: "Preview", icon: Eye, onSelect: () => setPreviewing("base") },
+                      {
+                        id: "pdf",
+                        label: "Download as PDF",
+                        icon: Download,
+                        onSelect: () => base.data?.content && download(base.data.content, baseName, "pdf"),
+                      },
+                      {
+                        id: "docx",
+                        label: "Download as DOCX",
+                        icon: Download,
+                        onSelect: () => base.data?.content && download(base.data.content, baseName, "docx"),
+                      },
+                    ]
+                  : undefined
+              }
+            />
           </div>
-        ) : sending.isPending ? (
-          <Loading label="Opening the resume">
-            <ScoreSkeleton />
-          </Loading>
-        ) : sending.isError ? (
-          <div className="flex flex-col items-start gap-2.5" role="alert">
-            <p className="text-[15px] text-[#b23c26]">The resume couldn&apos;t be opened just now, so it hasn&apos;t been scored.</p>
+        )}
+        {resumeFailed && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-[#b23c26]/20 bg-[#fdf4f2] px-3.5 py-2.5">
+            <p className="min-w-0 flex-1 text-sm text-[#b23c26]">Your resume couldn&apos;t be opened just now.</p>
             <StickerButton variant="outline" size="sm" onClick={retryResumes}>
               <RotateCw className="h-3.5 w-3.5" />
               Try again
             </StickerButton>
           </div>
-        ) : sending.data?.status === "pending" ? (
-          <Loading label="Reading the resume">
-            <ScoreSkeleton />
-          </Loading>
-        ) : !sendingReady ? (
-          <p className="text-[15px] text-black/60">{sending.data?.error ?? "This resume couldn't be read, so it can't be scored. Upload or select another."}</p>
-        ) : (
-          <Loading label="Getting ready to score">
-            <ScoreSkeleton />
-          </Loading>
         )}
-      </DashCard>
+      </section>
 
-      {/* The tools: two small buttons, no card or title around them (owner, 2026-10-03). A card appears only for
-          what they make: a result taking shape, and the proposal to add or discard. */}
-      <div ref={toolsRef} className="flex scroll-mt-40 flex-col gap-3">
-        {proposal ? (
-          <DashCard className="p-6">
-            <ProposalPanel
-              proposal={proposal}
-              original={content}
-              using={using}
-              error={useError}
-              onUse={() => void adoptProposal()}
-              onPreview={() => setPreviewing("proposal")}
-              onDiscard={() => update((s) => ({ ...s, proposal: null }))}
-              retrying={tools.running === "keywords"}
-              retryError={toolFrom === "proposal" && !tools.running ? (tools.failure?.message ?? null) : null}
-              onRetryMissed={
-                proposal.tool === "keywords" && proposal.missed.length > 0 && toolsIdle
-                  ? () => void runTool("keywords", proposal.missed, proposal)
-                  : undefined
-              }
-            />
-          </DashCard>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <ToolButton
-                label="Tailor summary & skills"
-                hint={`Rewrites your summary toward this posting and adds the skills it asks for. ${SUGGESTION_CREDITS} credit.`}
-                disabled={!toolsIdle || !canTailor}
-                onClick={() => void runTool("tailor")}
-              />
-              <ToolButton
-                label="Work in missing keywords"
-                hint={`Improves your bullets to show the gaps your history backs, and gives advice for the rest. ${SUGGESTION_CREDITS} credit.`}
-                disabled={!toolsIdle || !canKeywords}
-                onClick={() => void runTool("keywords")}
-              />
-            </div>
-            {tools.running ? (
-              <DashCard className="p-6">
-                <Loading label={tools.running === "tailor" ? "Tailoring your resume" : "Working the gaps in"}>
-                  <ProposalSkeleton />
-                </Loading>
-              </DashCard>
-            ) : sendingId && !content && sending.isPending ? (
-              <Loading label="Opening the resume">
-                <LinesSkeleton lines={1} className="max-w-md" />
-              </Loading>
-            ) : (
-              toolsBlocked && <p className="text-sm leading-relaxed text-black/55">{toolsBlocked}</p>
-            )}
-            {toolFrom === "tools" && tools.failure && !tools.running && (
-              <p role="alert" className="text-sm text-[#b23c26]">
-                {tools.failure.message}
-              </p>
-            )}
-            {tools.failure?.needsCredits && (
-              <Link
-                href={ATS_BILLING_HREF}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-semibold text-primary underline underline-offset-2">
-                Get more credits
-              </Link>
-            )}
-          </>
+      {/* The score and the fixes, together */}
+      <section className="flex flex-col gap-[18px] rounded-2xl border border-[#222325]/8 bg-white p-5">
+        <ScoreRow
+          state={scoreState}
+          report={shownReport}
+          previousScore={stored?.previousScore ?? null}
+          previousMetrics={stored?.previousMetrics}
+          company={job.company}
+          creditsHref={ATS_BILLING_HREF}
+          onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
+        />
+        {report && (
+          <FixesTabs
+            gaps={gapChips}
+            skillsOnly={proofChips}
+            picked={picked}
+            onToggle={(id) =>
+              setPicked((prev) => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              })
+            }
+            onClear={() => setPicked(new Set())}
+            working={working}
+            suggestions={suggestions}
+            places={places}
+            onPlaces={setPlaces}
+            busy={busy ?? (tools.running ? "Working on it…" : null)}
+            disabled={!toolsIdle}
+            onAddPicked={addPicked}
+            onProve={() => prove()}
+            error={changeError ?? (tools.failure && !tools.running ? tools.failure.message : null)}
+            creditsHref={tools.failure?.needsCredits ? ATS_BILLING_HREF : null}
+            unchecked={report.degraded ? report.verdicts.filter((verdict) => verdict.state === "undetermined").length : 0}
+            onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
+            note={stuffingView}
+          />
         )}
-      </div>
+      </section>
 
-      {/* The resume, whole: collapsed until "Preview" or its header opens it */}
+      {/* The resume, whole, with an eye beside each section, role and line */}
       {sendingId && (
-        <div ref={paperRef} className="scroll-mt-40">
-          <DashCard className="overflow-hidden p-0">
-            <button
-              type="button"
-              aria-expanded={paperOpen}
-              onClick={() => setPaperOpen((open) => !open)}
-              className="flex w-full cursor-pointer items-center gap-3 px-6 py-5 text-left">
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-bold text-primary">The resume you&apos;re sending</span>
-                <span className="block truncate text-sm text-black/55">
-                  {sendingName}
-                  {sendingDraft ? ` · ${paperChanges} change${paperChanges === 1 ? "" : "s"} for this job` : " · as it is"}
-                </span>
+        <section className="flex flex-col overflow-hidden rounded-2xl border border-[#222325]/8 bg-white">
+          <div className="flex flex-wrap items-center gap-2.5 px-[18px] py-4">
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-base font-extrabold text-primary">The resume you&apos;re sending</span>
+              <span className="text-xs text-[#5f6062]">
+                {shownHidden.length > 0
+                  ? `${[
+                      hiddenSections > 0 ? `${hiddenSections} ${hiddenSections === 1 ? "section" : "sections"}` : null,
+                      hiddenLines > 0 ? `${hiddenLines} ${hiddenLines === 1 ? "line" : "lines"}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" and ")} hidden. Click a line to edit it. Your saved resume is untouched.`
+                  : editable
+                    ? "Click a line to edit it, or use an eye to hide it for this job. Your saved resume is untouched."
+                    : "Your saved resume is untouched."}
               </span>
-              <span className="flex-none text-xs font-bold text-primary">{paperOpen ? "Hide" : "Show"}</span>
-              <ChevronDown className={cn("h-5 w-5 flex-none text-primary transition-transform", paperOpen && "rotate-180")} aria-hidden />
-            </button>
-
-            {paperOpen && (
-              <div className="border-t border-black/8 bg-[#f0f0ea] px-4 py-5 sm:px-8 sm:py-7">
-                {sending.isPending || sending.data?.status === "pending" ? (
-                  <Loading label="Opening the resume">
-                    <PaperSkeleton />
-                  </Loading>
-                ) : !content ? (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <p className="text-sm text-black/60">
-                      {sending.isError ? "The resume couldn't be opened just now." : (sending.data?.error ?? "This resume couldn't be read.")}
-                    </p>
-                    {sending.isError && (
-                      <StickerButton variant="outline" size="sm" onClick={retryResumes}>
-                        <RotateCw className="h-3.5 w-3.5" />
-                        Try again
-                      </StickerButton>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                      {sendingDraft ? (
-                        <p className="text-sm text-black/65">
-                          {paperChanges > 0 ? (
-                            <>
-                              What changed for this job is{" "}
-                              <span className="bg-[#eef7b8] underline decoration-[#9aab1f] decoration-2 underline-offset-2">
-                                highlighted
-                              </span>
-                              .
-                            </>
-                          ) : (
-                            "Nothing here differs from the original yet."
-                          )}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-black/65">Your resume, as it is.</p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <DownloadButton onDownload={(format) => download(content, sendingName, format)} />
-                        {sendingDraft && draftContent && (
-                          <StickerButton variant="outline" size="sm" disabled={openingCreator} onClick={() => void openInCreator(draftContent, draftName)}>
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            Open in resume creator
-                          </StickerButton>
-                        )}
-                      </div>
-                    </div>
-                    <ChangesPaper content={content} before={paperBefore} />
-                  </>
+            </span>
+            {content && <DownloadButton onDownload={(format) => download({ ...content, hiddenParts: shownHidden }, sendingName, format)} />}
+            {sendingDraft && draftContent && (
+              <button
+                type="button"
+                disabled={openingCreator}
+                onClick={() => void openInCreator(draftContent, draftName)}
+                className={cn(OUTLINE_BUTTON, "h-[38px]")}>
+                <ExternalLink className="h-[13px] w-[13px]" strokeWidth={2.4} />
+                Open in editor
+              </button>
+            )}
+          </div>
+          <div ref={paperRef} className="bg-[#ecece6] px-4 py-7 sm:px-7">
+            {sending.isPending || sending.data?.status === "pending" ? (
+              <Loading label="Opening the resume">
+                <PaperSkeleton />
+              </Loading>
+            ) : !content ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-black/60">
+                  {sending.isError ? "The resume couldn't be opened just now." : (sending.data?.error ?? "This resume couldn't be read.")}
+                </p>
+                {sending.isError && (
+                  <StickerButton variant="outline" size="sm" onClick={retryResumes}>
+                    <RotateCw className="h-3.5 w-3.5" />
+                    Try again
+                  </StickerButton>
                 )}
               </div>
+            ) : (
+              <ChangesPaper
+                content={{ ...content, hiddenParts: shownHidden }}
+                before={paperBefore}
+                eyes={
+                  editable ? { hidden: shownHidden, onToggle: toggleHidden, experienceIds: content.experience.map((entry) => entry.id) } : undefined
+                }
+                edits={paperEdits}
+                flash={flash}
+              />
             )}
-          </DashCard>
-        </div>
+          </div>
+        </section>
       )}
 
       <SelectResumeDialog open={selectOpen} onOpenChange={setSelectOpen} onPicked={setBase} />
 
-      {previewing === "proposal" && proposal && (
-        <ResumePreviewDialog
-          open
-          onOpenChange={(open) => !open && setPreviewing(null)}
-          title={proposal.tool === "tailor" ? "Tailored version, not used yet" : "Keywords worked in, not used yet"}
-          content={proposal.content}
-          before={content}
-        />
-      )}
       {previewing === "draft" && draftContent && (
         <ResumePreviewDialog
           open
           onOpenChange={(open) => !open && setPreviewing(null)}
-          title={resume.draftName ?? draftLabel}
+          title={draftName}
           content={draftContent}
           // What it was made from, once that is in; until then nothing is marked rather than everything.
           before={draftBase ?? draftContent}
@@ -927,7 +1091,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
         <ResumePreviewDialog
           open
           onOpenChange={(open) => !open && setPreviewing(null)}
-          title={resume.baseName ?? base.data.fileName}
+          title={baseName}
           content={base.data.content}
           before={base.data.content}
           onDownload={(format) => base.data?.content && download(base.data.content, baseName, format)}
@@ -938,51 +1102,12 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan })
   );
 };
 
-/**
- * One of the two tools: a small button, no icon, with a lime-green edge at rest and ink on hover so it
- * reads apart from the score card above (owner, 2026-10-03). What it does and costs is its tooltip,
- * not text around it.
- */
-const ToolButton: FC<{ label: string; hint: string; disabled: boolean; onClick: () => void }> = ({ label, hint, disabled, onClick }) => (
-  <button
-    type="button"
-    title={hint}
-    disabled={disabled}
-    onClick={onClick}
-    className="br-plain-press br-lime inline-flex h-9 cursor-pointer items-center rounded-lg border-2 border-[#c9d65a] bg-[#f8fbe8] px-3.5 text-sm font-bold whitespace-nowrap text-primary transition-colors hover:border-[#222325] hover:bg-[#222325] hover:text-white disabled:pointer-events-none disabled:opacity-45">
-    {label}
-  </button>
-);
-
-/** The score card's shape while a score is on its way: the ring, the tier and a few lines. */
-const ScoreSkeleton: FC = () => (
-  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-7">
-    <Bone className="h-32 w-32 flex-none rounded-full" />
-    <div className="flex min-w-0 flex-1 flex-col gap-3 pt-1">
-      <Bone className="h-7 w-28 rounded-full" />
-      <LinesSkeleton lines={3} className="max-w-xl" />
-    </div>
-  </div>
-);
-
-/** A tool's proposal while it is written: the terms, the change line and the new summary. */
-const ProposalSkeleton: FC = () => (
-  <div className="flex flex-col gap-3.5">
-    <div className="flex flex-wrap gap-1.5">
-      {["w-24", "w-36", "w-20"].map((width) => (
-        <Bone key={width} className={cn("h-7 rounded-full", width)} />
-      ))}
-    </div>
-    <Bone className="h-3 w-56" />
-    <div className="rounded-xl border border-black/8 p-4">
-      <LinesSkeleton lines={3} />
-    </div>
-  </div>
-);
+const OUTLINE_BUTTON =
+  "flex h-8 flex-none cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#222325]/22 bg-white px-2.5 text-xs font-extrabold text-primary disabled:cursor-default disabled:opacity-50";
 
 /** A page of resume while it opens: a name, then a few sections. */
 const PaperSkeleton: FC = () => (
-  <div className="mx-auto flex w-full max-w-[816px] flex-col gap-7 bg-white p-8 sm:p-10">
+  <div className="mx-auto flex w-full max-w-[760px] flex-col gap-7 bg-white p-8 sm:p-10">
     <div className="flex flex-col gap-2">
       <Bone className="h-6 w-1/3" />
       <Bone className="h-3 w-1/4" />
@@ -990,102 +1115,12 @@ const PaperSkeleton: FC = () => (
     {[0, 1, 2].map((section) => (
       <div key={section} className="flex flex-col gap-2.5">
         <Bone className="h-3 w-28" />
-        <LinesSkeleton lines={3} />
+        <Bone className="h-3 w-full" />
+        <Bone className="h-3 w-5/6" />
       </div>
     ))}
   </div>
 );
-
-/** How much the latest change moved the score. */
-const ScoreChange: FC<{ delta: number }> = ({ delta }) => (
-  <span className={cn("text-sm font-semibold", delta > 0 ? "text-[#3d7a1f]" : delta < 0 ? "text-[#b23c26]" : "text-black/50")}>
-    {delta > 0 ? `Up ${delta}` : delta < 0 ? `Down ${-delta}` : "No change"} since your last version
-  </span>
-);
-
-const STATE_RANK: Record<string, number> = { missing: 0, undetermined: 0, partial: 1, satisfied: 2 };
-
-/**
- * What moved the score since the last version (RWW/ATS-QUALITY-PLAN.md, 3.3): which requirements
- * changed state, and the line that now shows each one. A jump nobody can explain is then visible.
- */
-const ScoreMoves: FC<{ report: ScanReport; before: Record<string, CoverageState> }> = ({ report, before }) => {
-  const moved = report.verdicts
-    .filter((verdict) => before[verdict.requirement.id] !== undefined && STATE_RANK[before[verdict.requirement.id]] !== STATE_RANK[verdict.state])
-    .map((verdict) => ({ verdict, up: STATE_RANK[verdict.state] > STATE_RANK[before[verdict.requirement.id]] }));
-  if (moved.length === 0) return null;
-  const name = (verdict: RequirementVerdict) => verdict.requirement.label || verdict.requirement.text;
-  return (
-    <ul className="flex w-full max-w-xl flex-col gap-1 text-[13px] leading-snug text-black/65">
-      {moved.slice(0, 4).map(({ verdict, up }) => (
-        <li key={verdict.requirement.id} className="flex gap-1.5">
-          <span className={cn("flex-none font-semibold", up ? "text-[#3d7a1f]" : "text-[#b23c26]")}>{up ? (verdict.state === "satisfied" ? "Now matched" : "Partly matched") : "No longer matched"}:</span>
-          <span className="min-w-0">
-            <span className="font-semibold text-primary">{name(verdict)}</span>
-            {up && verdict.evidence[0] && <span className="text-black/50"> by “{verdict.evidence[0].text.length > 70 ? `${verdict.evidence[0].text.slice(0, 70)}…` : verdict.evidence[0].text}”</span>}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const METRIC_GROUPS: Array<{ title: string; ids: string[] }> = [
-  { title: "Pass the AI", ids: ["keyword-match", "parseability"] },
-  { title: "Pass the human", ids: ["impact-language", "length-format"] },
-];
-
-/**
- * The two stages a resume has to pass (RWW/ATS-QUALITY-PLAN.md, 13.1): the AI reads and ranks it,
- * then a person decides. Labels and grouping only; the headline stays the match score.
- */
-const TwoStages: FC<{ report: ScanReport }> = ({ report }) => {
-  const byId = new Map(report.metrics.map((metric) => [metric.id, metric]));
-  return (
-    <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
-      {METRIC_GROUPS.map((group) => (
-        <div key={group.title} className="rounded-lg border border-black/10 px-3 py-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-black/45">{group.title}</p>
-          {group.ids.map((id) => {
-            const metric = byId.get(id);
-            return metric ? (
-              <p key={id} className="mt-1 flex items-baseline justify-between gap-2 text-[13px] text-black/70">
-                <span>{metric.label}</span>
-                <span className="font-semibold tabular-nums text-primary">{metric.value}</span>
-              </p>
-            ) : null;
-          })}
-        </div>
-      ))}
-    </div>
-  );
-};
-
-/** The few points stuffing took off, and why: a suggestion, never a refusal (owner, 2026-10-18). */
-const StuffingNote: FC<{ reasons: string[]; points?: number }> = ({ reasons, points }) => (
-  <p className="max-w-xl rounded-lg border border-dashed border-[#b23c26]/35 px-3 py-2 text-[13px] leading-relaxed text-black/70">
-    <span className="font-semibold text-[#b23c26]">{stuffingHeadline(points)}</span> {reasons.join("; ")}. {STUFFING_ADVICE}
-  </p>
-);
-
-/** A note on how the score was reached, with the count in its "9 of 14" underlined (owner, 2026-10-03). */
-const ScoringNote: FC<{ text: string }> = ({ text }) => {
-  const clean = withoutEmDashes(text).trim();
-  const sentence = (/[.!?]$/.test(clean) ? clean : `${clean}.`).replace(/^./, (first) => first.toUpperCase());
-  return (
-    <p className="text-[15px] leading-relaxed text-black/70">
-      {noteParts(sentence).map((part, index) =>
-        part.kind === "count" ? (
-          <span key={index} className="text-primary underline decoration-2 underline-offset-4">
-            {part.text}
-          </span>
-        ) : (
-          <span key={index}>{part.text}</span>
-        ),
-      )}
-    </p>
-  );
-};
 
 interface RowMenuEntry {
   id: string;
@@ -1098,7 +1133,7 @@ interface RowMenuEntry {
 const MENU_ITEM =
   "flex w-full cursor-pointer items-center gap-2.5 border-b border-black/8 px-3.5 py-2.5 text-left text-xs font-semibold text-primary transition-colors last:border-b-0 hover:bg-[#fbfbf7] disabled:cursor-wait disabled:opacity-60";
 
-/** A resume row's ⋯ menu, beside "Sending this": the same menu as a row in My documents. */
+/** A resume card's ⋯ menu: the same menu as a row in My documents. */
 const RowMenu: FC<{ name: string; entries: RowMenuEntry[] }> = ({ name, entries }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -1107,11 +1142,12 @@ const RowMenu: FC<{ name: string; entries: RowMenuEntry[] }> = ({ name, entries 
         <button
           type="button"
           aria-label={`More for ${name}`}
+          title="More"
           className={cn(
-            "grid h-8 w-8 flex-none cursor-pointer place-content-center rounded-lg text-black/50 transition-colors hover:bg-black/[0.05] hover:text-primary",
-            open && "bg-black/[0.05] text-primary",
+            "grid h-[30px] w-[30px] flex-none cursor-pointer place-content-center rounded-lg text-primary transition-colors hover:bg-black/[0.05]",
+            open && "bg-black/[0.05]",
           )}>
-          <MoreHorizontal className="h-4 w-4" />
+          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.2} />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={4} className="br-bold w-56 overflow-hidden rounded-xl border-2 border-black bg-white p-0">
@@ -1121,7 +1157,7 @@ const RowMenu: FC<{ name: string; entries: RowMenuEntry[] }> = ({ name, entries 
             type="button"
             disabled={entry.busy}
             onClick={() => {
-              // Called inside the click: "Open in resume creator" opens its tab before anything is awaited.
+              // Called inside the click: "Open in editor" opens its tab before anything is awaited.
               entry.onSelect();
               setOpen(false);
             }}
@@ -1135,198 +1171,41 @@ const RowMenu: FC<{ name: string; entries: RowMenuEntry[] }> = ({ name, entries 
   );
 };
 
-const ResumeRow: FC<{
-  icon: ReactNode;
+/** One resume to send, side by side with the other (owner's design): a filled check and a lime edge on the one going. */
+const ResumeCard: FC<{
   name: string;
   meta: ReactNode;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
   menu?: RowMenuEntry[];
-}> = ({ icon, name, meta, selected, disabled, onSelect, menu }) => (
+}> = ({ name, meta, selected, disabled, onSelect, menu }) => (
   <div
     className={cn(
-      "flex items-center rounded-md border pr-1.5 transition-colors",
-      selected ? "border-[#222325] bg-[#f6faea]" : "border-black/12",
+      "flex min-h-[60px] flex-1 items-center gap-3 rounded-xl bg-white pl-3.5 pr-2.5",
+      selected ? "border-[1.5px] border-[#222325] shadow-[2px_2px_0_0_#e1f073]" : "border border-[#222325]/14",
     )}>
     <button
       type="button"
       aria-pressed={selected}
       disabled={disabled}
       onClick={onSelect}
-      className={cn(
-        "flex min-w-0 flex-1 items-center gap-3 rounded-md px-3.5 py-3 text-left",
-        disabled ? "cursor-default" : "cursor-pointer",
-        !selected && !disabled && "hover:bg-[#f6f6f6]",
-      )}>
-      {icon}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-primary">{name}</span>
-        <span className="block truncate text-[13px] text-black/50">{meta}</span>
-      </span>
+      className={cn("flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left", disabled ? "cursor-default" : "cursor-pointer")}>
       {selected ? (
-        <Pill variant="positive">Sending this</Pill>
+        <span className="grid h-5 w-5 flex-none place-content-center rounded-full bg-[#222325]">
+          <Check className="h-[11px] w-[11px] text-[#e1f073]" strokeWidth={3.2} />
+        </span>
       ) : (
-        !disabled && <span className="flex-none text-xs font-semibold text-black/45">Send this</span>
+        <span className="h-5 w-5 flex-none rounded-full border-[1.5px] border-[#222325]/35" />
       )}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className={cn("truncate text-sm text-primary", selected ? "font-extrabold" : "font-bold")}>{name}</span>
+        <span className="truncate text-xs text-[#5f6062]">{meta}</span>
+      </span>
+      {selected && <span className="flex-none rounded-full bg-[#e1f073] px-[9px] py-0.5 text-xs font-extrabold text-primary">Sending</span>}
     </button>
     {menu && menu.length > 0 && <RowMenu name={name} entries={menu} />}
   </div>
 );
-
-const ProposalPanel: FC<{
-  proposal: ApplyProposal;
-  original: ResumeContent | null;
-  using: boolean;
-  error: string | null;
-  onUse: () => void;
-  onPreview: () => void;
-  onDiscard: () => void;
-  /** Works the missed terms into this version, one credit; absent while no tool may run. */
-  onRetryMissed?: () => void;
-  retrying: boolean;
-  /** Why the last retry of the missed terms failed. */
-  retryError: string | null;
-}> = ({ proposal, original, using, error, onUse, onPreview, onDiscard, onRetryMissed, retrying, retryError }) => {
-  const changes = resumeChanges(original, proposal.content);
-  const nothing = changeCount(changes) === 0;
-  const busy = using || retrying;
-  const [shownTerm, setShownTerm] = useState<string | null>(null);
-  const shownLines = shownTerm ? (proposal.placed[shownTerm] ?? []) : [];
-
-  return (
-    // Saving the version: the panel holds still and pulses until the draft is in.
-    <div className={cn("flex flex-col gap-3.5", using && "animate-pulse")} aria-busy={using}>
-      {nothing ? (
-        <p className="text-[15px] text-black/65">Nothing to change. Your resume already says all of this.</p>
-      ) : (
-        <>
-          {proposal.terms.length > 0 && (
-            <div>
-              <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-black/45">Worked in</p>
-              <div className="flex flex-wrap gap-1.5">
-                {proposal.terms.map((term) => {
-                  const lines = proposal.placed[term] ?? [];
-                  return lines.length > 0 ? (
-                    // Click (or hover, through the title) to see the line it went into (owner, 2026-10-18).
-                    <button
-                      key={term}
-                      type="button"
-                      title={lines.join("\n")}
-                      aria-pressed={shownTerm === term}
-                      onClick={() => setShownTerm((current) => (current === term ? null : term))}
-                      className="cursor-pointer rounded-full">
-                      <Pill variant="positive" className={cn(shownTerm === term && "ring-2 ring-[#222325]")}>
-                        {term}
-                      </Pill>
-                    </button>
-                  ) : (
-                    <Pill key={term} variant="positive">
-                      {term}
-                    </Pill>
-                  );
-                })}
-              </div>
-              {shownLines.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-1 border-l-2 border-[#e1f073] pl-3 text-[13px] leading-relaxed text-black/70">
-                  {shownLines.map((line) => (
-                    <li key={line}>{line === "Skills" ? "Added to your Skills" : `“${line}”`}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          <p className="text-sm leading-relaxed text-black/65">{changeCaption(changes, Boolean(original?.summary.trim()))}.</p>
-          {changes.summary.length > 0 && (
-            <div className="rounded-xl bg-[#f6faea] p-4">
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-black/45">New summary</p>
-              <p className="text-sm leading-relaxed text-black/75">{proposal.content.summary}</p>
-            </div>
-          )}
-        </>
-      )}
-      {/* Picked lines the AI couldn't put in resume language this time (owner, 2026-10-04: a run used to
-          throw the rest away with them). Tried again on this version, so what went in stays. */}
-      {/* What the resume's history doesn't show (owner, 2026-10-18): advice, never a claim, and never a
-          paid retry, since another try can't make it true. */}
-      {proposal.notShown.length > 0 && (
-        <div className="rounded-xl border border-dashed border-black/20 p-4">
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-black/45">Your resume doesn&apos;t show these yet</p>
-          <p className="mb-2.5 text-sm leading-relaxed text-black/65">Nothing was written in for these. Here&apos;s how to show each one honestly.</p>
-          <ul className="flex flex-col gap-2">
-            {proposal.notShown.map((item) => (
-              <li key={item.term} className="flex flex-col gap-1">
-                <span className="self-start">
-                  <Pill variant="outline-dashed">{item.term}</Pill>
-                </span>
-                <span className="text-[13px] leading-relaxed text-black/65">{item.advice}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {proposal.missed.length > 0 && (
-        <div className="rounded-xl border border-dashed border-[#b23c26]/35 p-4">
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-[#b23c26]">Couldn&apos;t be written cleanly</p>
-          <p className="mb-2.5 text-sm leading-relaxed text-black/65">
-            These didn&apos;t pass the writing checks this time, so nothing of them was added.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {proposal.missed.map((term) => (
-              <Pill key={term} variant="outline-dashed">
-                {term}
-              </Pill>
-            ))}
-          </div>
-          {onRetryMissed && (
-            <StickerButton variant="outline" size="sm" className="mt-3" disabled={busy} onClick={onRetryMissed}>
-              <RotateCw className={cn("h-3.5 w-3.5", retrying && "animate-spin")} />
-              {retrying ? "Working them in" : `Try ${proposal.missed.length === 1 ? "it" : "these"} again · ${SUGGESTION_CREDITS} credit`}
-            </StickerButton>
-          )}
-          {retryError && (
-            <p role="alert" className="mt-2 text-sm text-[#b23c26]">
-              {retryError}
-            </p>
-          )}
-        </div>
-      )}
-      {proposal.unbacked.length > 0 && (
-        <div className="rounded-xl border border-dashed border-black/20 p-4">
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-black/45">Be ready to back these up</p>
-          <p className="mb-2.5 text-sm leading-relaxed text-black/65">
-            Nothing in your resume or profile backs these up yet, so make sure you can back them up in an interview.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {proposal.unbacked.map((term) => (
-              <Pill key={term} variant="outline-dashed">
-                {term}
-              </Pill>
-            ))}
-          </div>
-        </div>
-      )}
-      {error && <p className="text-sm text-[#b23c26]">{error}</p>}
-      <div className="flex flex-wrap gap-2">
-        {!nothing && (
-          <StickerButton variant="primary" size="sm" disabled={busy} onClick={onUse}>
-            <Check className="h-3.5 w-3.5" />
-            Add to resume
-          </StickerButton>
-        )}
-        {!nothing && (
-          <StickerButton variant="outline" size="sm" disabled={busy} onClick={onPreview}>
-            <Eye className="h-3.5 w-3.5" />
-            Preview
-          </StickerButton>
-        )}
-        <StickerButton variant="outline" size="sm" disabled={busy} onClick={onDiscard}>
-          <X className="h-3.5 w-3.5" />
-          {nothing ? "Close" : "Discard"}
-        </StickerButton>
-      </div>
-    </div>
-  );
-};
 
 export default ResumeStep;
