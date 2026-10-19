@@ -217,7 +217,7 @@ export function deriveCheckSuggestions(check: ResumeCheck | null, content: Resum
 
   // 3 · Impact language, when it scored in the "needs work" band AND there are
   // bullets with no number — the `quantify` tool's own rule for a candidate.
-  const impact = report.metrics.find((m) => m.id === METRIC_IMPACT)?.value;
+  const impact = report.metrics.find((m) => m.id === METRIC_IMPACT)?.value ?? undefined;
   const bare = content.experience.reduce((n, entry) => n + entry.bullets.filter((b) => b.trim() && !/\d/.test(b)).length, 0);
   if (needsWork(impact) && bare > 0) {
     out.push({
@@ -231,7 +231,7 @@ export function deriveCheckSuggestions(check: ResumeCheck | null, content: Resum
   // 4 · Length & format, when it scored in the "needs work" band on a resume
   // that runs past one page. Short resumes score low on this metric too, and
   // cutting one would be the wrong advice, so the page count has to agree.
-  const length = report.metrics.find((m) => m.id === METRIC_LENGTH)?.value;
+  const length = report.metrics.find((m) => m.id === METRIC_LENGTH)?.value ?? undefined;
   if (needsWork(length) && pageCount > 1) {
     out.push({
       id: `${scope}:shorten`,

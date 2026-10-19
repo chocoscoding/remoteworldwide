@@ -44,6 +44,8 @@ import { cn } from "@/lib/utils";
 import {
   ATS_BILLING_HREF,
   SCAN_CREDITS,
+  partialLine,
+  scanCoverage,
   type ScanFailure,
 } from "@/app/lib/ats/api";
 import { scoreColor, scoreTrackColor } from "@/app/lib/apply/score";
@@ -355,6 +357,10 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
     );
   } else if (report && check) {
     const score = report.score;
+    // A check against a job that could see only part of the posting says so, like the apply step
+    // (owner, 2026-10-19): faded, "Partly checked", how much, and Check again.
+    const coverage = check.job ? scanCoverage(report) : null;
+    const partial = coverage?.partial ?? false;
     scoreCard = (
       <section aria-label="ATS score" className={darkCard}>
         <span className="flex items-center gap-3">
@@ -363,7 +369,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
             aria-label={`${score} out of 100`}
             className={cn(
               "flex-none transition-opacity",
-              stale && "opacity-45",
+              (stale || partial) && "opacity-45",
             )}
           >
             <ScoreRing
@@ -415,7 +421,21 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           </span>
         </span>
 
-        {stale ? (
+        {partial && coverage && !stale ? (
+          <span className="flex items-center justify-between gap-2 rounded-[9px] bg-[#fdf1d6]/15 py-[7px] pl-2.5 pr-2 text-xs text-[#f6d77a]">
+            <span>
+              <strong className="font-extrabold">Partly checked.</strong> {partialLine(coverage)}
+            </span>
+            <button
+              type="button"
+              onClick={onRecheck}
+              title={`Check again · ${SCAN_CREDITS} credit`}
+              className="h-7 flex-none cursor-pointer rounded-[7px] border-[1.5px] border-[#222325] bg-[#e1f073] px-2.5 text-xs font-extrabold text-primary"
+            >
+              Check again
+            </button>
+          </span>
+        ) : stale ? (
           <span
             title={STALE_NOTE}
             className="flex items-center justify-between gap-2 rounded-[9px] bg-white/[0.08] py-[7px] pl-2.5 pr-2 text-xs text-white/75"
@@ -446,8 +466,8 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           </span>
         )}
 
-        {/* Scored on the reduced path when a provider was down. Still a real score. */}
-        {report.degraded && (
+        {/* Scored on the reduced path when a provider was down. A partly checked match says so above instead. */}
+        {report.degraded && !partial && (
           <p className="flex items-start gap-1.5 text-[11px] leading-snug text-white/60">
             <TriangleAlert className="mt-px h-3 w-3 flex-none" />
             {report.degradedReason ??

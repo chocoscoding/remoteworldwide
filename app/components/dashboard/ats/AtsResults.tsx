@@ -20,7 +20,7 @@
 // only, never the projection: a report outlives the screen it came from.
 
 import { FC, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, Download, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, ChevronDown, Download, Loader2, RotateCw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TimeAgo from "timeago-react";
@@ -32,7 +32,22 @@ import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import AddToPlanButton from "@/app/components/dashboard/plan/AddToPlanButton";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
-import { ATS_BILLING_HREF, MAX_SCAN_SCORE, STUFFING_ADVICE, coveredKeywords, scanTier, stuffingHeadline, unmetRequirements, type ScanFailure } from "@/app/lib/ats/api";
+import {
+  ATS_BILLING_HREF,
+  HEADLINE_SHARES,
+  MAX_SCAN_SCORE,
+  STUFFING_ADVICE,
+  coveredKeywords,
+  isUnchecked,
+  partialLine,
+  projectedLifts,
+  scanCoverage,
+  scanTier,
+  scoreMakeup,
+  stuffingHeadline,
+  unmetRequirements,
+  type ScanFailure,
+} from "@/app/lib/ats/api";
 import { fixHref, fixInstruction, fixesFor, writeFixHandoff } from "@/app/lib/ats/fix-handoff";
 import { scoreStep, scoreStepTrack } from "@/app/lib/ats/score-steps";
 import { ATS_REPORT_CSS, atsReportHtml, atsReportToDocx, atsReportToMarkdown } from "@/app/lib/export/ats-report";
@@ -74,17 +89,9 @@ export interface AtsResultsProps {
   onExit: () => void;
 }
 
-/**
- * What closing one gap is projected to be worth.
- *
- * A real rescore is the only thing that moves the real number, so this is
- * shown as a projection and never written anywhere. It is weighted by the
- * requirement's own weight (1-5) so closing the thing the job is actually
- * about is visibly worth more than closing a nice-to-have.
- */
-const projectedLift = (weight: number) => Math.max(1, Math.round(weight * 1.2));
-
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+const requirementCount = (n: number) => `${n} ${n === 1 ? "requirement" : "requirements"}`;
 
 /** The General / Against a job switch's two halves. */
 const SEGMENT = "rounded-md px-3 py-1 text-sm font-semibold transition-colors";
@@ -179,25 +186,42 @@ const AtsResults: FC<AtsResultsProps> = ({
   const present = useMemo(() => (report ? coveredKeywords(report) : []), [report]);
   const missing = report?.gaps ?? [];
 
-  const lift = useMemo(
-    () => unmet.filter((v) => fixedIds.has(v.requirement.id)).reduce((sum, v) => sum + projectedLift(v.requirement.weight), 0),
-    [unmet, fixedIds],
-  );
+  // A scan that could check only part of the posting says so, the way the apply step does (owner,
+  // 2026-10-19): "Partly checked", how much was checked, Rescore; its keyword match is "not checked",
+  // never a 0 that reads as "you matched nothing", and its number is never given a tier.
+  const coverage = report && job ? scanCoverage(report) : null;
+  const partial = coverage?.partial ?? false;
+  const metrics = (report?.metrics ?? []).filter((m) => !(m.id === KEYWORD_METRIC && !job));
+  const keywordChecked = Boolean(job) && !coverage?.keywordUnchecked;
+  // What the number is made of, worded as the downloaded report words it.
+  const makeup = report ? scoreMakeup(report, { keywordChecked, checked: coverage?.checked ?? 0 }) : null;
 
   const base = report?.score ?? 0;
-  // Nothing scores 100 (owner, 2026-10-18), the projection included.
+  // Nothing scores 100 (owner, 2026-10-18), the projection included, so no fix is worth more than the room left.
+  const headroom = Math.max(0, MAX_SCAN_SCORE - base);
+  // Closing a gap moves keyword match and nothing else, so a scan that could not check it projects nothing.
+  // An old scan, scored when the score was keyword match alone, projects nothing: a rescore gives the real number.
+  const projecting = keywordChecked && headroom > 0 && makeup?.current !== false;
+  // What closing each gap is projected to add, the scorer's own arithmetic (`projectedLifts`). A real
+  // rescore is the only thing that moves the real number, so this is shown and never written anywhere.
+  const lifts = useMemo(() => (report ? projectedLifts(report) : new Map<string, number>()), [report]);
+  const gapLift = (id: string) => Math.min(headroom, Math.max(1, Math.round(lifts.get(id) ?? 0)));
+  const lift = useMemo(() => {
+    if (!projecting) return 0;
+    const sum = unmet.filter((v) => fixedIds.has(v.requirement.id)).reduce((total, v) => total + (lifts.get(v.requirement.id) ?? 0), 0);
+    return Math.min(headroom, Math.round(sum));
+  }, [unmet, fixedIds, projecting, headroom, lifts]);
+
   const displayed = clamp(base + lift, 0, MAX_SCAN_SCORE);
   const tier = scanTier(displayed);
-
-  // `degraded` means the scan could not really compare against the posting, so
-  // the keyword figure is not a finding. Dropping it beats showing a 0 that
-  // reads as "you matched nothing".
-  const metrics = (report?.metrics ?? []).filter((m) => !(m.id === KEYWORD_METRIC && (report?.degraded || !job)));
 
   // Everything the report suggests, as the editor's AI will read it ("Fix these in my resume").
   const posting = useMemo(() => (job ? { company: job.company, role: job.role, description: job.description } : null), [job]);
   const fixes = useMemo(() => (report ? fixesFor(report, posting) : []), [report, posting]);
-  const advice = job ? [] : (report?.advice ?? []);
+  // A general scan (or one that could not check keyword match) gets one or two fixes from its weakest
+  // sections. A job scan works from its gaps, and since how it reads is 30% of its score (owner,
+  // 2026-10-19), at most one fix for that part too, shown after them.
+  const advice = keywordChecked ? (report?.advice ?? []).slice(0, 1) : (report?.advice ?? []);
 
   const fixInEditor = () => {
     if (!report) return;
@@ -227,6 +251,40 @@ const AtsResults: FC<AtsResultsProps> = ({
     }
     await printDocument({ title: fileName, html: atsReportHtml(input), pageSize: "A4", pageMargin: "16mm 16mm", css: ATS_REPORT_CSS });
   }
+
+  // Under 85, what to fix in how the resume reads: before the explanation on a general scan, after
+  // the gaps on a job scan, where it is the one more lever beside them.
+  const adviceCard =
+    advice.length > 0 ? (
+      <DashCard className="p-6">
+        <p className="text-[15px] font-bold text-primary">
+          {keywordChecked ? "One more thing that moves the number" : advice.length === 1 ? "One thing to fix first" : "Two things to fix first"}
+        </p>
+        <p className="mt-0.5 text-xs text-black/45">
+          {keywordChecked
+            ? `How your resume reads is ${100 - HEADLINE_SHARES["keyword-match"]}% of your score. This is where it reads weakest.`
+            : `From the ${advice.length === 1 ? "section" : "sections"} scoring lowest. These move the number most.`}
+        </p>
+        <ol className="mt-4 flex flex-col gap-4">
+          {advice.map((item, index) => (
+            <li key={item.id} className="flex gap-3">
+              <span className="grid h-6 w-6 flex-none place-content-center rounded-full border-[1.5px] border-[#222325] text-xs font-bold text-primary tabular-nums">
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-primary">{item.title}</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-black/60">{item.detail}</p>
+                {item.lines.map((line) => (
+                  <p key={line} className="mt-1.5 rounded-lg bg-[#f6f6f1] px-3 py-1.5 text-xs leading-relaxed text-black/55">
+                    &ldquo;{line}&rdquo;
+                  </p>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </DashCard>
+    ) : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -296,7 +354,7 @@ const AtsResults: FC<AtsResultsProps> = ({
               )}
             </div>
 
-            {report.degraded && (
+            {report.degraded && !partial && (
               <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-[#e0c060] bg-[#fdf6e3] px-4 py-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 flex-none text-[#8a6d1f]" />
                 <p className="text-xs leading-relaxed text-[#6b551a]">
@@ -318,14 +376,37 @@ const AtsResults: FC<AtsResultsProps> = ({
               </div>
               <div className="flex min-w-0 flex-1 flex-col items-center gap-4 text-center sm:items-start sm:text-left">
                 <div>
-                  <Pill variant={tier.tone} className="mb-2.5">
-                    {tier.label}
-                  </Pill>
-                  <p className="max-w-md text-[15px] leading-relaxed text-black/70">
-                    {job
-                      ? `Against ${report.verdicts.length} ${report.verdicts.length === 1 ? "requirement" : "requirements"} read from the posting.`
-                      : "How it reads on its own: structure, impact and length. Add a job to score the match."}
-                  </p>
+                  {partial && coverage ? (
+                    <>
+                      <span className="mb-2.5 inline-flex items-center gap-1.5 rounded-full bg-[#fdf1d6] px-2.5 py-1 text-xs font-extrabold text-[#a06f00]">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Partly checked
+                      </span>
+                      <p className="max-w-md text-[15px] leading-relaxed text-black/70">
+                        {partialLine(coverage)} {makeup?.partial}
+                      </p>
+                      <StickerButton variant="primary" size="sm" className="mt-3" onClick={onRetry}>
+                        <RotateCw className="h-3.5 w-3.5" />
+                        Rescore
+                      </StickerButton>
+                    </>
+                  ) : (
+                    <>
+                      <Pill variant={tier.tone} className="mb-2.5">
+                        {tier.label}
+                      </Pill>
+                      <p className="max-w-md text-[15px] leading-relaxed text-black/70">
+                        {/* A job score is mostly the match, not only it (owner, 2026-10-19); an older scan was the match alone. */}
+                        {!job
+                          ? "How it reads on its own: structure, impact and length. Add a job to score the match."
+                          : !keywordChecked
+                            ? "Nothing in the posting could be scored, so the number shows how it reads on its own: structure, impact and length."
+                            : makeup?.current === false
+                              ? `Against ${requirementCount(report.verdicts.length)} read from the posting.`
+                              : `${HEADLINE_SHARES["keyword-match"]}% how you cover the ${requirementCount(report.verdicts.length)} read from the posting, ${100 - HEADLINE_SHARES["keyword-match"]}% how it reads: impact, structure and length.`}
+                      </p>
+                    </>
+                  )}
                   {lift > 0 && (
                     <p className="mt-2 max-w-md text-xs leading-relaxed text-black/45">
                       {/* Said plainly: the ring is showing a projection right now. */}
@@ -344,41 +425,31 @@ const AtsResults: FC<AtsResultsProps> = ({
           {/* Metric tiles */}
           {metrics.length > 0 && (
             <div className={cn("grid gap-3.5", metrics.length >= 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3")}>
-              {metrics.map((m) => (
-                <DashCard key={m.id} className="p-4">
-                  <p className="mb-2 text-xs font-semibold text-black/45">{m.label}</p>
-                  <p className="mb-2.5 text-2xl font-bold text-primary tabular-nums">{m.value}%</p>
-                  <ProgressBar value={m.value} height="h-1.5" fillClassName={scoreStep(m.value).fill} />
-                </DashCard>
-              ))}
+              {metrics.map((m) => {
+                const notChecked = isUnchecked(m) || (m.id === KEYWORD_METRIC && Boolean(coverage?.keywordUnchecked));
+                return (
+                  <DashCard key={m.id} className="p-4">
+                    <p className="mb-2 text-xs font-semibold text-black/45">{m.label}</p>
+                    {notChecked || m.value === null ? (
+                      <>
+                        <p className="mb-2.5 text-base font-bold text-[#a06f00]">Not checked</p>
+                        <ProgressBar value={0} height="h-1.5" />
+                      </>
+                    ) : (
+                      <>
+                        <p className="mb-2.5 text-2xl font-bold text-primary tabular-nums">{m.value}%</p>
+                        <ProgressBar value={m.value} height="h-1.5" fillClassName={scoreStep(m.value).fill} />
+                      </>
+                    )}
+                  </DashCard>
+                );
+              })}
             </div>
           )}
+          {/* How the tiles make the ring, so the person can add it up (owner, 2026-10-19). */}
+          {metrics.length > 0 && makeup?.recipe && <p className="-mt-2 px-1 text-xs leading-relaxed text-black/50">{makeup.recipe}</p>}
 
-          {/* A general score under 85 says what to fix: one or two things, from the weakest sections. */}
-          {advice.length > 0 && (
-            <DashCard className="p-6">
-              <p className="text-[15px] font-bold text-primary">{advice.length === 1 ? "One thing to fix first" : "Two things to fix first"}</p>
-              <p className="mt-0.5 text-xs text-black/45">From the {advice.length === 1 ? "section" : "sections"} scoring lowest. These move the number most.</p>
-              <ol className="mt-4 flex flex-col gap-4">
-                {advice.map((item, index) => (
-                  <li key={item.id} className="flex gap-3">
-                    <span className="grid h-6 w-6 flex-none place-content-center rounded-full border-[1.5px] border-[#222325] text-xs font-bold text-primary tabular-nums">
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-primary">{item.title}</p>
-                      <p className="mt-0.5 text-[13px] leading-relaxed text-black/60">{item.detail}</p>
-                      {item.lines.map((line) => (
-                        <p key={line} className="mt-1.5 rounded-lg bg-[#f6f6f1] px-3 py-1.5 text-xs leading-relaxed text-black/55">
-                          &ldquo;{line}&rdquo;
-                        </p>
-                      ))}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </DashCard>
-          )}
+          {!keywordChecked && adviceCard}
 
           <AtsExplanation report={report} status={status} unexplained={unexplained} />
 
@@ -393,12 +464,14 @@ const AtsResults: FC<AtsResultsProps> = ({
                   {unmet.length === 1 ? "One gap to close" : `${unmet.length} gaps to close`}
                 </p>
                 <p className="mt-0.5 text-xs text-black/45">
-                  Read from the posting, heaviest first. Ticking one projects what closing it is worth. Scan again to score it for real.
+                  {projecting
+                    ? "Read from the posting, heaviest first. Ticking one projects what closing it is worth. Scan again to score it for real."
+                    : "Read from the posting, heaviest first. Scan again once you've closed them to see what they're worth."}
                 </p>
               </div>
               {unmet.map((verdict) => {
                 const { requirement } = verdict;
-                const fixed = fixedIds.has(requirement.id);
+                const fixed = projecting && fixedIds.has(requirement.id);
                 const quoted = verdict.evidence[0];
                 return (
                   <div
@@ -436,19 +509,23 @@ const AtsResults: FC<AtsResultsProps> = ({
                         }}
                         source={{ kind: "ats", ref: job?.id || resume.id }}
                       />
-                      <StickerButton
-                        variant={fixed ? "outline" : "primary"}
-                        size="sm"
-                        className="flex-none"
-                        onClick={() => onToggleFix(requirement.id)}>
-                        {fixed ? "Undo" : `+${projectedLift(requirement.weight)}`}
-                      </StickerButton>
+                      {projecting && (
+                        <StickerButton
+                          variant={fixed ? "outline" : "primary"}
+                          size="sm"
+                          className="flex-none"
+                          onClick={() => onToggleFix(requirement.id)}>
+                          {fixed ? "Undo" : `+${gapLift(requirement.id)}`}
+                        </StickerButton>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </DashCard>
           )}
+
+          {keywordChecked && adviceCard}
 
           {/* Keywords — what the posting asked for, and what the resume covered. */}
           {(present.length > 0 || missing.length > 0) && (
@@ -463,6 +540,7 @@ const AtsResults: FC<AtsResultsProps> = ({
                   </p>
                   <p className="mt-0.5 text-xs text-black/45">
                     {present.length} covered · {missing.length} missing
+                    {partial && coverage && coverage.total - coverage.checked > 0 && ` · ${coverage.total - coverage.checked} not checked this time`}
                   </p>
                 </div>
                 <ChevronDown className={cn("h-4 w-4 flex-none text-black/40 transition-transform", keywordsOpen && "rotate-180")} />

@@ -16,6 +16,10 @@
 // the AI service — and names the resume and the date it came from. With no
 // such scan it says so and links to the scorer, where a scan costs what it
 // costs; logging an application never spends a credit on the user's behalf.
+//
+// The stored score is the ATS score, not the match (owner, 2026-10-19: 70%
+// keyword match, 30% how the resume reads), so it is labelled as one, and the
+// match beside it is the scan's own Keyword match.
 
 import { type FC } from "react";
 import Link from "next/link";
@@ -29,7 +33,7 @@ import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
 import { useActivity, type LogApplicationResult } from "@/app/components/dashboard/activity/ActivityProvider";
-import { SCAN_CREDITS, scanTier } from "@/app/lib/ats/api";
+import { SCAN_CREDITS, isUnchecked, scanTier } from "@/app/lib/ats/api";
 import type { StoredScan } from "@/app/lib/ats/types";
 import { shortDateLabel, tierFor } from "@/app/lib/dashboard/streak";
 import { useStoredScanQuery } from "@/hooks/queries/useAtsQueries";
@@ -47,6 +51,19 @@ export interface PayoffPanelProps {
 
 const LABEL = "text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/45";
 
+/** What the block is headed: the score is the whole ATS score, the match is only part of it. */
+const SCORE_LABEL = "ATS score against your resume";
+
+/**
+ * The scan's Keyword match, or null when it was not checked. A reduced scan stored before keyword
+ * match could say "not checked" kept a 0 for it, read as not checked as the report screen does.
+ */
+const keywordMatchOf = (scan: StoredScan): number | null => {
+  const metric = scan.metrics.find((m) => m.id === "keyword-match");
+  if (!metric || isUnchecked(metric) || metric.value === null) return null;
+  return scan.degraded && metric.value === 0 ? null : metric.value;
+};
+
 /** The one link out when there is no score to show — to the scorer, with the price on it. */
 const ScanLink: FC<{ onClose: () => void; children: string }> = ({ onClose, children }) => (
   <Link
@@ -58,7 +75,7 @@ const ScanLink: FC<{ onClose: () => void; children: string }> = ({ onClose, chil
   </Link>
 );
 
-/** The match block: a stored scan's number with where it came from, or an honest account of why there is none. */
+/** The score block: a stored scan's number and its match, with where they came from, or an honest account of why there is none. */
 const MatchBlock: FC<{ hasPosting: boolean; loading: boolean; failed: boolean; scan: StoredScan | null | undefined; onClose: () => void }> = ({
   hasPosting,
   loading,
@@ -69,7 +86,7 @@ const MatchBlock: FC<{ hasPosting: boolean; loading: boolean; failed: boolean; s
   if (!hasPosting) {
     return (
       <div className="mb-5">
-        <span className={LABEL}>Match against your resume</span>
+        <span className={LABEL}>{SCORE_LABEL}</span>
         <p className="mt-2 text-sm leading-relaxed text-black/60">
           No job description came with this one, so there&apos;s nothing to score against. Scan a resume against the posting to see how it matches.
         </p>
@@ -81,7 +98,7 @@ const MatchBlock: FC<{ hasPosting: boolean; loading: boolean; failed: boolean; s
   if (loading) {
     return (
       <div className="mb-5">
-        <span className={LABEL}>Match against your resume</span>
+        <span className={LABEL}>{SCORE_LABEL}</span>
         <p className="mt-2 flex items-center gap-2 text-sm text-black/55">
           <Loader2 className="h-4 w-4 animate-spin" />
           Looking for a scan of this posting…
@@ -94,7 +111,7 @@ const MatchBlock: FC<{ hasPosting: boolean; loading: boolean; failed: boolean; s
     return (
       <div className="mb-5">
         <div className="mb-2 flex items-baseline justify-between gap-3">
-          <span className={LABEL}>Match against your resume</span>
+          <span className={LABEL}>{SCORE_LABEL}</span>
           {!failed && <Pill variant="outline-dashed">Not scanned yet</Pill>}
         </div>
         <p className="text-sm leading-relaxed text-black/60">
@@ -107,18 +124,27 @@ const MatchBlock: FC<{ hasPosting: boolean; loading: boolean; failed: boolean; s
     );
   }
 
-  const band = scanTier(scan.score);
+  // The band ("Strong match") speaks of the match, so it sits on Keyword match, never on the score.
+  const match = keywordMatchOf(scan);
+  const band = match === null ? null : scanTier(match);
   const gaps = scan.gaps.filter((gap) => !gap.present).slice(0, MAX_GAPS);
   return (
     <>
       <div className="mb-5">
-        <div className="mb-2 flex items-baseline justify-between gap-3">
-          <span className={LABEL}>Match against your resume</span>
-          <Pill variant={band.tone === "positive" ? "positive" : band.tone === "urgent" ? "urgent" : "neutral"}>{band.label}</Pill>
-        </div>
-        <div className="flex items-end gap-2.5">
+        <p className={cn(LABEL, "mb-2")}>{SCORE_LABEL}</p>
+        <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
           <span className="text-[40px] font-extrabold leading-none text-primary tabular-nums">{scan.score}</span>
           <span className="mb-1.5 text-sm text-black/45">out of 100</span>
+          <span className="mb-1 ml-auto flex items-center gap-2 text-sm text-black/60">
+            {match === null ? (
+              "Keyword match not checked"
+            ) : (
+              <>
+                Keyword match <span className="font-bold text-primary tabular-nums">{match}%</span>
+              </>
+            )}
+            {band && <Pill variant={band.tone === "positive" ? "positive" : band.tone === "urgent" ? "urgent" : "neutral"}>{band.label}</Pill>}
+          </span>
         </div>
         <ProgressBar value={scan.score} className="mt-2.5" />
         {/* Never a number without the document that earned it and when. */}
@@ -129,7 +155,7 @@ const MatchBlock: FC<{ hasPosting: boolean; loading: boolean; failed: boolean; s
         {scan.degraded && (
           <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-black/50">
             <TriangleAlert className="mt-px h-3 w-3 flex-none" />
-            {scan.degradedReason ?? "Scored on a reduced path, so treat the match as approximate."}
+            {scan.degradedReason ?? "Scored on a reduced path, so treat the score as approximate."}
           </p>
         )}
       </div>

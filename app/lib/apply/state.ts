@@ -7,12 +7,14 @@
 // trying to continue. Pure, and its imports are types or pure modules:
 // tests/apply.test.mjs runs it under plain `node --test`.
 
+import { isCurrentScore } from "@/app/lib/ats/score";
 import type { CoverageState, ScanReport } from "@/app/lib/ats/types";
 import type { TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
 import type { CoverTone } from "@/app/lib/cover/api";
 import { DEFAULT_LETTER_DESIGN, LETTERHEAD_OPTIONS, LETTER_FONT_OPTIONS, SPACING_OPTIONS, THEME_OPTIONS } from "@/app/lib/cover/presentation";
-import type { LetterDesign, ResumeContent } from "@/app/lib/dashboard/types";
-import type { ApplyHistoryStep } from "./history";
+import type { AtsMetric, LetterDesign, ResumeContent } from "@/app/lib/dashboard/types";
+import { metricValues } from "./fixes";
+import type { ApplyHistoryStep, ScoreBasis } from "./history";
 
 /** Mirrors `COVER_TONES` in app/lib/cover/api.ts, which this module cannot import at runtime. */
 const TONES: readonly CoverTone[] = ["warm", "formal", "story", "short"];
@@ -151,11 +153,29 @@ function readReport(value: unknown): ScanReport | null {
 const readNumbers = (value: Record<string, unknown>): Record<string, number> =>
   Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])));
 
-/** The draft's change history, each step read whole or dropped, and where it stands. */
+/** What a step's score was made from, once its report was dropped for room. */
+function readBasis(value: unknown): ScoreBasis | null {
+  if (!isRecord(value) || !Array.isArray(value.metrics)) return null;
+  return {
+    metrics: value.metrics.filter(isRecord) as unknown as AtsMetric[],
+    stuffingPenalty: typeof value.stuffingPenalty === "number" ? value.stuffingPenalty : 0,
+  };
+}
+
+/**
+ * The draft's change history, each step read whole or dropped, and where it stands. A step's score
+ * stands only when its report (or the basis kept in its place) makes it by today's formula (owner,
+ * 2026-10-19: no longer keyword match alone). Any other reads as none, never worked out again from
+ * old numbers: the list shows "–", and going back to the step rescores it.
+ */
 function readHistory(value: unknown, at: unknown): { history: ApplyHistoryStep[]; historyAt: number } {
   const history: ApplyHistoryStep[] = (Array.isArray(value) ? value : []).filter(isRecord).flatMap((row) => {
     const content = readContent(row.content);
     if (!content || typeof row.id !== "string" || typeof row.label !== "string" || typeof row.at !== "string") return [];
+    const report = readReport(row.report);
+    const basis = report ? null : readBasis(row.basis);
+    const score = typeof row.score === "number" ? row.score : null;
+    const stands = score !== null && (report ? isCurrentScore(report) : basis !== null && isCurrentScore({ score, ...basis }));
     return [
       {
         id: row.id,
@@ -163,8 +183,9 @@ function readHistory(value: unknown, at: unknown): { history: ApplyHistoryStep[]
         at: row.at,
         content,
         version: typeof row.version === "number" ? row.version : null,
-        score: typeof row.score === "number" ? row.score : null,
-        report: readReport(row.report),
+        score: stands ? score : null,
+        report: stands ? report : null,
+        ...(stands && basis ? { basis } : {}),
       },
     ];
   });
@@ -275,6 +296,32 @@ export function readApplyState(raw: unknown): ApplyState {
     },
     questions: readQuestions(raw.questions),
     tracked: raw.tracked === true,
+  };
+}
+
+type ScanBaseline = Pick<NonNullable<ApplyState["scan"]>, "previousScore" | "previousStates" | "previousMetrics">;
+
+/**
+ * What a new score of this version is measured against ("Up 3 since last change", the "+18" beside a
+ * check): the last version scored, or, on a re-run of that same version, what it was measured
+ * against. Never a partly checked scan (its numbers are not the resume's), and never one an older
+ * formula made (owner, 2026-10-19: the score is no longer keyword match alone, so the move would be
+ * the formula, not the resume).
+ */
+export function scanBaseline(last: ApplyState["scan"], resumeId: string, version: number): ScanBaseline {
+  if (!last || !isCurrentScore(last.report)) return { previousScore: null };
+  if (last.resumeId === resumeId && last.version === version) {
+    return {
+      previousScore: last.previousScore,
+      ...(last.previousStates ? { previousStates: last.previousStates } : {}),
+      ...(last.previousMetrics ? { previousMetrics: last.previousMetrics } : {}),
+    };
+  }
+  if (last.report.degraded) return { previousScore: null };
+  return {
+    previousScore: last.report.score,
+    previousStates: Object.fromEntries(last.report.verdicts.map((verdict) => [verdict.requirement.id, verdict.state])),
+    previousMetrics: metricValues(last.report),
   };
 }
 

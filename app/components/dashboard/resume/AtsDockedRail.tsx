@@ -14,7 +14,7 @@ import {
   RotateCw,
   Sparkle,
 } from "lucide-react";
-import { SCAN_CREDITS } from "@/app/lib/ats/api";
+import { SCAN_CREDITS, scanCoverage } from "@/app/lib/ats/api";
 import AiAssistRail from "./AiAssistRail";
 import {
   EmptyRing,
@@ -73,6 +73,8 @@ const AtsDockedRail: FC<
 
   const checking = checkStatus === "preparing" || checkStatus === "scoring";
   const score = check?.report?.score ?? null;
+  // Partly checked against a job: the ring fades, as in the floating dock.
+  const partial = Boolean(check?.report && check.job && scanCoverage(check.report).partial);
   const toReview = fixesToReview(props);
   const title =
     score !== null
@@ -156,7 +158,7 @@ const AtsDockedRail: FC<
             aria-label={title}
             className="relative grid h-11 w-11 cursor-pointer place-content-center rounded-full"
           >
-            <MiniScore score={score} size={38} stale={stale} />
+            <MiniScore score={score} size={38} stale={stale} partial={partial} />
             {toReview > 0 && (
               <span className="absolute -right-[3px] -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full border-[1.5px] border-white bg-[#b23c26] px-1 text-[10px] font-extrabold text-white">
                 {toReview}

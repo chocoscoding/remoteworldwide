@@ -195,10 +195,31 @@ export function resumeContentToText(whole: ResumeContent): string {
     }
   }
 
-  const skills = content.skills.map(clean).filter(Boolean);
-  if (skills.length > 0) {
+  // Skills as the page groups them (2026-10-19): one line per named entry ("Soft Skills: Empathy,
+  // Teamwork") and one per run of plain skills, so a line is one piece of evidence to the scorer and
+  // not a 40-skill list where "English: fluent (C1)" is skill 38. Written out in full in both repos.
+  const shownGroups = (content.skillGroups ?? []).filter((group) => !group.hidden && (clean(group.title) || group.skills.some((skill) => clean(skill))));
+  const skillLines: string[] = [];
+  if (shownGroups.length > 0) {
+    let run: string[] = [];
+    for (const group of shownGroups) {
+      const subs = group.skills.map(clean).filter(Boolean);
+      if (subs.length === 0) {
+        run.push(clean(group.title));
+        continue;
+      }
+      if (run.length > 0) skillLines.push(run.join(", "));
+      run = [];
+      skillLines.push(clean(group.title) ? `${clean(group.title)}: ${subs.join(", ")}` : subs.join(", "));
+    }
+    if (run.length > 0) skillLines.push(run.join(", "));
+  } else {
+    const skills = content.skills.map(clean).filter(Boolean);
+    if (skills.length > 0) skillLines.push(skills.join(", "));
+  }
+  if (skillLines.length > 0) {
     section("SKILLS");
-    push(skills.join(", "));
+    for (const line of skillLines) push(line);
   }
 
   const projects = content.projects.filter((entry) => clean(entry.name));

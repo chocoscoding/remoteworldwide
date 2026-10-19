@@ -1164,6 +1164,13 @@ body {
   text-underline-offset: 2px;
 }
 
+/* The apply step's paper shows what is sent: a section with nothing in it ("No projects added yet.")
+   is left off, as every download already leaves it off (owner, 2026-10-19). */
+.rww-sent-paper [data-resume-section]:has([data-resume-placeholder]),
+.rww-sent-paper [data-resume-placeholder] {
+  display: none !important;
+}
+
 /* "Show in resume": the lines a card means, lit leaf green over everything else for a moment. */
 ::highlight(rww-resume-flash) {
   background-color: #b6df8a;

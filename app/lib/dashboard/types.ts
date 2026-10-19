@@ -391,8 +391,14 @@ export interface TrackerColumn {
 export interface AtsMetric {
   id: string;
   label: string;
-  /** 0-100 */
-  value: number;
+  /** 0-100, or null when it could not be measured this time (`checked: false`). */
+  value: number | null;
+  /**
+   * False when the scan could not check this metric (owner, 2026-10-19): keyword match on a scan
+   * that checked under half the posting. Never shown as 0, which reads as "matches nothing".
+   * Absent on rows written before, which were all checked.
+   */
+  checked?: boolean;
 }
 
 export interface AtsKeyword {

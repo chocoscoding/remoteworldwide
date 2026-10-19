@@ -33,15 +33,17 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import { useDocuments } from "@/app/components/dashboard/documents/DocumentsProvider";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { changeCount, resumeChanges } from "@/app/lib/apply/changes";
-import { bareBullets, metricValues, onlyInSkills, unbackedSkills, workingItems } from "@/app/lib/apply/fixes";
+import { LANGUAGE_LEVELS, keepProof, languageAsk, namesLanguage, onlyInSkills, unbackedSkills, workingItems } from "@/app/lib/apply/fixes";
+import { impactMisses, openingWord } from "@/app/lib/apply/impact";
 import { editBullet, editSummary, type LineEdit } from "@/app/lib/apply/edits";
-import { hiddenLabel, pushStep, scoreStep, stampStep, stepId } from "@/app/lib/apply/history";
-import { sendingResumeId, type ApplyState } from "@/app/lib/apply/state";
-import { ATS_BILLING_HREF, missingGaps, prepareResumeForDoc } from "@/app/lib/ats/api";
+import { hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, stepId } from "@/app/lib/apply/history";
+import { scanBaseline, sendingResumeId, type ApplyState } from "@/app/lib/apply/state";
+import { ATS_BILLING_HREF, isCurrentScore, missingGaps, prepareResumeForDoc, scanCoverage } from "@/app/lib/ats/api";
 import type { IngestedResumeDetail } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { qk } from "@/app/lib/query/keys";
-import { askForRewrite, injectKeywords, tailorToJob, type ResumePlace } from "@/app/lib/resume/ai";
+import { injectKeywords, quantifySuggestions, storedBulletIndex, tailorToJob, type KeywordInjection, type ResumePlace } from "@/app/lib/resume/ai";
+import { applyQuantify } from "@/app/lib/dashboard/resume/ai-tools";
 import {
   RESUME_ACCEPT,
   createDraftResume,
@@ -91,11 +93,19 @@ const HIDE_SAVE_DELAY_MS = 1_200;
 /** How long before a failed draft save is tried once more. */
 const RETRY_SAVE_MS = 1_500;
 
-/** What "Quantify them" asks for: a result on every bullet that has none, marked for the person to check. */
-const QUANTIFY_INSTRUCTION =
-  "Add a specific, measurable result to every bullet that has no number yet, keeping what each bullet says. Leave bullets that already have a number as they are.";
-
 const withoutExtension = (name: string) => name.replace(/\.[a-z0-9]{1,5}$/i, "");
+
+/** The Impact row's line: "4 open with a weak verb (Held, Acted, Collaborated, Took) and 7 have no number." */
+const impactDetail = (weak: string[], bare: number): string => {
+  const names = [...new Set(weak.map(openingWord).filter(Boolean))].slice(0, 4);
+  const parts = [
+    weak.length > 0
+      ? `${weak.length} ${weak.length === 1 ? "opens" : "open"} with a weak verb${names.length > 0 ? ` (${names.join(", ")})` : ""}`
+      : null,
+    bare > 0 ? `${bare} ${bare === 1 ? "has" : "have"} no number` : null,
+  ].filter(Boolean);
+  return `${parts.join(" and ")}.`;
+};
 
 /** What a failed save says: never a provider's own words ("Voyage embed timed out after 3000ms"). */
 const changeMessage = (error: unknown): string =>
@@ -206,8 +216,19 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   }, [editable, resume.baseId, ingested.data, docs, docsLoading, masterResume.isPending, masterResume.data, update]);
 
   // ---- The score: automatic, and again after every change ---------------------------------------
-  const stored = state.scan && state.scan.resumeId === sendingId && state.scan.version === version ? state.scan : null;
+  // A stored score an older formula made (owner, 2026-10-19: no longer keyword match alone) is not
+  // this version's score: it shows as stale, and the effect below rescores the version once, not
+  // charged twice (the AI's credit ledger knows the version). A tracked application is never
+  // rescored, so it keeps the score it went with; and when the rescore fails (too few credits to
+  // start one), the old score stands as it did, rather than leaving the card empty.
   const live = scan.resumeId !== null && scan.resumeId === sendingId ? scan : null;
+  const stored =
+    state.scan &&
+    state.scan.resumeId === sendingId &&
+    state.scan.version === version &&
+    (!editable || isCurrentScore(state.scan.report) || Boolean(live?.failure))
+      ? state.scan
+      : null;
   // The stored score of this exact version first: after an undo the scanner still holds the newer version's report.
   const report = stored?.report ?? live?.report ?? null;
   const scoring = live?.status === "scoring";
@@ -228,18 +249,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       void runScan({ resumeId, jdText: job.description, jobId: job.savedJobId }).then((finished) => {
         if (!finished) return;
         update((s) => {
-          // Measured against the last version scored; a re-run of the same version keeps what it was measured against.
-          const same = s.scan?.resumeId === resumeId && s.scan.version === scoredVersion;
-          // A partly checked scan is never what a later one is measured against: its numbers are not the resume's.
-          const before = s.scan && !s.scan.report.degraded ? s.scan : null;
-          const previousScore = same ? (s.scan?.previousScore ?? null) : (before?.report.score ?? null);
-          // Each requirement's state and each check's value before this version: what "Now matched" and "+18" are read from.
-          const previousStates = same
-            ? s.scan?.previousStates
-            : before
-              ? Object.fromEntries(before.report.verdicts.map((verdict) => [verdict.requirement.id, verdict.state]))
-              : undefined;
-          const previousMetrics = same ? s.scan?.previousMetrics : before ? metricValues(before.report) : undefined;
+          // Measured against the last version scored (never a partly checked one, nor one an older formula
+          // made); a re-run of the same version keeps what it was measured against. Each requirement's state
+          // and each check's value before this version are what "Now matched" and "+18" are read from.
+          const baseline = scanBaseline(s.scan, resumeId, scoredVersion);
           // The history step this version belongs to takes its score: the step the draft is at, when this is the draft as it is now.
           // A partly checked scan is shown, never kept as a step's score (owner, 2026-10-19): going back rescores.
           const isDraft = resumeId === s.resume.draftId;
@@ -252,14 +265,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           return {
             ...s,
             resume: { ...s.resume, history },
-            scan: {
-              resumeId,
-              version: scoredVersion,
-              report: finished,
-              previousScore,
-              ...(previousStates ? { previousStates } : {}),
-              ...(previousMetrics ? { previousMetrics } : {}),
-            },
+            scan: { resumeId, version: scoredVersion, report: finished, ...baseline },
           };
         });
       });
@@ -281,12 +287,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       ? { kind: "scoring" }
       : live?.failure && !report
         ? { kind: "failed", message: live.failure.message, retryable: live.failure.retryable, credits: live.failure.kind === "credits" }
-        : report && stored && report.degraded
-          ? {
-              kind: "partial",
-              checked: report.verdicts.filter((verdict) => verdict.state !== "undetermined").length,
-              total: report.verdicts.length,
-            }
+        : report && stored && scanCoverage(report).partial
+          ? { kind: "partial", checked: scanCoverage(report).checked, total: scanCoverage(report).total }
           : report && stored
             ? { kind: "ready" }
             : { kind: "stale" };
@@ -390,11 +392,20 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   /**
    * The step being left keeps the score its words had: the current score, when it is of the draft as
    * it is now (read before the draft is written again). A score that was lost along the way (a reload
-   * mid-score, say) is put back here rather than shown wrong after an undo.
+   * mid-score, say) is put back here rather than shown wrong after an undo. One an older formula made
+   * is not: the step keeps none, and going back to it rescores.
    */
   function leaving(s: ApplyState, versionNow: number | undefined) {
     const draftId = s.resume.draftId;
-    if (!s.scan || s.scan.report.degraded || !draftId || s.scan.resumeId !== draftId || versionNow === undefined || s.scan.version !== versionNow)
+    if (
+      !s.scan ||
+      s.scan.report.degraded ||
+      !isCurrentScore(s.scan.report) ||
+      !draftId ||
+      s.scan.resumeId !== draftId ||
+      versionNow === undefined ||
+      s.scan.version !== versionNow
+    )
       return s.resume.history;
     return stampStep(s.resume.history, s.resume.historyAt, versionNow, s.scan.report);
   }
@@ -417,7 +428,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         let steps = leaving(s, versionNow);
         let index = s.resume.historyAt;
         if (steps.length === 0) {
-          // The first change: where the draft started is the first step, with the score it had.
+          // The first change: where the draft started is the first step, with the score it had (none
+          // when that was partly checked or made by an older formula).
           steps = [
             {
               id: stepId(),
@@ -425,8 +437,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
               at,
               content: before,
               version: null,
-              score: report && !report.degraded ? Math.round(report.score) : null,
-              report: report && !report.degraded ? report : null,
+              ...scoreOfScan(report),
             },
           ];
           index = 0;
@@ -438,8 +449,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           content: words,
           version: saved.version,
           // The same text is the same version: it keeps the score it has, and nothing is re-scored.
-          score: unchanged && report && !report.degraded ? Math.round(report.score) : null,
-          report: unchanged && report && !report.degraded ? report : null,
+          ...scoreOfScan(unchanged ? report : null),
         });
         return {
           ...s,
@@ -485,8 +495,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         },
         // The score jumps with it: the step's own report, read for the version it was just saved as.
         // Nothing is measured against the step left: a jump is not a change, so the card just says "Up to date".
+        // A step with no score of today's formula keeps the last scan (another version), so this one is rescored.
         scan:
-          step.report && !step.report.degraded
+          step.report && !step.report.degraded && isCurrentScore(step.report)
             ? { resumeId: saved.resumeId, version: saved.version, report: step.report, previousScore: null }
             : s.scan,
       }));
@@ -586,7 +597,22 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     setChangeError(null);
     try {
       const result = await run();
-      return result ? await commitChange(label, reconcileGroups(result.content)) : false;
+      if (!result || !content) return false;
+      // Never at the cost of what proves a requirement: a line the scan quotes as proof, rewritten so
+      // it no longer says it, goes back as it was (owner, 2026-10-19), and the person is told which.
+      const guarded = report ? keepProof(content, reconcileGroups(result.content), report) : { content: reconcileGroups(result.content), kept: [] };
+      // Nothing new on the page: said plainly, never a history step that claims a change (owner,
+      // 2026-10-19: "no matter the times I add this thing, it does not change anything").
+      if (changeCount(resumeChanges(content, guarded.content)) === 0 && guarded.kept.length === 0) {
+        setChangeError("Nothing on your resume changed that time. Try again, or click a line to say it yourself.");
+        return false;
+      }
+      if (guarded.kept.length > 0) {
+        toast(
+          `Kept ${guarded.kept.length === 1 ? "a line" : "some lines"} as ${guarded.kept.length === 1 ? "it was" : "they were"}: ${guarded.kept.length === 1 ? "it proves" : "they prove"} ${guarded.kept.join(", ")}.`,
+        );
+      }
+      return await commitChange(label, guarded.content);
     } finally {
       setBusy(null);
     }
@@ -619,12 +645,20 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
    */
   function addPicked() {
     if (!content || !toolsIdle) return;
-    const labels = gapChips.filter((chip) => picked.has(chip.id)).map((chip) => chip.label);
+    // A language is answered by its level, picked on its chip; never sent to be "added" bare.
+    const chosen = gapChips.filter((chip) => picked.has(chip.id) && !isLanguageChip(chip));
+    const labels = chosen.map((chip) => chip.label);
     if (labels.length === 0) return;
+    // What each one means: the posting's requirement and the words the scorer reads it in, so the
+    // line says that, not only the label (owner, 2026-10-19: "multichannel" alone stayed partial).
+    const hints = Object.fromEntries(
+      chosen.map((chip) => [chip.label, { means: chip.wants, proof: verdictById.get(chip.id)?.requirement.proof ?? [] }]),
+    );
     const n = labels.length;
     const noun = n === 1 ? "keyword" : "keywords";
     if (places.includes("bullets") || places.includes("summary")) {
       const where = places.includes("bullets") ? "your experience" : "your summary";
+      let outcome: KeywordInjection | null = null;
       void runAndCommit(`Worked ${n} ${noun} into ${where}`, `Working ${n} ${noun} into ${where}…`, async () => {
         const result = await tools.run("keywords", () =>
           injectKeywords({
@@ -635,10 +669,16 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             keywords: labels,
             places,
             insist: true,
+            hints,
           }),
         );
+        outcome = result;
         return result ? { content: result.content } : null;
-      }).then((made) => made && setPicked(new Set()));
+      }).then((made) => {
+        if (!made) return;
+        setPicked(new Set());
+        if (outcome) tellKeywords(outcome);
+      });
       return;
     }
     const words = addSkills(content, labels);
@@ -647,6 +687,27 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       if (made) setPicked(new Set());
       setBusy(null);
     });
+  }
+
+  /**
+   * After "Add N keywords": the lines they went into, lit on the page, and a word on any that only
+   * made it into Skills or that nothing on the resume backed (owner, 2026-10-19: warn, never refuse).
+   */
+  function tellKeywords(outcome: KeywordInjection) {
+    const lines = Object.values(outcome.placed ?? {})
+      .flat()
+      .filter((line) => line !== "Skills");
+    if (lines.length > 0) showOnPage(lines);
+    const inSkills = outcome.skillsOnly ?? [];
+    const toBack = (outcome.advice ?? []).map((note) => note.term).filter((term) => !inSkills.includes(term));
+    const list = (terms: string[]) => (terms.length === 1 ? terms[0] : `${terms.slice(0, -1).join(", ")} and ${terms[terms.length - 1]}`);
+    if (inSkills.length > 0) {
+      toast(
+        `${list(inSkills)} went into Skills for now: no line took ${inSkills.length === 1 ? "it" : "them"} cleanly. Click the line where you did it and say it there.`,
+      );
+    } else if (toBack.length > 0) {
+      toast(`Added. Your resume didn't show ${list(toBack)} before, so have a real example ready for the interview.`);
+    }
   }
 
   /**
@@ -676,11 +737,34 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     );
   }
 
-  function quantify(count: number) {
+  /**
+   * "Fix them" on the Impact row (owner, 2026-10-19: "why can't I make it better?"): each bullet that
+   * loses Impact points gets what it lacks, a strong opening, a number, or both, as one change. The
+   * Quantify tool, never the free-form Ask (Ask rewrote lines that proved requirements, padded every
+   * bullet and took the score from 61 to the 40s); applied here, and only to bullets shown for this job.
+   */
+  function strengthen() {
     if (!content) return;
-    void runAndCommit(`Added results to ${count} ${count === 1 ? "bullet" : "bullets"}`, "Adding results to your bullets…", async () => {
-      const result = await tools.run("ask", () => askForRewrite({ content, instruction: QUANTIFY_INSTRUCTION }));
-      return result ? { content: result.content } : null;
+    const sent = { ...content, hiddenParts: shownHidden };
+    let rewritten: string[] = [];
+    void runAndCommit("Strengthened your bullets", "Strengthening the bullets that lose Impact points…", async () => {
+      const proposals = await tools.run("quantify", () => quantifySuggestions({ content: sent, section: "experience", openers: true }));
+      if (!proposals) return null;
+      const landed = proposals
+        .filter((proposal) => !proposal.customId && sent.experience[proposal.entryIndex])
+        .map((proposal) => ({ ...proposal, bulletIndex: storedBulletIndex(sent.experience[proposal.entryIndex].bullets, proposal.bulletIndex) }))
+        .filter((proposal) => {
+          const entry = sent.experience[proposal.entryIndex];
+          return !shownHidden.includes(`exp:${entry.id}`) && !shownHidden.includes(`exp:${entry.id}:${proposal.bulletIndex}`);
+        });
+      if (landed.length === 0) {
+        setChangeError("Every bullet shown already opens strongly and carries a number.");
+        return null;
+      }
+      rewritten = landed.map((proposal) => proposal.after);
+      return { content: landed.reduce(applyQuantify, content) };
+    }).then((made) => {
+      if (made) showOnPage(rewritten);
     });
   }
 
@@ -695,7 +779,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   }
 
   const impact = report?.metrics.find((metric) => metric.id === "impact-language")?.value;
-  const bare = visible ? bareBullets(visible) : [];
+  // The lines Impact language marks down, read as the scorer reads them, live as the person edits.
+  const misses = visible ? impactMisses(visible) : null;
   const summaryHidden = shownHidden.includes("summary");
   const summaryText = visible?.summary.trim() ?? "";
   // A summary worth tailoring: shown, and naming none of what the posting still misses, and not
@@ -707,17 +792,56 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     !tailoredAlready &&
     gaps.length > 0 &&
     !gaps.some((gap) => summaryText.toLowerCase().includes(gap.label.toLowerCase()));
+  // A language the posting asks for and the resume never states: the person picks their level, and
+  // it goes into Skills as one plain line the scorer reads ("English: fluent (C1)").
+  const language = report && visible && !shownHidden.includes("skills") ? languageAsk(report, visible) : null;
+  function addLanguage(level: string) {
+    if (!content || !language || !toolsIdle) return;
+    const line = `${language.language}: ${level}`;
+    setBusy(`Adding ${line} and rescoring…`);
+    // A bare "English" the keyword tool once added makes way for the line with the level.
+    const words = addSkills(removeSkills(content, [language.language]), [line]);
+    void commitChange(`Added ${line} to Skills`, words).finally(() => setBusy(null));
+  }
+  const levelChoices = LANGUAGE_LEVELS.map((level) => ({ label: level[0].toUpperCase() + level.slice(1), onClick: () => addLanguage(level) }));
+  /** The chip of the language the card would ask about: it asks for the level itself (owner, 2026-10-19). */
+  function isLanguageChip(chip: GapChip): boolean {
+    return language !== null && namesLanguage(`${chip.label} ${chip.wants}`, language.language);
+  }
+  const shownChips: GapChip[] = gapChips.map((chip) =>
+    isLanguageChip(chip)
+      ? {
+          ...chip,
+          choices: { title: language?.level ? `The posting asks for ${language.level}. Your level:` : "Your level:", options: levelChoices },
+        }
+      : chip,
+  );
+  const languageOnChip = gapChips.some(isLanguageChip);
   const suggestions: Suggestion[] = [
-    ...(impact !== undefined && impact < 65 && bare.length > 0
+    ...(language && !languageOnChip
       ? [
           {
-            id: "quantify",
-            title: `${bare.length} ${bare.length === 1 ? "bullet has" : "bullets have"} no result.`,
-            detail: `Impact language reads ${Math.round(impact)}.`,
-            action: "Quantify them",
+            id: "language",
+            title: `Your resume doesn't say your ${language.language} level.`,
+            detail: language.level ? `The posting asks for ${language.level}. Pick yours:` : "The posting asks for it. Pick yours:",
+            action: "",
+            icon: "tailor" as const,
+            choices: levelChoices,
+          },
+        ]
+      : []),
+    // Every line that loses Impact points, and why (owner, 2026-10-19: "show me what impact language
+    // looks at"): its weak openings named, a click lights them all, "Fix them" mends both halves.
+    ...(impact !== undefined && impact !== null && misses && misses.lines.length > 0
+      ? [
+          {
+            id: "impact",
+            title: `${misses.lines.length} ${misses.lines.length === 1 ? "bullet loses" : "bullets lose"} Impact points.`,
+            detail: impactDetail(misses.weakOpeners, misses.noNumber.length),
+            action: "Fix them",
             icon: "quantify" as const,
-            onClick: () => quantify(bare.length),
-            onShow: () => showOnPage(bare, "experience"),
+            onClick: () => strengthen(),
+            onShow: () => showOnPage(misses.lines, "experience"),
           },
         ]
       : []),
@@ -980,7 +1104,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         />
         {report && (
           <FixesTabs
-            gaps={gapChips}
+            gaps={shownChips}
             skillsOnly={proofChips}
             picked={picked}
             onToggle={(id) =>

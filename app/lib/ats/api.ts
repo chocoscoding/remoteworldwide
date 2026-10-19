@@ -18,8 +18,21 @@ import { apiGet, apiPost } from "@/app/lib/api/client";
 import { PLANS_HREF } from "@/app/lib/settings/types";
 import { BackendError, apiMessage, signalPlanLimit } from "@/app/lib/api/core";
 import { createSseParser } from "@/app/lib/api/sse";
+import {
+  HEADLINE_SHARES,
+  MAX_SCAN_SCORE,
+  STUFFING_FROM_SCORE,
+  expectedScore,
+  isCurrentScore,
+  isUnchecked,
+  projectedLifts,
+  scoreMakeup,
+  scoreRecipe,
+} from "./score";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
 import { isPostingNote, type BulletRewrite, type ExtractedRequirements, type IngestedResume, type IngestedResumeDetail, type ScanInput, type ScanAdvice, type ScanRecord, type ScanReport, type StoredScan } from "./types";
+
+export { HEADLINE_SHARES, MAX_SCAN_SCORE, STUFFING_FROM_SCORE, expectedScore, isCurrentScore, isUnchecked, projectedLifts, scoreMakeup, scoreRecipe };
 
 export const ATS_PATH = "/api/ai/scan";
 const RESUMES_PATH = "/api/ai/resume";
@@ -433,6 +446,29 @@ export function describeScanFailure(error: unknown): ScanFailure {
 // ---------------------------------------------------------------------------
 
 /**
+ * How much of the posting a scan could check (owner, 2026-10-19). Partial when it ran on a reduced
+ * path and left requirements unchecked, or when its keyword match could not be measured at all.
+ * Read the same way for scans stored before keyword match could say "not checked": a reduced scan
+ * that checked no requirement had stored a 0 for it.
+ */
+export function scanCoverage(report: Pick<ScanReport, "degraded" | "verdicts" | "metrics">): {
+  partial: boolean;
+  keywordUnchecked: boolean;
+  checked: number;
+  total: number;
+} {
+  const total = report.verdicts.length;
+  const checked = report.verdicts.filter((verdict) => verdict.state !== "undetermined").length;
+  const keyword = report.metrics.find((metric) => metric.id === "keyword-match");
+  const keywordUnchecked = isUnchecked(keyword) || (report.degraded && total > 0 && checked === 0);
+  return { partial: report.degraded && (keywordUnchecked || checked < total), keywordUnchecked, checked, total };
+}
+
+/** "Only 1 of 8 keywords could be checked just now." */
+export const partialLine = ({ checked, total }: { checked: number; total: number }): string =>
+  total > 0 ? `Only ${checked} of ${total} ${total === 1 ? "keyword" : "keywords"} could be checked just now.` : "Part of this scan couldn't run just now.";
+
+/**
  * The banding the whole dashboard shares.
  *
  * Kept identical to `scoreTier` in `app/lib/dashboard/ats-stub.ts`, which the
@@ -440,9 +476,6 @@ export function describeScanFailure(error: unknown): ScanFailure {
  * asserts the two agree, so a band changed in one place and not the other is a
  * red build rather than two screens disagreeing about the same number.
  */
-/** The highest score any scan shows (owner, 2026-10-18): there is always something left to ask for. */
-export const MAX_SCAN_SCORE = 99;
-
 export function scanTier(score: number): { label: string; tone: "positive" | "neutral" | "urgent" } {
   if (score >= 85) return { label: "Strong match", tone: "positive" };
   if (score >= 65) return { label: "Good, not yet great", tone: "neutral" };

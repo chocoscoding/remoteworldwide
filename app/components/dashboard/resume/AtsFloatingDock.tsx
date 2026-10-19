@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SCAN_CREDITS } from "@/app/lib/ats/api";
+import { SCAN_CREDITS, scanCoverage } from "@/app/lib/ats/api";
 import { scoreColor, scoreTrackColor } from "@/app/lib/apply/score";
 import {
   MAX_ASK_INSTRUCTION_CHARS,
@@ -44,15 +44,16 @@ export interface AtsToolsProps extends AiAssistRailProps {
 }
 
 /** The score as a small ring with its number in the hole; faded while it is out of date. */
-export const MiniScore: FC<{ score: number; size: number; stale: boolean }> = ({
+export const MiniScore: FC<{ score: number; size: number; stale: boolean; partial?: boolean }> = ({
   score,
   size,
   stale,
+  partial = false,
 }) => (
   <span
     role="img"
     aria-label={`ATS score ${score} out of 100`}
-    className={cn("flex-none transition-opacity", stale && "opacity-50")}
+    className={cn("flex-none transition-opacity", (stale || partial) && "opacity-50")}
   >
     <ScoreRing
       value={score}
@@ -110,6 +111,8 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
 
   const checking = checkStatus === "preparing" || checkStatus === "scoring";
   const score = check?.report?.score ?? null;
+  // Partly checked against a job: faded, and said where the dock names its state.
+  const partial = Boolean(check?.report && check.job && scanCoverage(check.report).partial);
   const toReview = fixesToReview(props);
   const asking = aiRunning === "ask";
   const failed = !!checkFailure && !checking;
@@ -381,10 +384,14 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
                   panel && "bg-[#f0f0ea] hover:bg-[#f0f0ea]",
                 )}
               >
-                <MiniScore score={score} size={28} stale={stale} />
+                <MiniScore score={score} size={28} stale={stale} partial={partial} />
                 {stale ? (
                   <span className="font-semibold text-[#5f6062]">
                     Out of date
+                  </span>
+                ) : partial ? (
+                  <span className="font-semibold text-[#a06f00]">
+                    Partly checked
                   </span>
                 ) : (
                   "ATS"
@@ -498,7 +505,7 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
         >
           {score !== null && (
             <span className="flex h-8 items-center gap-1.5 pl-1 pr-2">
-              <MiniScore score={score} size={26} stale={stale} />
+              <MiniScore score={score} size={26} stale={stale} partial={partial} />
               {toReview > 0 && (
                 <span className="inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#b23c26] px-[5px] text-[10.5px] font-extrabold text-white">
                   {toReview}

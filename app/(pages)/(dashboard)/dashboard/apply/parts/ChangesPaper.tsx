@@ -168,7 +168,8 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className, eyes,
   return (
     <div ref={setBox} className={cn("w-full", className)}>
       {!canHighlight && texts.length > 0 && <ChangeList changes={changes} />}
-      <div ref={paperRef} style={{ zoom: fit }} className={cn("mx-auto w-fit", ALL_FONT_VARS)}>
+      {/* `rww-sent-paper`: sections with nothing in them are left off, as in every download. */}
+      <div ref={paperRef} style={{ zoom: fit }} className={cn("rww-sent-paper mx-auto w-fit", ALL_FONT_VARS)}>
         {/* The gap is zoomed with the paper, so it's divided by the zoom to stay 25px on screen. */}
         <PaperHighlightProvider value={{ focus: null, marks: [], eyes, edits }}>
           <PagedResume

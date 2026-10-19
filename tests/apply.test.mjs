@@ -33,14 +33,15 @@ registerHooks({
   },
 });
 
-const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, sendingResumeId } = await import("../app/lib/apply/state.ts");
+const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, scanBaseline, sendingResumeId } = await import("../app/lib/apply/state.ts");
 const { INTERVIEW_ADVICE, excerpt, stepsForGap } = await import("../app/lib/apply/gapSteps.ts");
 const { changeCount, highlightTexts, resumeChanges } = await import("../app/lib/apply/changes.ts");
 const { noteParts, quantityParts, scoreColor, withoutEmDashes } = await import("../app/lib/apply/score.ts");
 const { editBullet, editSummary } = await import("../app/lib/apply/edits.ts");
-const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreStep, stampStep } = await import("../app/lib/apply/history.ts");
-const { bareBullets, bulletsWithoutResult, fixFirstId, matchMoves, onlyInSkills, scoreHue, skillsOnlyNames, unbackedSkills, workingItems } =
+const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep } = await import("../app/lib/apply/history.ts");
+const { bareBullets, keepProof, languageAsk, bulletsWithoutResult, fixFirstId, matchMoves, onlyInSkills, scoreHue, skillsOnlyNames, unbackedSkills, workingItems } =
   await import("../app/lib/apply/fixes.ts");
+const { impactMisses, openingWord } = await import("../app/lib/apply/impact.ts");
 
 const content = (overrides = {}) => ({
   name: "Ada Obi",
@@ -524,5 +525,176 @@ describe("cards never point at what is hidden", () => {
     });
     assert.deepEqual(bareBullets(words), ["Ran research"]);
     assert.equal(bulletsWithoutResult(words), 1);
+  });
+});
+
+describe("AI changes keep what proves a requirement", () => {
+  const verdict = (label, state, text, section = "experience", proof = []) => ({
+    requirement: { id: label, text: `Needs ${label}`, label, category: "skill", type: "required", weight: 3, proof },
+    state,
+    score: 0.9,
+    resolvedBy: "rerank",
+    evidence: [{ chunkId: "c1", text, section, role: null, score: 0.9 }],
+    confidence: "high",
+  });
+  const before = content({
+    experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Wrote copywriting for onboarding emails", "Ran research"] }],
+  });
+
+  it("puts back a proving line the change rewrote away, and keeps the rest of the change", () => {
+    const after = content({
+      experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Grew activation 20% with lifecycle emails", "Ran research with 30 users"] }],
+    });
+    const result = keepProof(before, after, { verdicts: [verdict("Copywriting", "satisfied", "Wrote copywriting for onboarding emails", "experience", ["copy", "copywriting"])] });
+    assert.deepEqual(result.content.experience[0].bullets, ["Wrote copywriting for onboarding emails", "Ran research with 30 users"]);
+    assert.deepEqual(result.kept, ["Copywriting"]);
+  });
+
+  it("keeps a rewrite that still says what proved it", () => {
+    const after = content({
+      experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Wrote copywriting for 12 onboarding emails", "Ran research"] }],
+    });
+    const result = keepProof(before, after, { verdicts: [verdict("Copywriting", "satisfied", "Wrote copywriting for onboarding emails")] });
+    assert.equal(result.content.experience[0].bullets[0], "Wrote copywriting for 12 onboarding emails");
+    assert.deepEqual(result.kept, []);
+  });
+
+  it("leaves missing requirements alone", () => {
+    const after = content({ experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Something new", "Ran research"] }] });
+    const result = keepProof(before, after, { verdicts: [verdict("Copywriting", "missing", "Wrote copywriting for onboarding emails")] });
+    assert.equal(result.content, after);
+  });
+});
+
+describe("a language level the posting asks for", () => {
+  const ask = (state, text = "English from B2: written and spoken", label = "English proficiency") => ({
+    verdicts: [{ requirement: { id: "en", text, label, category: "skill", type: "required", weight: 5 }, state, evidence: [] }],
+  });
+
+  it("is named, with the level the posting asks for, when the resume never states it", () => {
+    assert.deepEqual(languageAsk(ask("missing"), content()), { language: "English", level: "B2" });
+    assert.deepEqual(languageAsk(ask("partial"), content()), { language: "English", level: "B2" });
+  });
+
+  it("says nothing when the resume already states it, or the requirement is met", () => {
+    assert.equal(languageAsk(ask("missing"), content({ skills: ["Figma", "English: native"] })), null);
+    assert.equal(languageAsk(ask("satisfied"), content()), null);
+    assert.equal(languageAsk(ask("missing", "Experience with Zendesk", "Zendesk experience"), content()), null);
+  });
+
+  it("still asks when the resume names the language with no level, which the scorer can't count", () => {
+    assert.deepEqual(languageAsk(ask("partial"), content({ skills: ["Figma", "English"] })), { language: "English", level: "B2" });
+    assert.equal(languageAsk(ask("partial"), content({ skills: ["Figma", "English (C1)"] })), null);
+  });
+});
+
+describe("what Impact language marks down", () => {
+  const role = (bullets, extra = {}) => ({ id: "x1", role: "CSM", company: "Kite", dates: "2022 – 2024", bullets, ...extra });
+
+  it("names each bullet that opens weakly or has no number, as the scorer reads them", () => {
+    const misses = impactMisses(
+      content({
+        experience: [
+          role([
+            "Held a 4.8/5 average rating on onboarding calls.",
+            "Acted as a trusted advisor to customers.",
+            "Partner directly with leadership on retention strategy.",
+            "Grew renewals 20% across 80 accounts.",
+            "Grow renewals 20% across 80 accounts.",
+            "Led onboarding in 2021.",
+          ]),
+        ],
+      }),
+    );
+    assert.deepEqual(misses.weakOpeners, ["Held a 4.8/5 average rating on onboarding calls.", "Acted as a trusted advisor to customers."]);
+    assert.deepEqual(misses.noNumber, ["Acted as a trusted advisor to customers.", "Partner directly with leadership on retention strategy.", "Led onboarding in 2021."]);
+    assert.equal(misses.lines.length, 4);
+    assert.equal(openingWord("Acted as a trusted advisor."), "Acted");
+  });
+
+  it("never reads a role or a line hidden for this job", () => {
+    const misses = impactMisses(
+      content({ experience: [role(["Acted as an advisor.", "Took tickets from 45 to 35."])], hiddenParts: ["exp:x1:0"] }),
+    );
+    assert.deepEqual(misses.lines, ["Took tickets from 45 to 35."]);
+  });
+});
+
+// Owner, 2026-10-19: the score is 70% keyword match, 15% impact, 10% parseability and 5% length,
+// no longer keyword match alone. A session saved before then still holds the old numbers.
+describe("scores made by an older formula", () => {
+  const metricsOf = (keyword, impact, parse, length) => [
+    { id: "keyword-match", label: "Keyword match", value: keyword },
+    { id: "impact-language", label: "Impact language", value: impact },
+    { id: "parseability", label: "Parseability", value: parse },
+    { id: "length-format", label: "Length & format", value: length },
+  ];
+  // Today's formula makes round(56 + 3 + 7 + 3) = 69 of these; the old one said 80, the keyword match.
+  const oldReport = { ...report, scanId: "old", score: 80, metrics: metricsOf(80, 20, 70, 60) };
+  const newReport = { ...report, scanId: "new", score: 69, metrics: metricsOf(80, 20, 70, 60) };
+  const basisOf = (scored) => ({ metrics: scored.metrics, stuffingPenalty: 0 });
+
+  it("reads a history step's score only when today's formula made it, never worked out again", () => {
+    const { history } = readApplyState({
+      resume: {
+        history: [
+          step("old", { version: 1, score: 80, report: oldReport }),
+          step("new", { version: 2, score: 69, report: newReport }),
+          // Its report was dropped before a basis was kept: nothing to tell it by.
+          step("bare", { version: 3, score: 75 }),
+          step("kept", { version: 4, score: 69, basis: basisOf(newReport) }),
+          step("stale", { version: 5, score: 80, basis: basisOf(oldReport) }),
+        ],
+        historyAt: 4,
+      },
+    }).resume;
+    assert.deepEqual(
+      history.map((row) => row.score),
+      [null, 69, null, 69, null],
+    );
+    assert.equal(history[0].report, null);
+    assert.equal(history[1].report?.scanId, "new");
+    assert.deepEqual(history[3].basis, basisOf(newReport));
+    assert.equal(history[4].basis, undefined);
+  });
+
+  it("keeps what a score was made from when its report is dropped for room, so a reload still shows it", () => {
+    let history = [step("start", { score: 69, report: newReport })];
+    let at = 0;
+    for (let i = 1; i <= REPORTS_KEPT; i += 1) ({ history, at } = pushStep(history, at, step(`s${i}`, { score: 69, report: newReport })));
+    assert.equal(history[0].report, null);
+    assert.deepEqual(history[0].basis, basisOf(newReport));
+    const read = readApplyState(JSON.parse(JSON.stringify({ resume: { history, historyAt: at } }))).resume.history;
+    assert.deepEqual(
+      read.map((row) => row.score),
+      history.map(() => 69),
+    );
+  });
+
+  it("never stamps or scores a step with a report an older formula made", () => {
+    const history = [step("a", { version: 1 }), step("b", { version: 2, score: 69, report: newReport })];
+    assert.equal(stampStep(history, 1, 3, oldReport), history);
+    assert.equal(scoreStep(history, 1, oldReport), history);
+    assert.deepEqual(scoreOfScan(oldReport), { score: null, report: null });
+    assert.deepEqual(scoreOfScan({ ...newReport, degraded: true }), { score: null, report: null });
+    assert.deepEqual(scoreOfScan(null), { score: null, report: null });
+    assert.deepEqual(scoreOfScan(newReport), { score: 69, report: newReport });
+  });
+
+  it("measures a new score against the last version scored, never across formulas", () => {
+    const last = (scored, extra = {}) => ({ resumeId: "d1", version: 2, report: { ...scored, verdicts: [verdict("skill", "partial")] }, ...extra });
+    const current = last(newReport, { previousScore: 61, previousMetrics: { "keyword-match": 70 } });
+    assert.deepEqual(scanBaseline(current, "d1", 3), {
+      previousScore: 69,
+      previousStates: { r1: "partial" },
+      previousMetrics: { "keyword-match": 80, "impact-language": 20, parseability: 70, "length-format": 60 },
+    });
+    // A re-run of the same version keeps what it was measured against.
+    assert.deepEqual(scanBaseline(current, "d1", 2), { previousScore: 61, previousMetrics: { "keyword-match": 70 } });
+    // Stored as 80 and rescored as 73 is the formula, not "Down 7": nothing is said to have moved.
+    assert.deepEqual(scanBaseline(last(oldReport, { previousScore: 61 }), "d1", 3), { previousScore: null });
+    assert.deepEqual(scanBaseline(last(oldReport, { previousScore: 61 }), "d1", 2), { previousScore: null });
+    assert.deepEqual(scanBaseline(last({ ...newReport, degraded: true }, { previousScore: 61 }), "d1", 3), { previousScore: null });
+    assert.deepEqual(scanBaseline(null, "d1", 3), { previousScore: null });
   });
 });

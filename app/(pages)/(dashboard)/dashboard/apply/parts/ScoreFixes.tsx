@@ -10,6 +10,7 @@ import { AlertCircle, ArrowDown, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { METRIC_GROUPS, fixFirstId, scoreColorOf, type WorkingItem } from "@/app/lib/apply/fixes";
+import { isCurrentScore, scoreRecipe } from "@/app/lib/ats/api";
 import type { ScanReport } from "@/app/lib/ats/types";
 import type { ResumePlace } from "@/app/lib/resume/ai";
 
@@ -244,7 +245,8 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
                   : id === "impact-language"
                     ? "Impact language"
                     : "Length & format");
-            const value = metric ? Math.round(metric.value) : null;
+            const notChecked = (partial && id === "keyword-match") || metric?.checked === false || (metric !== undefined && metric.value === null);
+            const value = metric && metric.value !== null && !notChecked ? Math.round(metric.value) : null;
             const was = previousMetrics?.[id];
             const moved = value !== null && was !== undefined ? value - was : 0;
             return (
@@ -253,7 +255,7 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
                   <span className="flex-1 text-[13px] font-bold text-primary">{label}</span>
                   {first === id && <span className="rounded-full bg-[#fbe9e5] px-[7px] text-[11px] font-extrabold text-[#b23c26]">Fix first</span>}
                   <span className="text-[13px] font-extrabold text-primary">
-                    {value ?? (partial && id === "keyword-match" ? <span className="text-xs font-bold text-[#a06f00]">not checked</span> : "–")}
+                    {value ?? (notChecked ? <span className="text-xs font-bold text-[#a06f00]">not checked</span> : "–")}
                     {value !== null && <span className="text-[11px] font-semibold text-[#9a9b95]"> / 100</span>}
                     {moved !== 0 && (
                       <span
@@ -287,23 +289,32 @@ export const ScoreRow: FC<{
   company: string;
   onRescore?: () => void;
   creditsHref: string;
-}> = ({ state, report, previousScore, previousMetrics, company, onRescore, creditsHref }) => (
-  <div className="flex flex-col items-stretch gap-4 lg:flex-row">
-    <ScoreSide
-      state={state}
-      score={report ? report.score : null}
-      previous={previousScore}
-      company={company}
-      onRescore={onRescore}
-      creditsHref={creditsHref}
-    />
-    <StagePanels
-      report={state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? report : null}
-      previousMetrics={state.kind === "ready" ? previousMetrics : undefined}
-      partial={state.kind === "partial"}
-    />
-  </div>
-);
+}> = ({ state, report, previousScore, previousMetrics, company, onRescore, creditsHref }) => {
+  // How the number is made, so the bars add up to it (owner, 2026-10-19: "the ATS is meant to be more
+  // than a keyword matcher"). Never under a score an older formula made, which it would not explain.
+  const recipe = report && (state.kind === "ready" || state.kind === "stale") && isCurrentScore(report) ? scoreRecipe(report) : null;
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col items-stretch gap-4 lg:flex-row">
+        <ScoreSide
+          state={state}
+          score={report ? report.score : null}
+          previous={previousScore}
+          company={company}
+          onRescore={onRescore}
+          creditsHref={creditsHref}
+        />
+        <StagePanels
+          report={state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? report : null}
+          previousMetrics={state.kind === "ready" ? previousMetrics : undefined}
+          partial={state.kind === "partial"}
+        />
+      </div>
+      {/* Under the bars it sums up: past the score side (280px and the row's gap) on a wide screen. */}
+      {recipe && <p className="m-0 text-xs text-[#8a8b85] lg:pl-[296px]">{recipe}</p>}
+    </div>
+  );
+};
 
 // ---- Points taken off ----------------------------------------------------------------------
 
@@ -435,6 +446,11 @@ export interface GapChip {
   label: string;
   /** What the posting asks, word for word: the chip's hover card. */
   wants: string;
+  /**
+   * Picks that answer it at once, in place of being picked for the AI (owner, 2026-10-19): a
+   * language's level ("Native", "Fluent (C1)"), which no tool can know and the scorer needs.
+   */
+  choices?: { title: string; options: Array<{ label: string; onClick: () => void }> };
 }
 
 export interface Suggestion {
@@ -446,6 +462,8 @@ export interface Suggestion {
   onClick?: () => void;
   /** "Show in resume", and a click on the row: what it means, lit on the page. */
   onShow?: () => void;
+  /** Small choices in place of the one action ("Native", "Fluent (C1)"…): the person picks what is true. */
+  choices?: Array<{ label: string; onClick: () => void }>;
 }
 
 const PLACE_LABELS: Record<ResumePlace, string> = { summary: "Summary", bullets: "Bullets", skills: "Skills" };
@@ -503,7 +521,7 @@ export const FixesTabs: FC<{
 }) => {
   const [tab, setTab] = useState<"missing" | "working">("missing");
   const missingCount = gaps.length + skillsOnly.length;
-  const pickedCount = gaps.filter((gap) => picked.has(gap.id)).length;
+  const pickedCount = gaps.filter((gap) => picked.has(gap.id) && !gap.choices).length;
   const bulletsOn = places.includes("bullets");
   const prove = skillsOnly.length > 0;
   const togglePlace = (place: ResumePlace) =>
@@ -607,14 +625,18 @@ export const FixesTabs: FC<{
             {skillsOnly.map((chip) => (
               <Chip key={chip.id} chip={chip} tone="proof" />
             ))}
-            {gaps.map((chip) => (
-              <Chip
-                key={chip.id}
-                chip={chip}
-                tone={picked.has(chip.id) ? "picked" : "open"}
-                onClick={disabled ? undefined : () => onToggle(chip.id)}
-              />
-            ))}
+            {gaps.map((chip) =>
+              chip.choices ? (
+                <ChoiceChip key={chip.id} chip={chip} disabled={disabled} />
+              ) : (
+                <Chip
+                  key={chip.id}
+                  chip={chip}
+                  tone={picked.has(chip.id) ? "picked" : "open"}
+                  onClick={disabled ? undefined : () => onToggle(chip.id)}
+                />
+              ),
+            )}
           </div>
         </div>
       )}
@@ -636,21 +658,36 @@ export const FixesTabs: FC<{
                 <strong>{row.title}</strong> <span className="text-[#5f6062]">{row.detail}</span>
               </span>
               {row.onShow && <ShowInResume onClick={row.onShow} />}
-              <button
-                type="button"
-                disabled={disabled || !row.onClick}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  row.onClick?.();
-                }}
-                className={ROW_BUTTON}>
-                {row.icon === "quantify" ? (
-                  <Hash className="h-[13px] w-[13px]" strokeWidth={2.4} />
-                ) : (
-                  <Crosshair className="h-[13px] w-[13px]" strokeWidth={2.4} />
-                )}
-                {row.action}
-              </button>
+              {row.choices?.map((choice) => (
+                <button
+                  key={choice.label}
+                  type="button"
+                  disabled={disabled}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    choice.onClick();
+                  }}
+                  className={ROW_BUTTON}>
+                  {choice.label}
+                </button>
+              ))}
+              {!row.choices && (
+                <button
+                  type="button"
+                  disabled={disabled || !row.onClick}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    row.onClick?.();
+                  }}
+                  className={ROW_BUTTON}>
+                  {row.icon === "quantify" ? (
+                    <Hash className="h-[13px] w-[13px]" strokeWidth={2.4} />
+                  ) : (
+                    <Crosshair className="h-[13px] w-[13px]" strokeWidth={2.4} />
+                  )}
+                  {row.action}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -743,6 +780,59 @@ export const FixesTabs: FC<{
         )}
       </div>
     </div>
+  );
+};
+
+/**
+ * A keyword answered by a pick of the person's own (a language's level): a click opens the choices
+ * under it, and a choice puts it on the resume at once. Escape or a click elsewhere closes them.
+ */
+const ChoiceChip: FC<{ chip: GapChip; disabled: boolean }> = ({ chip, disabled }) => {
+  const [open, setOpen] = useState(false);
+  const choices = chip.choices;
+  if (!choices) return null;
+  return (
+    <span
+      className="relative"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setOpen(false);
+      }}>
+      <button
+        type="button"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((was) => !was)}
+        className={cn(
+          "flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed pl-[9px] pr-3 text-[13px] font-bold text-primary disabled:cursor-default",
+          open ? "border-[#222325] bg-[#f4f9c9]" : "border-[#222325]/40 bg-white",
+        )}>
+        <Plus className="h-[11px] w-[11px] text-[#8a8b85]" strokeWidth={2.6} />
+        {chip.label}
+      </button>
+      {open && (
+        <span className="absolute left-0 top-full z-30 mt-2 flex w-[260px] flex-col gap-2 rounded-xl bg-[#222325] p-3 text-left text-white">
+          <span className="text-xs font-extrabold text-[#e1f073]">{choices.title}</span>
+          <span className="text-xs leading-[1.45] text-white/80">{chip.wants}</span>
+          <span className="flex flex-wrap gap-1.5">
+            {choices.options.map((option) => (
+              <button
+                key={option.label}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  option.onClick();
+                }}
+                className="h-7 cursor-pointer rounded-full bg-white px-2.5 text-xs font-bold text-primary hover:bg-[#e1f073]">
+                {option.label}
+              </button>
+            ))}
+          </span>
+        </span>
+      )}
+    </span>
   );
 };
 

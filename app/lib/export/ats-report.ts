@@ -16,7 +16,7 @@
 // file of the same scan can never disagree about what it said.
 
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
-import { STUFFING_ADVICE, coveredKeywords, missingGaps, scanTier, stuffingHeadline, unmetRequirements } from "@/app/lib/ats/api";
+import { STUFFING_ADVICE, coveredKeywords, isUnchecked, missingGaps, partialLine, scanCoverage, scanTier, scoreMakeup, stuffingHeadline, unmetRequirements } from "@/app/lib/ats/api";
 import type { ScanReport } from "@/app/lib/ats/types";
 
 export interface AtsReportInput {
@@ -44,7 +44,10 @@ interface ReportModel {
   score: number;
   band: string;
   degradedNote: string | null;
-  metrics: { label: string; value: number }[];
+  /** Each check as the report prints it: "88%", or "Not checked" when the scan could not measure it. */
+  metrics: { label: string; value: string }[];
+  /** How the metrics make the score, printed under them so a forwarded report adds up (owner, 2026-10-19). */
+  scoreNote: string | null;
   explanation: string | null;
   gaps: ReportGap[];
   covered: string[];
@@ -55,20 +58,37 @@ interface ReportModel {
   scanId: string;
 }
 
-/** The metric that needs a job description to mean anything — dropped exactly when the screen drops it. */
+/** The metric that needs a job description to mean anything: dropped for a general score, as the screen does. */
 const KEYWORD_METRIC = "keyword-match";
 
 const TITLE = "ATS scan report";
 
 function modelOf({ report, resumeName, job, scannedAt }: AtsReportInput): ReportModel {
+  // A scan that could check only part of the posting reads as the screen shows it (owner,
+  // 2026-10-19): "Partly checked", how much, and keyword match "Not checked", never a 0 or a tier.
+  const coverage = job ? scanCoverage(report) : null;
+  const partial = coverage?.partial ?? false;
+  // Worded by the same helper as the screen, so the two cannot drift.
+  const makeup = scoreMakeup(report, { keywordChecked: Boolean(job) && !coverage?.keywordUnchecked, checked: coverage?.checked ?? 0 });
   return {
     resumeName: resumeName.trim() || "Resume",
     subject: job ? `Scored against ${job.company} · ${job.role}` : "General score: how the resume reads on its own",
     scannedAt: scannedAt ? scannedAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : null,
     score: report.score,
-    band: scanTier(report.score).label,
-    degradedNote: report.degraded ? (report.degradedReason ?? "Part of this scan ran on a reduced path, so treat the match as approximate.") : null,
-    metrics: report.metrics.filter((m) => !(m.id === KEYWORD_METRIC && (report.degraded || !job))).map((m) => ({ label: m.label, value: m.value })),
+    band: partial ? "Partly checked" : scanTier(report.score).label,
+    degradedNote:
+      partial && coverage
+        ? `${partialLine(coverage)} ${makeup.partial}`
+        : report.degraded
+          ? (report.degradedReason ?? "Part of this scan ran on a reduced path, so treat the match as approximate.")
+          : null,
+    metrics: report.metrics
+      .filter((m) => !(m.id === KEYWORD_METRIC && !job))
+      .map((m) => ({
+        label: m.label,
+        value: isUnchecked(m) || m.value === null || (m.id === KEYWORD_METRIC && coverage?.keywordUnchecked) ? "Not checked" : `${m.value}%`,
+      })),
+    scoreNote: makeup.recipe,
     explanation: report.explanation?.trim() || null,
     gaps: unmetRequirements(report).map((verdict) => ({
       text: verdict.requirement.text,
@@ -110,8 +130,9 @@ export function atsReportToMarkdown(input: AtsReportInput): string {
 
   if (m.metrics.length > 0) {
     lines.push("## Metrics", "", "| Metric | Score |", "| --- | --- |");
-    for (const metric of m.metrics) lines.push(`| ${md(metric.label)} | ${metric.value}% |`);
+    for (const metric of m.metrics) lines.push(`| ${md(metric.label)} | ${metric.value} |`);
     lines.push("");
+    if (m.scoreNote) lines.push(`_${md(m.scoreNote)}_`, "");
   }
 
   if (m.explanation) lines.push("## What this comes down to", "", md(m.explanation), "");
@@ -174,7 +195,8 @@ export async function atsReportToDocx(input: AtsReportInput): Promise<Blob> {
 
   if (m.metrics.length > 0) {
     children.push(heading("Metrics"));
-    for (const metric of m.metrics) children.push(body([new TextRun({ text: `${metric.label}: `, bold: true }), new TextRun(`${metric.value}%`)], 60));
+    for (const metric of m.metrics) children.push(body([new TextRun({ text: `${metric.label}: `, bold: true }), new TextRun(metric.value)], 60));
+    if (m.scoreNote) children.push(body([new TextRun({ text: m.scoreNote, italics: true, color: MUTED, size: 20 })]));
   }
 
   if (m.explanation) {
@@ -255,7 +277,8 @@ export function atsReportHtml(input: AtsReportInput): string {
   if (m.degradedNote) parts.push(`<p class="note">${esc(m.degradedNote)}</p>`);
 
   if (m.metrics.length > 0) {
-    parts.push(`<h2>Metrics</h2><table>${m.metrics.map((x) => `<tr><td>${esc(x.label)}</td><td class="v">${x.value}%</td></tr>`).join("")}</table>`);
+    parts.push(`<h2>Metrics</h2><table>${m.metrics.map((x) => `<tr><td>${esc(x.label)}</td><td class="v">${esc(x.value)}</td></tr>`).join("")}</table>`);
+    if (m.scoreNote) parts.push(`<p class="recipe">${esc(m.scoreNote)}</p>`);
   }
   if (m.explanation) parts.push(`<h2>What this comes down to</h2><p>${esc(m.explanation)}</p>`);
   if (m.notes.length > 0) parts.push(`<h2>Notes from the posting</h2><ul>${m.notes.map((note) => `<li>${esc(note)}</li>`).join("")}</ul>`);
@@ -309,6 +332,7 @@ export const ATS_REPORT_CSS = [
   ".rww-report table{border-collapse:collapse;width:100%;}",
   ".rww-report td{padding:3pt 0;border-bottom:1px solid #eee;}",
   ".rww-report td.v{text-align:right;font-weight:700;}",
+  ".rww-report .recipe{margin-top:6pt;font-size:9.5pt;color:#666;}",
   ".rww-report ul{margin:0;padding-left:16pt;}",
   ".rww-report li{margin:0 0 6pt;break-inside:avoid;}",
   ".rww-report .rw{margin:0 0 8pt;break-inside:avoid;}",

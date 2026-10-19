@@ -85,6 +85,13 @@ export interface SuggestionInput {
    * allowed, each must land in a line, never only in Skills.
    */
   insist?: boolean;
+  /** `keywords` with `insist`: what each picked term means (the posting's requirement, the words a resume says it with), by the term. */
+  hints?: Record<string, { means: string; proof: string[] }> | null;
+  /**
+   * `quantify` only: the apply wizard's Impact fix (owner, 2026-10-19): a bullet with a weak opening
+   * gets a strong verb from the scorer's own list as well as a number for one with none.
+   */
+  openers?: boolean;
   /** `shorten` only: "page" cuts to one page; absent trims to at most 750 words (owner, 2026-10-18). */
   target?: "page" | null;
   /**
@@ -173,6 +180,8 @@ const run = <T>(tool: SuggestionTool, input: SuggestionInput) =>
     keywords: input.keywords ?? null,
     propose: input.propose === true ? true : null,
     insist: input.insist === true ? true : null,
+    openers: input.openers === true ? true : null,
+    hints: input.hints && Object.keys(input.hints).length > 0 ? input.hints : null,
     entryIndex: typeof input.entryIndex === "number" ? input.entryIndex : null,
     customId: input.customId || null,
     bulletIndex: typeof input.bulletIndex === "number" ? input.bulletIndex : null,

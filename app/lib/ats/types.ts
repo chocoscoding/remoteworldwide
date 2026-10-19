@@ -99,7 +99,12 @@ export interface ScanAdvice {
 export interface ScanReport {
   scanId: string;
   resumeVersion: number;
-  /** 0-99 overall match: nothing scores 100. */
+  /**
+   * 0-99 ATS score, never 100. Not the match: 70% keyword match, 15% impact language, 10%
+   * parseability, 5% length & format (HEADLINE_SHARES), or the mean of the last three when keyword
+   * match was not checked; stuffing comes off only from 94. The match is the keyword-match metric.
+   * Scans from before 2026-10-19 scored the match alone (`isCurrentScore`).
+   */
   score: number;
   metrics: AtsMetric[];
   /** Missing keywords, highest impact first. */
@@ -207,7 +212,7 @@ export interface StoredScan {
   resumeId: string;
   /** The file that was scored, as the ATS picker names it. Null when that resume has since been removed. */
   fileName: string | null;
-  /** 0-100 overall match. */
+  /** The ATS score, as on `ScanReport.score`: not the match, which is the keyword-match metric. */
   score: number;
   metrics: AtsMetric[];
   /** Missing keywords, highest impact first — exactly as the scan stored them. */

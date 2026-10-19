@@ -69,6 +69,10 @@ export interface KeywordInjection {
   notShown?: TermAdvice[];
   /** Where each added term went, by its spelling as sent: the lines that now show it ("Skills" for a skill name). */
   placed?: Record<string, string[]>;
+  /** Picked terms only: the ones no line took after every ask, put in Skills for now (each is in `added` too). */
+  skillsOnly?: string[];
+  /** Picked terms only: the added terms the resume did not already show, each with a word on backing it in an interview. */
+  advice?: TermAdvice[];
 }
 
 // ---------------------------------------------------------------------------

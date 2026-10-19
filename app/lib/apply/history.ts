@@ -6,10 +6,16 @@
 //
 // Each step keeps the draft's words, so going back to it is writing them again, and the score it
 // had (with its report for the latest few), so the score jumps with it and nothing is re-scored.
+// A step only ever keeps a score made by today's formula (owner, 2026-10-19: the score is no longer
+// keyword match alone), so the list and undo's "73 → 80" never mix two ways of scoring.
 // Pure: tests/apply.test.mjs runs it under plain `node --test`.
 
+import { isCurrentScore } from "@/app/lib/ats/score";
 import type { ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+
+/** The numbers a score is made from: what tells a score of today's formula from an older one. */
+export type ScoreBasis = Pick<ScanReport, "metrics" | "stuffingPenalty">;
 
 export interface ApplyHistoryStep {
   id: string;
@@ -25,6 +31,8 @@ export interface ApplyHistoryStep {
   score: number | null;
   /** The whole report, for the latest few steps only, so a jump back shows it without re-scoring. */
   report?: ScanReport | null;
+  /** What `score` was made from, kept once `report` is dropped for room, so a reload can still check it. */
+  basis?: ScoreBasis;
 }
 
 /** Most steps one application keeps: the oldest go first (the starting point stays). */
@@ -42,9 +50,20 @@ function bounded(steps: ApplyHistoryStep[], at: number): { history: ApplyHistory
     index = Math.max(0, index - drop);
   }
   const keepFrom = history.length - REPORTS_KEPT;
-  history = history.map((step, i) => (i < keepFrom && step.report ? { ...step, report: null } : step));
+  history = history.map((step, i) =>
+    i < keepFrom && step.report
+      ? { ...step, report: null, basis: { metrics: step.report.metrics, stuffingPenalty: step.report.stuffingPenalty ?? 0 } }
+      : step,
+  );
   return { history, at: index };
 }
+
+/**
+ * The score a step takes from a scan: none from a partly checked one (going back rescores) or from
+ * one an older formula made, which would not compare with the steps around it.
+ */
+export const scoreOfScan = (report: ScanReport | null | undefined): { score: number | null; report: ScanReport | null } =>
+  report && !report.degraded && isCurrentScore(report) ? { score: Math.round(report.score), report } : { score: null, report: null };
 
 /**
  * A new change: the steps after the current one are cleared (owner's design: "Making a new change
@@ -55,8 +74,9 @@ export function pushStep(history: ApplyHistoryStep[], at: number, step: ApplyHis
   return bounded([...kept, step], kept.length);
 }
 
-/** The step a scanned version belongs to gets its score (and report). */
+/** The step a scanned version belongs to gets its score (and report), when today's formula made it. */
 export function scoreStep(history: ApplyHistoryStep[], version: number, report: ScanReport): ApplyHistoryStep[] {
+  if (!isCurrentScore(report)) return history;
   let changed = false;
   const next = history.map((step) => {
     if (step.version !== version) return step;
@@ -69,10 +89,11 @@ export function scoreStep(history: ApplyHistoryStep[], version: number, report: 
 /**
  * The step the draft is at now takes this score of the draft's current version, whatever version it
  * was recorded with: its words ARE the draft's words, so the score belongs to it. Run before leaving
- * a step (a change, an undo, a jump), so going back to it shows the score it really had.
+ * a step (a change, an undo, a jump), so going back to it shows the score it really had. A score an
+ * older formula made is never stamped: the step keeps none, and going back to it rescores.
  */
 export function stampStep(history: ApplyHistoryStep[], at: number, version: number, report: ScanReport): ApplyHistoryStep[] {
-  if (!history[at]) return history;
+  if (!history[at] || !isCurrentScore(report)) return history;
   return bounded(
     history.map((step, i) => (i === at ? { ...step, version, score: Math.round(report.score), report } : step)),
     0,
