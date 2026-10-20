@@ -1,5 +1,5 @@
 "use client";
-import React, { FC, Suspense, useRef } from "react";
+import React, { FC, Suspense, useEffect, useRef } from "react";
 import { Calendar, ChartNoAxesColumnIncreasing, MapPinned, Zap } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -32,18 +32,31 @@ const JobDescriptionSkeleton: FC = () => {
 };
 
 /**
- * Counts one press of "Apply Now" for the admin's job page (backend POST /api/jobs/:id/apply-click,
- * through the site's rewrite). A beacon outlives the tab switch the link causes and never holds the
- * link up; anything that fails here is dropped, because the visitor's apply comes first.
+ * Counts one event for the admin's job page: a view of the page (`impression`) or a press of
+ * "Apply Now" (`apply-click`), through the site's rewrite to the backend's POST /api/jobs/:id/<kind>.
+ * A beacon outlives the tab switch the link causes and never holds anything up; anything that fails
+ * here is dropped, because the visitor comes first.
  */
-const countApplyClick = (jobId: string) => {
-  const url = `/api/jobs/${encodeURIComponent(jobId)}/apply-click`;
+const countJobEvent = (jobId: string, kind: "impression" | "apply-click") => {
+  const url = `/api/jobs/${encodeURIComponent(jobId)}/${kind}`;
   try {
     if (navigator.sendBeacon?.(url)) return;
     void fetch(url, { method: "POST", keepalive: true }).catch(() => {});
   } catch {
-    // Nothing to do: the click still opens the posting.
+    // Nothing to do: the page and its link work without it.
   }
+};
+
+/** One impression per listing per tab, so a refresh or coming back to the page is not a second view. */
+const firstViewInTab = (jobId: string): boolean => {
+  const key = `rww:job-seen:${jobId}`;
+  try {
+    if (sessionStorage.getItem(key)) return false;
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // Storage blocked: count it, the backend's limit still caps a loop.
+  }
+  return true;
 };
 
 const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?: boolean; trackApply?: boolean }> = ({
@@ -54,6 +67,12 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
 }) => {
   const { title, description, region, createdAt, seniority, applicationUrl } = data;
   const refEye = useRef<LinkIconHandle>(null);
+
+  // A view of the listing's page, counted once it is in a browser (crawlers that only read the HTML
+  // never run this). `trackApply` is false on the admin's own page, which counts neither.
+  useEffect(() => {
+    if (trackApply && firstViewInTab(data.id)) countJobEvent(data.id, "impression");
+  }, [trackApply, data.id]);
 
   const copyJobLink = () => {
     navigator.clipboard
@@ -134,7 +153,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
         <Link
           href={applicationUrl}
           target="_blank"
-          onClick={trackApply ? () => countApplyClick(data.id) : undefined}
+          onClick={trackApply ? () => countJobEvent(data.id, "apply-click") : undefined}
           className="bg-primary text-white w-full h-12 text-lg flex justify-center gap-3 items-center hover:rounded-lg transition-all mt-5 rounded-md">
           <Zap />
           <span className="font-bold">Apply Now</span>

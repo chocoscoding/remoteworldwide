@@ -36,6 +36,8 @@ export interface Company {
 export interface JobStats {
   applyClicks: number;
   lastApplyClickAt: string | null;
+  impressions: number;
+  lastImpressionAt: string | null;
 }
 
 export interface AdminJobPage extends JobAndCompany {

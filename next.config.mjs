@@ -249,6 +249,11 @@ const nextConfig = {
         source: "/api/jobs/:id/apply-click",
         destination: `${backend}/api/jobs/:id/apply-click`,
       },
+      // A view of a job page, counted the same way (the admin's job page shows it as impressions).
+      {
+        source: "/api/jobs/:id/impression",
+        destination: `${backend}/api/jobs/:id/impression`,
+      },
       {
         source: "/api/jobs/:slug",
         destination: `${backend}/api/jobs/:slug`,
