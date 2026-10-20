@@ -5,7 +5,7 @@ export const quillToolbarOptions = [
   ["blockquote", "code-block"],
   [{ list: "ordered" }, { list: "bullet" }, { list: "check" }],
   [{ indent: "-1" }, { indent: "+1" }],
-  ["link", "image", "video"],
+  ["link", "image", "video", "table"],
   [{ align: [false, "center", "right"] }], // No justify: posts render left-aligned.
   ["clean"],
 ];

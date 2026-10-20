@@ -22,6 +22,8 @@ import { normalizeEditorHtml } from "@/app/lib/blog/editorHtml";
 import { AUTO, DEFAULT_INLINE_OFFERS, effectiveInlineOffers, offerToken, parseOfferToken, type OfferRef } from "@/app/lib/blog/offers";
 import Article from "@/app/components/blog/Article";
 import QuillEditor, { type QuillRef } from "./QuillEditor";
+import TableBar from "./TableBar";
+import { insertTable } from "./tableStyle";
 import { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
 
 export interface BlogFormProps {
@@ -36,6 +38,8 @@ type Preview = Awaited<ReturnType<typeof previewBlog>>;
 
 const SELECT_THEME = (theme: import("react-select").Theme) => ({ ...theme, borderRadius: 6, colors: { ...theme.colors, primary25: "#e5e5e5", primary: "black" } });
 const AUTO_OPTION: Option = { value: "", label: "Auto (category → tags → site default)" };
+// The backend's NO_CTA (offerTargeting.ts): the post ends without a product CTA.
+const NO_CTA_OPTION: Option = { value: "none", label: "None (no closing CTA)" };
 
 function markerSummary(html: string): { cta: string[]; magnet: string[] } {
   const out = { cta: [] as string[], magnet: [] as string[] };
@@ -157,6 +161,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
   const router = useRouter();
   const quillRef: QuillRef = useRef(null);
   const imagePicker = useRef<HTMLButtonElement>(null);
+  const editorWrap = useRef<HTMLDivElement>(null);
   const imageRange = useRef<RangeStatic | null>(null);
   const hostedImages = useRef(new Map<string, string>());
   const byId = useMemo(() => new Map(authors.map((a) => [a.id, a])), [authors]);
@@ -175,6 +180,11 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
             imageRange.current = quill.getSelection(true);
             imagePicker.current?.click();
           },
+          table() {
+            const quill = quillRef.current?.getEditor();
+            if (!quill) return;
+            insertTable(quill);
+          },
         },
       },
       keyboard: {
@@ -183,6 +193,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
           "leave block down": { key: "ArrowDown", collapsed: true, format: BLOCK_FORMATS, handler: leaveBlockDown },
         },
       },
+      table: true,
       uploader: {
         mimetypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
         // Pasted and dropped images go to Cloudinary; Quill's default inlines them as base64, which posts can't show.
@@ -220,7 +231,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
 
   const categoryOptions: Option[] = BLOG_CATEGORIES.map((c) => ({ value: c.slug, label: c.name }));
   const magnetOptions: Option[] = [AUTO_OPTION, ...magnets.map((m) => ({ value: m.id, label: m.title }))];
-  const ctaOptions: Option[] = [AUTO_OPTION, ...ctas.map((c) => ({ value: c.key, label: c.name }))];
+  const ctaOptions: Option[] = [AUTO_OPTION, NO_CTA_OPTION, ...ctas.map((c) => ({ value: c.key, label: c.name }))];
   const coauthorOptions = authors.filter((a) => a.id !== publisher?.id).map(authorOption);
   const suggested = useMemo(() => (category ? null : inferCategory(tags)), [category, tags]);
   const chosenCategory = category || suggested?.slug || "job-search";
@@ -545,12 +556,18 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
         <div>
           <label className={ADMIN_LABEL}>Content</label>
           <div
+            ref={editorWrap}
+            className="relative"
             onMouseDown={(e) => {
               const quill = quillRef.current?.getEditor();
               if (quill) exitTrailingBlock(quill, e);
             }}>
             <QuillEditor forwardedRef={quillRef} value={text} theme="snow" onChange={setText} modules={quillModules} placeholder="Write the post" className="post-editor mt-1" />
+            <TableBar quillRef={quillRef} wrapRef={editorWrap} />
           </div>
+          <p className={ADMIN_HINT}>
+            Tables: the table button adds one at the cursor. Hover a table for its controls. The letter switches the style: F = Full (first row is the heading), R = Rows only, L = Rows only with column labels.
+          </p>
           <p className={ADMIN_HINT}>
             Quotes: to credit a source, end the quote with a line starting with “---” (e.g. “--- Jane Doe[link here]”). It can be a link. Leave it out for no source. Press Enter on an empty quote line, or click below the quote, to carry on with normal text.
           </p>

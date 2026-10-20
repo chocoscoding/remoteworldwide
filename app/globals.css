@@ -869,24 +869,51 @@ body {
   border-top: 1px solid rgba(34, 35, 37, 0.15);
   margin: 2em 0;
 }
+/* Tables (see shapeTables): hairline rows, no vertical rules, bold first column.
+   Full tables and Rows-only tables with column labels have a mono-caps heading on an
+   ink rule; plain Rows only gets a hairline on top instead. Wide ones scroll on phones. */
+.post-prose .post-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.75em;
+}
 .post-prose table {
   width: 100%;
   border-collapse: collapse;
-  margin: 0 0 1.75em;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.9375rem;
+  line-height: 1.55;
 }
 .post-prose th,
 .post-prose td {
-  border: 1px solid #d9d9d2;
-  padding: 0.5em 0.75em;
+  padding: 0.9em 1.25em 0.9em 0;
+  border-bottom: 1px solid rgba(34, 35, 37, 0.12);
   text-align: left;
   vertical-align: top;
 }
-.post-prose th {
-  background: #f6f6f1;
+.post-prose :is(th, td):last-child {
+  padding-right: 0;
+}
+.post-prose td:first-child {
   color: #222325;
   font-weight: 700;
+}
+.post-prose thead th {
+  padding-top: 0;
+  padding-bottom: 0.75em;
+  border-bottom-color: #222325;
+  color: #8e8f92;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.post-prose .post-table--rows > tbody:first-child > tr:first-child > td {
+  border-top: 1px solid rgba(34, 35, 37, 0.12);
+}
+.post-prose .post-table--rows td:first-child {
+  width: 28%;
+  min-width: 9rem;
 }
 .post-prose .ql-align-center {
   text-align: center;
@@ -952,6 +979,10 @@ body {
   margin-top: 0.5em;
   margin-bottom: 0.5em;
 }
+.post-prose--as-written .post-table-wrap {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
 /* Room for the quote badge above and the block shadow below. */
 .post-prose--as-written blockquote {
   margin-top: 1.75rem;
@@ -990,6 +1021,34 @@ body {
   right: max(1.5rem, calc((100% - 720px) / 2));
   color: #737373;
   font-style: normal;
+}
+/* Tables: a light grid so every cell is clickable, and the heading row (Full, or Rows
+   only with column labels) drawn in the page's mono caps so writers see which they have. */
+.post-editor .ql-container .ql-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  table-layout: auto;
+}
+.post-editor .ql-container .ql-editor td {
+  border: 1px dashed #d9d9d2;
+  padding: 0.6em 0.75em;
+  vertical-align: top;
+}
+.post-editor .ql-container .ql-editor td:first-child {
+  color: #222325;
+  font-weight: 700;
+}
+.post-editor .ql-container .ql-editor table:not(:has(td.ql-table-rows)) tr:first-child td {
+  border-bottom: 1px solid #222325;
+  color: #8e8f92;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .post-editor .ql-container .ql-editor h2,
 .post-editor .ql-container .ql-editor h3,

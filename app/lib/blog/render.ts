@@ -34,7 +34,7 @@ const BLANK_LINE = "<p><br /></p>";
 const EDGE_BLANKS_RE = /^(?:\s*<p><br \/><\/p>)+\s*|\s*(?:<p><br \/><\/p>\s*)+$/g;
 
 // Justify is left out on purpose: posts render left-aligned, like the editor now shows.
-const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video)$/;
+const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video|table-rows(-head)?)$/;
 const VIDEO_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/;
 
 // Off-site links open in a new tab and pass no ranking.
@@ -103,14 +103,44 @@ function joinQuotes(html: string): string {
   });
 }
 
+const TABLE_RE = /<table(?:\s[^>]*)?>([\s\S]*?)<\/table>/gi;
+const TABLE_STYLE_RE = /\bql-table-(rows-head|rows)\b/;
+const FIRST_ROW_RE = /<tr(?:\s[^>]*)?>[\s\S]*?<\/tr>/i;
+
+// Drops the editor's table-style class from a cell's attributes.
+function cellAttrs(attrs: string): string {
+  return attrs.replace(/\s*class="([^"]*)"/i, (_m, cls: string) => {
+    const kept = cls.split(/\s+/).filter((c) => c && !c.startsWith("ql-table-"));
+    return kept.length ? ` class="${kept.join(" ")}"` : "";
+  });
+}
+
+// The editor marks a table's style on its cells (see ADMIN/blog/tableStyle.ts): none = Full,
+// whose first row becomes the heading; ql-table-rows = Rows only; ql-table-rows-head = Rows
+// only with column labels (a heading too). Each table gets a wrap that scrolls on phones.
+function shapeTables(html: string): string {
+  return html.replace(TABLE_RE, (_whole, inner: string) => {
+    const style = TABLE_STYLE_RE.exec(inner)?.[1] ?? "full";
+    let body = inner.replace(/<(td|th)(\s[^>]*)?>/gi, (_t, tag: string, attrs = "") => `<${tag}${cellAttrs(attrs)}>`);
+    if (style !== "rows" && !/<thead[\s>]/i.test(body)) {
+      const first = FIRST_ROW_RE.exec(body);
+      if (first && stripTags(first[0]) !== "") {
+        const head = first[0].replace(/<(\/?)td(?=[\s>])/gi, "<$1th").replace(/<th(?=[\s>])/gi, '<th scope="col"');
+        body = `<thead>${head}</thead>${(body.slice(0, first.index) + body.slice(first.index + first[0].length)).replace(/<tbody(?:\s[^>]*)?>\s*<\/tbody>/i, "")}`;
+      }
+    }
+    return `<div class="post-table-wrap"><table class="post-table post-table--${style === "full" ? "full" : "rows"}">${body}</table></div>`;
+  });
+}
+
 export function sanitizePostHtml(html: string): string {
-  return joinQuotes(
+  return shapeTables(joinQuotes(
     normalizeEditorHtml(sanitizeHtml(html, SANITIZE_OPTIONS))
       .replace(BLANK_BLOCK_RE, BLANK_LINE)
       // Quill wraps an indented list in a bare <li> (<ul><li><ul>…); tag it so it draws no bullet.
       // An empty item with a sub-list saves identically, so it is hidden (and uncounted) too.
       .replace(/<li>(?=<(?:ul|ol)>)/g, '<li class="list-wrap">'),
-  );
+  ));
 }
 
 export interface TocEntry {
