@@ -33,6 +33,27 @@ export interface TailorResult {
   woven: string[];
   /** Gaps left out because the resume's history doesn't show them (or they're about where the candidate may work), with advice. */
   notShown?: TermAdvice[];
+  /** "Tailor to this job" (`whole`): the lines it tuned or reframed, and why. */
+  changed?: FitChange[];
+  /** "Tailor to this job": what the job asks for that the resume does not show, to ask the person about. */
+  couldAdd?: FitAddition[];
+}
+
+/** One line "Tailor to this job" changed: lightly ("tune") or led with what the job wants ("reframe"). */
+export interface FitChange {
+  marker: string;
+  kind: "tune" | "reframe";
+  before: string;
+  after: string;
+  serves: string;
+}
+
+/** Something the job asks for that the resume does not show: asked of the person ("NetSuite, if you have used it"), never written in. */
+export interface FitAddition {
+  term: string;
+  ifTrue: string;
+  /** Where a "Yes" puts it: work into a line of the experience, a tool, language or certification into Skills. */
+  place: "experience" | "skills";
 }
 
 /** A requested term the resume doesn't show yet, with one line of advice. Never written in, never charged for. */

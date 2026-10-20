@@ -90,6 +90,25 @@ export interface ApplyResumeState {
    * to the very words it was tried on. Emptied when another base resume is picked.
    */
   worked: WorkedTerm[];
+  /**
+   * "Tailor to this job"'s asks ("Have you written launch messaging?"), kept with the history they
+   * came from: undo past the Tailor hides them, undo past a "Yes" brings that ask back (owner,
+   * 2026-10-20: "once it's gone, it's gone forever"). Emptied when another base resume is picked.
+   */
+  asks: FitAsk[];
+}
+
+export interface FitAsk {
+  term: string;
+  ifTrue: string;
+  /** Where a "Yes" puts it: a line of the experience, or Skills for a tool, language or certification. */
+  place: "experience" | "skills";
+  /** The history step the Tailor that asked it made; null when that Tailor changed no line. */
+  fromStep: string | null;
+  /** Answered no: not asked again. */
+  no: boolean;
+  /** The history step its "Yes" made: while that step stands, it is answered. */
+  addedIn: string | null;
 }
 
 export interface WorkedTerm {
@@ -151,6 +170,7 @@ export const EMPTY_APPLY_STATE: ApplyState = {
     history: [],
     historyAt: 0,
     worked: [],
+    asks: [],
   },
   scan: null,
   proposal: null,
@@ -213,6 +233,24 @@ function readWorked(value: unknown): WorkedTerm[] {
     }))
     .filter((item) => item.lines.length > 0)
     .slice(-MAX_WORKED);
+}
+
+/** The most asks kept: a Tailor returns at most four, and it can run again after an undo. */
+const MAX_ASKS = 16;
+
+function readAsks(value: unknown): FitAsk[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> & { term: string } => isRecord(item) && typeof item.term === "string" && item.term.trim() !== "")
+    .map((item) => ({
+      term: item.term.slice(0, 120),
+      ifTrue: typeof item.ifTrue === "string" && item.ifTrue.trim() !== "" ? item.ifTrue.slice(0, 300) : item.term.slice(0, 120),
+      place: item.place === "skills" ? ("skills" as const) : ("experience" as const),
+      fromStep: str(item.fromStep),
+      no: item.no === true,
+      addedIn: str(item.addedIn),
+    }))
+    .slice(-MAX_ASKS);
 }
 
 /**
@@ -306,6 +344,7 @@ export function readApplyState(raw: unknown): ApplyState {
       creatorSeen: str(resume.creatorSeen),
       ...readHistory(resume.history, resume.historyAt),
       worked: readWorked(resume.worked),
+      asks: readAsks(resume.asks),
     },
     scan:
       scan && report && typeof scan.resumeId === "string" && typeof scan.version === "number"

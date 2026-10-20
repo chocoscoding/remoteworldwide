@@ -147,14 +147,27 @@ export function reconcileGroups<C extends Pick<ResumeContent, "skills" | "skillG
 export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string): boolean => content.skills.some((have) => key(have) === key(skill));
 
 /**
- * The content with these skills added to the end of the list, each as an entry
- * of its own, and only if it is not there already. Returns the same object when
- * nothing was new.
+ * The content with these skills added, each as an entry of its own, and only if
+ * it is not there already: right after the last plain skill, so it prints in that
+ * list, never on a line of its own below an entry with sub skills ("English:
+ * native-level", owner 2026-10-20). At the end when there is no plain skill.
+ * Returns the same object when nothing was new.
  */
 export function addSkills(content: ResumeContent, skills: string[]): ResumeContent {
   const fresh = flattenGroups(skills.map((skill) => ({ id: "", title: skill, skills: [] }))).filter((skill) => !hasSkill(content, skill));
   if (fresh.length === 0) return content;
-  return reconcileGroups({ ...content, skills: [...content.skills, ...fresh] });
+  const next = reconcileGroups({ ...content, skills: [...content.skills, ...fresh] });
+  const entries = next.skillGroups ?? [];
+  const added = new Set(fresh.map(key));
+  const isNew = (group: ResumeSkillGroup) => group.skills.length === 0 && added.has(key(group.title));
+  const old = entries.filter((group) => !isNew(group));
+  let after = -1;
+  old.forEach((group, i) => {
+    if (!group.hidden && group.title.trim() && !group.skills.some((skill) => skill.trim())) after = i;
+  });
+  if (after === -1 || after === old.length - 1) return next;
+  const placed = [...old.slice(0, after + 1), ...entries.filter(isNew), ...old.slice(after + 1)];
+  return { ...next, skillGroups: placed, skills: flattenGroups(placed) };
 }
 
 /**

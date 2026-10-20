@@ -89,6 +89,17 @@ describe("adding a keyword to Skills", () => {
     assert.ok(hasSkill(added, "hubspot"));
     assert.equal(addSkills(entries, ["figma"]), entries);
   });
+
+  it("adds a skill to the plain list, never on a line of its own below an entry with sub skills", () => {
+    const groups = [entry("a", "Figma"), entry("b", "Product design"), entry("c", "English", ["native-level"])];
+    const content = { skills: flattenGroups(groups), skillGroups: groups };
+    const added = addSkills(content, ["Product marketing"]);
+    assert.deepEqual(
+      added.skillGroups.map((group) => group.title),
+      ["Figma", "Product design", "Product marketing", "English"],
+    );
+    assert.deepEqual(added.skills, flattenGroups(added.skillGroups));
+  });
 });
 
 describe("printing", () => {

@@ -1214,9 +1214,9 @@ body {
 
 /* The apply wizard's resume preview: what tailoring changed, marked on the real paper with the CSS
    Custom Highlight API (no DOM is rewritten, so the resume renderer stays untouched). */
-/* What changed for this job: 10% lighter than it was (owner, 2026-10-19). */
+/* What changed for this job: 10% lighter than it was (owner, 2026-10-19), then 15% toward white (2026-10-20). */
 ::highlight(rww-resume-change) {
-  background-color: #f0f8bf;
+  background-color: #f2f9c9;
   text-decoration: underline;
   text-decoration-color: #a4b335;
   text-decoration-thickness: 2px;

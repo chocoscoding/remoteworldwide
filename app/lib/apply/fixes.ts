@@ -175,7 +175,31 @@ export const onlyInSkills = (verdict: RequirementVerdict): boolean =>
  * proof chip instead (review, 2026-10-19: the same requirement showed as both, and adding it to
  * Skills again changed nothing). A gap with no verdict to read is shown.
  */
-export const worthGapChip = (verdict: RequirementVerdict | undefined): boolean => !verdict || (worthAdding(verdict) && !onlyInSkills(verdict));
+export const worthGapChip = (verdict: RequirementVerdict | undefined): boolean =>
+  !verdict ||
+  (worthAdding(verdict) &&
+    !onlyInSkills(verdict) &&
+    verdict.requirement.category === "skill" &&
+    !TRAIT_LABEL.test(verdict.requirement.label ?? verdict.requirement.text) &&
+    // A skill has a short name; a window of a requirement line ("Own go-to-market for everything
+    // Flex ships") is a duty or a trait, never a keyword chip (owner, 2026-10-20).
+    (verdict.requirement.label ?? verdict.requirement.text).trim().split(/\s+/).length <= MAX_CHIP_WORDS);
+
+/** Words a keyword chip's label may run to. */
+const MAX_CHIP_WORDS = 4;
+
+/**
+ * A label that names a disposition, not a skill: "Phone comfort" (from "comfortable picking up the
+ * phone") went in as a skill and into a bullet as outbound dialing nobody did (owner, 2026-10-20).
+ */
+const TRAIT_LABEL = /\b(?:comfort\w*|confiden\w*|willing\w*|eager\w*|energy|initiative|instinct\w*|passion\w*|curio\w*|resilien\w*|mindset|attitude|motivat\w*)\b/i;
+
+/**
+ * A duty the posting describes ("Own month-end reconciliation") is no keyword to add: worked in as a
+ * term it read as stuffing for every model the bake-off tried (judges, 2026-10-19). It gets no chip;
+ * "Tailor to this job" reframes the real work that matches it instead (owner, 2026-10-20).
+ */
+export const fitGap = (verdict: RequirementVerdict | undefined): boolean => !verdict || worthAdding(verdict);
 
 /** The keywords matched only in Skills, by name. */
 export const skillsOnlyNames = (report: Pick<ScanReport, "verdicts">): string[] => [...new Set(report.verdicts.filter(onlyInSkills).map(nameOf))];

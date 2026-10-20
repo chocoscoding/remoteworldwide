@@ -16,7 +16,7 @@
 // shared highlight. A browser without the API gets the same changes as a list
 // instead.
 
-import { useEffect, useMemo, useRef, useState, type FC } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FC } from "react";
 import { PagedResume } from "@/app/components/dashboard/resume/paper";
 import { PaperHighlightProvider, type PaperEdits, type PaperEyes } from "@/app/components/dashboard/resume/paper/highlight";
 import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
@@ -101,8 +101,49 @@ export interface ChangesPaperProps {
   flash?: { texts: string[]; key: number } | null;
 }
 
-const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className, eyes, edits, flash = null }) => {
+/** Never in a key: section and part keys, and entry ids, are plain words and ids. */
+const SEP = "\u0000";
+
+const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className, eyes, edits, flash = null }) => {
   const paperRef = useRef<HTMLDivElement | null>(null);
+  // The paper is the slowest thing on the resume step (owner, 2026-10-20: undo "slow and laggy"), so
+  // it renders again only when its words or what is hidden change: the step hands it a new object on
+  // every render, and a save that comes back with the same words is the same paper.
+  const contentKey = JSON.stringify(given);
+  const [held, setHeld] = useState({ key: contentKey, content: given });
+  if (held.key !== contentKey) setHeld({ key: contentKey, content: given });
+  const content = held.key === contentKey ? held.content : given;
+  // The eyes' and edits' handlers are the step's latest, read when one is used, so they never change the paper.
+  const eyesRef = useRef(eyes);
+  const editsRef = useRef(edits);
+  useLayoutEffect(() => {
+    eyesRef.current = eyes;
+    editsRef.current = edits;
+  });
+  const hiddenKey = eyes ? eyes.hidden.join(SEP) : null;
+  const idsKey = eyes ? eyes.experienceIds.join(SEP) : null;
+  const hasEdits = edits !== undefined;
+  const highlight = useMemo(
+    () => ({
+      focus: null,
+      marks: [],
+      eyes:
+        hiddenKey === null || idsKey === null
+          ? undefined
+          : {
+              hidden: hiddenKey ? hiddenKey.split(SEP) : [],
+              experienceIds: idsKey ? idsKey.split(SEP) : [],
+              onToggle: (key: string) => eyesRef.current?.onToggle(key),
+            },
+      edits: hasEdits
+        ? {
+            onSummary: (text: string) => editsRef.current?.onSummary(text),
+            onBullet: (entryId: string, index: number, text: string) => editsRef.current?.onBullet(entryId, index, text),
+          }
+        : undefined,
+    }),
+    [hiddenKey, idsKey, hasEdits],
+  );
   const changes = useMemo(() => resumeChanges(before, content), [before, content]);
   const texts = useMemo(() => highlightTexts(changes), [changes]);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
@@ -165,23 +206,31 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content, before, className, eyes,
     };
   }, [flashKey, flashTexts]);
 
+  // The same element while nothing it shows changed, so React skips the whole paper.
+  const paper = useMemo(
+    () => (
+      // The gap is zoomed with the paper, so it's divided by the zoom to stay 25px on screen.
+      <PaperHighlightProvider value={highlight}>
+        <PagedResume
+          design={DEFAULT_DESIGN}
+          sections={withContentSections(DEFAULT_SECTIONS, content)}
+          content={content}
+          chrome={DEFAULT_DESIGN.chrome}
+          gap={25 / fit}
+          sheetClassName="shadow-[0_2px_18px_rgba(0,0,0,0.12)]"
+          onPageCountChange={setPages}
+        />
+      </PaperHighlightProvider>
+    ),
+    [highlight, content, fit],
+  );
+
   return (
     <div ref={setBox} className={cn("w-full", className)}>
       {!canHighlight && texts.length > 0 && <ChangeList changes={changes} />}
       {/* `rww-sent-paper`: sections with nothing in them are left off, as in every download. */}
       <div ref={paperRef} style={{ zoom: fit }} className={cn("rww-sent-paper mx-auto w-fit", ALL_FONT_VARS)}>
-        {/* The gap is zoomed with the paper, so it's divided by the zoom to stay 25px on screen. */}
-        <PaperHighlightProvider value={{ focus: null, marks: [], eyes, edits }}>
-          <PagedResume
-            design={DEFAULT_DESIGN}
-            sections={withContentSections(DEFAULT_SECTIONS, content)}
-            content={content}
-            chrome={DEFAULT_DESIGN.chrome}
-            gap={25 / fit}
-            sheetClassName="shadow-[0_2px_18px_rgba(0,0,0,0.12)]"
-            onPageCountChange={setPages}
-          />
-        </PaperHighlightProvider>
+        {paper}
       </div>
     </div>
   );

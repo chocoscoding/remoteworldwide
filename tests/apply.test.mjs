@@ -49,6 +49,7 @@ const {
   workedIn,
   worthAdding,
   worthGapChip,
+  fitGap,
   bulletsWithoutResult,
   fixFirstId,
   matchMoves,
@@ -111,6 +112,7 @@ describe("reading a session's state", () => {
         history: [],
         historyAt: 0,
         worked: [],
+        asks: [{ term: "HubSpot", ifTrue: "HubSpot, if you have used it", place: "skills", fromStep: "s-1", no: false, addedIn: null }],
       },
       scan: { resumeId: "d1", version: 2, report, previousScore: 54 },
       proposal: null,
@@ -715,6 +717,30 @@ describe("scores made by an older formula", () => {
     assert.deepEqual(scanBaseline(last(oldReport, { previousScore: 61 }), "d1", 2), { previousScore: null });
     assert.deepEqual(scanBaseline(last({ ...newReport, degraded: true }, { previousScore: 61 }), "d1", 3), { previousScore: null });
     assert.deepEqual(scanBaseline(null, "d1", 3), { previousScore: null });
+  });
+});
+
+describe("a duty is work to reframe, never a keyword chip (owner, 2026-10-20)", () => {
+  const duty = { state: "missing", score: 0, evidence: [], requirement: { id: "d", text: "Own month-end reconciliation", label: "Month-end reconciliation", type: "required", category: "responsibility", weight: 4, proof: [] } };
+  const skill = { ...duty, requirement: { ...duty.requirement, id: "s", text: "NetSuite", label: "NetSuite", category: "skill" } };
+
+  it("gives a missing duty no chip, and keeps it for Tailor to this job", () => {
+    assert.equal(worthGapChip(duty), false);
+    assert.equal(fitGap(duty), true);
+  });
+
+  it("still gives a missing skill its chip", () => {
+    assert.equal(worthGapChip(skill), true);
+    assert.equal(fitGap(skill), true);
+  });
+
+  it("gives a disposition or a years-of-experience line no chip (owner, 2026-10-20: \"Phone comfort is not even a thing\")", () => {
+    assert.equal(worthGapChip({ ...skill, requirement: { ...skill.requirement, label: "Phone comfort", text: "Comfortable picking up the phone" } }), false);
+    assert.equal(worthGapChip({ ...skill, requirement: { ...skill.requirement, label: "Professional experience", category: "experience" } }), false);
+  });
+
+  it("gives Tailor nothing a nice-to-have asks", () => {
+    assert.equal(fitGap({ ...duty, requirement: { ...duty.requirement, type: "preferred" } }), false);
   });
 });
 
