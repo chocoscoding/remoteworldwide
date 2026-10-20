@@ -165,7 +165,20 @@ export function addSkills(content: ResumeContent, skills: string[]): ResumeConte
   old.forEach((group, i) => {
     if (!group.hidden && group.title.trim() && !group.skills.some((skill) => skill.trim())) after = i;
   });
-  if (after === -1 || after === old.length - 1) return next;
+  if (after === -1) {
+    // Every skill sits in a named group ("Others: Tailwind CSS, Storybook"): a new one goes in as a
+    // sub skill of the "Other" group, or a new one, never on a line of its own (owner, 2026-10-20).
+    const grouped = old.filter((group) => !group.hidden && group.skills.some((skill) => skill.trim()));
+    if (grouped.length === 0) return next;
+    const at = old.findIndex((group) => !group.hidden && /^others?\b/i.test(group.title.trim()) && group.skills.some((skill) => skill.trim()));
+    const names = entries.filter(isNew).map((group) => group.title);
+    const placed =
+      at === -1
+        ? [...old, { id: entryIdFor("other", new Set(old.map((group) => group.id))), title: "Other", skills: names }]
+        : old.map((group, i) => (i === at ? { ...group, skills: [...group.skills, ...names] } : group));
+    return { ...next, skillGroups: placed, skills: flattenGroups(placed) };
+  }
+  if (after === old.length - 1) return next;
   const placed = [...old.slice(0, after + 1), ...entries.filter(isNew), ...old.slice(after + 1)];
   return { ...next, skillGroups: placed, skills: flattenGroups(placed) };
 }

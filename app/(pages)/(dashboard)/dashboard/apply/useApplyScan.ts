@@ -35,6 +35,8 @@ export interface ApplyScanRequest {
   jdText: string | null;
   /** The saved job's id: the service's key for the posting's extracted requirements. */
   jobId: string | null;
+  /** The job's title, read against the resume's. */
+  jobTitle?: string | null;
 }
 
 const IDLE: ApplyScanState = { status: "idle", resumeId: null, report: null, failure: null };
@@ -61,7 +63,7 @@ export function useApplyScan() {
 
   /** Resolves with the finished report, or null when it failed or was superseded. */
   const run = useCallback(
-    async ({ resumeId, jdText, jobId }: ApplyScanRequest): Promise<ScanReport | null> => {
+    async ({ resumeId, jdText, jobId, jobTitle = null }: ApplyScanRequest): Promise<ScanReport | null> => {
       runIdRef.current += 1;
       const runId = runIdRef.current;
       abortRef.current?.abort();
@@ -72,7 +74,7 @@ export function useApplyScan() {
       setState({ status: "scoring", resumeId, report: null, failure: null });
       try {
         const report = await streamScan(
-          { resumeId, jdText, jobId },
+          { resumeId, jdText, jobId, jobTitle },
           {
             signal: controller.signal,
             onScored: (scored) => {

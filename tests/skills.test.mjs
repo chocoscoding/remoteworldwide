@@ -100,6 +100,15 @@ describe("adding a keyword to Skills", () => {
     );
     assert.deepEqual(added.skills, flattenGroups(added.skillGroups));
   });
+  it("adds a skill into the Other group when every skill sits in a named group", () => {
+    const groups = [entry("a", "Frameworks", ["React", "Express"]), entry("b", "Others", ["Tailwind CSS"])];
+    const added = addSkills({ skills: flattenGroups(groups), skillGroups: groups }, ["Sanity"]);
+    assert.deepEqual(added.skillGroups.map((group) => [group.title, group.skills]), [["Frameworks", ["React", "Express"]], ["Others", ["Tailwind CSS", "Sanity"]]]);
+    const plain = [entry("a", "Frameworks", ["React"])];
+    const made = addSkills({ skills: flattenGroups(plain), skillGroups: plain }, ["Sanity"]);
+    assert.deepEqual(made.skillGroups.map((group) => [group.title, group.skills]), [["Frameworks", ["React"]], ["Other", ["Sanity"]]]);
+    assert.deepEqual(made.skills, flattenGroups(made.skillGroups));
+  });
 });
 
 describe("printing", () => {

@@ -96,6 +96,11 @@ export interface ApplyResumeState {
    * 2026-10-20: "once it's gone, it's gone forever"). Emptied when another base resume is picked.
    */
   asks: FitAsk[];
+  /**
+   * The history step a "Tailor to this job" ran on and changed nothing ("start" before any): the
+   * row stays hidden there, since running it again asks the same things (owner, 2026-10-20).
+   */
+  fitAt: string | null;
 }
 
 export interface FitAsk {
@@ -171,6 +176,7 @@ export const EMPTY_APPLY_STATE: ApplyState = {
     historyAt: 0,
     worked: [],
     asks: [],
+    fitAt: null,
   },
   scan: null,
   proposal: null,
@@ -345,6 +351,7 @@ export function readApplyState(raw: unknown): ApplyState {
       ...readHistory(resume.history, resume.historyAt),
       worked: readWorked(resume.worked),
       asks: readAsks(resume.asks),
+      fitAt: str(resume.fitAt),
     },
     scan:
       scan && report && typeof scan.resumeId === "string" && typeof scan.version === "number"

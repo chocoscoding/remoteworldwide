@@ -113,6 +113,7 @@ describe("reading a session's state", () => {
         historyAt: 0,
         worked: [],
         asks: [{ term: "HubSpot", ifTrue: "HubSpot, if you have used it", place: "skills", fromStep: "s-1", no: false, addedIn: null }],
+        fitAt: "s-1",
       },
       scan: { resumeId: "d1", version: 2, report, previousScore: 54 },
       proposal: null,

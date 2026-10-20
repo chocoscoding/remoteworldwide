@@ -317,7 +317,7 @@ export async function streamScan(input: ScanInput, { signal, onScored, onUnexpla
   const res = await fetch(ATS_PATH, {
     method: "POST",
     headers: { accept: "text/event-stream", "content-type": "application/json" },
-    body: JSON.stringify({ resumeId: input.resumeId, jdText: input.jdText ?? null, jobId: input.jobId ?? null }),
+    body: JSON.stringify({ resumeId: input.resumeId, jdText: input.jdText ?? null, jobId: input.jobId ?? null, jobTitle: input.jobTitle ?? null }),
     credentials: "same-origin",
     cache: "no-store",
     signal,

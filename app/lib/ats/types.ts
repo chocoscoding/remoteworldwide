@@ -125,6 +125,11 @@ export interface ScanReport {
   stuffingPenalty?: number;
   /** One or two fixes for a general score under 85, from its weakest sections. Absent on older scans. */
   advice?: ScanAdvice[];
+  /**
+   * The resume's title (headline or latest role) against the job's, and the keyword-match points
+   * it was worth: 3 same, 2 related, 0 unsure, -2 unrelated. Absent with no job title.
+   */
+  titleFit?: TitleFit;
   explanation: string | null;
   rewrites: BulletRewrite[];
 }
@@ -161,10 +166,20 @@ export interface ScanRecord extends ScanReport {
   explanationStatus: ExplanationStatus;
 }
 
+/** Mirrors `TitleFit` in the service's `titleFit.ts`. */
+export interface TitleFit {
+  kind: "same" | "related" | "unsure" | "unrelated";
+  points: number;
+  jobTitle: string;
+  resumeTitle: string;
+}
+
 /** `POST /api/ai/scan` body. Omit `jdText` for the general score. */
 export interface ScanInput {
   resumeId: string;
   jdText?: string | null;
+  /** The job's title, read against the resume's for a few points of keyword match. */
+  jobTitle?: string | null;
   /** The saved job's id, when the description came from one rather than being pasted. */
   jobId?: string | null;
 }

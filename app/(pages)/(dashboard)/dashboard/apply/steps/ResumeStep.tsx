@@ -57,7 +57,14 @@ import { ATS_BILLING_HREF, isCurrentScore, missingGaps, prepareResumeForDoc, sca
 import type { IngestedResumeDetail } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { qk } from "@/app/lib/query/keys";
-import { injectKeywords, quantifySuggestions, storedBulletIndex, tailorToJob, type KeywordInjection, type ResumePlace } from "@/app/lib/resume/ai";
+import {
+  injectKeywords,
+  quantifySuggestions,
+  storedBulletIndex,
+  tailorToJob,
+  type KeywordInjection,
+  type ResumePlace,
+} from "@/app/lib/resume/ai";
 import { applyQuantify, type FitAddition } from "@/app/lib/dashboard/resume/ai-tools";
 import {
   RESUME_ACCEPT,
@@ -81,7 +88,15 @@ import type { useApplyScan } from "../useApplyScan";
 import ChangesPaper from "../parts/ChangesPaper";
 import DraftHistory from "../parts/DraftHistory";
 import ResumePreviewDialog, { DownloadButton } from "../parts/ResumePreviewDialog";
-import { FixesTabs, ScoreRow, StuffingNote, type GapChip, type ScoreState, type StuffingNoteView, type Suggestion } from "../parts/ScoreFixes";
+import {
+  FixesTabs,
+  ScoreRow,
+  StuffingNote,
+  type GapChip,
+  type ScoreState,
+  type StuffingNoteView,
+  type Suggestion,
+} from "../parts/ScoreFixes";
 import SelectResumeDialog, { type PickedResume } from "../parts/SelectResumeDialog";
 import { useResumeDownload } from "../parts/useResumeDownload";
 
@@ -263,7 +278,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const { run: runScan } = scan;
   const runScore = useCallback(
     (resumeId: string, scoredVersion: number) => {
-      void runScan({ resumeId, jdText: job.description, jobId: job.savedJobId }).then((finished) => {
+      void runScan({ resumeId, jdText: job.description, jobId: job.savedJobId, jobTitle: job.role }).then((finished) => {
         if (!finished) return;
         update((s) => {
           // Measured against the last version scored (never a partly checked one, nor one an older formula
@@ -287,7 +302,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         });
       });
     },
-    [runScan, job.description, job.savedJobId, update, draftVersionNow],
+    [runScan, job.description, job.savedJobId, job.role, update, draftVersionNow],
   );
 
   // Once per resume version: a version already scored (here or before a refresh) is shown, not re-run.
@@ -322,7 +337,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const draftBase = draftFrom.data?.content ?? base.data?.content ?? null;
   // Sending the draft: what changed for this job is marked (once what it was made from is in). Sending the original: nothing is.
   const paperBefore = sendingDraft && draftBase ? draftBase : content;
-  const paperChanges = useMemo(() => (content && paperBefore ? changeCount(resumeChanges(paperBefore, content)) : 0), [content, paperBefore]);
+  const paperChanges = useMemo(
+    () => (content && paperBefore ? changeCount(resumeChanges(paperBefore, content)) : 0),
+    [content, paperBefore],
+  );
 
   // ---- Edits made in the resume creator come back -----------------------------------------------
   // Read when this tab is shown again, and once on load, so the preview and the score follow them.
@@ -394,7 +412,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     update((s) => ({
       ...s,
       proposal: null,
-      resume: { ...s.resume, baseId: picked.resumeId, baseName: picked.name, sendDraft: false, worked: [], asks: [] },
+      resume: { ...s.resume, baseId: picked.resumeId, baseName: picked.name, sendDraft: false, worked: [], asks: [], fitAt: null },
     }));
   }
 
@@ -819,7 +837,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       }
       // Never at the cost of what proves a requirement: a line the scan quotes as proof, rewritten so
       // it no longer says it, goes back as it was (owner, 2026-10-19), and the person is told which.
-      const guarded = report ? keepProof(content, reconcileGroups(result.content), report) : { content: reconcileGroups(result.content), kept: [] };
+      const guarded = report
+        ? keepProof(content, reconcileGroups(result.content), report)
+        : { content: reconcileGroups(result.content), kept: [] };
       // Nothing new on the page: said plainly, never a history step that claims a change (owner,
       // 2026-10-19: "no matter the times I add this thing, it does not change anything").
       if (changeCount(resumeChanges(content, guarded.content)) === 0 && guarded.kept.length === 0) {
@@ -854,7 +874,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     // Said as what it may touch, never Skills when only the summary goes (review, 2026-10-19).
     // "Tailored" leads every label: `tailoredAlready` reads it.
     const label = summary && skills ? "Tailored summary & skills" : summary ? "Tailored summary" : "Tailored skills";
-    const busyText = summary && skills ? "Tailoring your summary and skills…" : summary ? "Writing your summary…" : "Tailoring your skills…";
+    const busyText =
+      summary && skills ? "Tailoring your summary and skills…" : summary ? "Writing your summary…" : "Tailoring your skills…";
     void runAndCommit(label, busyText, async () => {
       const result = await tools.run("tailor", () =>
         tailorToJob({
@@ -902,6 +923,12 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       "Your resume already fits this job.",
     ).then((made) => {
       if (made) showOnPage(lines);
+      // Nothing changed: the row hides on this step, and the asks say what is left (never "already fits").
+      if (!made) {
+        const at = history[historyAt]?.id ?? "start";
+        update((s) => ({ ...s, resume: { ...s.resume, fitAt: at } }));
+        if (asks.length > 0) setChangeError(null);
+      }
       if (asks.length === 0) return;
       // Asked from the step this Tailor made, or from where the draft stood when it changed nothing.
       const fromStep = made?.stepId ?? history[historyAt]?.id ?? null;
@@ -912,11 +939,27 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           ...s.resume,
           asks: [
             ...(s.resume.asks ?? []).filter((ask) => !terms.has(ask.term.toLowerCase())),
-            ...asks.map((ask): FitAsk => ({ term: ask.term, ifTrue: ask.ifTrue, place: ask.place === "skills" ? "skills" : "experience", fromStep, no: false, addedIn: null })),
+            ...asks.map(
+              (ask): FitAsk => ({
+                term: ask.term,
+                ifTrue: ask.ifTrue,
+                place: ask.place === "skills" ? "skills" : "experience",
+                fromStep,
+                no: false,
+                addedIn: null,
+              }),
+            ),
           ],
         },
       }));
     });
+  }
+
+  /** The job's title as the resume's headline: one change, undoable like any other. */
+  function applyJobTitle(title: string) {
+    if (!content || !toolsIdle) return;
+    setBusy("Updating your title and rescoring…");
+    void commitChange(`Title set to ${title}`, { ...content, title }).finally(() => setBusy(null));
   }
 
   /** Marks one ask answered: `no`, or the step its "Yes" made. */
@@ -925,7 +968,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       ...s,
       resume: {
         ...s.resume,
-        asks: (s.resume.asks ?? []).map((ask) => (ask.term === term ? { ...ask, ...("no" in answer ? { no: true } : { addedIn: answer.addedIn }) } : ask)),
+        asks: (s.resume.asks ?? []).map((ask) =>
+          ask.term === term ? { ...ask, ...("no" in answer ? { no: true } : { addedIn: answer.addedIn }) } : ask,
+        ),
       },
     }));
   }
@@ -957,27 +1002,23 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       return;
     }
     let outcome: KeywordInjection | null = null;
-    void runAndCommit(
-      `Added ${item.term} to your experience`,
-      `Adding ${item.term} to your experience…`,
-      async () => {
-        const result = await tools.run("keywords", () =>
-          injectKeywords({
-            content,
-            jdText: job.description,
-            company: job.company,
-            role: job.role,
-            keywords: [item.term],
-            places: ["bullets"],
-            insist: true,
-            // What the person said yes to, so the line says that work, not only the name.
-            hints: { [item.term]: { means: item.ifTrue, proof: [] } },
-          }),
-        );
-        outcome = result;
-        return result ? { content: result.content } : null;
-      },
-    ).then((made) => {
+    void runAndCommit(`Added ${item.term} to your experience`, `Adding ${item.term} to your experience…`, async () => {
+      const result = await tools.run("keywords", () =>
+        injectKeywords({
+          content,
+          jdText: job.description,
+          company: job.company,
+          role: job.role,
+          keywords: [item.term],
+          places: ["bullets"],
+          insist: true,
+          // What the person said yes to, so the line says that work, not only the name.
+          hints: { [item.term]: { means: item.ifTrue, proof: [] } },
+        }),
+      );
+      outcome = result;
+      return result ? { content: result.content } : null;
+    }).then((made) => {
       if (made) {
         answerAsk(item.term, { addedIn: made.stepId });
         if (outcome) tellKeywords(outcome);
@@ -1144,7 +1185,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       if (!proposals) return null;
       const landed = proposals
         .filter((proposal) => !proposal.customId && sent.experience[proposal.entryIndex])
-        .map((proposal) => ({ ...proposal, bulletIndex: storedBulletIndex(sent.experience[proposal.entryIndex].bullets, proposal.bulletIndex) }))
+        .map((proposal) => ({
+          ...proposal,
+          bulletIndex: storedBulletIndex(sent.experience[proposal.entryIndex].bullets, proposal.bulletIndex),
+        }))
         .filter((proposal) => {
           const entry = sent.experience[proposal.entryIndex];
           return !shownHidden.includes(`exp:${entry.id}`) && !shownHidden.includes(`exp:${entry.id}:${proposal.bulletIndex}`);
@@ -1180,6 +1224,11 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const tailoredAlready = history.some((step) => step.label.startsWith("Tailored s"));
   // Undone, it can be run again: only the steps up to where the person stands count.
   const fittedAlready = history.slice(0, historyAt + 1).some((step) => step.label === FITTED_LABEL);
+  // The job's title as a resume headline: what comes before a comma or a dash ("Chief Compliance
+  // Officer, Ramp Advisory LLC" is "Chief Compliance Officer").
+  const titleFit = report?.titleFit ?? null;
+  const headlineTitle = (job.role ?? "").split(/\s*(?:,|\s[-–|]\s|\()\s*/)[0].trim().slice(0, 120) || null;
+  const fold = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
   const summaryMissing = Boolean(visible) && !summaryHidden && !tailoredAlready && !summaryText && worthGaps.length > 0;
   // A language the posting asks for and the resume never states, only one worth adding as the chips
   // are (`languageAsk`): the person picks their level, and it goes into Skills as one plain line the
@@ -1193,7 +1242,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     const words = addSkills(removeSkills(content, [language.language]), [line]);
     void commitChange(`Added ${line} to Skills`, words).finally(() => setBusy(null));
   }
-  const levelChoices = LANGUAGE_LEVELS.map((level) => ({ label: level[0].toUpperCase() + level.slice(1), onClick: () => addLanguage(level) }));
+  const levelChoices = LANGUAGE_LEVELS.map((level) => ({
+    label: level[0].toUpperCase() + level.slice(1),
+    onClick: () => addLanguage(level),
+  }));
   /** The chip of the language the card would ask about: it asks for the level itself (owner, 2026-10-19). */
   function isLanguageChip(chip: GapChip): boolean {
     return language !== null && namesLanguage(`${chip.label} ${chip.wants}`, language.language);
@@ -1225,7 +1277,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       ? [
           {
             id: "impact",
-            title: `${misses.lines.length} ${misses.lines.length === 1 ? "bullet" : "bullets"} could hit harder.`,
+            title: `Strengthen ${misses.lines.length} ${misses.lines.length === 1 ? "bullet" : "bullets"} points for impact.`,
             action: "Fix them",
             icon: "quantify" as const,
             onClick: () => strengthen(),
@@ -1233,12 +1285,26 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           },
         ]
       : []),
-    // The whole resume toward the job, once per draft, while anything is still worth adding.
-    ...(!done && content && visible && !fittedAlready && fitGaps.length > 0
+    // The job's title as the headline, unless it already reads the same (owner, 2026-10-20): the
+    // title counts toward keyword match, so it is one of the fixes.
+    ...(content && visible && headlineTitle && titleFit && titleFit.kind !== "same" && fold(content.title ?? "") !== fold(headlineTitle)
+      ? [
+          {
+            id: "title",
+            title: `Use "${headlineTitle}" as your title.`,
+            action: "Use it",
+            icon: "tailor" as const,
+            onClick: () => applyJobTitle(headlineTitle),
+          },
+        ]
+      : []),
+    // The whole resume toward the job, once per draft, while anything is still worth adding. Hidden
+    // while its asks are open, and on the step it last changed nothing on (owner, 2026-10-20).
+    ...(!done && content && visible && !fittedAlready && openAsks.length === 0 && resume.fitAt !== (history[historyAt]?.id ?? "start") && fitGaps.length > 0
       ? [
           {
             id: "fit",
-            title: "Tailor every line to this job.",
+            title: "Tailor CV to this job.",
             action: "Tailor",
             icon: "tailor" as const,
             onClick: () => tailorWhole(),
@@ -1273,7 +1339,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   // The points-off note, until it is kept as is for this score. The skills it is about are named
   // here from the resume (the scorer's own line only says how many), so each can be acted on.
   const UNBACKED_REASON = /appear nowhere in your experience$/;
-  const unbacked = report && visible && (report.stuffing ?? []).some((reason) => UNBACKED_REASON.test(reason)) ? unbackedSkills(visible, report) : [];
+  const unbacked =
+    report && visible && (report.stuffing ?? []).some((reason) => UNBACKED_REASON.test(reason)) ? unbackedSkills(visible, report) : [];
   const stuffingNote: StuffingNoteView | null =
     report && (report.stuffingPenalty ?? 0) > 0 && (report.stuffing ?? []).length > 0 && keptStuffing !== report.scanId
       ? {
@@ -1288,7 +1355,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     if (!content || !toolsIdle || unbacked.length === 0) return;
     const n = unbacked.length;
     setBusy(`Removing ${n} ${n === 1 ? "skill" : "skills"} and rescoring…`);
-    void commitChange(`Removed ${n} ${n === 1 ? "skill" : "skills"} from Skills`, removeSkills(content, unbacked)).finally(() => setBusy(null));
+    void commitChange(`Removed ${n} ${n === 1 ? "skill" : "skills"} from Skills`, removeSkills(content, unbacked)).finally(() =>
+      setBusy(null),
+    );
   }
 
   /** A section on the page, brought into view: where "Show in resume" goes when it has no lines to light. */
@@ -1356,10 +1425,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   return (
     <div className="flex flex-col gap-4">
       {actionsSlot &&
-        createPortal(
-          <DraftHistory history={history} at={historyAt} onJump={jumpTo} disabled={!editable || Boolean(busy)} />,
-          actionsSlot,
-        )}
+        createPortal(<DraftHistory history={history} at={historyAt} onJump={jumpTo} disabled={!editable || Boolean(busy)} />, actionsSlot)}
 
       {/* Which resume */}
       <section className="flex flex-col gap-3 rounded-2xl border border-[#222325]/8 bg-white p-[18px]">
@@ -1592,7 +1658,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
                 content={{ ...content, hiddenParts: shownHidden }}
                 before={paperBefore}
                 eyes={
-                  editable ? { hidden: shownHidden, onToggle: toggleHidden, experienceIds: content.experience.map((entry) => entry.id) } : undefined
+                  editable
+                    ? { hidden: shownHidden, onToggle: toggleHidden, experienceIds: content.experience.map((entry) => entry.id) }
+                    : undefined
                 }
                 edits={paperEdits}
                 flash={flash}
