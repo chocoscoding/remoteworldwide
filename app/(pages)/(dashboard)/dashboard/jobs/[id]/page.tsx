@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
-import { prisma } from "@/prisma";
 import { checkBookmarkForUser } from "@/libs/query";
+import { BOARD_TAGS, backendCachedOrNull } from "@/app/lib/backend";
+import type { JobAndCompany } from "@/types/main";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import OneJobClient from "@/app/(pages)/(general)/jobs/[id]/Client";
 
@@ -14,7 +15,7 @@ export const metadata = { title: "Jobs", robots: { index: false, follow: false }
 // dashboard header with a way back to the list.
 export default async function DashboardJobPage({ params }: { params: Promise<{ id: string }> }) {
   const slug = decodeURIComponent((await params).id);
-  const job = await prisma.job.findUnique({ where: { slug }, include: { company: true } });
+  const job = await backendCachedOrNull<JobAndCompany>(`/jobs/${encodeURIComponent(slug)}`, { revalidate: 43200, tags: [BOARD_TAGS.jobs] });
   if (!job) notFound();
 
   const session = await auth();

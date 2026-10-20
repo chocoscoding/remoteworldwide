@@ -5,7 +5,8 @@ import { Facebook, Globe, Image as ImageIcon, Linkedin, Twitter } from "lucide-r
 import { CldUploadWidget, CloudinaryUploadWidgetResults } from "next-cloudinary";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import type { Company } from "@prisma/client";
+import type { Company } from "@/types/main";
+import { createCompany } from "@/libs/query";
 import { cn } from "@/lib/utils";
 
 /**
@@ -67,17 +68,9 @@ const CompanyForm: FC<CompanyFormProps> = ({ onCreated, renderActions, className
     toast.info("Adding new company...", { autoClose: 300 });
 
     try {
-      const response = await fetch("/api/companies", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formValues),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message);
+      const result = await createCompany(formValues);
+      if ("error" in result) {
+        throw new Error(result.error);
       }
 
       toast.success("Company created successfully!", {
@@ -90,7 +83,7 @@ const CompanyForm: FC<CompanyFormProps> = ({ onCreated, renderActions, className
         progress: undefined,
         theme: "dark",
       });
-      onCreated(data.data as Company);
+      onCreated(result.data);
     } catch (error: any) {
       toast.error(`Failed to create company: ${error.message}`);
     } finally {

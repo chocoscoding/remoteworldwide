@@ -3,24 +3,18 @@ import { FC, useState } from "react";
 import CategorySection from "./CategorySection";
 import { FilterData, FilterType } from "@/types/main";
 import { useRouter } from "next/navigation";
+import { createFilter, deleteFilter } from "@/libs/query";
 
 const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
   const [categories, setCategories] = useState<FilterData>(initialData);
   const router = useRouter();
   const addCategory = async (section: keyof FilterData, newCategory: FilterType) => {
     try {
-      const response = await fetch("/api/filters/" + section, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name: newCategory.label }),
-      });
+      const result = await createFilter(section, newCategory.label);
 
-      if (!response.ok) {
-        throw new Error("Failed to save this filter");
+      if ("error" in result) {
+        throw new Error(result.error);
       }
-      const result = await response.json();
 
       setCategories((prevCategories) => ({
         ...prevCategories,
@@ -34,16 +28,10 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
   };
   const removeCategory = async (section: keyof FilterData, categoryId: string) => {
     try {
-      const response = await fetch(`/api/filters/${section}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id: categoryId }),
-      });
+      const result = await deleteFilter(section, categoryId);
 
-      if (!response.ok) {
-        throw new Error("Failed to delete this filter");
+      if ("error" in result) {
+        throw new Error(result.error);
       }
 
       setCategories((prevCategories) => ({

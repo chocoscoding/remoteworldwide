@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { CldUploadWidget, CloudinaryUploadWidgetInfo } from "next-cloudinary";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import { Company } from "@prisma/client";
+import type { Company } from "@/types/main";
+import { updateCompany } from "@/libs/query";
 
 const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
   const [name, setName] = useState(companyData.name);
@@ -40,17 +41,9 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
     toast.info("Adding new company...", { autoClose: 300 });
 
     try {
-      const response = await fetch("/api/companies/" + companyData.id, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formValues),
-      });
-      const data = (await response.json()) as { data: Company; message: string };
-
-      if (!response.ok) {
-        throw new Error(data.message);
+      const data = await updateCompany(companyData.id, formValues);
+      if ("error" in data) {
+        throw new Error(data.error);
       }
 
       toast.success("Company updated successfully!", {

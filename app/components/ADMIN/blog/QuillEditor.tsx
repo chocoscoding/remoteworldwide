@@ -5,6 +5,7 @@ import type { ComponentProps, RefObject } from "react";
 import type ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { registerTableStyle } from "./tableStyle";
+import { registerSoftBreak } from "./softBreak";
 
 type QuillProps = ComponentProps<typeof ReactQuill>;
 
@@ -12,6 +13,7 @@ const QuillWithRef = dynamic(
   async () => {
     const { default: RQ, Quill } = await import("react-quill-new");
     registerTableStyle(Quill);
+    registerSoftBreak(Quill);
     const Wrapped = ({ forwardedRef, ...props }: QuillProps & { forwardedRef: RefObject<ReactQuill | null> }) => <RQ ref={forwardedRef} {...props} />;
     return Wrapped;
   },

@@ -4,7 +4,7 @@ import { Calendar, ChartNoAxesColumnIncreasing, MapPinned, Zap } from "lucide-re
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import BookmarkStatus from "../BookmarkStatus";
-import { Job } from "@prisma/client";
+import type { Job } from "@/types/main";
 import { toast } from "react-toastify";
 import { LinkIcon, type LinkIconHandle } from "@/components/ui/link-icon";
 import { isJobExpired } from "@/app/lib/jobs/jobLifetime";
@@ -31,10 +31,26 @@ const JobDescriptionSkeleton: FC = () => {
   );
 };
 
-const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?: boolean }> = ({
+/**
+ * Counts one press of "Apply Now" for the admin's job page (backend POST /api/jobs/:id/apply-click,
+ * through the site's rewrite). A beacon outlives the tab switch the link causes and never holds the
+ * link up; anything that fails here is dropped, because the visitor's apply comes first.
+ */
+const countApplyClick = (jobId: string) => {
+  const url = `/api/jobs/${encodeURIComponent(jobId)}/apply-click`;
+  try {
+    if (navigator.sendBeacon?.(url)) return;
+    void fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+  } catch {
+    // Nothing to do: the click still opens the posting.
+  }
+};
+
+const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?: boolean; trackApply?: boolean }> = ({
   data,
   showBookmark = true,
   hasUserBookmarked,
+  trackApply = true,
 }) => {
   const { title, description, region, createdAt, seniority, applicationUrl } = data;
   const refEye = useRef<LinkIconHandle>(null);
@@ -118,6 +134,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
         <Link
           href={applicationUrl}
           target="_blank"
+          onClick={trackApply ? () => countApplyClick(data.id) : undefined}
           className="bg-primary text-white w-full h-12 text-lg flex justify-center gap-3 items-center hover:rounded-lg transition-all mt-5 rounded-md">
           <Zap />
           <span className="font-bold">Apply Now</span>

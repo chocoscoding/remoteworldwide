@@ -1,16 +1,12 @@
-import { prisma } from "@/prisma";
 import CreateJob from "./Client";
-import { FilterData, FilterType } from "@/types/main";
-import { randomUUID } from "crypto";
+import { FilterData } from "@/types/main";
+import { backend } from "@/app/lib/backend";
+import { getCompanyOptions } from "@/libs/query";
 
+// Every company and filter for the form's dropdowns, from the backend, fresh on every visit.
 const getAllFilters = async (): Promise<FilterData> => {
   try {
-    const res = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/filters?q=" + randomUUID(), { cache: "no-store" });
-    if (!res.ok) {
-      throw new Error("error");
-    }
-    const data: Promise<{ data: FilterData }> = await res.json();
-    return (await data).data;
+    return await backend<FilterData>("/filters");
   } catch (error) {
     throw new Error("Failed to fetch filters.");
   }
@@ -18,30 +14,13 @@ const getAllFilters = async (): Promise<FilterData> => {
 
 const getAllCompanies = async () => {
   try {
-    const companies = (await prisma.company.aggregateRaw({
-      pipeline: [
-        {
-          $project: {
-            _id: { $toString: "$_id" }, // Selects the `_id` field
-            name: 1, // Selects the `name` field
-          },
-        },
-        {
-          $project: {
-            value: "$_id", // Maps `_id` to `value`
-            label: "$name", // Maps `name` to `label`
-          },
-        },
-      ],
-    })) as unknown as FilterType[];
-    return companies;
+    return await getCompanyOptions();
   } catch (error) {
     throw new Error("Failed to fetch companies.");
   }
 };
 const Page = async () => {
-  const allCompanies = await getAllCompanies();
-  const filters = await getAllFilters();
+  const [allCompanies, filters] = await Promise.all([getAllCompanies(), getAllFilters()]);
 
   return (
     <>

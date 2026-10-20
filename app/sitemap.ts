@@ -1,21 +1,19 @@
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/prisma";
+import { backend } from "@/app/lib/backend";
 import { MetadataRoute } from "next";
 import { SITE_URL } from "@/app/lib/seo";
 import { BLOG_CATEGORIES } from "@/app/lib/blog/categories";
 import { getSitemapEntries } from "@/app/lib/blog/data";
-import { liveJobsSince } from "@/app/lib/jobs/jobLifetime";
 import { TOOLS, toolPath } from "@/app/lib/tools/catalogue";
+
+type SitemapEntry = { slug: string; updatedAt: Date };
 
 const fetchJobMetaData_Jobs = async () => {
   try {
-    // Live jobs only: an expired posting's page is noindexed, and a sitemap that lists
-    // noindexed pages teaches Google to trust it less.
-    return await prisma.job.findMany({
-      where: { isActive: true, createdAt: { gte: liveJobsSince() } },
-      select: { slug: true, updatedAt: true },
-    });
+    // Live jobs only (the backend applies JOB_LIFETIME_DAYS): an expired posting's page is
+    // noindexed, and a sitemap that lists noindexed pages teaches Google to trust it less.
+    return await backend<SitemapEntry[]>("/jobs/sitemap");
   } catch {
     return [];
   }
@@ -24,7 +22,7 @@ const fetchJobMetaData_Jobs = async () => {
 
 const fetchCompaniesMetaData = async () => {
   try {
-    return await prisma.company.findMany({ select: { slug: true, updatedAt: true } });
+    return await backend<SitemapEntry[]>("/companies/sitemap");
   } catch {
     return [];
   }

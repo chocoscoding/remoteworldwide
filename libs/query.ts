@@ -17,265 +17,222 @@
 //   - The public reads (latest jobs, the active count, filters) stay open and
 //     return only active listings and public fields.
 
-import { prisma } from "@/prisma";
-import { Job } from "@prisma/client";
-import { revalidatePath } from "next/cache";
-import { hexoid } from "hexoid";
-import { backend, BackendError, backendOrNull, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
+import { revalidatePath, updateTag } from "next/cache";
+import { backend, BackendError, backendCached, backendOrNull, BOARD_TAGS, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
+import type { Company, CompanyWithJobsCount, FilterData, Job, OneBookmarkType } from "@/types/main";
 import type { Author, Blog, BlogStatus, EditableBlog } from "@/app/lib/blog/types";
 import { requireAdminAction, requireRoleAction, requireUserAction } from "@/app/lib/auth/action-guards";
+
+// The job board lives in the backend (remoteworldwidebackend routes/job.routes.ts /jobs/admin,
+// company.routes.ts, bookmark.routes.ts) since 2026-10-20; the website has no database client. These
+// actions keep their names and shapes, so no page changed, and expire the board's cached reads
+// (BOARD_TAGS) and pages after a write.
+
+/** A board refusal in the backend's own words ("Company already exist", "Job not found"), as the Prisma actions threw them. */
+const boardError = (error: unknown): never => {
+  throw new Error(error instanceof BackendError ? error.message : "something went wrong");
+};
+
+/** After a listing write: the cached board reads, the home page, and the listing's own page. */
+const listingsChanged = (...slugs: (string | undefined)[]) => {
+  updateTag(BOARD_TAGS.jobs);
+  revalidatePath("/");
+  for (const slug of slugs) if (slug) revalidatePath(`/jobs/${slug}`);
+};
+
+const jobAdmin = <T,>(path: string, init: BackendInit = {}) => backend<T>(`/jobs/admin${path}`, { ...init, session: true });
 
 export const deleteOneJob = async (id: string) => {
   await requireAdminAction();
   try {
-    await prisma.job.delete({
-      where: {
-        id,
-      },
-    });
-    revalidatePath("/");
+    const { slug } = await jobAdmin<{ slug: string }>(`/${idSegment(id)}`, { method: "DELETE" });
+    listingsChanged(slug);
     return { status: "deleted job successfully" };
-  } catch (error: any) {
-    if (error.message.includes("Record to delete does not exist")) {
-      throw new Error("Record to delete does not exist");
-    }
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return boardError(error);
   }
 };
 
 export const toggleJobActiveState = async (id: string, state: boolean) => {
   await requireAdminAction();
   try {
-    await prisma.job.update({
-      where: {
-        id,
-      },
-      data: {
-        isActive: state,
-      },
-    });
-    revalidatePath("/");
+    const job = await jobAdmin<Job>(`/${idSegment(id)}/active`, { method: "PATCH", body: { isActive: state } });
+    listingsChanged(job.slug);
     return { status: "updated job successfully" };
-  } catch (error: any) {
-    if (error.message.includes("Record to update does not exist")) {
-      throw new Error("Record to update does not exist");
-    }
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return boardError(error);
   }
 };
-
-// A listing's slug: the title made URL-safe, then 30 random characters and the time, so two
-// listings with the same title never collide.
-const jobSlug = (title: string) =>
-  title
-    .replace(/[*+~.()^'"!#:@&/|{}[\]\\]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-") +
-  "-" +
-  hexoid(30)() +
-  Date.now();
 
 export type JobCreate = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "seniority"> & { region: string[] | string };
 
-// The admin's "Create job". It was POST /api/jobs until the public job reads moved to the
-// backend (2026-10-15); writing listings stays here, in Prisma, which the backend reads but
-// never writes. Every field is required, as the route required it.
+// The admin's "Create job". Every field is required; the backend names the first one missing.
 export const createOneJob = async (jobDetails: JobCreate) => {
   await requireAdminAction();
   const { title, description, companyId, applicationUrl, category, region, seniority } = jobDetails;
-  const regions = Array.isArray(region) ? region : region ? [region] : [];
-  const missing = [
-    !title && "title",
-    !description && "description",
-    !companyId && "companyId",
-    !applicationUrl && "applicationUrl",
-    !category && "category",
-    regions.length === 0 && "region",
-    !seniority && "seniority",
-  ].filter(Boolean) as string[];
-  if (missing.length) throw new Error(`Missing values: ${missing.join(", ")}`);
   try {
-    const data = await prisma.job.create({
-      data: { title, description, companyId, applicationUrl, category, region: regions, seniority, slug: jobSlug(title) },
-    });
-    revalidatePath("/");
+    const data = await jobAdmin<Job>("", { method: "POST", body: { title, description, companyId, applicationUrl, category, region, seniority } });
+    listingsChanged();
     return { data };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return boardError(error);
   }
 };
 
-// The fields the edit form owns. The type alone never limited the write — it is
-// erased at runtime, and `data: jobDetails` let a direct call pass anything the
-// update input accepts: `isActive` (publishing is toggleJobActiveState's job) or
-// `createdAt` (which orders the board). Naming each field makes the write match
-// the type.
+// The fields the edit form owns, named one by one so a direct call cannot set `isActive`
+// (publishing is toggleJobActiveState's job) or `createdAt` (which orders the board).
 type JobEdit = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "region" | "seniority" | "slug">;
 
 export const updateOneJob = async (id: string, jobDetails: JobEdit) => {
   await requireAdminAction();
   try {
     const { title, description, companyId, applicationUrl, category, region, seniority, slug } = jobDetails;
-    const data = await prisma.job.update({
-      where: {
-        id,
-      },
-      data: { title, description, companyId, applicationUrl, category, region, seniority, slug },
+    const { previousSlug, ...data } = await jobAdmin<Job & { previousSlug: string }>(`/${idSegment(id)}`, {
+      method: "PUT",
+      body: { title, description, companyId, applicationUrl, category, region, seniority, slug },
     });
-    revalidatePath("/");
+    listingsChanged(previousSlug, data.slug);
     return { data };
-  } catch (error: any) {
-    if (error.message.includes("Record to update does not exist")) {
-      throw new Error("Record to update does not exist");
-    }
-    throw new Error(error.message ?? "something went wrong");
+  } catch (error) {
+    return boardError(error);
   }
 };
 
 export const findJobsAdmin = async (page: number, active: boolean) => {
   await requireAdminAction();
   try {
-    const inactiveJobsListPromise = prisma.job.findMany({
-      where: {
-        isActive: active,
-      },
-      select: {
-        id: true,
-        title: true,
-        company: {
-          select: {
-            logo: true,
-            name: true,
-            slug: true,
-          },
-        },
-        isActive: true,
-        slug: true,
-        category: true,
-        region: true,
-        seniority: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      skip: (page - 1) * 50,
-      take: 50,
-    });
-    const inactiveJobsCountPromise = prisma.job.count({
-      where: {
-        isActive: active,
-      },
-    });
-    const [inactiveJobsList, inactiveJobsCount] = await Promise.all([inactiveJobsListPromise, inactiveJobsCountPromise]);
-    return { data: inactiveJobsList, count: inactiveJobsCount };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+    const { items, count } = await jobAdmin<{ items: JobListItem[]; count: number }>(`?active=${active}&page=${Math.max(1, page | 0)}`);
+    return { data: items, count };
+  } catch (error) {
+    return boardError(error);
   }
 };
 
-// The admin view of a company. The public /companies pages read through
-// app/api/companies and the backend's /api/jobs/company, which filter to active listings.
+/** A listing in a board list, as the backend sends it (BoardJobItem, with the description on the admin's). */
+type JobListItem = Pick<Job, "id" | "slug" | "title" | "isActive" | "applicationUrl" | "createdAt" | "updatedAt" | "category" | "region" | "seniority"> & {
+  description?: string;
+  company: { name: string; logo: string; slug: string };
+};
+
+// The admin view of a company. The public /companies pages read the same company through the
+// backend's /api/companies, and its listings through /api/jobs/company, which shows live ones only.
 export const findCompany = async (slug: string) => {
   await requireAdminAction();
   try {
-    const company = await prisma.company.findUnique({
-      where: {
-        slug,
-      },
-      include: {
-        _count: {
-          select: {
-            jobs: true,
-          },
-        },
-      },
-    });
-    if (!company) {
-      return null;
-    }
-    return { data: company };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+    const company = await backendOrNull<CompanyWithJobsCount>(`/companies/${encodeURIComponent(slug)}`);
+    return company ? { data: company } : null;
+  } catch (error) {
+    return boardError(error);
   }
 };
 
 export const findCompanyJobs = async (companyId: string, page: number) => {
   await requireAdminAction();
   try {
-    const jobsListPromise = prisma.job.findMany({
-      where: {
-        companyId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        isActive: true,
-        createdAt: true,
-        slug: true,
-        company: {
-          select: {
-            name: true,
-            logo: true,
-            slug: true,
-          },
-        },
-        category: true,
-        region: true,
-        seniority: true,
-      },
-      skip: (page - 1) * 50,
-      take: 50,
-    });
-    const jobsCountPromise = prisma.job.count({
-      where: {
-        companyId,
-      },
-    });
-    const [jobsList, jobsCount] = await Promise.all([jobsListPromise, jobsCountPromise]);
-    return { data: jobsList, count: jobsCount };
-  } catch (error: any) {
-    throw new Error(error.message ?? "something went wrong");
+    const { items, count } = await backend<{ items: JobListItem[]; count: number }>(
+      `/companies/admin/${idSegment(companyId)}/jobs?page=${Math.max(1, page | 0)}`,
+      { session: true }
+    );
+    return { data: items, count };
+  } catch (error) {
+    return boardError(error);
   }
+};
+
+// Company and filter writes, the admin's. They were the browser's own calls to app/api/companies
+// and app/api/filters; as actions they can expire the cached pages that show them. A refusal the
+// admin can fix ("Company already exist", "This company still has jobs") comes back as `{ error }`
+// in the backend's words, because production hides a thrown action's message.
+const boardRefused = (error: unknown): { error: string } => {
+  if (error instanceof BackendError && error.status < 500) return { error: error.message };
+  console.error("[query] board write:", error);
+  return { error: "something went wrong" };
+};
+
+export type CompanyInput = Pick<Company, "name" | "about" | "website"> & {
+  logo: string | null;
+  linkedin?: string | null;
+  twitter?: string | null;
+  facebook?: string | null;
+};
+
+const companiesChanged = (...slugs: (string | undefined)[]) => {
+  updateTag(BOARD_TAGS.companies);
+  revalidatePath("/companies");
+  for (const slug of slugs) if (slug) revalidatePath(`/companies/${slug}`);
+};
+
+export const createCompany = async (input: CompanyInput): Promise<{ data: Company } | { error: string }> => {
+  await requireAdminAction();
+  try {
+    const data = await backend<Company>("/companies", { method: "POST", body: input, session: true });
+    companiesChanged(data.slug);
+    return { data };
+  } catch (error) {
+    return boardRefused(error);
+  }
+};
+
+export const updateCompany = async (id: string, input: CompanyInput): Promise<{ data: Company } | { error: string }> => {
+  await requireAdminAction();
+  try {
+    const data = await backend<Company>(`/companies/${idSegment(id)}`, { method: "PUT", body: input, session: true });
+    companiesChanged(data.slug);
+    // A listing's page shows its company's panel.
+    updateTag(BOARD_TAGS.jobs);
+    return { data };
+  } catch (error) {
+    return boardRefused(error);
+  }
+};
+
+export const deleteCompany = async (id: string): Promise<{ data: Company } | { error: string }> => {
+  await requireAdminAction();
+  try {
+    const data = await backend<Company>(`/companies/${idSegment(id)}`, { method: "DELETE", session: true });
+    companiesChanged(data.slug);
+    return { data };
+  } catch (error) {
+    return boardRefused(error);
+  }
+};
+
+export type FilterKind = keyof FilterData;
+
+export const createFilter = async (kind: FilterKind, name: string): Promise<{ data: { id: string; name: string } } | { error: string }> => {
+  await requireAdminAction();
+  try {
+    const data = await backend<{ id: string; name: string }>(`/filters/${encodeURIComponent(kind)}`, { method: "POST", body: { name }, session: true });
+    updateTag(BOARD_TAGS.filters);
+    return { data };
+  } catch (error) {
+    return boardRefused(error);
+  }
+};
+
+export const deleteFilter = async (kind: FilterKind, id: string): Promise<{ data: { id: string; name: string } } | { error: string }> => {
+  await requireAdminAction();
+  try {
+    const data = await backend<{ id: string; name: string }>(`/filters/${encodeURIComponent(kind)}/${idSegment(id)}`, { method: "DELETE", session: true });
+    updateTag(BOARD_TAGS.filters);
+    return { data };
+  } catch (error) {
+    return boardRefused(error);
+  }
+};
+
+// Every company as a dropdown option, for the job forms.
+export const getCompanyOptions = async () => {
+  await requireAdminAction();
+  return backend<{ value: string; label: string }[]>("/companies/options", { session: true });
 };
 
 // heroshima/page.tsx returns early for an AUTHOR, so only ADMIN renders this.
 export const getAdminDashboardInfo = async () => {
   await requireAdminAction();
   try {
-    const [latestJob, jobsCount, companiesCount, blogsCount] = await Promise.all([
-      prisma.job.findMany({
-        where: {
-          isActive: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        select: {
-          id: true,
-          title: true,
-          company: {
-            select: {
-              slug: true,
-              logo: true,
-              name: true,
-            },
-          },
-          createdAt: true,
-          isActive: true,
-          slug: true,
-          category: true,
-          region: true,
-          seniority: true,
-        },
-        take: 14,
-      }),
-      prisma.job.count(),
-      prisma.company.count(),
+    const [board, blogsCount] = await Promise.all([
+      jobAdmin<{ latestJob: JobListItem[]; jobsCount: number; companiesCount: number }>("/dashboard"),
       admin<{ posts: number }>("/stats")
         .then((stats) => stats.posts)
         .catch((error) => {
@@ -284,7 +241,7 @@ export const getAdminDashboardInfo = async () => {
         }),
     ]);
 
-    return { latestJob, jobsCount, companiesCount, blogsCount };
+    return { ...board, blogsCount };
   } catch (error) {
     throw new Error("something went wrong");
   }
@@ -463,51 +420,22 @@ export const deleteBlog = async (id: string) => {
   }
 };
 
-// How a query failure reaches a caller who is not an admin. Prisma's message names
-// the database host when the connection drops and echoes malformed ids back, and
-// development forwards a thrown message to the browser (production already hides
-// it). These callers show their own fixed copy, so the detail stays in the server
-// log and the caller gets the same words in every environment.
+// How a failure reaches a caller who is not an admin. Development forwards a thrown
+// message to the browser (production already hides it). These callers show their own
+// fixed copy, so the detail stays in the server log and the caller gets the same words
+// in every environment.
 const opaque = (action: string, error: unknown): never => {
   console.error(`[query] ${action}:`, error);
   throw new Error("something went wrong");
 };
 
-// The bookmarks below are the session user's own: the id comes from
-// requireUserAction(), never from an argument.
+// The bookmarks below are the session user's own: the backend reads the user from the
+// session cookie, never from an argument.
 export const getAllBookmarksForUser = async (page: number) => {
-  const { id: userId } = await requireUserAction();
+  await requireUserAction();
   try {
-    const bookmarksPromise = prisma.bookmark.findMany({
-      where: { userId },
-      select: {
-        job: {
-          select: {
-            title: true,
-            slug: true,
-            region: true,
-            id: true,
-            seniority: true,
-            category: true,
-            company: {
-              select: {
-                name: true,
-                logo: true,
-              },
-            },
-          },
-        },
-      },
-      skip: (page - 1) * 30,
-      take: 30,
-    });
-
-    const totalCountPromise = prisma.bookmark.count({
-      where: { userId },
-    });
-
-    const [bookmarks, count] = await Promise.all([bookmarksPromise, totalCountPromise]);
-    return { data: bookmarks, count };
+    const { items, count } = await backend<{ items: OneBookmarkType[]; count: number }>(`/bookmarks?page=${Math.max(1, page | 0)}`, { session: true });
+    return { data: items, count };
   } catch (error) {
     return opaque("getAllBookmarksForUser", error);
   }
@@ -515,138 +443,68 @@ export const getAllBookmarksForUser = async (page: number) => {
 
 //delete a bookmark
 export const deleteBookmarkForUser = async (jobId: string) => {
-  const { id: userId } = await requireUserAction();
+  await requireUserAction();
   try {
-    await prisma.bookmark.delete({
-      where: {
-        userId_jobId: {
-          userId,
-          jobId,
-        },
-      },
-    });
+    await backend(`/bookmarks/${idSegment(jobId)}`, { method: "DELETE", session: true });
     return { status: "deleted bookmark successfully" };
-  } catch (error: any) {
-    if (error.message.includes("Record to delete does not exist")) {
-      throw new Error("Record to delete does not exist");
-    }
+  } catch (error) {
+    if (error instanceof BackendError && error.status === 404) throw new Error("Record to delete does not exist");
     return opaque("deleteBookmarkForUser", error);
   }
 };
+
 //crate a bookmark
-// Only a live listing can be saved. The row's jobId is a bare ObjectId — Mongo has no
-// foreign keys and Prisma checks none on a scalar write — so any invented id used to
-// make a row, as many as the caller liked, and an inactive listing's id read its title
-// and slug back through getAllBookmarksForUser. Listing inactive jobs is ADMIN's.
-const JOB_NOT_LIVE = "Job not found";
+// Only a live listing can be saved; the backend refuses any other id with "Job not found".
 export const createBookmarkForUser = async (jobId: string) => {
-  const { id: userId } = await requireUserAction();
+  await requireUserAction();
   try {
-    const live = isObjectId(jobId) && (await prisma.job.count({ where: { id: jobId, isActive: true } })) > 0;
-    if (!live) throw new Error(JOB_NOT_LIVE);
-    const bookmark = await prisma.bookmark.create({
-      data: {
-        userId,
-        jobId,
-      },
-    });
-    return { data: bookmark };
-  } catch (error: any) {
-    if (error.message === JOB_NOT_LIVE) throw error;
-    if (error.message.includes("Unique constraint failed")) {
-      throw new Error("Bookmark already exists");
-    }
+    if (!isObjectId(jobId)) throw new BackendError(404, "Job not found");
+    return { data: await backend<BookmarkRow>("/bookmarks", { method: "POST", body: { jobId }, session: true }) };
+  } catch (error) {
+    if (error instanceof BackendError && (error.status === 404 || error.status === 409)) throw new Error(error.message);
     return opaque("createBookmarkForUser", error);
   }
 };
+
+type BookmarkRow = { id: string; userId: string; jobId: string; createdAt: Date };
+
 //check if a user has job bookmarked
 export const checkBookmarkForUser = async (jobId: string) => {
-  const { id: userId } = await requireUserAction();
+  await requireUserAction();
   try {
-    const bookmark = await prisma.bookmark.findUnique({
-      where: {
-        userId_jobId: {
-          userId,
-          jobId,
-        },
-      },
-    });
-    return { data: bookmark };
+    if (!isObjectId(jobId)) return { data: null };
+    return { data: await backend<BookmarkRow | null>(`/bookmarks/${idSegment(jobId)}`, { session: true }) };
   } catch (error) {
     return opaque("checkBookmarkForUser", error);
   }
 };
 
-export const getAllActiveJobsCount = async () => {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+// The public reads below sit in Next's data cache (backendCached), so the cached home and
+// waitlist pages stay cached; an admin's write expires them through BOARD_TAGS.
+const BOARD_CACHE_S = 600;
 
+export const getAllActiveJobsCount = async () => {
   try {
-    const count = await prisma.job.count({
-      where: {
-        isActive: true,
-        createdAt: {
-          gte: thirtyDaysAgo,
-        },
-      },
-    });
+    const { count } = await backendCached<{ count: number }>("/jobs/active-count", { revalidate: BOARD_CACHE_S, tags: [BOARD_TAGS.jobs] });
     return { count };
-  } catch (error: any) {
-    // throw new Error(error.message ?? "something went wrong");
+  } catch {
     return { count: null };
   }
 };
 
 export const getFilters = async () => {
   try {
-    const [category, seniority, region] = await Promise.all([
-      prisma.category
-        .findMany({ select: { id: true, name: true } })
-        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
-      prisma.seniority
-        .findMany({ select: { id: true, name: true } })
-        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
-      prisma.region
-        .findMany({ select: { id: true, name: true } })
-        .then((results) => results.map(({ id, name }) => ({ value: id, label: name }))),
-    ]);
-    return { data: { category, seniority, region } };
+    return { data: await backendCached<FilterData>("/filters", { revalidate: BOARD_CACHE_S, tags: [BOARD_TAGS.filters] }) };
   } catch (error) {
-    // Public, like fetchLatestJobs: a dropped connection's Prisma text names the host.
     return opaque("getFilters", error);
   }
 };
 
-// Public, like the home page that calls it with 10. `amount` comes from the caller,
-// so it is capped: uncapped, one direct POST read every active job in one query.
+// Public, like the home page that calls it with 10. Capped at 50 here and in the backend.
 export const fetchLatestJobs = async (amount: number) => {
   const take = Math.min(Math.max(1, amount | 0), 50);
   try {
-    const jobs = await prisma.job.findMany({
-      where: {
-        isActive: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take,
-      select: {
-        id: true,
-        title: true,
-        company: {
-          select: {
-            logo: true,
-            name: true,
-            slug: true,
-          },
-        },
-        slug: true,
-        category: true,
-        region: true,
-        seniority: true,
-        createdAt: true,
-      },
-    });
-    return { data: jobs };
+    return { data: await backendCached<JobListItem[]>(`/jobs/latest?amount=${take}`, { revalidate: BOARD_CACHE_S, tags: [BOARD_TAGS.jobs] }) };
   } catch (error) {
     return opaque("fetchLatestJobs", error);
   }

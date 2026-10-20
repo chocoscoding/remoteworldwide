@@ -4,12 +4,12 @@ import { FC, useState } from "react";
 import { PencilIcon, Trash } from "lucide-react";
 import CompanySection from "@/app/components/main/job/CompanySection";
 import Link from "next/link";
-import { Company } from "@prisma/client";
+import type { Company } from "@/types/main";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import OverlayLoader from "@/app/components/OverlayLoader";
 import { OneJobListType } from "@/types/main";
-import { findCompanyJobs } from "@/libs/query";
+import { deleteCompany as deleteCompanyAction, findCompanyJobs } from "@/libs/query";
 import withPagination from "@/app/components/main/withPagination";
 
 const CompanyClient: FC<{ companyData: Company; initialJobs: OneJobListType[]; initialCount: number }> = ({
@@ -22,13 +22,9 @@ const CompanyClient: FC<{ companyData: Company; initialJobs: OneJobListType[]; i
   const deleteCompany = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/companies/" + companyData.id, {
-        method: "DELETE",
-      });
-      const data = (await response.json()) as { data: Company; message: string };
-
-      if (!response.ok) {
-        throw new Error(data.message);
+      const data = await deleteCompanyAction(companyData.id);
+      if ("error" in data) {
+        throw new Error(data.error);
       }
 
       toast.success("Company deleted successfully!", {
@@ -43,9 +39,8 @@ const CompanyClient: FC<{ companyData: Company; initialJobs: OneJobListType[]; i
       });
       push("/heroshima/companies/");
     } catch (error: any) {
-      const NOT_FOUND_ERROR = error.message === `company doesn't exist` ? `: company doesn't exist` : "";
       toast.dismiss("deleteError");
-      toast.error(`Failed to delete company ${NOT_FOUND_ERROR}`, {
+      toast.error(`Failed to delete company: ${error.message}`, {
         toastId: "deleteError",
       });
     } finally {

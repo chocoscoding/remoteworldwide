@@ -1,4 +1,5 @@
-// The one door for the job-board write routes (jobs, companies, filters).
+// The one door for the site's own admin routes (app/api/admin/*). It began as the guard of the
+// job-board write routes (jobs, companies, filters), which the backend serves since 2026-10-20.
 //
 // These routes each carried the same line: reject when `role === "USER"`. That is a
 // blocklist of one, and the roles are three — so an AUTHOR, an account that exists to
@@ -26,7 +27,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   if (!session?.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   // An admin who asked to be deleted is locked like anyone else. The backend answers 423
-  // on its own routes; these write the board through Prisma and never ask it.
+  // on its own routes; these never ask it.
   if (session.user.deletionDueAt) return NextResponse.json({ message: "Account locked" }, { status: 423 });
   if (session.user.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 

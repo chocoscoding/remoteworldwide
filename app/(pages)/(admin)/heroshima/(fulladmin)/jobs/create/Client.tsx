@@ -8,7 +8,7 @@ import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
 import AIJobParser from "./AIJobParser";
 import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
-import type { Company } from "@prisma/client";
+import type { Company } from "@/types/main";
 import { createOneJob, type JobCreate } from "@/libs/query";
 import { actionErrorMessage } from "@/app/lib/auth/action-error";
 

@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import { SelectField, TextField } from "@/app/components/inputs";
 import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
-import { Job } from "@prisma/client";
+import type { Job } from "@/types/main";
 import { updateOneJob } from "@/libs/query";
 import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import OverlayLoader from "@/app/components/OverlayLoader";
 import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
-import type { Company } from "@prisma/client";
+import type { Company } from "@/types/main";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 

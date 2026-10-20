@@ -1,16 +1,10 @@
 import CompaniesList from "@/app/(pages)/(general)/companies/Client";
 import { CompanyList } from "@/types/main";
+import { backendWithCount } from "@/app/lib/backend";
 
 const getCompanies = async (): Promise<{ data: CompanyList[]; count: number }> => {
   try {
-    const response = await fetch(process.env.NEXT_PUBLIC_SITE_URL + "/api/companies", { cache: "no-cache" });
-    console.log(response);
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch companies");
-    }
-    const companies = await response.json();
-    return companies;
+    return await backendWithCount<CompanyList[]>("/companies");
   } catch (error) {
     console.error("Error fetching companies:", error);
     return { data: [], count: 0 };

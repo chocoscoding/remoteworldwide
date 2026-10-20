@@ -233,8 +233,9 @@ const nextConfig = {
       // by slug. They were Prisma routes here until 2026-10-15 and moved so scrapers meet the
       // backend's per-visitor rate limit (proxy.ts tells it who each visitor is). No session.
       // `/api/jobs/:slug` also reaches the backend's /api/jobs/bot and /parse, which keep their own
-      // guards (the bot's token, an admin session). Writing listings stays here, in libs/query.ts.
-      // Don't add an app/api/jobs route: rewrites run after routes, so it would shadow these.
+      // guards (the bot's token, an admin session). The site has no database since 2026-10-20:
+      // writing listings, companies and filters goes through libs/query.ts to the backend.
+      // Don't add an app/api/jobs route: a static route runs before these and would shadow them.
       {
         source: "/api/jobs",
         destination: `${backend}/api/jobs`,
@@ -243,9 +244,24 @@ const nextConfig = {
         source: "/api/jobs/company/:id",
         destination: `${backend}/api/jobs/company/:id`,
       },
+      // An "Apply Now" press on a job page, counted for the admin's job page (JobDescription.tsx).
+      {
+        source: "/api/jobs/:id/apply-click",
+        destination: `${backend}/api/jobs/:id/apply-click`,
+      },
       {
         source: "/api/jobs/:slug",
         destination: `${backend}/api/jobs/:slug`,
+      },
+      // The /companies list's search and paging (companies/Client.tsx). Public reads; the
+      // backend's writes under the same path need an admin session.
+      {
+        source: "/api/companies",
+        destination: `${backend}/api/companies`,
+      },
+      {
+        source: "/api/companies/:path*",
+        destination: `${backend}/api/companies/:path*`,
       },
       // Same-origin door to the admin job parser, so the Auth.js cookie is sent
       // and the backend can require an admin session instead of a token that

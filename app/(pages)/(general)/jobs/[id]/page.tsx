@@ -1,58 +1,30 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { checkBookmarkForUser } from "@/libs/query";
-import { prisma } from "@/prisma";
+import { cache } from "react";
 import { JobAndCompany } from "@/types/main";
-import { Job } from "@prisma/client";
+import type { Job } from "@/types/main";
 import OneJobClient from "./Client";
 import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 import { jobPostingJsonLd } from "@/app/lib/jobs/jobPostingJsonLd";
 import { isJobLive } from "@/app/lib/jobs/jobLifetime";
 import { jobFacts } from "@/app/lib/jobs/jobFacts";
+import { BOARD_TAGS, backendCachedOrNull } from "@/app/lib/backend";
 
 export const revalidate = 43200; // 3600 * 12
-const fetchJob = async (slug: string): Promise<JobAndCompany | null> => {
-  try {
-    const job = await prisma.job.findUnique({
-      where: {
-        slug,
-      },
-      include: {
-        company: true,
-      },
-    });
-    return job;
-  } catch (error) {
-    throw new Error("Something went wrong");
-  }
-};
 
-const fetchJobMetaData = async (slug: string): Promise<any | null> => {
+// One listing and its whole company, from the backend (GET /api/jobs/:slug, description
+// sanitized). Held in the data cache under the board's jobs tag, so an admin's edit shows at
+// once; cache() lets generateMetadata and the page share one read per request.
+const fetchJob = cache(async (slug: string): Promise<JobAndCompany | null> => {
   try {
-    const job = await prisma.job.findUnique({
-      where: {
-        slug,
-      },
-      select: {
-        slug: true,
-        title: true,
-        isActive: true,
-        createdAt: true,
-        region: true,
-        seniority: true,
-        company: {
-          select: {
-            name: true,
-            logo: true,
-          },
-        },
-      },
-    });
-    return job;
+    return await backendCachedOrNull<JobAndCompany>(`/jobs/${encodeURIComponent(slug)}`, { revalidate: 43200, tags: [BOARD_TAGS.jobs] });
   } catch (error) {
     throw new Error("Something went wrong");
   }
-};
+});
+
+const fetchJobMetaData = fetchJob;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const jobSlug = decodeURIComponent((await params).id);

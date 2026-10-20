@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import React, { cache } from "react";
 import { Metadata } from "next";
-import { prisma } from "@/prisma";
+import { BOARD_TAGS, backendCachedOrNull } from "@/app/lib/backend";
 import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 
 interface PageProps {
@@ -24,17 +24,15 @@ interface PageProps {
     facebook: string;
   };
 }
-// Straight from the database, like the job page. This used to fetch the site's
-// own public /api/companies/slug URL, which sent every render back out through
-// the CDN firewall from Vercel's shared server addresses: the per-IP rate limit
-// then answered 429 now and then and a real company showed "Company Not Found".
-// cache() lets generateMetadata and the page share one query per request.
+// Straight from the backend (GET /api/companies/:slug), like the job page. This used to
+// fetch the site's own public /api/companies/slug URL, which sent every render back out
+// through the CDN firewall from Vercel's shared server addresses: the per-IP rate limit
+// then answered 429 now and then and a real company showed "Company Not Found". Held in
+// the data cache under the board's companies tag, which an admin's edit expires; cache()
+// lets generateMetadata and the page share one read per request.
 const fetchCompany = cache(async (slug: string): Promise<CompanyWithJobsCount | null> => {
   try {
-    return await prisma.company.findUnique({
-      where: { slug },
-      include: { _count: { select: { jobs: true } } },
-    });
+    return await backendCachedOrNull<CompanyWithJobsCount>(`/companies/${encodeURIComponent(slug)}`, { revalidate: 3600, tags: [BOARD_TAGS.companies] });
   } catch (error) {
     console.error("Failed to fetch company:", error);
     return null;

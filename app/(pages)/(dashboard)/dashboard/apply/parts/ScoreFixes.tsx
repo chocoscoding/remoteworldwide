@@ -206,7 +206,9 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
   partial = false,
 }) => {
   // A partly checked scan's keyword match is over the few it could check: shown as not checked, never as a number.
-  const byId = new Map((report?.metrics ?? []).filter((metric) => !(partial && metric.id === "keyword-match")).map((metric) => [metric.id, metric]));
+  const byId = new Map(
+    (report?.metrics ?? []).filter((metric) => !(partial && metric.id === "keyword-match")).map((metric) => [metric.id, metric]),
+  );
   const first = report && !partial ? fixFirstId(report) : null;
   return (
     <>
@@ -224,7 +226,8 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
                   : id === "impact-language"
                     ? "Impact language"
                     : "Length & format");
-            const notChecked = (partial && id === "keyword-match") || metric?.checked === false || (metric !== undefined && metric.value === null);
+            const notChecked =
+              (partial && id === "keyword-match") || metric?.checked === false || (metric !== undefined && metric.value === null);
             const value = metric && metric.value !== null && !notChecked ? Math.round(metric.value) : null;
             const was = previousMetrics?.[id];
             const moved = value !== null && was !== undefined ? value - was : 0;
@@ -232,7 +235,9 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
               <div key={id} className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
                   <span className="flex-1 text-[13px] font-bold text-primary">{label}</span>
-                  {first === id && <span className="rounded-full bg-[#fbe9e5] px-[7px] text-[11px] font-extrabold text-[#b23c26]">Fix first</span>}
+                  {first === id && (
+                    <span className="rounded-full bg-[#fbe9e5] px-[7px] text-[11px] font-extrabold text-[#b23c26]">Fix first</span>
+                  )}
                   <span className="text-[13px] font-extrabold text-primary">
                     {value ?? (notChecked ? <span className="text-xs font-bold text-[#a06f00]">not checked</span> : "–")}
                     {value !== null && <span className="text-[11px] font-semibold text-[#9a9b95]"> / 100</span>}
@@ -242,14 +247,20 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
                           "ml-1.5 inline-flex items-center gap-px text-[11px] font-extrabold",
                           moved > 0 ? "text-[#6c7a1e]" : "text-[#b23c26]",
                         )}>
-                        {moved > 0 ? <ArrowUp className="h-2.5 w-2.5" strokeWidth={3} /> : <ArrowDown className="h-2.5 w-2.5" strokeWidth={3} />}
+                        {moved > 0 ? (
+                          <ArrowUp className="h-2.5 w-2.5" strokeWidth={3} />
+                        ) : (
+                          <ArrowDown className="h-2.5 w-2.5" strokeWidth={3} />
+                        )}
                         {Math.abs(moved)}
                       </span>
                     )}
                   </span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-[#ecece6]">
-                  {value !== null && <div className="h-full rounded-full" style={{ width: `${value}%`, background: scoreColorOf(value) }} />}
+                  {value !== null && (
+                    <div className="h-full rounded-full" style={{ width: `${value}%`, background: scoreColorOf(value) }} />
+                  )}
                 </div>
               </div>
             );
@@ -270,7 +281,13 @@ export const ScoreRow: FC<{
 }> = ({ state, report, previousScore, previousMetrics, onRescore, creditsHref }) => (
   // Never the score's recipe under it (owner, 2026-10-19: "70% keyword match" read as a keyword matcher).
   <div className="flex flex-col items-stretch gap-4 lg:flex-row">
-    <ScoreSide state={state} score={report ? report.score : null} previous={previousScore} onRescore={onRescore} creditsHref={creditsHref} />
+    <ScoreSide
+      state={state}
+      score={report ? report.score : null}
+      previous={previousScore}
+      onRescore={onRescore}
+      creditsHref={creditsHref}
+    />
     <StagePanels
       report={state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? report : null}
       previousMetrics={state.kind === "ready" ? previousMetrics : undefined}
@@ -289,7 +306,8 @@ export interface StuffingNoteView {
   others: string[];
 }
 
-const listOf = (names: string[]) => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+const listOf = (names: string[]) =>
+  names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
 /** Up to three names, then "and N more". */
 const someOf = (names: string[]) => (names.length <= 3 ? listOf(names) : `${names.slice(0, 3).join(", ")} and ${names.length - 3} more`);
@@ -361,8 +379,8 @@ export const StuffingNote: FC<{
           className="w-72 overflow-hidden rounded-xl border-[1.5px] border-[#222325] bg-white p-0 shadow-[3px_3px_0_0_#222325]">
           {n > 0 && (
             <p className="border-b border-black/8 px-3.5 py-2.5 text-xs leading-relaxed text-[#55564f]">
-              <strong className="text-primary">{someOf(note.unbacked)}</strong> {n === 1 ? "is" : "are"} in Skills, but no job or project mentions{" "}
-              {n === 1 ? "it" : "them"}.{note.others.length > 0 ? ` Also: ${note.others.join("; ")}.` : ""}
+              <strong className="text-primary">{someOf(note.unbacked)}</strong> {n === 1 ? "is" : "are"} in Skills, but no job or project
+              mentions {n === 1 ? "it" : "them"}.{note.others.length > 0 ? ` Also: ${note.others.join("; ")}.` : ""}
             </p>
           )}
           {onRemove && n > 0 && (
@@ -433,7 +451,7 @@ const PLACE_LABELS: Record<ResumePlace, string> = { summary: "Summary", bullets:
 const PLACES: ResumePlace[] = ["summary", "bullets", "skills"];
 
 const TOOL_BUTTON =
-  "flex h-[38px] flex-none cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:cursor-default";
+  "flex h-[32px] flex-none cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:cursor-default";
 
 export const FixesTabs: FC<{
   gaps: GapChip[];
@@ -640,7 +658,11 @@ export const FixesTabs: FC<{
         <p role="alert" className="text-sm text-[#b23c26]">
           {error}{" "}
           {creditsHref && (
-            <a href={creditsHref} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline underline-offset-2">
+            <a
+              href={creditsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-primary underline underline-offset-2">
               Get more credits
             </a>
           )}
@@ -694,8 +716,8 @@ export const FixesTabs: FC<{
               title={bulletsOn ? undefined : "Turn on Bullets under Add to"}
               onClick={onProve}
               className={cn(TOOL_BUTTON, "border-[1.5px] border-[#222325] bg-[#222325] text-white disabled:opacity-50")}>
-              <Plus className="h-[13px] w-[13px]" strokeWidth={2.6} />
-              Prove the {skillsOnly.length} in a bullet
+              <Plus className="h-[10px] w-[10px]" strokeWidth={2.6} />
+              Add the {skillsOnly.length} to resume.
             </button>
           )}
         </div>
@@ -780,7 +802,9 @@ const Chip: FC<{ chip: GapChip; tone: "open" | "picked" | "proof"; onClick?: () 
     <span
       role="tooltip"
       className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[260px] flex-col gap-1.5 rounded-xl bg-[#222325] p-3 text-left font-medium text-white group-focus-within:flex group-hover:flex">
-      <span className="text-xs font-extrabold text-[#e1f073]">{tone === "proof" ? "Only in your Skills list" : "What the posting wants"}</span>
+      <span className="text-xs font-extrabold text-[#e1f073]">
+        {tone === "proof" ? "Only in your Skills list" : "What the posting wants"}
+      </span>
       <span className="text-xs leading-[1.45] text-white/80">{chip.wants}</span>
     </span>
   </span>

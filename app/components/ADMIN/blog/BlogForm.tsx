@@ -28,6 +28,7 @@ import { useBlogAutosave } from "./useBlogAutosave";
 import QuillEditor, { type QuillRef } from "./QuillEditor";
 import TableBar from "./TableBar";
 import { insertTable } from "./tableStyle";
+import { softBreakMatcher, tableEnterBinding } from "./softBreak";
 import { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
 
 export interface BlogFormProps {
@@ -269,8 +270,10 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
         bindings: {
           "leave block up": { key: "ArrowUp", collapsed: true, format: BLOCK_FORMATS, handler: leaveBlockUp },
           "leave block down": { key: "ArrowDown", collapsed: true, format: BLOCK_FORMATS, handler: leaveBlockDown },
+          "table enter": tableEnterBinding,
         },
       },
+      clipboard: { matchers: [softBreakMatcher] },
       table: true,
       uploader: {
         mimetypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],

@@ -34,9 +34,8 @@ export class ActionAuthError extends Error {
 /**
  * The signed-in user, taken from the session. Throws 401 when there is none, and 423
  * when the account is waiting out its deletion: the backend refuses a locked session
- * on every guard, staff included (middleware/auth.ts), but the actions that go
- * straight to Prisma (bookmarks, the board) never pass through it, so the lock has
- * to be read here too. Nothing a locked account may still do (see and cancel the
+ * on every guard, staff included (middleware/auth.ts); reading the lock here too
+ * makes an action refuse before it calls anything. Nothing a locked account may still do (see and cancel the
  * deletion) goes through these guards; that runs on the backend's AllowLocked routes.
  */
 export async function requireUserAction(): Promise<ActionUser> {

@@ -4,7 +4,7 @@ import { FC, useRef } from "react";
 import Link from "next/link";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ExternalLink, Plus, X } from "lucide-react";
-import type { Company } from "@prisma/client";
+import type { Company } from "@/types/main";
 import CompanyForm from "./CompanyForm";
 
 /**

@@ -1,5 +1,46 @@
-import { Company, Job } from "@prisma/client";
 import type { Author } from "@/app/lib/blog/types";
+
+// The job board's listing and company, as the backend sends them (remoteworldwidebackend
+// src/types/board.ts, BoardJob and BoardCompany): change one, change the other. The dates arrive
+// as ISO strings and app/lib/api/core.ts revives them into Dates.
+export interface Job {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  isActive: boolean;
+  companyId: string;
+  applicationUrl: string;
+  category: string;
+  region: string[];
+  seniority: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  slug: string;
+  about: string;
+  logo: string;
+  website: string;
+  linkedin: string | null;
+  twitter: string | null;
+  facebook: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** How a listing is doing, on the admin's job page. */
+export interface JobStats {
+  applyClicks: number;
+  lastApplyClickAt: string | null;
+}
+
+export interface AdminJobPage extends JobAndCompany {
+  stats: JobStats;
+}
 
 export interface FilterData {
   category: FilterType[];

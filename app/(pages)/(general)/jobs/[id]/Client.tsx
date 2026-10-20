@@ -2,7 +2,7 @@
 import CompanySection from "@/app/components/main/job/CompanySection";
 import JobDescription from "@/app/components/main/job/JobDescription";
 import { JobAndCompany } from "@/types/main";
-import { Job } from "@prisma/client";
+import type { Job } from "@/types/main";
 import { FC } from "react";
 
 const OneJobClient: FC<{ Job: JobAndCompany; hasUserBookmarked: boolean | undefined }> = ({ Job, hasUserBookmarked }) => {
