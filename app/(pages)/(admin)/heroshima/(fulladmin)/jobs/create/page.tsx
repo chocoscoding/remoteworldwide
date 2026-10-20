@@ -3,6 +3,9 @@ import { FilterData } from "@/types/main";
 import { backend } from "@/app/lib/backend";
 import { getCompanyOptions } from "@/libs/query";
 
+// Behind the admin's session, read fresh on every visit: never prerendered at build time.
+export const dynamic = "force-dynamic";
+
 // Every company and filter for the form's dropdowns, from the backend, fresh on every visit.
 const getAllFilters = async (): Promise<FilterData> => {
   try {

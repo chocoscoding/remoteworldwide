@@ -2,6 +2,9 @@ import CompaniesList from "@/app/(pages)/(general)/companies/Client";
 import { CompanyList } from "@/types/main";
 import { backendWithCount } from "@/app/lib/backend";
 
+// Behind the admin's session, read fresh on every visit: never prerendered at build time.
+export const dynamic = "force-dynamic";
+
 const getCompanies = async (): Promise<{ data: CompanyList[]; count: number }> => {
   try {
     return await backendWithCount<CompanyList[]>("/companies");
