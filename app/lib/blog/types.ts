@@ -55,6 +55,33 @@ export interface PostFull extends Omit<PostCard, "author" | "authors"> {
 
 export type Blog = PostFull;
 
+/** Fields a post needs before it can go live; the backend's PublishField. */
+export type PublishField = "title" | "description" | "tags" | "content" | "authors" | "coverImage";
+
+/** The edited version of a published post: saved, not yet live. */
+export interface PendingEdit {
+  slug: string | null;
+  title: string;
+  description: string;
+  content: string;
+  coverImage: string;
+  tags: string[];
+  authorIds: string[];
+  category: string | null;
+  featuredRank: number | null;
+  leadMagnetId: string | null;
+  ctaKey: string | null;
+  autoCtas: boolean;
+  inlineOffers: string[];
+  updatedAt: Date;
+}
+
+/** What the editor loads: the live post plus any edited version waiting for Update. */
+export interface EditableBlog extends PostFull {
+  hasPendingEdit: boolean;
+  pendingEdit: PendingEdit | null;
+}
+
 export interface LeadMagnet {
   id: string;
   slug: string;

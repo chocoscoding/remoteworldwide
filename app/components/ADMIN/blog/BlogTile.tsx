@@ -4,16 +4,22 @@ import Link from "next/link";
 import type { PostFull } from "@/app/lib/blog/types";
 import { formatPostDate, postAuthors } from "@/app/components/blog/PostCard";
 import { formatAuthorNames } from "@/app/components/blog/AuthorStack";
+import NoImage from "@/app/components/blog/NoImage";
 
-export const BlogTile: FC<{ blog: PostFull }> = ({ blog }) => (
+export const BlogTile: FC<{ blog: PostFull & { hasPendingEdit?: boolean } }> = ({ blog }) => (
   <Link href={`/heroshima/blogs/${blog.slug}`} className="flex h-[400px] flex-col rounded-lg bg-white p-2 shadow">
     <div className="h-[60%] w-full">
-      <Image src={blog.coverImage} alt={blog.title} width={1080} height={720} className="aspect-square h-full rounded-lg object-cover" />
+      {blog.coverImage ? (
+        <Image src={blog.coverImage} alt={blog.title} width={1080} height={720} className="aspect-square h-full rounded-lg object-cover" />
+      ) : (
+        <NoImage className="h-full w-full rounded-lg" />
+      )}
     </div>
     <div className="mt-4 w-full">
       <div className="flex items-center gap-2">
-        <h2 className="text-xl font-semibold">{blog.title}</h2>
+        <h2 className="text-xl font-semibold">{blog.title || "Untitled post"}</h2>
         {blog.status !== "PUBLISHED" && <span className="rounded-full bg-[#fdeae6] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#b23c26]">Draft</span>}
+        {blog.status === "PUBLISHED" && blog.hasPendingEdit && <span className="rounded-full bg-[#fdf4f2] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#b23c26]">Not updated</span>}
       </div>
       <p className="my-2 line-clamp-2 text-md font-light text-gray-400">{blog.description.substring(0, 200)}</p>
       <p className="text-gray-600">

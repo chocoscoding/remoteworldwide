@@ -11,7 +11,7 @@ import type { BlogStatus } from "@/app/lib/blog/types";
 
 const BTN = "inline-flex h-9 items-center gap-1.5 rounded-sm border-2 border-primary px-3 text-xs font-bold transition-all drop-shadow-primary2-hover disabled:opacity-50";
 
-const AdminPostActions: FC<{ id: string; slug: string; title: string; status: BlogStatus }> = ({ id, slug, title, status }) => {
+const AdminPostActions: FC<{ id: string; slug: string; title: string; status: BlogStatus; notUpdated?: boolean }> = ({ id, slug, title, status, notUpdated = false }) => {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -39,7 +39,8 @@ const AdminPostActions: FC<{ id: string; slug: string; title: string; status: Bl
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-2.5">
         <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#e1f073]">Admin view</span>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${status === "PUBLISHED" ? "bg-[#e1f073] text-[#222325]" : "bg-[#fdeae6] text-[#b23c26]"}`}>{status}</span>
-        <span className="text-xs text-white/60">Exactly what readers see.</span>
+        {notUpdated && <span className="rounded-full bg-[#fdf4f2] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#b23c26]">Not updated</span>}
+        <span className="text-xs text-white/60">{notUpdated ? "The live version. Your saved edits are waiting in the editor." : "Exactly what readers see."}</span>
         <div className="ml-auto flex items-center gap-2">
           {status === "PUBLISHED" && (
             <a href={`/blogs/${slug}`} target="_blank" rel="noreferrer" className={`${BTN} bg-white text-primary`}>
@@ -47,7 +48,7 @@ const AdminPostActions: FC<{ id: string; slug: string; title: string; status: Bl
               Open live
             </a>
           )}
-          <Link href={`/heroshima/blogs/${slug}/edit`} className={`${BTN} bg-[#e1f073] text-primary`}>
+          <Link href={`/heroshima/blogs/${id}/edit`} className={`${BTN} bg-[#e1f073] text-primary`}>
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </Link>

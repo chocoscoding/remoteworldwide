@@ -22,7 +22,7 @@ import { Job } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { hexoid } from "hexoid";
 import { backend, BackendError, backendOrNull, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
-import type { Author, Blog, BlogStatus } from "@/app/lib/blog/types";
+import type { Author, Blog, BlogStatus, EditableBlog } from "@/app/lib/blog/types";
 import { requireAdminAction, requireRoleAction, requireUserAction } from "@/app/lib/auth/action-guards";
 
 export const deleteOneJob = async (id: string) => {
@@ -389,7 +389,55 @@ export const createBlog = async (data: BlogInput) => {
 
 export const getBlogBySlug = async (slug: string) => {
   await requireWriterAction();
-  return { data: await backendOrNull<Blog>(`/blog/admin/posts/${encodeURIComponent(slug)}`, { session: true }) };
+  return { data: await backendOrNull<EditableBlog>(`/blog/admin/posts/${encodeURIComponent(slug)}`, { session: true }) };
+};
+
+export const getBlogById = async (id: string) => {
+  await requireWriterAction();
+  if (!isObjectId(id)) return { data: null };
+  return { data: await backendOrNull<EditableBlog>(`/blog/admin/posts/id/${idSegment(id)}`, { session: true }) };
+};
+
+// Autosave. A draft is written in place; a published post's edits are kept as
+// its edited version, so neither touches the public pages and nothing is revalidated.
+export const createBlogDraft = async (data: Partial<BlogInput>) => {
+  await requireWriterAction();
+  try {
+    return { data: await admin<EditableBlog>("/posts/draft", { method: "POST", body: data }) };
+  } catch (error) {
+    return refused(error);
+  }
+};
+
+export const autosaveBlog = async (id: string, data: Partial<BlogInput>) => {
+  await requireWriterAction();
+  try {
+    return { data: await admin<EditableBlog>(`/posts/${idSegment(id)}/autosave`, { method: "PATCH", body: data }) };
+  } catch (error) {
+    return refused(error);
+  }
+};
+
+/** Publish a draft, or put a published post's edited version live. */
+export const publishBlog = async (id: string) => {
+  await requireWriterAction();
+  try {
+    const blog = await admin<EditableBlog>(`/posts/${idSegment(id)}/publish`, { method: "POST" });
+    revalidatePath("/blogs");
+    for (const slug of [blog.slug, ...blog.previousSlugs]) revalidatePath("/blogs/" + slug);
+    return { data: blog };
+  } catch (error) {
+    return refused(error);
+  }
+};
+
+export const discardBlogEdit = async (id: string) => {
+  await requireWriterAction();
+  try {
+    return { data: await admin<EditableBlog>(`/posts/${idSegment(id)}/pending`, { method: "DELETE" }) };
+  } catch (error) {
+    return refused(error);
+  }
 };
 
 export const editBlog = async (id: string, data: Partial<BlogInput>) => {

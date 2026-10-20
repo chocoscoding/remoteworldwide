@@ -2,6 +2,7 @@ import type { FC, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import NoImage from "./NoImage";
 import type { BlogCategory } from "@/app/lib/blog/categories";
 import type { RenderedPost } from "@/app/lib/blog/render";
 import type { AuthorProfile, BlogStatus, Cta, LeadMagnet, PostCard as PostCardData } from "@/app/lib/blog/types";
@@ -162,14 +163,18 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
         <div className={GRID}>
           <main className={cn("min-w-0", TEXT_COLUMN)}>
             <figure className="relative mb-7 aspect-[3/2] overflow-hidden rounded-[20px] border-2 border-primary">
-              <Image
-                src={post.coverImage}
-                alt={post.title}
-                fill
-                priority
-                sizes="(min-width: 768px) 720px, 100vw"
-                className="object-cover"
-              />
+              {post.coverImage ? (
+                <Image
+                  src={post.coverImage}
+                  alt={post.title}
+                  fill
+                  priority
+                  sizes="(min-width: 768px) 720px, 100vw"
+                  className="object-cover"
+                />
+              ) : (
+                <NoImage className="absolute inset-0" />
+              )}
             </figure>
 
             <TableOfContents
