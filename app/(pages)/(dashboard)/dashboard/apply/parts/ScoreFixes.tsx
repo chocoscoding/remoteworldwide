@@ -445,6 +445,8 @@ export interface Suggestion {
   onShow?: () => void;
   /** Small choices in place of the one action ("Native", "Fluent (C1)"…): the person picks what is true. */
   choices?: Array<{ label: string; onClick: () => void }>;
+  /** A note in the list, not a fix: a dark row with no button ("You've reached your best match…"). */
+  note?: boolean;
 }
 
 const PLACE_LABELS: Record<ResumePlace, string> = { summary: "Summary", bullets: "Bullets", skills: "Skills" };
@@ -594,13 +596,20 @@ export const FixesTabs: FC<{
               key={row.id}
               onClick={row.onShow}
               className={cn(
-                "flex min-h-10 items-center gap-2.5 rounded-[10px] bg-[#f6f6f6] px-3 py-1.5",
+                "flex min-h-10 items-center gap-2.5 rounded-[10px] px-3 py-1.5",
+                row.note ? "mt-[10px] bg-[#222325] py-2.5 text-white" : "bg-[#f6f6f6]",
                 row.onShow && "cursor-pointer hover:bg-[#f0f0ea]",
               )}>
-              <span className="h-1.5 w-1.5 flex-none rounded-full bg-[#d99a00]" />
+              {row.note ? (
+                <span className="grid h-[18px] w-[18px] flex-none place-content-center rounded-full bg-[#e1f073]">
+                  <Check className="h-2.5 w-2.5 text-primary" strokeWidth={3.4} />
+                </span>
+              ) : (
+                <span className="h-1.5 w-1.5 flex-none rounded-full bg-[#d99a00]" />
+              )}
               <span className="flex-1 text-[13px]">
                 <strong>{row.title}</strong>
-                {row.detail && <span className="text-[#5f6062]"> {row.detail}</span>}
+                {row.detail && <span className={row.note ? "text-[#d3d1c7]" : "text-[#5f6062]"}> {row.detail}</span>}
               </span>
               {row.onShow && <ShowInResume onClick={row.onShow} />}
               {row.choices?.map((choice) => (
@@ -616,7 +625,7 @@ export const FixesTabs: FC<{
                   {choice.label}
                 </button>
               ))}
-              {!row.choices && (
+              {!row.choices && !row.note && (
                 <button
                   type="button"
                   disabled={disabled || !row.onClick}

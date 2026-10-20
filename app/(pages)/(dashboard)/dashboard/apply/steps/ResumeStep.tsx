@@ -50,7 +50,7 @@ import {
   fitGap,
 } from "@/app/lib/apply/fixes";
 import { impactMisses } from "@/app/lib/apply/impact";
-import { editBullet, editSummary, type LineEdit } from "@/app/lib/apply/edits";
+import { editBullet, editName, editSummary, editTitle, type LineEdit } from "@/app/lib/apply/edits";
 import { hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, stepId, undoIfWorse } from "@/app/lib/apply/history";
 import { scanBaseline, sendingResumeId, textPrint, type ApplyState, type FitAsk } from "@/app/lib/apply/state";
 import { ATS_BILLING_HREF, isCurrentScore, missingGaps, prepareResumeForDoc, scanCoverage } from "@/app/lib/ats/api";
@@ -313,6 +313,23 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     triedKey.current = scoreKey;
     runScore(sendingId, version);
   }, [editable, scoreKey, sendingId, version, sendingReady, stored, runScore]);
+
+  // A score shown for the draft as it is now, from the stored scan (a reload, an undo back to a
+  // scored version), goes on the step the draft is at when that step has none: only a fresh scan
+  // ever stamped it, so the history read "–" beside a score on screen (owner, 2026-10-20).
+  const atStep = resume.history[resume.historyAt];
+  const unstampedAt = atStep && atStep.score === null ? atStep.id : null;
+  useEffect(() => {
+    if (!editable || !stored || !unstampedAt || stored.resumeId !== resume.draftId || stored.report.degraded || !isCurrentScore(stored.report)) return;
+    const { version: scoredVersion, report: scoredReport } = stored;
+    update((s) => {
+      const step = s.resume.history[s.resume.historyAt];
+      if (step?.id !== unstampedAt || step.score !== null) return s;
+      const history = stampStep(s.resume.history, s.resume.historyAt, scoredVersion, scoredReport);
+      // Unchanged state when nothing was stamped: a new object every time would loop this effect.
+      return history === s.resume.history ? s : { ...s, resume: { ...s.resume, history } };
+    });
+  }, [editable, stored, unstampedAt, resume.draftId, update]);
 
   const scoreState: ScoreState = !sendingId
     ? { kind: "none" }
@@ -746,6 +763,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           onSummary: (text: string) => commitEdit(editSummary({ ...content, hiddenParts: shownHidden }, text)),
           onBullet: (entryId: string, index: number, text: string) =>
             commitEdit(editBullet({ ...content, hiddenParts: shownHidden }, entryId, index, text)),
+          onName: (text: string) => commitEdit(editName({ ...content, hiddenParts: shownHidden }, text)),
+          onTitle: (text: string) => commitEdit(editTitle({ ...content, hiddenParts: shownHidden }, text)),
         }
       : undefined;
 
@@ -820,7 +839,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     label: string,
     busyText: string,
     run: () => Promise<{ content: ResumeContent } | null>,
-    nothing = "Nothing on your resume changed that time. Try again, or click a line to say it yourself.",
+    /** Said when nothing changed; null says nothing (the caller shows its own note). */
+    nothing: string | null = "Nothing on your resume changed that time. Try again, or click a line to say it yourself.",
   ): Promise<CommittedStep | null> {
     if (!toolsIdle) return null;
     setBusy(busyText);
@@ -843,7 +863,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       // Nothing new on the page: said plainly, never a history step that claims a change (owner,
       // 2026-10-19: "no matter the times I add this thing, it does not change anything").
       if (changeCount(resumeChanges(content, guarded.content)) === 0 && guarded.kept.length === 0) {
-        setChangeError(nothing);
+        if (nothing) setChangeError(nothing);
         return null;
       }
       if (guarded.kept.length > 0) {
@@ -901,6 +921,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     if (!content) return;
     let lines: string[] = [];
     let asks: FitAddition[] = [];
+    let answered = false;
     void runAndCommit(
       FITTED_LABEL,
       "Tailoring your resume to this job…",
@@ -916,18 +937,19 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           }),
         );
         if (!result) return null;
+        answered = true;
         lines = (result.changed ?? []).map((change) => change.after);
         asks = result.couldAdd ?? [];
         return { content: result.content };
       },
-      "Your resume already fits this job.",
+      // Never a red "already fits" (owner, 2026-10-20): the best-match note says it, calmly.
+      null,
     ).then((made) => {
       if (made) showOnPage(lines);
-      // Nothing changed: the row hides on this step, and the asks say what is left (never "already fits").
-      if (!made) {
+      // Answered, and nothing changed: the Tailor row hides on this step and the best-match note shows.
+      if (!made && answered) {
         const at = history[historyAt]?.id ?? "start";
         update((s) => ({ ...s, resume: { ...s.resume, fitAt: at } }));
-        if (asks.length > 0) setChangeError(null);
       }
       if (asks.length === 0) return;
       // Asked from the step this Tailor made, or from where the draft stood when it changed nothing.
@@ -1322,6 +1344,20 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         { label: "No", onClick: () => answerAsk(item.term, { no: true }) },
       ],
     })),
+    // Tailor found nothing to change on this step: said as a note at the end of the list, never as
+    // an error (owner, 2026-10-20, "D but black themed").
+    ...(!done && content && visible && resume.fitAt === (history[historyAt]?.id ?? "start")
+      ? [
+          {
+            id: "best-match",
+            title: "You've reached your best match for this role based on your current resume.",
+            detail: "Add relevant skills, experience, or projects to improve your match further.",
+            action: "",
+            icon: "tailor" as const,
+            note: true,
+          },
+        ]
+      : []),
     ...(summaryMissing && content
       ? [
           {

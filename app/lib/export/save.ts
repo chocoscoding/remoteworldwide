@@ -73,6 +73,11 @@ export async function printDocument({ title, html, pageSize, pageMargin, bodyCla
   frame.tabIndex = -1;
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
   document.body.appendChild(frame);
+  // "Save as PDF" names the file after the TOP page's title in some hosts (the desktop app's own
+  // print dialog, 2026-10-20: "Apply to a job | Remote Worldwide.pdf"), not the frame's: the page
+  // carries the file's name while the dialog is open, and gets its own back after.
+  const pageTitle = document.title;
+  document.title = title;
 
   try {
     const doc = frame.contentDocument;
@@ -109,6 +114,10 @@ export async function printDocument({ title, html, pageSize, pageMargin, bodyCla
   } finally {
     // print() blocks until the dialog closes in Chrome, Edge and Firefox; the
     // delay covers Safari, which returns early and prints from the frame after.
-    window.setTimeout(() => frame.remove(), 1_000);
+    window.setTimeout(() => {
+      frame.remove();
+      // Unless the page moved on and named itself since.
+      if (document.title === title) document.title = pageTitle;
+    }, 1_000);
   }
 }

@@ -109,6 +109,9 @@ export interface PaperHighlight {
 export interface PaperEdits {
   onSummary: (text: string) => void;
   onBullet: (entryId: string, index: number, text: string) => void;
+  /** The name and the title under it, retyped the same way (owner, 2026-10-20). */
+  onName?: (text: string) => void;
+  onTitle?: (text: string) => void;
 }
 
 const NONE: PaperHighlight = { focus: null, marks: [], underlines: [] };
@@ -319,7 +322,12 @@ export const UnderlinedText: FC<{ at: UnderlineAt; text: string }> = ({ at, text
  * Plain text while editable, and remounted after every save or cancel, so React never has to
  * reconcile with what the browser's own editing wrote into the DOM.
  */
-const EditableLine: FC<{ text: string; label: string; onCommit: (text: string) => void }> = ({ text, label, onCommit }) => {
+export const EditableLine: FC<{ text: string; label: string; onCommit: (text: string) => void; hint?: string }> = ({
+  text,
+  label,
+  onCommit,
+  hint = "Click to edit. Clear it to delete the line.",
+}) => {
   const [round, setRound] = useState(0);
   const done = (element: HTMLElement, save: boolean) => {
     const next = (element.innerText ?? "").replace(/\s+/g, " ").trim();
@@ -331,7 +339,7 @@ const EditableLine: FC<{ text: string; label: string; onCommit: (text: string) =
       key={round}
       role="textbox"
       aria-label={`Edit ${label}`}
-      title="Click to edit. Clear it to delete the line."
+      title={hint}
       contentEditable="plaintext-only"
       suppressContentEditableWarning
       spellCheck

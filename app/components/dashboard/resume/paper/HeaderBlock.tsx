@@ -11,7 +11,7 @@ import type {
 } from "@/app/lib/dashboard/resume/design-types";
 import { ICON_SETS, type IconSet } from "@/app/lib/dashboard/resume/icon-sets";
 import { detectPlatform, displayUrl } from "@/app/lib/dashboard/resume/link-platforms";
-import { SectionFrame } from "./highlight";
+import { EditableLine, SectionFrame, usePaperHighlight } from "./highlight";
 
 export interface HeaderBlockProps {
   content: ResumeContent;
@@ -74,6 +74,8 @@ function buildContactItems(content: ResumeContent, iconSet: IconSet): ContactIte
  * comment).
  */
 const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
+  // The apply step's click-to-edit: the name and the title retype like a summary line (owner, 2026-10-20).
+  const { edits } = usePaperHighlight();
   const alignCenter = design.header.align === "center";
   const iconSet = ICON_SETS[design.header.iconSet];
   const contactItems = buildContactItems(content, iconSet);
@@ -105,10 +107,20 @@ const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
           {/* Same role as the sections' "No experience added yet." lines: a
               hint at what goes here, not content. Faded off the name's own
               colour so it reads on every chrome, band and sidebar included. */}
-          {content.name || <span data-resume-placeholder className="opacity-35">Your name</span>}
+          {content.name && edits?.onName ? (
+            <EditableLine text={content.name} label="your name" onCommit={edits.onName} hint="Click to edit your name." />
+          ) : (
+            content.name || <span data-resume-placeholder className="opacity-35">Your name</span>
+          )}
         </p>
         {content.title && (
-          <p className="mt-[2pt] text-[length:var(--r-fs-title)] leading-tight text-[color:var(--r-c-title)]">{content.title}</p>
+          <p className="mt-[2pt] text-[length:var(--r-fs-title)] leading-tight text-[color:var(--r-c-title)]">
+            {edits?.onTitle ? (
+              <EditableLine text={content.title} label="your title" onCommit={edits.onTitle} hint="Click to edit your title. Clear it to remove it." />
+            ) : (
+              content.title
+            )}
+          </p>
         )}
 
         {contactItems.length > 0 && (

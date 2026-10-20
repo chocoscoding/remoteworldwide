@@ -16,6 +16,20 @@ const roleName = (content: ResumeContent, entryId: string): string => {
   return entry ? entry.company.trim() || entry.role.trim() || "a role" : "a role";
 };
 
+/** The name, retyped. Never emptied: a resume always says whose it is. Null when nothing changed. */
+export function editName(content: ResumeContent, text: string): LineEdit | null {
+  const next = text.trim();
+  if (!next || next === content.name.trim()) return null;
+  return { content: { ...content, name: next }, label: "Edited your name" };
+}
+
+/** The title under the name, retyped, or removed when emptied. Null when nothing changed. */
+export function editTitle(content: ResumeContent, text: string): LineEdit | null {
+  const next = text.trim();
+  if (next === (content.title ?? "").trim()) return null;
+  return { content: { ...content, title: next }, label: next ? `Title set to ${next}` : "Removed your title" };
+}
+
 /** The summary, retyped. Null when nothing changed. */
 export function editSummary(content: ResumeContent, text: string): LineEdit | null {
   const next = text.trim();

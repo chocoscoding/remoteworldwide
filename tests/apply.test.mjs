@@ -37,7 +37,7 @@ const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, scanBaseline, 
 const { INTERVIEW_ADVICE, excerpt, stepsForGap } = await import("../app/lib/apply/gapSteps.ts");
 const { changeCount, highlightTexts, resumeChanges } = await import("../app/lib/apply/changes.ts");
 const { noteParts, quantityParts, scoreColor, withoutEmDashes } = await import("../app/lib/apply/score.ts");
-const { editBullet, editSummary } = await import("../app/lib/apply/edits.ts");
+const { editBullet, editName, editSummary, editTitle } = await import("../app/lib/apply/edits.ts");
 const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, undoIfWorse } = await import("../app/lib/apply/history.ts");
 const {
   TRIED,
@@ -533,6 +533,17 @@ describe("editing lines on the page", () => {
   it("retypes the summary", () => {
     assert.equal(editSummary(content(), "New words.").label, "Edited the Summary");
     assert.equal(editSummary(content(), content().summary), null);
+  });
+
+  it("retypes the name, never to nothing, and the title, removed when cleared", () => {
+    const words = { ...content(), name: "Jane Doe", title: "Product Designer" };
+    assert.equal(editName(words, "Jane A. Doe").content.name, "Jane A. Doe");
+    assert.equal(editName(words, "  "), null);
+    assert.equal(editName(words, "Jane Doe"), null);
+    assert.equal(editTitle(words, "Senior Product Designer").label, "Title set to Senior Product Designer");
+    assert.equal(editTitle(words, "").content.title, "");
+    assert.equal(editTitle(words, "").label, "Removed your title");
+    assert.equal(editTitle(words, "Product Designer"), null);
   });
 });
 
