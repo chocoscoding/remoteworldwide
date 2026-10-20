@@ -34,7 +34,7 @@ const BLANK_LINE = "<p><br /></p>";
 const EDGE_BLANKS_RE = /^(?:\s*<p><br \/><\/p>)+\s*|\s*(?:<p><br \/><\/p>\s*)+$/g;
 
 // Justify is left out on purpose: posts render left-aligned, like the editor now shows.
-const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video|table-rows(-head)?)$/;
+const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video|table-rows(-head)?|line-height-(1|1-5|2))$/;
 const VIDEO_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/;
 
 // Off-site links open in a new tab and pass no ranking.

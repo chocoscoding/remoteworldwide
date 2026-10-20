@@ -989,6 +989,40 @@ body {
   margin-bottom: 1rem;
 }
 
+/* Line spacing, picked per paragraph in the editor's toolbar like a word processor's.
+   The old 1.75 body line is "1.5"; the rest scale from it (1.75 / 1.5 per step), and
+   1.15 is the default, so a line with no class gets it. Blog posts only: the legal
+   pages keep .post-prose's 1.75. */
+.post-prose--blog {
+  line-height: 1.465; /* 23.4px at 16px: the 1.15 step (21.4px) plus 2px */
+}
+:is(.post-editor .ql-editor, .post-prose) .ql-line-height-1 {
+  line-height: 1.17;
+}
+:is(.post-editor .ql-editor, .post-prose) .ql-line-height-1-5 {
+  line-height: 1.75;
+}
+:is(.post-editor .ql-editor, .post-prose) .ql-line-height-2 {
+  line-height: 2.33;
+}
+/* The toolbar's spacing picker, labelled like a word processor's. */
+.post-editor .ql-snow .ql-picker.ql-lineheight {
+  width: 78px;
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight .ql-picker-label::before,
+.post-editor .ql-snow .ql-picker.ql-lineheight .ql-picker-item::before {
+  content: "1.15";
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight [data-value="1"]::before {
+  content: "Single";
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight [data-value="1-5"]::before {
+  content: "1.5";
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight [data-value="2"]::before {
+  content: "Double";
+}
+
 /* The blog editor (BlogForm): the same type as .post-prose, so writers see
    roughly what readers get. Block margins stay 0 because blank lines are the
    spacing here, and one 28px blank line equals the 28px paragraph gap on the
@@ -1003,6 +1037,25 @@ body {
   border-radius: 12px 12px 0 0;
   background: #fff;
 }
+/* Once the toolbar is pinned, the strip above it (behind the undo pill) frosts over, so
+   the text scrolling past doesn't show through. BlogForm sets data-stuck. */
+.post-editor .ql-toolbar.ql-snow::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: 100%;
+  height: 3.5rem;
+  background: rgb(255 255 255 / 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+[data-stuck] .post-editor .ql-toolbar.ql-snow::before {
+  opacity: 1;
+}
 .post-editor .ql-container.ql-snow {
   border: 1px solid #e5e5e5;
   border-radius: 0 0 12px 12px;
@@ -1012,13 +1065,13 @@ body {
 }
 .post-editor .ql-container .ql-editor {
   min-height: 480px;
-  padding: 2rem max(1.5rem, calc((100% - 720px) / 2)) 4rem;
+  padding: 2rem max(1.5rem, calc((100% - 720px) / 2 - 3%)) 4rem;
   color: #5f6063;
-  line-height: 1.75;
+  line-height: 1.465; /* 23.4px at 16px: the 1.15 step (21.4px) plus 2px */
 }
 .post-editor .ql-container .ql-editor.ql-blank::before {
-  left: max(1.5rem, calc((100% - 720px) / 2));
-  right: max(1.5rem, calc((100% - 720px) / 2));
+  left: max(1.5rem, calc((100% - 720px) / 2 - 3%));
+  right: max(1.5rem, calc((100% - 720px) / 2 - 3%));
   color: #737373;
   font-style: normal;
 }

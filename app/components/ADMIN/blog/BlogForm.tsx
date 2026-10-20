@@ -326,6 +326,21 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
   const doUndo = useCallback(() => setHistory(undo), []);
   const doRedo = useCallback(() => setHistory(redo), []);
 
+  // Marks when the editor's toolbar has scrolled up to its pinned spot, which frosts the
+  // strip above it (globals.css). Capture, since the admin scrolls an inner pane, not the window.
+  useEffect(() => {
+    const onScroll = () => {
+      const wrap = editorWrap.current;
+      const bar = wrap?.querySelector<HTMLElement>(".ql-toolbar");
+      if (!wrap || !bar?.parentElement) return;
+      // Pinned = pushed down from where it sits in the editor's own flow (the top of its box).
+      wrap.toggleAttribute("data-stuck", bar.getBoundingClientRect().top > bar.parentElement.getBoundingClientRect().top + 1);
+    };
+    onScroll();
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener("scroll", onScroll, { capture: true });
+  }, []);
+
   // One undo stack for the whole form, the rich-text body included: the keys are
   // taken before the focused input (or Quill's own history) can act on them.
   useEffect(() => {

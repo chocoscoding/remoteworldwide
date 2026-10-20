@@ -19,7 +19,7 @@ const PostBody: FC<PostBodyProps> = ({ segments, spacing, blogSlug, leadMagnet, 
   <div>
     {segments.map((seg, i) => {
       if (seg.type === "html") {
-        return <div key={i} className={cn("post-prose", spacing === "as-written" && "post-prose--as-written")} dangerouslySetInnerHTML={{ __html: seg.html }} />;
+        return <div key={i} className={cn("post-prose post-prose--blog", spacing === "as-written" && "post-prose--as-written")} dangerouslySetInnerHTML={{ __html: seg.html }} />;
       }
       if (seg.kind === "cta") {
         const chosen = seg.ref ? (ctasByKey[seg.ref] ?? null) : cta;
