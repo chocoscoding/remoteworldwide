@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { ResumeContent, ResumeSkillGroup } from "@/app/lib/dashboard/types";
 import type { ResumeDesign, SkillSeparator } from "@/app/lib/dashboard/resume/design-types";
 import { printableSkills, SKILL_SEPARATOR_GLYPH } from "@/app/lib/resume/skills";
-import { SkillText } from "../highlight";
+import { EditableLine, SkillText, usePaperHighlight } from "../highlight";
 
 export interface SkillsSectionProps {
   content: ResumeContent;
@@ -29,8 +29,30 @@ const TITLE_CLASS = "font-semibold underline decoration-[0.75pt] underline-offse
 /** A title on its own line, over the group's grid or bubbles. */
 const GroupTitle: FC<{ title: string }> = ({ title }) => (title ? <p className={cn(TITLE_CLASS, "leading-[var(--r-lh)]")}>{title}</p> : null);
 
-/** "Frontend: React, TypeScript, Next.js" — the title, then every skill on the one line it wraps from. */
-const GroupLine: FC<{ group: ResumeSkillGroup; separator: SkillSeparator }> = ({ group, separator }) => (
+/**
+ * "Frontend: React, TypeScript, Next.js" — the title, then every skill on the one line it wraps from.
+ * In the apply step the whole line retypes, title and all (owner, 2026-10-20).
+ */
+const GroupLine: FC<{ group: ResumeSkillGroup; separator: SkillSeparator }> = ({ group, separator }) => {
+  const { edits } = usePaperHighlight();
+  if (edits?.onSkills) {
+    const onSkills = edits.onSkills;
+    const text = group.title ? `${group.title}: ${group.skills.join(", ")}` : group.skills.join(", ");
+    return (
+      <p className="leading-[var(--r-lh)]">
+        <EditableLine
+          text={text}
+          label="these skills"
+          onCommit={(next) => onSkills(group.id, next)}
+          hint={'Click to edit. "Name: a, b, c" groups them under a name. Clear it to remove them.'}
+        />
+      </p>
+    );
+  }
+  return <PrintedLine group={group} separator={separator} />;
+};
+
+const PrintedLine: FC<{ group: ResumeSkillGroup; separator: SkillSeparator }> = ({ group, separator }) => (
   <p className="leading-[var(--r-lh)]">
     {group.title && (
       <>

@@ -50,7 +50,7 @@ import {
   fitGap,
 } from "@/app/lib/apply/fixes";
 import { impactMisses } from "@/app/lib/apply/impact";
-import { editBullet, editName, editSummary, editTitle, type LineEdit } from "@/app/lib/apply/edits";
+import { editBullet, editName, editSkills, editSummary, editTitle, type LineEdit } from "@/app/lib/apply/edits";
 import { hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, stepId, undoIfWorse } from "@/app/lib/apply/history";
 import { scanBaseline, sendingResumeId, textPrint, type ApplyState, type FitAsk } from "@/app/lib/apply/state";
 import { ATS_BILLING_HREF, isCurrentScore, missingGaps, prepareResumeForDoc, scanCoverage } from "@/app/lib/ats/api";
@@ -172,6 +172,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
   const [places, setPlaces] = useState<ResumePlace[]>(["bullets", "skills"]);
   const [busy, setBusy] = useState<string | null>(null);
+  // Changes still being written to the draft: the score card shows scoring from the moment one
+  // starts, never the old "Up to date" while the save is in flight (owner, 2026-10-20).
+  const [saving, setSaving] = useState(0);
   const [changeError, setChangeError] = useState<string | null>(null);
   // The −1 pt note set aside ("Keep as is") for this score.
   const [keptStuffing, setKeptStuffing] = useState<string | null>(null);
@@ -331,9 +334,17 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     });
   }, [editable, stored, unstampedAt, resume.draftId, update]);
 
+  // A score lands before its write-up, which the stream sends a few seconds later: it is this
+  // version's score from the moment it lands (owner, 2026-10-20: the card read "Edited since this
+  // score" for the four seconds the explanation took).
+  const landed = !stored && live?.status === "explaining" && live.report && triedKey.current === scoreKey ? live.report : null;
   const scoreState: ScoreState = !sendingId
     ? { kind: "none" }
-    : scoring || (!report && (sending.isPending || sending.data?.status === "pending" || !live?.failure))
+    : landed
+      ? scanCoverage(landed).partial
+        ? { kind: "partial", checked: scanCoverage(landed).checked, total: scanCoverage(landed).total }
+        : { kind: "ready" }
+      : (editable && saving > 0) || scoring || (!report && (sending.isPending || sending.data?.status === "pending" || !live?.failure))
       ? { kind: "scoring" }
       : live?.failure && !report
         ? { kind: "failed", message: live.failure.message, retryable: live.failure.retryable, credits: live.failure.kind === "credits" }
@@ -341,7 +352,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           ? { kind: "partial", checked: scanCoverage(report).checked, total: scanCoverage(report).total }
           : report && stored
             ? { kind: "ready" }
-            : { kind: "stale" };
+            : // A change just made rescores by itself: shown as scoring straight away, never as "Edited
+              // since this score" while the draft is read again (owner, 2026-10-20). A tracked
+              // application, a failed read or a failed scan keeps the stale score and its Rescore.
+              // Only until this version's scan has run: one that finished without a score here is stale.
+              editable && sending.data?.status !== "failed" && !live?.failure && triedKey.current !== scoreKey
+              ? { kind: "scoring" }
+              : { kind: "stale" };
   const shownReport = report ?? (scoreState.kind === "stale" ? (anyScore?.report ?? null) : null);
 
   const gaps = report ? missingGaps(report) : [];
@@ -539,6 +556,15 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     worseGuard.current = null;
     commits.current += 1;
     setChangeError(null);
+    setSaving((n) => n + 1);
+    try {
+      return await commitChangeNow(label, words, before);
+    } finally {
+      setSaving((n) => Math.max(0, n - 1));
+    }
+  }
+
+  async function commitChangeNow(label: string, words: ResumeContent, before: ResumeContent): Promise<CommittedStep | null> {
     // An undo or jump still being saved goes first, so this lands over the step the person sees.
     await jumpsSaved();
     const versionNow = draftVersionNow(resume.draftId);
@@ -765,6 +791,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             commitEdit(editBullet({ ...content, hiddenParts: shownHidden }, entryId, index, text)),
           onName: (text: string) => commitEdit(editName({ ...content, hiddenParts: shownHidden }, text)),
           onTitle: (text: string) => commitEdit(editTitle({ ...content, hiddenParts: shownHidden }, text)),
+          onSkills: (blockId: string, text: string) => commitEdit(editSkills({ ...content, hiddenParts: shownHidden }, blockId, text)),
         }
       : undefined;
 
@@ -1599,7 +1626,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         <ScoreRow
           state={scoreState}
           report={shownReport}
-          previousScore={stored?.previousScore ?? null}
+          previousScore={stored?.previousScore ?? (landed && anyScore ? Math.round(anyScore.report.score) : null)}
           previousMetrics={stored?.previousMetrics}
           creditsHref={ATS_BILLING_HREF}
           onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}

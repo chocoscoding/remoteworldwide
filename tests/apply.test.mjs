@@ -37,7 +37,7 @@ const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, scanBaseline, 
 const { INTERVIEW_ADVICE, excerpt, stepsForGap } = await import("../app/lib/apply/gapSteps.ts");
 const { changeCount, highlightTexts, resumeChanges } = await import("../app/lib/apply/changes.ts");
 const { noteParts, quantityParts, scoreColor, withoutEmDashes } = await import("../app/lib/apply/score.ts");
-const { editBullet, editName, editSummary, editTitle } = await import("../app/lib/apply/edits.ts");
+const { editBullet, editName, editSkills, editSummary, editTitle } = await import("../app/lib/apply/edits.ts");
 const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, undoIfWorse } = await import("../app/lib/apply/history.ts");
 const {
   TRIED,
@@ -533,6 +533,29 @@ describe("editing lines on the page", () => {
   it("retypes the summary", () => {
     assert.equal(editSummary(content(), "New words.").label, "Edited the Summary");
     assert.equal(editSummary(content(), content().summary), null);
+  });
+
+  it("retypes a Skills line: a name over sub skills, plain skills, or nothing", () => {
+    const groups = [
+      { id: "a", title: "Figma", skills: [] },
+      { id: "b", title: "Sketch", skills: [] },
+      { id: "c", title: "Frameworks", skills: ["React", "Express"] },
+    ];
+    const words = { ...content(), skills: ["Figma", "Sketch", "React", "Express"], skillGroups: groups };
+    const shape = (edit) => edit.content.skillGroups.map(({ title, skills }) => [title, skills]);
+    // The plain run "Figma, Sketch" becomes a named group.
+    assert.deepEqual(shape(editSkills(words, "plain:a", "Design tools: Figma, Sketch, Framer")), [
+      ["Design tools", ["Figma", "Sketch", "Framer"]],
+      ["Frameworks", ["React", "Express"]],
+    ]);
+    // A group loses a skill and gains one; the flat list follows.
+    const framed = editSkills(words, "c", "Frameworks: React, Next.js");
+    assert.deepEqual(framed.content.skills, ["Figma", "Sketch", "React", "Next.js"]);
+    assert.equal(framed.content.skillGroups[2].id, "c");
+    // Cleared: gone. Unchanged: nothing.
+    assert.deepEqual(shape(editSkills(words, "c", "")), [["Figma", []], ["Sketch", []]]);
+    assert.equal(editSkills(words, "c", "Frameworks: React, Express"), null);
+    assert.equal(editSkills(words, "plain:a", "Figma, Sketch"), null);
   });
 
   it("retypes the name, never to nothing, and the title, removed when cleared", () => {

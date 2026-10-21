@@ -112,6 +112,8 @@ export interface PaperEdits {
   /** The name and the title under it, retyped the same way (owner, 2026-10-20). */
   onName?: (text: string) => void;
   onTitle?: (text: string) => void;
+  /** One printed Skills line ("Frameworks: React, Express"), by its block's id (`editSkills`). */
+  onSkills?: (blockId: string, text: string) => void;
 }
 
 const NONE: PaperHighlight = { focus: null, marks: [], underlines: [] };

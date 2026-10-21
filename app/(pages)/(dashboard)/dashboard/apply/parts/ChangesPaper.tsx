@@ -141,6 +141,7 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
             onBullet: (entryId: string, index: number, text: string) => editsRef.current?.onBullet(entryId, index, text),
             onName: (text: string) => editsRef.current?.onName?.(text),
             onTitle: (text: string) => editsRef.current?.onTitle?.(text),
+            onSkills: (blockId: string, text: string) => editsRef.current?.onSkills?.(blockId, text),
           }
         : undefined,
     }),

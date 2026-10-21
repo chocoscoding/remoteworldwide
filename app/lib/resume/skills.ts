@@ -45,7 +45,7 @@ export const parseSubSkills = (text: string): string[] =>
 export const subSkillText = (skills: string[]): string => skills.join(", ");
 
 /** An entry's id from its name, unique among `taken` (which it joins). Deterministic, so an updater run twice agrees. */
-function entryIdFor(name: string, taken: Set<string>): string {
+export function entryIdFor(name: string, taken: Set<string>): string {
   const base = `skl-${
     key(name)
       .replace(/[^a-z0-9]+/g, "-")

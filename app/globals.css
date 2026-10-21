@@ -1283,6 +1283,26 @@ body {
   display: none !important;
 }
 
+/* The ATS ring while a score is worked out: grey filling from 0 toward the top, slowing as it goes,
+   instead of a spinner (owner, 2026-10-20). A scan takes a few seconds to about twenty. */
+@keyframes ats-ring-fill {
+  from {
+    stroke-dasharray: 0 94.2;
+  }
+  to {
+    stroke-dasharray: 90 94.2;
+  }
+}
+.ats-ring-fill {
+  animation: ats-ring-fill 18s cubic-bezier(0.1, 0.75, 0.25, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ats-ring-fill {
+    animation: none;
+    stroke-dasharray: 40 94.2;
+  }
+}
+
 /* "Show in resume": the lines a card means, lit leaf green over everything else for a moment. */
 ::highlight(rww-resume-flash) {
   background-color: #b6df8a;

@@ -3,7 +3,8 @@
 // step of its history, so undo takes it back. Pure: tests/apply.test.mjs runs it under plain
 // `node --test`.
 
-import type { ResumeContent } from "@/app/lib/dashboard/types";
+import type { ResumeContent, ResumeSkillGroup } from "@/app/lib/dashboard/types";
+import { entriesOf, entryIdFor, withEntries } from "@/app/lib/resume/skills";
 
 export interface LineEdit {
   content: ResumeContent;
@@ -28,6 +29,55 @@ export function editTitle(content: ResumeContent, text: string): LineEdit | null
   const next = text.trim();
   if (next === (content.title ?? "").trim()) return null;
   return { content: { ...content, title: next }, label: next ? `Title set to ${next}` : "Removed your title" };
+}
+
+/**
+ * One printed Skills line, retyped (owner, 2026-10-20: "I should also be able to type and edit my
+ * skills"): "Frameworks: React, Express" is a group over its sub skills, a line with no colon is
+ * skills on their own, and an emptied line takes its entries away. `blockId` is the printed
+ * block's id (`printableGroups`): an entry's own id, or "plain:<first entry>" for a run of skills
+ * printed as one list. Hidden entries stay where they are. Null when nothing changed.
+ */
+export function editSkills(content: ResumeContent, blockId: string, text: string): LineEdit | null {
+  const entries = entriesOf(content);
+  const plain = blockId.startsWith("plain:");
+  const start = entries.findIndex((entry) => entry.id === (plain ? blockId.slice("plain:".length) : blockId));
+  if (start === -1) return null;
+
+  // The entries the line printed: one with sub skills, or the run of plain ones (skipping hidden
+  // and blank entries, as printing does) up to the next entry with sub skills.
+  const isPlain = (entry: ResumeSkillGroup) => !entry.hidden && entry.title.trim() !== "" && entry.skills.every((skill) => !skill.trim());
+  const skipped = (entry: ResumeSkillGroup) => entry.hidden || (!entry.title.trim() && entry.skills.every((skill) => !skill.trim()));
+  let end = start + 1;
+  if (plain) while (end < entries.length && (isPlain(entries[end]) || skipped(entries[end]))) end += 1;
+  const span = entries.slice(start, end);
+  const printed = span.filter((entry) => !entry.hidden && (plain ? isPlain(entry) : true));
+  const own = span[0].skills.map((skill) => skill.trim()).filter(Boolean).join(", ");
+  const before = plain ? printed.map((entry) => entry.title.trim()).join(", ") : span[0].title.trim() ? `${span[0].title.trim()}: ${own}` : own;
+
+  const line = text.replace(/\s+/g, " ").trim();
+  if (line === before) return null;
+  const colon = line.indexOf(":");
+  const title = colon > 0 ? line.slice(0, colon).trim() : "";
+  const skills = (colon > 0 ? line.slice(colon + 1) : line)
+    .split(/\s*[,;•★]\s*/)
+    .map((skill) => skill.trim())
+    .filter((skill, i, all) => skill !== "" && all.findIndex((other) => other.toLowerCase() === skill.toLowerCase()) === i);
+
+  const taken = new Set(entries.filter((_, i) => i < start || i >= end).map((entry) => entry.id));
+  const kept = (id: string) => {
+    taken.add(id);
+    return id;
+  };
+  const made: ResumeSkillGroup[] =
+    skills.length === 0
+      ? []
+      : title
+        ? [{ id: plain ? entryIdFor(title, taken) : kept(span[0].id), title, skills }]
+        : skills.map((skill) => ({ id: entryIdFor(skill, taken), title: skill, skills: [] }));
+  // Hidden entries in the span keep their place after the line's.
+  const groups = [...entries.slice(0, start), ...made, ...span.filter((entry) => entry.hidden), ...entries.slice(end)];
+  return { content: withEntries(content, groups), label: made.length === 0 ? "Removed skills" : "Edited your Skills" };
 }
 
 /** The summary, retyped. Null when nothing changed. */

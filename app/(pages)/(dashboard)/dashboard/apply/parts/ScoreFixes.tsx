@@ -36,9 +36,10 @@ const Ring: FC<{ score: number | null; previous: number | null; state: ScoreStat
   if (state === "scoring") {
     return (
       <span className="h-[88px] w-[88px] flex-none">
-        <svg width="88" height="88" viewBox="0 0 36 36" className="animate-spin" aria-hidden>
+        {/* Filled in grey from 0, slowing as it nears the top, never spinning (owner, 2026-10-20). */}
+        <svg width="88" height="88" viewBox="0 0 36 36" aria-hidden>
           <circle cx="18" cy="18" r="15" fill="none" stroke="#ecece6" strokeWidth="3.2" />
-          <circle cx="18" cy="18" r="15" fill="none" stroke="#222325" strokeWidth="3.2" strokeLinecap="round" strokeDasharray={`20 ${C}`} />
+          <circle cx="18" cy="18" r="15" fill="none" stroke="#b9bab4" strokeWidth="3.2" strokeLinecap="round" className="ats-ring-fill" transform="rotate(-90 18 18)" />
         </svg>
       </span>
     );
@@ -94,6 +95,9 @@ const Ring: FC<{ score: number | null; previous: number | null; state: ScoreStat
             stroke="#ffffff"
             strokeOpacity=".55"
             strokeWidth="3.2"
+            // Round like the score's arc, so its rounded start never shows through at the top as
+            // a filled cap (owner, 2026-10-21).
+            strokeLinecap="round"
             strokeDasharray={`${arc(previous)} ${C}`}
             transform="rotate(-90 18 18)"
           />
