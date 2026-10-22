@@ -6,6 +6,7 @@
 import type { ChunkSection, CoverageState, RequirementVerdict, ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { ResumePlace } from "@/app/lib/resume/ai";
+import type { FitAsk } from "./state";
 
 export type ScoreHue = "low" | "mid" | "high";
 
@@ -200,6 +201,38 @@ const TRAIT_LABEL = /\b(?:comfort\w*|confiden\w*|willing\w*|eager\w*|energy|init
  * "Tailor to this job" reframes the real work that matches it instead (owner, 2026-10-20).
  */
 export const fitGap = (verdict: RequirementVerdict | undefined): boolean => !verdict || worthAdding(verdict);
+
+/** Example asks shown at once, at most. */
+const MAX_EXAMPLE_ASKS = 4;
+
+/**
+ * The examples a posting names that the resume does not ("such as Java, Python, SQL", met on Python
+ * and SQL), each a yes or no that puts it in Skills (owner, 2026-10-21: "Java and Azure" left the page
+ * once the requirement they illustrate was met, and only Tailor ever asked). What a required one names
+ * first; never one answered no or already in Skills.
+ */
+export function exampleAsks(
+  report: Pick<ScanReport, "verdicts">,
+  content: Pick<ResumeContent, "skills">,
+  asked: ReadonlyArray<Pick<FitAsk, "term" | "no">>,
+): FitAsk[] {
+  const listed = new Set(content.skills.map(fold));
+  const declined = new Set(asked.filter((ask) => ask.no).map((ask) => fold(ask.term)));
+  const seen = new Set<string>();
+  const out: FitAsk[] = [];
+  const ordered = [...report.verdicts].sort((a, b) => Number(b.requirement.type === "required") - Number(a.requirement.type === "required"));
+  for (const verdict of ordered) {
+    if (verdict.requirement.id.startsWith("role:")) continue;
+    for (const term of verdict.unnamed ?? []) {
+      const key = fold(term);
+      if (!key || seen.has(key) || listed.has(key) || declined.has(key)) continue;
+      seen.add(key);
+      const near = (verdict.requirement.proof ?? []).filter((word) => fold(word) !== key);
+      out.push({ term, ifTrue: `${term}, if you have used it`, place: "skills", fromStep: null, no: false, addedIn: null, near });
+    }
+  }
+  return out.slice(0, MAX_EXAMPLE_ASKS);
+}
 
 /** The keywords matched only in Skills, by name. */
 export const skillsOnlyNames = (report: Pick<ScanReport, "verdicts">): string[] => [...new Set(report.verdicts.filter(onlyInSkills).map(nameOf))];

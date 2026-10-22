@@ -30,6 +30,7 @@ import {
 } from "./score";
 import type { VaultDoc } from "@/app/lib/dashboard/types";
 import { isPostingNote, type BulletRewrite, type ExtractedRequirements, type IngestedResume, type IngestedResumeDetail, type ScanInput, type ScanAdvice, type ScanRecord, type ScanReport, type StoredScan } from "./types";
+import { strictnessCopy } from "./strictness";
 
 export { HEADLINE_SHARES, MAX_SCAN_SCORE, STUFFING_FROM_SCORE, expectedScore, isCurrentScore, isUnchecked, projectedLifts, scoreMakeup };
 
@@ -271,6 +272,9 @@ function toReport(data: unknown): ScanReport | null {
     advice: listOf<ScanAdvice>(data.advice).filter((item) => isRecord(item) && typeof item.title === "string" && typeof item.detail === "string"),
     explanation: typeof data.explanation === "string" ? data.explanation : null,
     rewrites: Array.isArray(data.rewrites) ? (data.rewrites as BulletRewrite[]) : [],
+    ...(isRecord(data.stretch) && typeof data.stretch.leans === "string"
+      ? { stretch: { leans: data.stretch.leans, carryOver: listOf<string>(data.stretch.carryOver).filter((label) => typeof label === "string").slice(0, 2) } }
+      : {}),
   };
 }
 
@@ -476,9 +480,11 @@ export const partialLine = ({ checked, total }: { checked: number; total: number
  * red build rather than two screens disagreeing about the same number.
  */
 export function scanTier(score: number): { label: string; tone: "positive" | "neutral" | "urgent" } {
-  if (score >= 85) return { label: "Strong match", tone: "positive" };
-  if (score >= 65) return { label: "Good, not yet great", tone: "neutral" };
-  return { label: "Needs work", tone: "urgent" };
+  // The labels follow the strictness level (strictness.ts); the bands never move.
+  const [strong, good, low] = strictnessCopy().bands;
+  if (score >= 85) return { label: strong, tone: "positive" };
+  if (score >= 65) return { label: good, tone: "neutral" };
+  return { label: low, tone: "urgent" };
 }
 
 /**

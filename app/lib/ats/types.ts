@@ -70,6 +70,15 @@ export interface RequirementVerdict {
   resolvedBy: ResolvedBy;
   evidence: Evidence[];
   confidence: "high" | "medium" | "low";
+  /** Met, but shown only in the summary or the Skills list: it earned part of the credit. */
+  mention?: boolean;
+  /** Met, and the share (0 to 1) of the examples it names ("such as Java, Python, SQL") the resume shows. */
+  examples?: number;
+  /**
+   * The examples it names that the resume does not show, as a Skills list writes them ("Java",
+   * "Facebook API"): asked as a yes or no while naming them would still move the score.
+   */
+  unnamed?: string[];
 }
 
 /** One suggested bullet edit. `before` is the service's own copy of the line, never the model's. */
@@ -130,6 +139,8 @@ export interface ScanReport {
    * it was worth: 3 same, 2 related, 0 unsure, -2 unrelated. Absent with no job title.
    */
   titleFit?: TitleFit;
+  /** The job leans to another field and little of it matches: a one-line tip, never a stop. Mirrors the service's `ScanStretch`. */
+  stretch?: ScanStretch;
   explanation: string | null;
   rewrites: BulletRewrite[];
 }
@@ -164,6 +175,12 @@ export interface ScanRecord extends ScanReport {
   /** When the scan ran, ISO-8601. */
   scannedAt: string;
   explanationStatus: ExplanationStatus;
+}
+
+/** A job outside the resume's field: the field it leans to and up to two things to lead with. */
+export interface ScanStretch {
+  leans: string;
+  carryOver: string[];
 }
 
 /** Mirrors `TitleFit` in the service's `titleFit.ts`. */

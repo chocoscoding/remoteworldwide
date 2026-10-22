@@ -4,6 +4,7 @@
 
 import type { AtsMetric } from "@/app/lib/dashboard/types";
 import { isPostingNote, type RequirementVerdict, type ScanReport } from "./types";
+import { strictness } from "./strictness";
 
 /** The highest score any scan shows (owner, 2026-10-18): there is always something left to ask for. */
 export const MAX_SCAN_SCORE = 99;
@@ -93,7 +94,11 @@ export function scoreMakeup(
 export const REQUIREMENT_WEIGHTS = {
   type: { required: 1, preferred: 0.4 },
   category: { responsibility: 0.5 },
-  coverage: { satisfied: 1, partial: 0.5, missing: 0 },
+  // Partial and mention credit come from the strictness level (strictness.ts), as the scorer's do.
+  coverage: { satisfied: 1, partial: strictness().partialCredit, missing: 0 },
+  mention: strictness().mentionCredit,
+  // A met requirement's named examples carry this share of its credit (EXAMPLES_SHARE in the scorer).
+  examples: 0.3,
   confidence: { high: 1, medium: 0.9, low: 0.75 },
 } as const;
 
@@ -118,8 +123,15 @@ export function projectedLifts(report: Pick<ScanReport, "verdicts" | "metrics">)
   const possible = scored.reduce((sum, verdict) => sum + weightOf(verdict), 0);
   if (possible <= 0) return lifts;
   for (const verdict of scored) {
-    if (verdict.state === "satisfied" || verdict.state === "undetermined") continue;
-    const earned = REQUIREMENT_WEIGHTS.coverage[verdict.state] * (REQUIREMENT_WEIGHTS.confidence[verdict.confidence] ?? 1);
+    // Met in the work with every example it names: nothing left to earn. Met only in the summary or
+    // Skills, or without some of its examples: the rest of its credit.
+    const examples = verdict.state === "satisfied" && typeof verdict.examples === "number" ? verdict.examples : 1;
+    if (verdict.state === "undetermined" || (verdict.state === "satisfied" && !verdict.mention && examples >= 1)) continue;
+    const earned =
+      REQUIREMENT_WEIGHTS.coverage[verdict.state] *
+      (verdict.mention ? REQUIREMENT_WEIGHTS.mention : 1) *
+      (1 - REQUIREMENT_WEIGHTS.examples * (1 - examples)) *
+      (REQUIREMENT_WEIGHTS.confidence[verdict.confidence] ?? 1);
     lifts.set(verdict.requirement.id, (HEADLINE_SHARES["keyword-match"] * weightOf(verdict) * (1 - earned)) / possible);
   }
   return lifts;

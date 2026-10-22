@@ -48,6 +48,7 @@ import {
   workingItems,
   worthGapChip,
   fitGap,
+  exampleAsks,
 } from "@/app/lib/apply/fixes";
 import { impactMisses } from "@/app/lib/apply/impact";
 import { editBullet, editName, editSkills, editSummary, editTitle, type LineEdit } from "@/app/lib/apply/edits";
@@ -66,6 +67,8 @@ import {
   type ResumePlace,
 } from "@/app/lib/resume/ai";
 import { applyQuantify, type FitAddition } from "@/app/lib/dashboard/resume/ai-tools";
+import { addedFigures, withAiFigures } from "@/app/lib/dashboard/resume/ai-figures";
+import { strictnessCopy } from "@/app/lib/ats/strictness";
 import {
   RESUME_ACCEPT,
   createDraftResume,
@@ -79,7 +82,7 @@ import {
   visibleContent,
   type ImportedResume,
 } from "@/app/lib/resume/api";
-import { addSkills, reconcileGroups, removeSkills } from "@/app/lib/resume/skills";
+import { addSkillNear, addSkills, reconcileGroups, removeSkills } from "@/app/lib/resume/skills";
 import { useIngestedResumeQuery, useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
 import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
@@ -825,6 +828,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       ? []
       : (report?.verdicts ?? []).filter(
           (verdict) =>
+            // The job's own title (the scan's "role:" requirement) is never written in: the work shows the role or not.
+            !verdict.requirement.id.startsWith("role:") &&
             onlyInSkills(verdict) &&
             verdict.state === "partial" &&
             !proved.has((verdict.requirement.label?.trim() || verdict.requirement.text).toLowerCase()),
@@ -834,6 +839,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     label: verdict.requirement.label?.trim() || verdict.requirement.text,
     wants: verdict.requirement.text,
   }));
+  // The examples the posting names and the resume does not ("Java", "Azure"), asked whether Tailor
+  // ran or not (owner, 2026-10-21); one Tailor already asks about is not asked twice.
+  const tailorAsked = new Set(openAsks.map((ask) => ask.term.toLowerCase()));
+  const shownAsks = [
+    ...openAsks,
+    ...(done || !report || !visible ? [] : exampleAsks(report, visible, resume.asks ?? []).filter((ask) => !tailorAsked.has(ask.term.toLowerCase()))),
+  ];
   const working = report ? workingItems(report, content) : [];
   const toolsIdle = editable && Boolean(content) && tools.running === null && !busy;
 
@@ -845,11 +857,14 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   useEffect(() => {
     const pending = worseGuard.current;
     if (!pending) return;
-    if (!editable || !sendingDraft) {
-      // Tracked, or the Original picked to send: undo would switch the person back to the draft.
+    // Tracked, or the Original picked to send: undo would switch the person back to the draft.
+    if (!editable || (resume.draftId !== null && !resume.sendDraft)) {
       worseGuard.current = null;
       return;
     }
+    // The first change makes the draft, and the page switches to sending it a render later: wait for
+    // it rather than disarm (2026-10-21: "Down 4" on a first change was never undone).
+    if (!sendingDraft) return;
     // Decided once this version's own score is in.
     if (!stored || stored.resumeId !== pending.resumeId || stored.version !== pending.version) return;
     if (busy || tools.running !== null || pendingHidden !== null) return;
@@ -859,7 +874,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     if (jumpTo(back)) toast("That change lowered your score, so it was undone.");
     // jumpTo reads the state it is called with; the guard fires once per tool change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editable, sendingDraft, stored, history, historyAt, busy, tools.running, pendingHidden]);
+  }, [editable, sendingDraft, resume.draftId, resume.sendDraft, stored, history, historyAt, busy, tools.running, pendingHidden]);
 
   /** Runs a tool, then puts what it wrote into the draft as one change. `nothing` says why, when that is nothing. */
   async function runAndCommit(
@@ -1011,17 +1026,21 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     void commitChange(`Title set to ${title}`, { ...content, title }).finally(() => setBusy(null));
   }
 
-  /** Marks one ask answered: `no`, or the step its "Yes" made. */
-  function answerAsk(term: string, answer: { no: true } | { addedIn: string }) {
-    update((s) => ({
-      ...s,
-      resume: {
-        ...s.resume,
-        asks: (s.resume.asks ?? []).map((ask) =>
-          ask.term === term ? { ...ask, ...("no" in answer ? { no: true } : { addedIn: answer.addedIn }) } : ask,
-        ),
-      },
-    }));
+  /** Marks one ask answered: `no`, or the step its "Yes" made. One the scan's examples raised is kept from then on. */
+  function answerAsk(item: FitAsk, answer: { no: true } | { addedIn: string }) {
+    const answered = "no" in answer ? { no: true } : { addedIn: answer.addedIn };
+    update((s) => {
+      const asks = s.resume.asks ?? [];
+      return {
+        ...s,
+        resume: {
+          ...s.resume,
+          asks: asks.some((ask) => ask.term === item.term)
+            ? asks.map((ask) => (ask.term === item.term ? { ...ask, ...answered } : ask))
+            : [...asks, { ...item, ...answered }],
+        },
+      };
+    });
   }
 
   /**
@@ -1032,7 +1051,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   function addIfTrue(item: FitAsk) {
     if (!content || !toolsIdle) return;
     const toSkills = (words: ResumeContent, note: string | null) => {
-      const next = addSkills(words, [item.term]);
+      const next = addSkillNear(words, item.term, item.near ?? []);
       if (next === words) {
         setChangeError("Already in your Skills.");
         return;
@@ -1041,7 +1060,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       void commitChange(`Added ${item.term} to Skills`, next)
         .then((made) => {
           if (!made) return;
-          answerAsk(item.term, { addedIn: made.stepId });
+          answerAsk(item, { addedIn: made.stepId });
           if (note) toast(note);
         })
         .finally(() => setBusy(null));
@@ -1069,7 +1088,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       return result ? { content: result.content } : null;
     }).then((made) => {
       if (made) {
-        answerAsk(item.term, { addedIn: made.stepId });
+        answerAsk(item, { addedIn: made.stepId });
         if (outcome) tellKeywords(outcome);
         return;
       }
@@ -1208,6 +1227,14 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             keywords: terms,
             places: ["bullets"],
             insist: true,
+            // What each requirement means and the words that show it, as the Missing chips send them
+            // (2026-10-21: without them "backend development such as Java, Python, SQL" was put into
+            // a line as the bare label, and the score never moved).
+            hints: Object.fromEntries(
+              proofChips
+                .filter((chip) => terms.includes(chip.label))
+                .map((chip) => [chip.label, { means: chip.wants, proof: verdictById.get(chip.id)?.requirement.proof ?? [] }]),
+            ),
           }),
         );
         outcome = result;
@@ -1229,6 +1256,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     if (!content) return;
     const sent = { ...content, hiddenParts: shownHidden };
     let rewritten: string[] = [];
+    // Lines that gained a number the person did not write, for the nudge.
+    let numbered = 0;
     void runAndCommit("Strengthened your bullets", "Strengthening the bullets that lose Impact points…", async () => {
       const proposals = await tools.run("quantify", () => quantifySuggestions({ content: sent, section: "experience", openers: true }));
       if (!proposals) return null;
@@ -1247,9 +1276,14 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         return null;
       }
       rewritten = landed.map((proposal) => proposal.after);
-      return { content: landed.reduce(applyQuantify, content) };
+      numbered = landed.filter((proposal) => addedFigures(proposal.before, proposal.after).length > 0).length;
+      // Recorded like the resume screen's Quantify (owner, 2026-10-21), so the AI numbers pill counts them.
+      return { content: withAiFigures(landed.reduce(applyQuantify, content), landed) };
     }).then((made) => {
-      if (made) showOnPage(rewritten);
+      if (!made) return;
+      showOnPage(rewritten);
+      // A nudge, never a block (owner, 2026-10-21): the numbers stay unless the person changes them.
+      if (numbered > 0) toast(`Added numbers to ${numbered === 1 ? "a line" : `${numbered} lines`}. ${strictnessCopy().numberNudge}`);
     });
   }
 
@@ -1361,14 +1395,14 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         ]
       : []),
     // What the job asks for that the resume does not show: only added on a yes (owner, 2026-10-20).
-    ...openAsks.map((item) => ({
+    ...shownAsks.map((item) => ({
       id: `if-true-${item.term}`,
       title: item.ifTrue,
       action: "",
       icon: "tailor" as const,
       choices: [
         { label: "Yes, add it", onClick: () => addIfTrue(item) },
-        { label: "No", onClick: () => answerAsk(item.term, { no: true }) },
+        { label: "No", onClick: () => answerAsk(item, { no: true }) },
       ],
     })),
     // Tailor found nothing to change on this step: said as a note at the end of the list, never as
@@ -1631,6 +1665,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           creditsHref={ATS_BILLING_HREF}
           onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
         />
+        {/* A job outside the resume's field: one line on what carries over, never a stop (owner, 2026-10-21). */}
+        {report?.stretch && (
+          <p className="text-[13px] leading-snug text-[#5f6062]">
+            This role leans {report.stretch.leans}.
+            {report.stretch.carryOver.length > 0 ? ` Lead with ${report.stretch.carryOver.join(" and ")}.` : ""}
+          </p>
+        )}
         {report && (
           <FixesTabs
             gaps={shownChips}

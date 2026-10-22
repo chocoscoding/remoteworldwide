@@ -80,3 +80,78 @@ export const changeCount = (changes: ResumeChanges): number =>
 /** Every changed string, longest first, so a sentence is matched before a skill that appears inside it. */
 export const highlightTexts = (changes: ResumeChanges): string[] =>
   [...changes.summary, ...changes.bullets, ...(changes.title ? [changes.title] : []), ...changes.skills].sort((a, b) => b.length - a.length);
+
+/** One thing to mark on the paper: `text`, found inside the line `within` when it is given. */
+export interface HighlightMark {
+  text: string;
+  within?: string;
+}
+
+/** A word as compared: lower case, without the punctuation around it. */
+const wordKey = (word: string) => word.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+
+/**
+ * The runs of words a line gained, as `after` writes them (owner, 2026-10-21: "we are only meant to
+ * highlight what we added, not the whole line that was changed"). Compared word for word against the
+ * line it replaced, by the longest common run of words, so a reworded line marks only what is new.
+ */
+export function addedParts(before: string, after: string): string[] {
+  const a = before.trim().split(/\s+/).filter(Boolean);
+  const b = after.trim().split(/\s+/).filter(Boolean);
+  const ka = a.map(wordKey);
+  const kb = b.map(wordKey);
+  // Longest common subsequence of words: what stayed. Lines are short, so the table is small.
+  const table = Array.from({ length: ka.length + 1 }, () => new Array<number>(kb.length + 1).fill(0));
+  for (let i = ka.length - 1; i >= 0; i -= 1) {
+    for (let j = kb.length - 1; j >= 0; j -= 1) {
+      table[i][j] = ka[i] && ka[i] === kb[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+    }
+  }
+  const kept = new Array<boolean>(b.length).fill(false);
+  for (let i = 0, j = 0; i < ka.length && j < kb.length; ) {
+    if (ka[i] && ka[i] === kb[j]) {
+      kept[j] = true;
+      i += 1;
+      j += 1;
+    } else if (table[i + 1][j] >= table[i][j + 1]) i += 1;
+    else j += 1;
+  }
+  const parts: string[] = [];
+  let run: string[] = [];
+  b.forEach((word, index) => {
+    if (!kept[index] && wordKey(word)) run.push(word);
+    else if (run.length > 0) {
+      parts.push(run.join(" "));
+      run = [];
+    }
+  });
+  if (run.length > 0) parts.push(run.join(" "));
+  return parts;
+}
+
+/**
+ * What the paper marks: in a reworded bullet or a rewritten summary only the words it gained, inside
+ * that line; a new bullet, a new title and a new skill whole.
+ */
+export function highlightMarks(before: ResumeContent | null, after: ResumeContent): HighlightMark[] {
+  const changes = resumeChanges(before, after);
+  const marks: HighlightMark[] = [];
+  const reworded = new Set(changes.rewordedBullets);
+  after.experience.forEach((entry, index) => {
+    entry.bullets.forEach((bullet, position) => {
+      const line = bullet.trim();
+      if (!reworded.has(line)) return;
+      const old = before?.experience[index]?.bullets[position] ?? "";
+      for (const text of addedParts(old, line)) marks.push({ text, within: line });
+    });
+  });
+  for (const line of changes.newBullets) marks.push({ text: line });
+  if (changes.summary.length > 0 && before?.summary.trim()) {
+    for (const text of addedParts(before.summary, after.summary)) marks.push({ text, within: after.summary.trim() });
+  } else {
+    for (const sentence of changes.summary) marks.push({ text: sentence });
+  }
+  if (changes.title) marks.push({ text: changes.title });
+  for (const skill of changes.skills) marks.push({ text: skill });
+  return marks.sort((x, y) => y.text.length - x.text.length);
+}

@@ -30,6 +30,7 @@ registerHooks({
 });
 
 const { expectedScore, isCurrentScore, projectedLifts, scoreMakeup } = await import("../app/lib/ats/score.ts");
+const { strictness } = await import("../app/lib/ats/strictness.ts");
 
 const metrics = (keyword, impact, parse, length) => [
   keyword === null ? { id: "keyword-match", label: "Keyword match", value: null, checked: false } : { id: "keyword-match", label: "Keyword match", value: keyword },
@@ -74,11 +75,20 @@ describe("what meeting a missing requirement is projected to add", () => {
   });
 
   it("is its share of the checked weight, at keyword match's 70%, as a rescore would count it", () => {
-    // Two met, one missing, one partly met, all weight 4: 16 checked. Missing lacks 4 of 16 (70 x 4 / 16 = 17.5); partial lacks half.
+    // Two met, one missing, one partly met, all weight 4: 16 checked. Missing lacks 4 of 16 (70 x 4 / 16 = 17.5);
+    // partial lacks what the strictness level does not give it (balanced: 55%).
     const report = { metrics: metrics(63, 70, 90, 90), verdicts: [verdict("a", "satisfied"), verdict("b", "satisfied"), verdict("c", "missing"), verdict("d", "partial")] };
     const lifts = projectedLifts(report);
     assert.equal(lifts.get("c"), 17.5);
-    assert.equal(lifts.get("d"), 8.75);
+    assert.equal(lifts.get("d"), 17.5 * (1 - strictness().partialCredit));
+    assert.equal(lifts.has("a"), false);
+  });
+
+  // Owner, 2026-10-21: met only in the summary or Skills earns the level's mention share, so showing it in the work lifts the rest.
+  it("projects the rest of a requirement met only in the summary or Skills", () => {
+    const report = { metrics: metrics(63, 70, 90, 90), verdicts: [verdict("a", "satisfied"), { ...verdict("m", "satisfied"), mention: true }] };
+    const lifts = projectedLifts(report);
+    assert.equal(lifts.get("m"), 35 * (1 - strictness().mentionCredit));
     assert.equal(lifts.has("a"), false);
   });
 

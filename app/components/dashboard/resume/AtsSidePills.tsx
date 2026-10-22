@@ -19,6 +19,7 @@ import { motion } from "motion/react";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import type { ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
 import { cn } from "@/lib/utils";
+import { strictnessCopy } from "@/app/lib/ats/strictness";
 
 const PILL =
   "pointer-events-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[#222325] bg-white px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-[#fbfbf7]";
@@ -147,6 +148,8 @@ export const AiFiguresPill: FC<{
                 {label}
               </span>
             </button>
+            {/* The nudge, never a block (owner, 2026-10-21): the numbers stay unless the person changes them. */}
+            <p className="max-w-[15rem] text-[11px] leading-snug text-[#5b5b5b]">{strictnessCopy().numberNudge}</p>
             <div className="flex gap-2">
               <StickerButton variant="outline" size="sm" onClick={onShow}>
                 <Eye className="h-3.5 w-3.5" />

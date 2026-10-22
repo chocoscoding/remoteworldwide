@@ -1272,8 +1272,9 @@ body {
   background-color: #f2f9c9;
   text-decoration: underline;
   text-decoration-color: #a4b335;
-  text-decoration-thickness: 2px;
+  text-decoration-thickness: 1px;
   text-underline-offset: 2px;
+  transition: 1s all ease;
 }
 
 /* The apply step's paper shows what is sent: a section with nothing in it ("No projects added yet.")

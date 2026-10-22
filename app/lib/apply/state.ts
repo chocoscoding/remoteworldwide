@@ -114,6 +114,8 @@ export interface FitAsk {
   no: boolean;
   /** The history step its "Yes" made: while that step stands, it is answered. */
   addedIn: string | null;
+  /** Skills it goes beside: a "Yes" puts it in the Skills entry that holds one of them ("Java" by "Python"). */
+  near?: string[];
 }
 
 export interface WorkedTerm {
@@ -255,6 +257,9 @@ function readAsks(value: unknown): FitAsk[] {
       fromStep: str(item.fromStep),
       no: item.no === true,
       addedIn: str(item.addedIn),
+      ...(Array.isArray(item.near)
+        ? { near: item.near.filter((word): word is string => typeof word === "string" && word.trim() !== "").slice(0, 12).map((word) => word.slice(0, 120)) }
+        : {}),
     }))
     .slice(-MAX_ASKS);
 }

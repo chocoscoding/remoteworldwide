@@ -99,8 +99,8 @@ const isBlank = (group: ResumeSkillGroup) => !group.title.trim() && group.skills
  * Brings the entries back in line with the flat list after something that only
  * knows the flat list changed it: a skill no longer listed leaves the entry it
  * was a sub skill of, or takes its entry with it when it was the entry's name; an
- * entry whose sub skills have all gone goes too; a skill new to the list becomes
- * an entry of its own at the end. Hidden and blank entries are left as they
+ * entry whose sub skills have all gone goes too; a skill new to the list goes in
+ * where it prints with its kind (`placeNew`). Hidden and blank entries are left as they
  * are. A resume saved before entries gets one entry per skill. Returns the same
  * object when nothing was out of line.
  */
@@ -129,58 +129,72 @@ export function reconcileGroups<C extends Pick<ResumeContent, "skills" | "skillG
 
   const covered = new Set(flattenGroups(entries).map(key));
   const taken = new Set(entries.map((group) => group.id));
+  const fresh: ResumeSkillGroup[] = [];
   for (const skill of content.skills) {
     const k = key(skill);
     if (!k || covered.has(k)) continue;
     covered.add(k);
     changed = true;
-    entries.push({ id: entryIdFor(skill, taken), title: skill.trim(), skills: [] });
+    fresh.push({ id: entryIdFor(skill, taken), title: skill.trim(), skills: [] });
   }
 
-  const flat = flattenGroups(entries);
+  const placed = placeNew(entries, fresh, taken);
+  const flat = flattenGroups(placed);
   const sameOrder = flat.length === content.skills.length && flat.every((skill, i) => skill === content.skills[i]);
   if (!changed && sameOrder) return content;
-  return { ...content, skillGroups: entries, skills: flat };
+  return { ...content, skillGroups: placed, skills: flat };
+}
+
+/**
+ * Skills new to the list, where they print with their kind: right after the last plain skill, so they
+ * print in that list, never on a line of their own below an entry with sub skills ("English:
+ * native-level", owner 2026-10-20). When every skill sits in a named group ("Others: Tailwind CSS"),
+ * as sub skills of the "Other" group, or a new one (owner, 2026-10-22: "Rapid prototyping" from a
+ * keyword tool had a line of its own). At the end when there is nothing to go with.
+ */
+function placeNew(entries: ResumeSkillGroup[], fresh: ResumeSkillGroup[], taken: Set<string>): ResumeSkillGroup[] {
+  if (fresh.length === 0) return entries;
+  let after = -1;
+  entries.forEach((group, i) => {
+    if (!group.hidden && group.title.trim() && !group.skills.some((skill) => skill.trim())) after = i;
+  });
+  if (after !== -1) return [...entries.slice(0, after + 1), ...fresh, ...entries.slice(after + 1)];
+  if (!entries.some((group) => !group.hidden && group.skills.some((skill) => skill.trim()))) return [...entries, ...fresh];
+  const names = fresh.map((group) => group.title);
+  const at = entries.findIndex((group) => !group.hidden && /^others?\b/i.test(group.title.trim()) && group.skills.some((skill) => skill.trim()));
+  return at === -1
+    ? [...entries, { id: entryIdFor("other", taken), title: "Other", skills: names }]
+    : entries.map((group, i) => (i === at ? { ...group, skills: [...group.skills, ...names] } : group));
 }
 
 /** Whether the resume lists this skill already, whatever its case. */
 export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string): boolean => content.skills.some((have) => key(have) === key(skill));
 
 /**
- * The content with these skills added, each as an entry of its own, and only if
- * it is not there already: right after the last plain skill, so it prints in that
- * list, never on a line of its own below an entry with sub skills ("English:
- * native-level", owner 2026-10-20). At the end when there is no plain skill.
- * Returns the same object when nothing was new.
+ * The content with these skills added, only if it is not there already, where
+ * `reconcileGroups` places a skill new to the list (`placeNew`). Returns the same
+ * object when nothing was new.
  */
 export function addSkills(content: ResumeContent, skills: string[]): ResumeContent {
   const fresh = flattenGroups(skills.map((skill) => ({ id: "", title: skill, skills: [] }))).filter((skill) => !hasSkill(content, skill));
   if (fresh.length === 0) return content;
-  const next = reconcileGroups({ ...content, skills: [...content.skills, ...fresh] });
-  const entries = next.skillGroups ?? [];
-  const added = new Set(fresh.map(key));
-  const isNew = (group: ResumeSkillGroup) => group.skills.length === 0 && added.has(key(group.title));
-  const old = entries.filter((group) => !isNew(group));
-  let after = -1;
-  old.forEach((group, i) => {
-    if (!group.hidden && group.title.trim() && !group.skills.some((skill) => skill.trim())) after = i;
-  });
-  if (after === -1) {
-    // Every skill sits in a named group ("Others: Tailwind CSS, Storybook"): a new one goes in as a
-    // sub skill of the "Other" group, or a new one, never on a line of its own (owner, 2026-10-20).
-    const grouped = old.filter((group) => !group.hidden && group.skills.some((skill) => skill.trim()));
-    if (grouped.length === 0) return next;
-    const at = old.findIndex((group) => !group.hidden && /^others?\b/i.test(group.title.trim()) && group.skills.some((skill) => skill.trim()));
-    const names = entries.filter(isNew).map((group) => group.title);
-    const placed =
-      at === -1
-        ? [...old, { id: entryIdFor("other", new Set(old.map((group) => group.id))), title: "Other", skills: names }]
-        : old.map((group, i) => (i === at ? { ...group, skills: [...group.skills, ...names] } : group));
-    return { ...next, skillGroups: placed, skills: flattenGroups(placed) };
-  }
-  if (after === old.length - 1) return next;
-  const placed = [...old.slice(0, after + 1), ...entries.filter(isNew), ...old.slice(after + 1)];
-  return { ...next, skillGroups: placed, skills: flattenGroups(placed) };
+  return reconcileGroups({ ...content, skills: [...content.skills, ...fresh] });
+}
+
+/**
+ * The content with this skill added beside the ones it goes with: into the first shown entry holding
+ * one of `near` as a sub skill ("Java" into "Programming Languages: Python, SQL"; owner, 2026-10-21, it
+ * had gone in after "Rapid prototyping"). Without such an entry, as `addSkills`.
+ */
+export function addSkillNear(content: ResumeContent, skill: string, near: readonly string[]): ResumeContent {
+  if (hasSkill(content, skill)) return content;
+  const base = reconcileGroups(content);
+  const entries = base.skillGroups ?? [];
+  const wanted = new Set(near.map(key));
+  const at = entries.findIndex((group) => !group.hidden && group.skills.some((sub) => wanted.has(key(sub))));
+  if (at === -1) return addSkills(content, [skill]);
+  const placed = entries.map((group, i) => (i === at ? { ...group, skills: [...group.skills, skill.trim()] } : group));
+  return { ...base, skillGroups: placed, skills: flattenGroups(placed) };
 }
 
 /**

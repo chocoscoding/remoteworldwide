@@ -3,6 +3,8 @@
 // (`prep/report/reportScales.ts`), the green is its "went well" green (`prep/Chip.tsx`), never the
 // theme lime. The steps break where `scanTier` does (65 and 85), with red under 50.
 
+import { strictnessCopy } from "./strictness";
+
 export interface ScoreStep {
   /** Scores under this take the step. */
   below: number;
@@ -20,7 +22,9 @@ export const SCORE_STEPS: readonly ScoreStep[] = [
 
 export function scoreStep(score: number): ScoreStep {
   const value = Number.isFinite(score) ? score : 0;
-  return SCORE_STEPS.find((step) => value < step.below) ?? SCORE_STEPS[SCORE_STEPS.length - 1];
+  // At the encouraging level (strictness.ts) nothing shows red: under 50 takes the amber step.
+  const steps = strictnessCopy().redUnder50 ? SCORE_STEPS : SCORE_STEPS.slice(1);
+  return steps.find((step) => value < step.below) ?? steps[steps.length - 1];
 }
 
 /** The step's colour, faint: the ring's unfilled part, so the whole ring reads red, amber, yellow or green. */

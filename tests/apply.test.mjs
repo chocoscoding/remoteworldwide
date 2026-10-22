@@ -35,7 +35,7 @@ registerHooks({
 
 const { EMPTY_APPLY_STATE, readApplyState, readStep, readVisited, scanBaseline, sendingResumeId, textPrint } = await import("../app/lib/apply/state.ts");
 const { INTERVIEW_ADVICE, excerpt, stepsForGap } = await import("../app/lib/apply/gapSteps.ts");
-const { changeCount, highlightTexts, resumeChanges } = await import("../app/lib/apply/changes.ts");
+const { addedParts, changeCount, highlightMarks, highlightTexts, resumeChanges } = await import("../app/lib/apply/changes.ts");
 const { noteParts, quantityParts, scoreColor, withoutEmDashes } = await import("../app/lib/apply/score.ts");
 const { editBullet, editName, editSkills, editSummary, editTitle } = await import("../app/lib/apply/edits.ts");
 const { MAX_HISTORY_STEPS, REPORTS_KEPT, hiddenLabel, pushStep, scoreOfScan, scoreStep, stampStep, undoIfWorse } = await import("../app/lib/apply/history.ts");
@@ -50,6 +50,7 @@ const {
   worthAdding,
   worthGapChip,
   fitGap,
+  exampleAsks,
   bulletsWithoutResult,
   fixFirstId,
   matchMoves,
@@ -112,7 +113,10 @@ describe("reading a session's state", () => {
         history: [],
         historyAt: 0,
         worked: [],
-        asks: [{ term: "HubSpot", ifTrue: "HubSpot, if you have used it", place: "skills", fromStep: "s-1", no: false, addedIn: null }],
+        asks: [
+          { term: "HubSpot", ifTrue: "HubSpot, if you have used it", place: "skills", fromStep: "s-1", no: false, addedIn: null },
+          { term: "Java", ifTrue: "Java, if you have used it", place: "skills", fromStep: null, no: true, addedIn: null, near: ["Python", "SQL"] },
+        ],
         fitAt: "s-1",
       },
       scan: { resumeId: "d1", version: 2, report, previousScore: 54 },
@@ -417,6 +421,29 @@ describe("the score card's fixes", () => {
     requirement: { id, text: `Wants ${id}`, label: id, category: "skill", importance: "required" },
     state,
     evidence: sections.map((section) => ({ section, text: `${id} in ${section}` })),
+  });
+
+  it("asks about the examples a posting names that the resume does not, required first (2026-10-21: Java and Azure vanished)", () => {
+    const named = (id, type, unnamed, proof = []) => ({ requirement: { id, text: `Wants ${id}`, category: "experience", type, proof }, state: "satisfied", evidence: [], unnamed });
+    const report = {
+      verdicts: [
+        named("cloud", "preferred", ["Azure"]),
+        named("backend", "required", ["Java"], ["Java", "Python", "SQL"]),
+        named("social", "preferred", ["Facebook API", "Instagram API", "WhatsApp API"]),
+        named("role:title", "required", ["Engineer"]),
+      ],
+    };
+    const asks = exampleAsks(report, { skills: ["AWS", "GCP"] }, []);
+    assert.deepEqual(
+      asks.map((ask) => ask.term),
+      ["Java", "Azure", "Facebook API", "Instagram API"],
+    );
+    assert.deepEqual(asks[0], { term: "Java", ifTrue: "Java, if you have used it", place: "skills", fromStep: null, no: false, addedIn: null, near: ["Python", "SQL"] });
+    // Answered no, or already in Skills: not asked.
+    assert.deepEqual(
+      exampleAsks(report, { skills: ["azure"] }, [{ term: "Java", no: true }]).map((ask) => ask.term),
+      ["Facebook API", "Instagram API", "WhatsApp API"],
+    );
   });
 
   it("colours a score by the design's bands", () => {
@@ -1000,5 +1027,27 @@ describe("edits made in the resume creator (review, 2026-10-19)", () => {
     assert.ok(textPrint(text.repeat(50)).length < 20);
     assert.equal(readApplyState({ resume: { creatorSeen: textPrint(text) } }).resume.creatorSeen, textPrint(text));
     assert.equal(readApplyState({ resume: { creatorSeen: 4 } }).resume.creatorSeen, null);
+  });
+});
+
+// Owner, 2026-10-21: "we are only meant to highlight what we added, not the whole line that was changed".
+describe("what the paper marks", () => {
+  it("marks only the words a reworded line gained", () => {
+    assert.deepEqual(
+      addedParts("Resolving complex cross-service failures via RabbitMQ event-driven architecture.", "Resolving complex cross-service failures via RabbitMQ event-driven architecture for customer support."),
+      ["for customer support."],
+    );
+    assert.deepEqual(addedParts("Led onboarding programs that improved adoption", "Led high-touch onboarding programs that improved early adoption"), ["high-touch", "early"]);
+    assert.deepEqual(addedParts("Same line.", "Same line"), []);
+  });
+
+  it("marks a reworded bullet's new words inside that line, and a new bullet or skill whole", () => {
+    const before = { title: "Dev", summary: "", skills: ["Go"], experience: [{ id: "a", role: "Dev", company: "X", dates: "", bullets: ["Built the API"] }] };
+    const after = { ...before, skills: ["Go", "SQL"], experience: [{ ...before.experience[0], bullets: ["Built the payments API", "Ran the on-call rota"] }] };
+    const marks = highlightMarks(before, after);
+    assert.deepEqual(marks.find((mark) => mark.text === "payments"), { text: "payments", within: "Built the payments API" });
+    assert.ok(marks.some((mark) => mark.text === "Ran the on-call rota" && !mark.within));
+    assert.ok(marks.some((mark) => mark.text === "SQL"));
+    assert.ok(!marks.some((mark) => mark.text === "Built the payments API"));
   });
 });

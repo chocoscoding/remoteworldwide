@@ -456,6 +456,14 @@ export interface Suggestion {
 const PLACE_LABELS: Record<ResumePlace, string> = { summary: "Summary", bullets: "Bullets", skills: "Skills" };
 const PLACES: ResumePlace[] = ["summary", "bullets", "skills"];
 
+/** A requirement's label short enough for a button: cut at a word, about 28 characters. */
+const shortLabel = (label: string): string => {
+  const clean = label.trim();
+  if (clean.length <= 28) return clean;
+  const cut = clean.slice(0, 28);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 12)).trim()}…`;
+};
+
 const TOOL_BUTTON =
   "flex h-[32px] flex-none cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:cursor-default";
 
@@ -730,7 +738,9 @@ export const FixesTabs: FC<{
               onClick={onProve}
               className={cn(TOOL_BUTTON, "border-[1.5px] border-[#222325] bg-[#222325] text-white disabled:opacity-50")}>
               <Plus className="h-[10px] w-[10px]" strokeWidth={2.6} />
-              Add the {skillsOnly.length} to resume.
+              {/* What it does, said plainly (owner, 2026-10-21: "Add the 1 to resume." meant nothing): these are
+                  shown only in Skills, and the button works them into a line of experience. */}
+              {skillsOnly.length === 1 ? `Show ${shortLabel(skillsOnly[0].label)} in your experience` : `Show all ${skillsOnly.length} in your experience`}
             </button>
           )}
         </div>

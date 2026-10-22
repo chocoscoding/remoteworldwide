@@ -579,8 +579,9 @@ describe("skill entries", () => {
     assert.deepEqual(form.skillEntries, [
       entry("saved-skl-0", "Soft Skills", ["Teamwork"]),
       entry("saved-skl-1", "Python"),
-      entry("saved-skl-2", "Fortran", [], { hidden: true }),
+      // A new plain skill goes in after the last shown plain one, so it prints in that list.
       entry("skl-rust", "Rust"),
+      entry("saved-skl-2", "Fortran", [], { hidden: true }),
     ]);
   });
 

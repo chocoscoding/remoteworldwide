@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 const {
+  addSkillNear,
   addSkills,
   entriesOf,
   flattenGroups,
@@ -62,11 +63,29 @@ describe("keeping the entries in step with the flat list", () => {
     assert.deepEqual(fixed.skills, ["React", "Figma"]);
   });
 
-  it("drops a skill the list lost, from its entry or with it, and adds a new one as its own entry", () => {
+  it("drops a skill the list lost, from its entry or with it, and puts a new one with its kind", () => {
     const entries = withEntries(base, [entry("a", "Code", ["React", "Vue"]), entry("b", "Figma"), entry("c", "Old", ["Gone"])]);
     const tailored = reconcileGroups({ ...entries, skills: ["React", "TypeScript"] });
-    assert.deepEqual(tailored.skillGroups, [entry("a", "Code", ["React"]), entry("skl-typescript", "TypeScript")]);
+    // Every skill left sits in a named group: the new one goes under "Other", never on a line of its own.
+    assert.deepEqual(tailored.skillGroups, [entry("a", "Code", ["React"]), entry("skl-other", "Other", ["TypeScript"])]);
     assert.deepEqual(tailored.skills, ["React", "TypeScript"]);
+    const plain = reconcileGroups({ ...withEntries(base, [entry("a", "Code", ["React"]), entry("b", "Figma")]), skills: ["React", "Figma", "Go"] });
+    assert.deepEqual(plain.skillGroups, [entry("a", "Code", ["React"]), entry("b", "Figma"), entry("skl-go", "Go")]);
+  });
+
+  it("puts a skill a tool added to the flat list into Others (2026-10-22: \"Rapid prototyping\" sat on a line of its own)", () => {
+    const groups = [entry("a", "Programming Languages", ["TypeScript", "Python"]), entry("b", "Others", ["Jest", "n8n"]), entry("c", "Database", ["MongoDB"])];
+    const content = { skills: flattenGroups(groups), skillGroups: groups };
+    const next = reconcileGroups({ ...content, skills: [...content.skills, "Rapid prototyping"] });
+    assert.deepEqual(
+      next.skillGroups.map((group) => [group.title, group.skills]),
+      [
+        ["Programming Languages", ["TypeScript", "Python"]],
+        ["Others", ["Jest", "n8n", "Rapid prototyping"]],
+        ["Database", ["MongoDB"]],
+      ],
+    );
+    assert.deepEqual(next.skills, flattenGroups(next.skillGroups));
   });
 
   it("keeps hidden entries and the one being added as they are", () => {
@@ -108,6 +127,18 @@ describe("adding a keyword to Skills", () => {
     const made = addSkills({ skills: flattenGroups(plain), skillGroups: plain }, ["Sanity"]);
     assert.deepEqual(made.skillGroups.map((group) => [group.title, group.skills]), [["Frameworks", ["React"]], ["Other", ["Sanity"]]]);
     assert.deepEqual(made.skills, flattenGroups(made.skillGroups));
+  });
+
+  it("adds a skill beside the ones it goes with (2026-10-21: Java went in after \"Rapid prototyping\")", () => {
+    const groups = [entry("a", "Programming Languages", ["TypeScript", "Python", "SQL"]), entry("b", "Cloud Platforms", ["AWS", "GCP"]), entry("c", "Rapid prototyping")];
+    const content = { skills: flattenGroups(groups), skillGroups: groups };
+    const java = addSkillNear(content, "Java", ["Python", "sql"]);
+    assert.deepEqual(java.skillGroups[0].skills, ["TypeScript", "Python", "SQL", "Java"]);
+    assert.deepEqual(java.skills, flattenGroups(java.skillGroups));
+    assert.deepEqual(addSkillNear(content, "Azure", ["AWS", "GCP"]).skillGroups[1].skills, ["AWS", "GCP", "Azure"]);
+    // Nothing it goes with: as any skill. Already there: the same content.
+    assert.deepEqual(addSkillNear(content, "Facebook API", ["Instagram API"]), addSkills(content, ["Facebook API"]));
+    assert.equal(addSkillNear(content, "python", ["SQL"]), content);
   });
 });
 

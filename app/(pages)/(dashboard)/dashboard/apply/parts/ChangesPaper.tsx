@@ -22,7 +22,7 @@ import { PaperHighlightProvider, type PaperEdits, type PaperEyes } from "@/app/c
 import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
-import { highlightTexts, resumeChanges, type ResumeChanges } from "@/app/lib/apply/changes";
+import { highlightMarks, highlightTexts, resumeChanges, type HighlightMark, type ResumeChanges } from "@/app/lib/apply/changes";
 import { cn } from "@/lib/utils";
 
 const HIGHLIGHT = "rww-resume-change";
@@ -47,21 +47,36 @@ function publish() {
   else registry.delete(HIGHLIGHT);
 }
 
-/** A short changed string (a skill like "Go") only counts as a whole word, never inside another. */
+/** A changed string counts only as whole words, never inside another ("Java" in "JavaScript", 2026-10-22). */
 const isWord = (char: string | undefined) => Boolean(char && /[\p{L}\p{N}]/u.test(char));
 
-/** Ranges for every place a changed string appears in the paper's text, longest strings first, never overlapping. */
-function changeRanges(root: Node, texts: readonly string[]): Range[] {
+const collapse = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/** Whether a text node is (part of) a line: it holds the line's start, or the line holds all of it. */
+const inLine = (data: string, within: string): boolean => {
+  const node = collapse(data);
+  const line = collapse(within);
+  return node.length > 0 && (node.includes(line.slice(0, 40)) || line.includes(node));
+};
+
+/**
+ * Ranges for every place a changed string appears in the paper's text, longest strings first, never
+ * overlapping. A mark with `within` is looked for only inside that line, so the few words a reworded
+ * bullet gained are marked there and nowhere else on the page.
+ */
+function changeRanges(root: Node, marks: readonly (string | HighlightMark)[]): Range[] {
   const ranges: Range[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const data = node.textContent ?? "";
     if (!data.trim()) continue;
     const taken: [number, number][] = [];
-    for (const text of texts) {
+    for (const mark of marks) {
+      const text = typeof mark === "string" ? mark : mark.text;
+      if (typeof mark !== "string" && mark.within && !inLine(data, mark.within)) continue;
       for (let from = data.indexOf(text); from !== -1; from = data.indexOf(text, from + 1)) {
         const to = from + text.length;
-        if (text.length < 4 && (isWord(data[from - 1]) || isWord(data[to]))) continue;
+        if ((isWord(text[0]) && isWord(data[from - 1])) || (isWord(text[text.length - 1]) && isWord(data[to]))) continue;
         if (taken.some(([start, end]) => from < end && to > start)) continue;
         taken.push([from, to]);
         const range = document.createRange();
@@ -149,6 +164,8 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
   );
   const changes = useMemo(() => resumeChanges(before, content), [before, content]);
   const texts = useMemo(() => highlightTexts(changes), [changes]);
+  // Only what was added is marked: a reworded line's new words, inside that line (owner, 2026-10-21).
+  const marks = useMemo(() => highlightMarks(before, content), [before, content]);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const [fit, setFit] = useState(1);
   // The sheets after the first mount once the paper is measured, so the marks are found again then.
@@ -170,7 +187,7 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
     // Wait a frame: a paper that just mounted (a section opening, a dialog) isn't laid out yet.
     const frame = requestAnimationFrame(() => {
       if (!paperRef.current) return;
-      rangesByPaper.set(key, changeRanges(paperRef.current, texts));
+      rangesByPaper.set(key, changeRanges(paperRef.current, marks));
       publish();
     });
     return () => {
@@ -178,7 +195,7 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
       rangesByPaper.delete(key);
       publish();
     };
-  }, [texts, pages]);
+  }, [marks, pages]);
 
   // "Show in resume": the first place on a sheet's visible part is scrolled to, and every place lit.
   const flashKey = flash?.key ?? null;
@@ -231,8 +248,9 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
   return (
     <div ref={setBox} className={cn("w-full", className)}>
       {!canHighlight && texts.length > 0 && <ChangeList changes={changes} />}
-      {/* `rww-sent-paper`: sections with nothing in them are left off, as in every download. */}
-      <div ref={paperRef} style={{ zoom: fit }} className={cn("rww-sent-paper mx-auto w-fit", ALL_FONT_VARS)}>
+      {/* `rww-sent-paper`: sections with nothing in them are left off, as in every download. `isolate`
+          keeps the eyes' z-index inside the paper, so they scroll under the sticky header (owner, 2026-10-22). */}
+      <div ref={paperRef} style={{ zoom: fit }} className={cn("rww-sent-paper isolate mx-auto w-fit", ALL_FONT_VARS)}>
         {paper}
       </div>
     </div>
