@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
+import { downloadPdf } from "@/app/lib/export/pdf-download";
 import { resumePrintSpec } from "@/app/lib/export/print-css";
 import { resumeToDocx, resumeToMarkdown } from "@/app/lib/export/resume";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
@@ -42,7 +43,7 @@ import CustomizePanelsRail from "./CustomizePanelsRail";
 import AtsFloatingDock, { type AtsToolsProps } from "./AtsFloatingDock";
 import AtsDockedRail from "./AtsDockedRail";
 import { AiFiguresPill, ReadabilityPill } from "./AtsSidePills";
-import { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures, withLonger } from "@/app/lib/dashboard/resume/ai-figures";
+import { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures, withOwnFigures, withLonger } from "@/app/lib/dashboard/resume/ai-figures";
 import { readabilityFlags, type ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
@@ -516,6 +517,16 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       saveText(resumeToMarkdown(content, sections, design.doc.dateFormat), `${base}.md`);
       return;
     }
+    // The server renderer first, so the PDF has real text an ATS can read: the print dialog's
+    // "Microsoft Print to PDF" turns it into outlines (owner, 2026-10-22). It prints the saved
+    // resume, so everything typed is saved first; the dialog below stays for when that or the
+    // renderer fails.
+    const saved = await autosave.settle().catch(() => false);
+    await downloadPdf({ source: saved ? { kind: "resume", id: activeDocId } : null, fileName: base, save: saveBlob, fallback: () => printFromScreen(base) });
+  };
+
+  /** The print dialog on the live paper: the fallback when the server cannot make the PDF. */
+  const printFromScreen = async (base: string) => {
     const paper = printPaperRef.current?.firstElementChild;
     if (!(paper instanceof HTMLElement)) throw new Error("The resume preview isn't ready yet. Try again in a moment.");
     // The editor's "No … added yet." prompts are for the editor: a section
@@ -1088,11 +1099,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
         setQuantifyFor(entry ? { entryId: entry.id } : customId ? { customId } : null);
         if (suggestions.length === 0) {
           setQuantifyList(null);
+          // The service's own reason first (owner, 2026-10-22, fix plan 1a): a skipped description
+          // or a role of short lines does not "already carry a number".
           landAiTool(
             "quantify",
-            target.kind === "bullet" || target.kind === "point"
-              ? "That line already carries a number. Nothing to do."
-              : `Every line in ${scope} already carries a number. Nothing to do.`,
+            suggestions.note ??
+              (target.kind === "bullet" || target.kind === "point"
+                ? "That line already carries a number. Nothing to do."
+                : `Every line in ${scope} already carries a number. Nothing to do.`),
           );
           return;
         }
@@ -1170,18 +1184,20 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
 
   // Every number Quantify adds is recorded for the person to check (owner, 2026-10-18): the "AI
   // numbers" pill by the ATS check counts them and shows each on the page.
-  const applyQuantifyAt = (index: number) => {
-    const suggestion = quantifyList?.[index];
+  const applyQuantifyAt = (index: number, confirmed?: string) => {
+    const original = quantifyList?.[index];
+    if (original?.estimate && (!confirmed || confirmed.trim().split(/\s+/).length < 5)) return;
+    const suggestion = original && confirmed ? { ...original, after: confirmed, estimate: false } : original;
     if (!suggestion || quantifyApplied.has(index)) return;
     dispatch({
       type: "edit",
-      content: (prev) => withAiFigures(applyQuantify(prev, suggestion), [suggestion]),
+      content: (prev) => confirmed ? withOwnFigures(applyQuantify(prev, suggestion), suggestion.before, suggestion.after) : withAiFigures(applyQuantify(prev, suggestion), [suggestion]),
       marks: (m) => ({ quantified: [...m.quantified, quantifyKey(suggestion)] }),
     });
   };
 
   const applyAllQuantify = () => {
-    const waiting = (quantifyList ?? []).filter((_, i) => !quantifyApplied.has(i));
+    const waiting = (quantifyList ?? []).filter((suggestion, i) => !suggestion.estimate && !quantifyApplied.has(i));
     if (waiting.length === 0) return;
     dispatch({
       type: "edit",

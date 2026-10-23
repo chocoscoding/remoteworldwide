@@ -10,6 +10,8 @@
 // with, fed the same hydrated design — so the PDF is the template the user
 // chose, in its fonts, as real text. Imported directly rather than through the
 // paper barrel, which also carries the editor's client-side `PageGuides`.
+// Through `ClientResumePaper` since 2026-10-22: the paper reads a client hook (click-to-edit,
+// 2026-10-20), and drawn straight from this server component it made the page a 500.
 //
 // The page CSS is print-css.ts's, shared with the browser's own export; the
 // editor-only placeholders are hidden rather than removed (removing them would
@@ -23,7 +25,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import ResumePaper from "@/app/components/dashboard/resume/paper/ResumePaper";
+import ResumePaper from "@/app/components/dashboard/resume/paper/ClientResumePaper";
 import { cn } from "@/lib/utils";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import { hydrateDesign, hydrateSections } from "@/app/lib/dashboard/resume/hydrate-design";

@@ -51,7 +51,7 @@ export function resumePrintSpec(design: Pick<ResumeDesign, "doc" | "spacing">, m
     pageSize: design.doc.pageFormat === "a4" ? "A4" : "Letter",
     pageMargin: multi ? `${design.spacing.marginYmm}mm 0` : "0",
     css:
-      ".rww-print li{break-inside:avoid;}.rww-print [data-resume-keep-with-next]{break-inside:avoid;break-after:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}" +
+      ".rww-print li{break-inside:avoid;}.rww-print li:nth-last-child(2){break-after:avoid;}.rww-print [data-resume-keep-with-next]{break-inside:avoid;break-after:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}" +
       (multi ? ".rww-print-multi>*{min-height:0!important;padding-top:0!important;padding-bottom:0!important;}" : ""),
   };
 }

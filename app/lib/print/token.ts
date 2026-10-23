@@ -26,8 +26,8 @@
 //
 // Payload `{ u, k, d, v, exp, lh? }`:
 //   u   the user id (session.user.id) the page fetches as
-//   k   "resume" | "letter"
-//   d   the ai_documents id (24 hex)
+//   k   "resume" | "letter" | "draft"
+//   d   the ai_documents id (24 hex); for a draft, the ai_resumes id
 //   v   the token format, 1 — a later format is refused rather than misread
 //   exp expiry, epoch SECONDS
 //   lh  a letter's letterhead, resolved from the profile when minted: the
@@ -53,7 +53,11 @@ const MAX_NAME = 120;
 const MAX_CONTACT = 160;
 const MAX_CONTACTS = 4;
 
-export type PrintKind = "resume" | "letter";
+// "draft": an ingested resume (`ai_resumes`) as the apply step shows it, printed at
+// /print/draft/[id] so its "Download as PDF" has real text (owner, 2026-10-22).
+export type PrintKind = "resume" | "letter" | "draft";
+
+const PRINT_KINDS: ReadonlySet<string> = new Set<PrintKind>(["resume", "letter", "draft"]);
 
 export interface PrintLetterhead {
   name: string;
@@ -104,7 +108,7 @@ export interface MintInput {
 export function mintPrintToken({ userId, kind, id, letterhead, now = Date.now() }: MintInput): string {
   const key = secret();
   if (!key) throw new Error("PRINT_TOKEN_SECRET is not configured");
-  if (!USER_ID.test(userId) || !OBJECT_ID.test(id) || (kind !== "resume" && kind !== "letter")) throw new Error("Not a printable document");
+  if (!USER_ID.test(userId) || !OBJECT_ID.test(id) || !PRINT_KINDS.has(kind)) throw new Error("Not a printable document");
 
   const payload: PrintTokenPayload = { u: userId, k: kind, d: id, v: VERSION, exp: Math.floor(now / 1000) + PRINT_TOKEN_TTL_SECONDS };
   if (kind === "letter" && letterhead && letterhead.name.trim()) payload.lh = clampLetterhead(letterhead);

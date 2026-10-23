@@ -7,6 +7,10 @@
 // engine is the one renderer that reproduces it exactly, with real, selectable
 // text an ATS can read. The price is that the user picks "Save as PDF" in the
 // print dialog rather than getting the file straight away.
+//
+// Since 2026-10-22 (owner, PHASE6-OPEN-ITEMS-PLAN.md item I) this dialog is only the fallback for
+// resumes and library letters: "Microsoft Print to PDF" outlines the text, so their "Download as
+// PDF" asks the server renderer first (./pdf-download.ts).
 
 import { printFrameCss } from "./print-css";
 

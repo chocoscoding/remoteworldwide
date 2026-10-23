@@ -22,6 +22,7 @@ import type { ResumeContent, ResumeDocumentSummary } from "@/app/lib/dashboard/t
 import { getIngestedResume, prepareResumeForDoc } from "@/app/lib/ats/api";
 import { waitForImport, type ResumeImportAccepted, type ResumeImportView } from "./importJob";
 import { MAX_RESUME_BYTES, RESUME_TYPES_HINT, isReadableMime, mimeForFileName } from "./mime";
+import { visibleContent } from "./visible";
 
 // The accepted types, the size ceiling and the copy live in `./mime.ts` so the
 // server-side ingest bridge shares them. The ceiling is checked here as well as
@@ -125,28 +126,9 @@ export async function importResume(file: File): Promise<ImportedResume> {
  * exists and is not embedded again — which is what makes checking an unedited
  * resume a second time cheap, and a re-scan of it free.
  */
-/**
- * The resume without the parts hidden for this application (`hiddenParts`, the apply wizard's
- * eyes): what is scored, written from, downloaded and sent. Mirrors `visibleContent` in the AI
- * service's src/lib/resumeText.ts, so both texts of one resume stay identical.
- */
-export function visibleContent(content: ResumeContent): ResumeContent {
-  const hidden = new Set(content.hiddenParts ?? []);
-  if (hidden.size === 0) return content;
-  return {
-    ...content,
-    summary: hidden.has("summary") ? "" : content.summary,
-    skills: hidden.has("skills") ? [] : content.skills,
-    ...(content.skillGroups && hidden.has("skills") ? { skillGroups: [] } : {}),
-    education: hidden.has("education") ? [] : content.education,
-    projects: hidden.has("projects") ? [] : content.projects,
-    certifications: hidden.has("certifications") ? [] : content.certifications,
-    experience: content.experience
-      .filter((entry) => !hidden.has(`exp:${entry.id}`))
-      .map((entry) => ({ ...entry, bullets: entry.bullets.filter((_, index) => !hidden.has(`exp:${entry.id}:${index}`)) })),
-    hiddenParts: [],
-  };
-}
+// Moved to ./visible.ts so server code (the apply draft's print page) can use it without importing
+// this module's client-only fetch helpers (2026-10-22).
+export { visibleContent };
 
 export function resumeContentToText(whole: ResumeContent): string {
   const content = visibleContent(whole);

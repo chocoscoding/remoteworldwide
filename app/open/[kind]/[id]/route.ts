@@ -8,6 +8,10 @@
 //           pdf | docx     -> the file, as a download
 //   letter  edit (default) -> /dashboard/cover?letter=<id>
 //           view | pdf | docx as for a resume
+//   draft   pdf (default)  -> an apply-step resume (`ai_resumes`) as the step's paper draws it,
+//           view | docx       as a download (view: inline); `&v=` is the version the page showed,
+//                             and another one saved is a 409 (owner, 2026-10-22: the apply step's
+//                             "Download as PDF" comes here so the file has real text)
 //   file    view (default) -> the vault's signed link for the original file
 //           copy | edit    -> /dashboard/resume?from=<id> ("Edit a copy")
 //           pdf | docx     -> the original file, as a download
@@ -27,17 +31,17 @@ import { auth } from "@/auth";
 import { backend } from "@/app/lib/backend";
 import { fileResponse, streamVaultFile } from "@/app/lib/extension/vault-file";
 import { loginWithNext } from "@/app/lib/next-url";
-import { builtResumeFile, letterFile, type DocumentFileResult, type DocumentFormat } from "@/app/lib/print/documents";
+import { builtResumeFile, draftResumeFile, letterFile, type DocumentFileResult, type DocumentFormat } from "@/app/lib/print/documents";
 
 export const runtime = "nodejs";
 // `view`/`pdf` wait on the PDF renderer, like /api/extension/document.
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-type Kind = "resume" | "letter" | "file";
+type Kind = "resume" | "letter" | "draft" | "file";
 type To = "edit" | "view" | "pdf" | "docx" | "copy";
 
-const KINDS: ReadonlySet<string> = new Set<Kind>(["resume", "letter", "file"]);
+const KINDS: ReadonlySet<string> = new Set<Kind>(["resume", "letter", "draft", "file"]);
 const TOS: ReadonlySet<string> = new Set<To>(["edit", "view", "pdf", "docx", "copy"]);
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const VAULT_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -89,7 +93,7 @@ export async function GET(request: Request, props: { params: Promise<{ kind: str
 
   if (kind === "file" ? !VAULT_ID.test(id) : !OBJECT_ID.test(id)) return notFound();
   const asked = url.searchParams.get("to") ?? "";
-  const to: To = TOS.has(asked) ? (asked as To) : kind === "file" ? "view" : "edit";
+  const to: To = TOS.has(asked) ? (asked as To) : kind === "file" ? "view" : kind === "draft" ? "pdf" : "edit";
 
   const self = (next: To) => `/open/${kind}/${encodeURIComponent(id)}?to=${next}`;
 
@@ -111,6 +115,22 @@ export async function GET(request: Request, props: { params: Promise<{ kind: str
     } catch {
       return messagePage(404, "That document could not be opened. It may have been deleted.", [{ href: "/dashboard/vault", label: "Open My documents" }]);
     }
+  }
+
+  // ---- Apply-step resumes ---------------------------------------------------
+  // No editor of their own to send anyone to: they live in an application, so a link that cannot
+  // be a file is a 404, and a refusal offers the Word file and the tracker.
+  if (kind === "draft") {
+    if (to === "edit" || to === "copy" || session?.user?.deletionDueAt) return notFound();
+    const v = Number(url.searchParams.get("v"));
+    const format: DocumentFormat = to === "docx" ? "docx" : "pdf";
+    const result = await draftResumeFile(userId, id, format, Number.isInteger(v) && v > 0 ? v : null);
+    if (result.ok) {
+      return withPrivateHeaders(fileResponse(result.bytes, result.fileName, result.mimeType, { disposition: to === "view" ? "inline" : "attachment", format: result.format }));
+    }
+    const links = [{ href: "/dashboard/tracker", label: "Open the tracker" }];
+    if (format === "pdf" && result.code !== "not_found") links.unshift({ href: self("docx"), label: "Download the Word file" });
+    return messagePage(result.status, result.message, links);
   }
 
   // ---- Built resumes and letters ------------------------------------------

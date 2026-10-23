@@ -15,6 +15,7 @@
 // File names are the editors' own: "Jane-Doe-Resume.pdf",
 // "Jane-Doe-Cover-Letter.docx" — the name a recruiter sees, not the library label.
 
+import { createHash } from "node:crypto";
 import { aiOrNull } from "@/app/lib/ai";
 import { BackendError } from "@/app/lib/api/core";
 import { backend } from "@/app/lib/backend";
@@ -24,9 +25,11 @@ import { hydrateDesign, hydrateSections } from "@/app/lib/dashboard/resume/hydra
 import { coverToDocxBuffer, type Letterhead } from "@/app/lib/export/cover";
 import { resumeToDocxBuffer } from "@/app/lib/export/resume";
 import { safeFileName } from "@/app/lib/export/save";
+import type { IngestedResumeDetail } from "@/app/lib/ats/types";
 import type { StoredResumeDocument } from "@/app/lib/resume/api";
 import { reconcileGroups } from "@/app/lib/resume/skills";
 import type { Settings } from "@/app/lib/settings/types";
+import { draftPaper } from "./draft-paper";
 import { MAX_PDF_BYTES, RenderError, renderPdf } from "./render";
 
 export type DocumentFormat = "pdf" | "docx";
@@ -34,7 +37,7 @@ export type DocumentFormat = "pdf" | "docx";
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MIME: Record<DocumentFormat, string> = { pdf: "application/pdf", docx: DOCX_MIME };
 
-export type DocumentFileCode = "renderer_unavailable" | "renderer_busy" | "not_found" | "too_large" | "unreadable" | "unavailable";
+export type DocumentFileCode = "renderer_unavailable" | "renderer_busy" | "not_found" | "too_large" | "unreadable" | "unavailable" | "stale";
 
 export type DocumentFileResult =
   | { ok: true; bytes: ArrayBuffer | Uint8Array; fileName: string; mimeType: string; format: DocumentFormat }
@@ -78,6 +81,10 @@ export const loadBuiltResume = (userId: string, id: string): Promise<StoredResum
 
 export const loadLetter = (userId: string, id: string): Promise<LetterView | null> =>
   aiOrNull<LetterView>(`/cover/letters/${encodeURIComponent(id)}`, { userId });
+
+/** An ingested resume (`ai_resumes`): an apply-step draft, or the original it was made from. */
+export const loadDraftResume = (userId: string, id: string): Promise<IngestedResumeDetail | null> =>
+  aiOrNull<IngestedResumeDetail>(`/resume/${encodeURIComponent(id)}`, { userId });
 
 /**
  * The profile, for a letter's letterhead and its file name. Through the backend
@@ -161,6 +168,49 @@ export async function letterFile(userId: string, id: string, format: DocumentFor
   } else {
     try {
       bytes = await renderPdf({ userId, kind: "letter", id, updatedAt: letter.updatedAt, letterhead });
+    } catch (error) {
+      return fromRenderError(error);
+    }
+  }
+  if (tooLarge(bytes)) return refuse(413, "too_large", "That file is larger than 4MB, so it can't be sent through here.");
+  return { ok: true, bytes, fileName, mimeType: MIME[format], format };
+}
+
+/**
+ * An apply-step resume (an `ai_resumes` row) as a PDF or a Word file, drawn as the step's paper
+ * draws it (`draftPaper`). Owner, 2026-10-22: its "Download as PDF" goes through the renderer so the
+ * file has real text, where the print dialog's "Microsoft Print to PDF" left only outlines.
+ *
+ * `expectVersion` is the version the page showed: another one here means the draft moved on (or an
+ * undo is still being saved), and the answer is a 409 so the page prints what it shows instead.
+ */
+export async function draftResumeFile(userId: string, id: string, format: DocumentFormat, expectVersion?: number | null): Promise<DocumentFileResult> {
+  let row: IngestedResumeDetail | null;
+  try {
+    row = await loadDraftResume(userId, id);
+  } catch (error) {
+    return unavailable(error);
+  }
+  if (!row) return NOT_FOUND;
+  if (row.status !== "ready" || !row.content) return refuse(422, "unreadable", "That resume hasn't been read yet.");
+  if (typeof expectVersion === "number" && row.version !== expectVersion) return refuse(409, "stale", "That resume changed a moment ago. Try again.");
+
+  const paper = draftPaper(row.content);
+  const fileName = `${personFileBase(paper.content.name, "Resume")}.${format}`;
+  let bytes: ArrayBuffer | Uint8Array;
+  if (format === "docx") {
+    try {
+      bytes = await resumeToDocxBuffer(paper.content, paper.design, paper.sections);
+    } catch (error) {
+      console.error("[print] a draft resume could not be built as Word", error);
+      return refuse(422, "unreadable", "That resume couldn't be turned into a Word file.");
+    }
+  } else {
+    // No updatedAt on an ingested resume, and its version can stay put through a hide: the cache key
+    // is the content the print page will draw.
+    const revision = createHash("sha256").update(JSON.stringify(row.content)).digest("hex");
+    try {
+      bytes = await renderPdf({ userId, kind: "draft", id, updatedAt: 0, revision });
     } catch (error) {
       return fromRenderError(error);
     }

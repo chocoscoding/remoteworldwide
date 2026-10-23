@@ -73,18 +73,25 @@ export interface RenderInput {
   id: string;
   /** The document's saved version — part of the cache key, so an edit is a new PDF. */
   updatedAt: Date | string | number;
+  /**
+   * Stands in for `updatedAt` in the cache key when the document has none: an apply-step draft
+   * (`ai_resumes`) carries only a version, which a hide or unhide may leave as it was, so its key is
+   * a digest of the content the print page will draw (owner, 2026-10-22).
+   */
+  revision?: string;
   letterhead?: PrintLetterhead | null;
 }
 
 const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
 
 /** `sha256(uid|kind|id|updatedAtMs|deploySha|letterheadHash)` — 64 hex characters, inside the renderer's `[A-Za-z0-9_-]{16,128}`. */
-export function printCacheKey({ userId, kind, id, updatedAt, letterhead }: RenderInput): string {
+export function printCacheKey({ userId, kind, id, updatedAt, revision, letterhead }: RenderInput): string {
   const updatedAtMs = new Date(updatedAt).getTime();
   // Unset outside Vercel; "dev" keeps local renders cacheable within one run of the code.
   const deploy = process.env.VERCEL_GIT_COMMIT_SHA || "dev";
   const lh = kind === "letter" && letterhead && letterhead.name.trim() ? sha256(JSON.stringify({ n: letterhead.name, c: letterhead.contact })) : "-";
-  return sha256([userId, kind, id.toLowerCase(), Number.isFinite(updatedAtMs) ? updatedAtMs : 0, deploy, lh].join("|"));
+  const saved = revision ?? (Number.isFinite(updatedAtMs) ? updatedAtMs : 0);
+  return sha256([userId, kind, id.toLowerCase(), saved, deploy, lh].join("|"));
 }
 
 interface RendererRefusal {

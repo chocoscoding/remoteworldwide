@@ -53,6 +53,12 @@ export interface ResumeAutosave {
   savedAt: Date;
   /** Save now rather than after the debounce. Also what the error's Retry button calls. */
   flush: () => void;
+  /**
+   * Saves now and waits for every save queued: true when the library then holds exactly what is on
+   * screen. "Download as PDF" asks this first, because the server renderer prints the saved
+   * resume, not the screen (owner, 2026-10-22).
+   */
+  settle: () => Promise<boolean>;
 }
 
 const changedSlices = (base: Slices, now: Slices): ResumeDocumentPatch => ({
@@ -146,5 +152,13 @@ export function useResumeAutosave({ id, content, design, sections, savedAt: load
 
   const flush = useCallback(() => save(), [save]);
 
-  return { status, savedAt, flush };
+  const settle = useCallback(async () => {
+    save();
+    await queue.current;
+    const now = latest.current;
+    const held = savedRef.current;
+    return now.content === held.content && now.design === held.design && now.sections === held.sections;
+  }, [save]);
+
+  return { status, savedAt, flush, settle };
 }
