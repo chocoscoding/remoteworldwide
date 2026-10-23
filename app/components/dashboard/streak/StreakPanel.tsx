@@ -1,23 +1,15 @@
 "use client";
 
-// The full streak surface, opened from the header pill: a dark hero with the
-// live count and tier, the month calendar, and the reward ladder.
-//
-// Deliberately two columns on desktop so the calendar and the ladder are
-// visible together — the whole point of the ladder is to be read against the
-// days you have actually logged.
-
 import { type FC } from "react";
-import { motion, useReducedMotion } from "motion/react";
-import { cn } from "@/lib/utils";
-import { Gift, Flame, Share2, Snowflake, Trophy } from "lucide-react";
+import { ArrowRight, Gift, Flame, Share2, Trophy } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
-import { milestoneProgress, nextMilestone, nextTier, tierFor } from "@/app/lib/dashboard/streak";
+import { milestoneProgress, nextMilestone, tierFor } from "@/app/lib/dashboard/streak";
 import { hasWeekToShare } from "@/app/lib/dashboard/week-card";
+import { streakStatus } from "@/app/lib/dashboard/streak-status";
 import { useStreak } from "./StreakContext";
-import StreakFlame from "./StreakFlame";
+import StreakEmblem from "./StreakEmblem";
 import StreakCalendar from "./StreakCalendar";
 import StreakRewards from "./StreakRewards";
 
@@ -27,125 +19,59 @@ export interface StreakPanelProps {
 }
 
 const StreakPanel: FC<StreakPanelProps> = ({ open, onOpenChange }) => {
-  const { current, longest, freezes, freeFreezes, giftsWaiting, loggedToday, openLog, logPulse, openGifts, weeks, openWeekCard } = useStreak();
-  const reduceMotion = useReducedMotion();
-  // This week once it has something in it; until then, last week's.
-  const shareWeek = hasWeekToShare(weeks?.current) ? "current" : hasWeekToShare(weeks?.previous) ? "previous" : null;
-
+  const streak = useStreak();
+  const { current, longest, freezes, freeFreezes, giftsWaiting, loggedToday, openLog, openGifts, weeks, openWeekCard, repair, openRepair, streakLoading, claimed } = streak;
+  const status = streakStatus(streak);
   const tier = tierFor(current);
-  const upNext = nextTier(current);
   const upcoming = nextMilestone(current);
-  const progress = milestoneProgress(current);
+  const alreadyEarned = claimed.includes(upcoming.days);
+  const shareWeek = hasWeekToShare(weeks?.current) ? "current" : hasWeekToShare(weeks?.previous) ? "previous" : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-white rounded-[20px] border-2 border-[#222325] p-0 max-w-3xl overflow-hidden gap-0 max-h-[92vh] overflow-y-auto scrollbar-neo">
-        {/* Dark hero */}
-        <div className="relative overflow-hidden bg-primary text-white px-7 pt-7 pb-6">
-          {/* Kept low and left of the close button so it reads as texture
-              rather than colliding with the dismiss affordance. */}
-          <div aria-hidden className="pointer-events-none absolute -bottom-10 right-6 h-28 w-28 rotate-12 rounded-2xl bg-secondary/10" />
-
-          <div className="relative">
-            <DialogTitle className="text-[11px] font-bold tracking-[0.12em] uppercase text-secondary mb-4">Your streak</DialogTitle>
-
-            <div className="flex items-end gap-4 mb-1">
-              <motion.div
-                initial={reduceMotion ? undefined : { scale: 0.7, opacity: 0 }}
-                animate={reduceMotion ? undefined : { scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 360, damping: 22 }}>
-                <StreakFlame tier={tier} size={46} pulse={logPulse} dimmed={current === 0} />
-              </motion.div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[56px] font-extrabold leading-none tabular-nums">{current}</span>
-                <span className="text-base text-white/55">{current === 1 ? "day" : "days"}</span>
-              </div>
-              <span className="mb-2 inline-flex items-center rounded-full border-[1.5px] border-secondary bg-secondary/15 px-2.5 py-1 text-[11px] font-bold text-secondary">
-                {tier.label}
-              </span>
-            </div>
-
-            <DialogDescription className="text-sm text-white/55 mb-5">
-              {loggedToday
-                ? "Today is logged. Come back tomorrow to keep it going."
-                : "Today is still open. Log one application to keep the streak."}
-            </DialogDescription>
-
-            {/* Progress to the next rung */}
-            {upcoming && (
-              <div className="mb-5">
-                <div className="flex items-center justify-between gap-3 mb-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-white/45">
-                    Next: {upcoming.label}
-                  </span>
-                  <span className="text-[11px] font-bold text-secondary">{upcoming.days - current} days to go</span>
-                </div>
-                <ProgressBar value={progress} dark height="h-[9px]" />
-                {upNext && <p className="mt-1.5 text-[11px] text-white/40">Reaching {upNext.min} days unlocks the {upNext.label} flame.</p>}
-              </div>
-            )}
-
-            {/* Stat strip */}
-            <div className={cn("grid gap-2 mb-5", longest > current ? "grid-cols-3" : "grid-cols-2")}>
-              {[
-                // Best-ever is hidden while it equals the current streak — until
-                // they diverge it's the same number printed twice.
-                ...(longest > current ? [{ icon: <Trophy className="h-3.5 w-3.5" />, label: "Best ever", value: `${longest}d` }] : []),
-                // Total, with the free-weekly share spelled out — the free
-                // tier expires Sunday, so it deserves its own mention.
-                { icon: <Snowflake className="h-3.5 w-3.5" />, label: "Freezes", value: `${freezes}`, hint: `${freeFreezes} free this week` },
-                { icon: <Gift className="h-3.5 w-3.5" />, label: "Gifts", value: `${giftsWaiting}`, hint: "waiting for you" },
-              ].map((stat) => (
-                <div key={stat.label} className="rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5">
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.06em] text-white/40">
-                    {stat.icon}
-                    {stat.label}
-                  </span>
-                  <span className="mt-0.5 block text-lg font-bold tabular-nums">{stat.value}</span>
-                  {"hint" in stat && stat.hint && <span className="block text-[10px] text-white/35">{stat.hint}</span>}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              <StickerButton variant="secondary" size="md" shadowColor="#ffffff" onClick={openLog}>
-                <Flame className="h-4 w-4" />
-                {loggedToday ? "Log another" : "Log an application"}
-              </StickerButton>
-              <StickerButton variant="outline" size="md" shadowColor="#ffffff" onClick={openGifts}>
-                Your gifts
-              </StickerButton>
-              {shareWeek && (
-                <StickerButton
-                  variant="outline"
-                  size="md"
-                  shadowColor="#ffffff"
-                  onClick={() => {
-                    // One dialog at a time: the panel steps aside for the card.
-                    onOpenChange(false);
-                    openWeekCard(shareWeek);
-                  }}>
-                  <Share2 className="h-4 w-4" />
-                  Share your week
-                </StickerButton>
-              )}
+      <DialogContent className="bg-[#f7f8f2] rounded-[16px] border border-[#222325] p-0 max-w-3xl gap-0 max-h-[92vh] overflow-y-auto scrollbar-neo">
+        <div className="relative overflow-hidden rounded-t-[15px] bg-[#202820] px-6 pb-6 pt-6 text-white sm:px-8">
+          <DialogTitle className="pr-6 text-[10px] font-bold tracking-[0.18em] uppercase text-secondary">Your streak · built one day at a time</DialogTitle>
+          <div className="mt-4 grid grid-cols-[110px_1fr] items-center gap-4 sm:grid-cols-[170px_1fr] sm:gap-6">
+            <StreakEmblem days={current} className="h-[110px] w-[110px] sm:h-[170px] sm:w-[170px]" />
+            <div>
+              <p className="mb-2 text-xs font-semibold text-orange-200">{current === 0 ? "Your fire starts here" : tier.label + " · " + status.label}</p>
+              <div className="flex items-baseline gap-2.5"><span className="text-[60px] font-extrabold leading-none tracking-tight tabular-nums sm:text-[76px]">{streakLoading ? "—" : current}</span><span className="text-lg text-white/60">{current === 1 ? "day" : "days"}</span></div>
+              <DialogDescription className="mt-3 max-w-sm text-sm leading-relaxed text-white/65">{streakLoading ? "Every run begins with one action." : status.detail}</DialogDescription>
             </div>
           </div>
+          {!streakLoading && <div className="mt-4 rounded-xl border border-secondary/30 bg-secondary/[0.08] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-secondary">{alreadyEarned ? "Reach again" : "Your next milestone"}</p><h3 className="mt-1 text-2xl font-bold">{upcoming.label}</h3></div>
+              <div className="text-right"><p className="text-2xl font-bold text-secondary tabular-nums">{upcoming.days - current}<span className="ml-1 text-xs font-medium">{upcoming.days - current === 1 ? "day" : "days"} away</span></p><p className="mt-1 text-[11px] text-white/55">Day {upcoming.days}</p></div>
+            </div>
+            <p className="mb-3 mt-2 text-xs text-white/70">{alreadyEarned ? "You've earned this milestone before. Rebuild your run toward it." : upcoming.giftTier ? "Reach this milestone to reveal your surprise gift." : "Earn your Spark milestone. Your first surprise gift follows at day 7."}</p>
+            <ProgressBar value={milestoneProgress(current)} dark height="h-2" />
+          </div>}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <StickerButton variant="secondary" size="md" onClick={() => { onOpenChange(false); openLog(); }}><Flame className="h-4 w-4" />{loggedToday ? "Log another action" : current === 0 ? "Earn day one" : "Keep it going"}<ArrowRight className="h-4 w-4" /></StickerButton>
+            <button type="button" className="flex items-center gap-2 rounded-md px-2 py-2 text-xs font-semibold text-white/80 hover:text-secondary" onClick={() => { onOpenChange(false); openGifts(); }}><Gift className="h-4 w-4" />Your gifts{giftsWaiting > 0 && <span className="rounded-full bg-secondary px-1.5 py-0.5 text-primary">{giftsWaiting}</span>}</button>
+            {longest > 0 && <span className="ml-auto flex items-center gap-1.5 text-xs text-white/50"><Trophy className="h-3.5 w-3.5" />Best {longest} days</span>}
+          </div>
+          {repair && <p className="mt-4 text-xs text-white/65">Your previous {repair.brokenStreak}-day run has recovery options. <button type="button" className="font-semibold text-secondary underline underline-offset-2" onClick={() => { onOpenChange(false); openRepair(); }}>View options</button></p>}
         </div>
-
-        {/* Calendar + rewards */}
-        <div className="grid grid-cols-1 md:grid-cols-[340px_1fr] gap-7 px-7 py-6">
-          <StreakCalendar />
-
-          <div className="min-w-0">
-            <p className="text-[15px] font-bold text-primary mb-1">Rewards</p>
-            <p className="text-xs text-black/45 mb-3">Each reward pays out once, the day you reach it.</p>
-            <StreakRewards />
-          </div>
+        <div className="px-6 py-6 sm:px-8">
+          <div className="mb-4 flex items-baseline justify-between gap-3"><div><h3 className="text-lg font-bold text-primary">Grow your flame.</h3><p className="mt-1 text-xs text-black/55">New milestones. Bigger gifts. A run worth keeping.</p></div><span className="text-[10px] text-black/45">Rewards earned once</span></div>
+          <StreakRewards />
+          <details className="mt-5 border-t border-black/10 pt-4">
+            <summary className="cursor-pointer text-xs font-semibold text-black/60">Your activity & streak details</summary>
+            <div className="mt-5 grid gap-6 sm:grid-cols-[1fr_220px]">
+              <StreakCalendar />
+              <div className="space-y-4 text-xs leading-relaxed text-black/60">
+                <p><strong className="block text-primary">Backup freezes: {freezes}</strong>{freeFreezes} free this week. A freeze is a last resort for one missed day; it does not earn a streak day.</p>
+                <p>Milestone gifts are revealed when earned. Returning to a milestone does not award the same gift twice.</p>
+                {shareWeek && <button type="button" className="flex items-center gap-2 font-semibold text-primary" onClick={() => { onOpenChange(false); openWeekCard(shareWeek); }}><Share2 className="h-4 w-4" />Share your week</button>}
+              </div>
+            </div>
+          </details>
         </div>
       </DialogContent>
     </Dialog>
   );
 };
-
 export default StreakPanel;

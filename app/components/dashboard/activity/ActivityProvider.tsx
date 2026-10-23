@@ -262,6 +262,8 @@ interface ActivityContextValue extends StreakState {
   // --- repair ---
   /** Set while a broken streak can still be bought back. Null the rest of the time. */
   repair: RepairOffer | null;
+  repairOpen: boolean;
+  openRepair: () => void;
   /** Buys the broken streak back with a restore gift. False when none is held. */
   restoreStreak: () => boolean;
   /** Buys it back with credits — a ledger spend at the server's price. */
@@ -390,10 +392,9 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [giftsOpen, setGiftsOpen] = useState(false);
   const [weekCardOpen, setWeekCardOpen] = useState<"current" | "previous" | null>(null);
   const [atRiskDismissed, setAtRiskDismissed] = useState(false);
-  // The break whose repair panel was closed this session. Closing is not a
-  // decision — an overlay click must not throw a streak away — so only the
-  // explicit "start from zero" is sent to the server.
-  const [repairHiddenFor, setRepairHiddenFor] = useState<string | null>(null);
+  // Recovery is opened deliberately from streak details, never on page load.
+  // Closing keeps the offer available; only "start from zero" retires it.
+  const [repairOpenFor, setRepairOpenFor] = useState<string | null>(null);
 
   const todayKey = streak?.today ?? dayKey(now);
   const streakDays = streak?.days ?? EMPTY_DAYS;
@@ -492,10 +493,10 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const left = streak.freezes.free + streak.freezes.held;
     // A freeze covers one day at a time: right after one, today is unprotected until it counts.
     const exposed = streak.current > 0 && !streak.loggedToday && streak.freezeReady === false;
-    toast(`Life happened. A freeze covered ${fresh.map((notice) => weekdayName(notice.day)).join(" and ")}.`, {
+    toast(`Backup freeze used for ${fresh.map((notice) => weekdayName(notice.day)).join(" and ")}.`, {
       description: exposed
-        ? "Your streak never broke, but a freeze only covers one day. Log something today to keep it."
-        : `Your streak never broke. ${left} ${left === 1 ? "freeze" : "freezes"} left.`,
+        ? "No streak day earned. Another missed hunt day ends this run; log an action to keep going."
+        : `No streak day earned. ${left} backup ${left === 1 ? "freeze" : "freezes"} remaining.`,
     });
     markSeenNow({ freezes: fresh.map((notice) => notice.day) });
   }, [streak, markSeenNow]);
@@ -659,7 +660,7 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     });
   }
 
-  const offer = streak?.repair && streak.repair.day !== repairHiddenFor ? streak.repair : null;
+  const offer = streak?.repair ?? null;
   const repair: RepairOffer | null = offer
     ? {
         brokenStreak: offer.brokenStreak,
@@ -725,11 +726,13 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     checkDuplicate,
 
     repair,
+    repairOpen: !!offer && repairOpenFor === offer.day,
+    openRepair: () => setRepairOpenFor(offer?.day ?? null),
     freeRestoreUsed: streak?.freeRestoreUsed ?? false,
     repairing: repairMutation.isPending,
-    dismissRepair: () => setRepairHiddenFor(streak?.repair?.day ?? null),
+    dismissRepair: () => setRepairOpenFor(null),
     startOverFromZero: () => {
-      setRepairHiddenFor(streak?.repair?.day ?? null);
+      setRepairOpenFor(null);
       dismiss.mutate();
     },
     nowHour: streak?.localHour ?? now.getHours(),

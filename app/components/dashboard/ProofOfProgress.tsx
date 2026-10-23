@@ -83,23 +83,23 @@ const ProofOfProgress: FC = () => {
   ];
 
   return (
-    <DashCard className="p-6">
+    <DashCard className="p-5 !rounded-[12px]">
       <div className="flex items-baseline justify-between gap-3 mb-1">
-        <p className="text-[15px] font-bold text-primary">What&apos;s come back</p>
+        <p className="text-[15px] font-bold text-primary">Your effort, in numbers</p>
         <span className="text-xs text-black/45">
           {current > 0 ? `${current}-day streak · best ${longest}` : `best run: ${longest} ${longest === 1 ? "day" : "days"}`}
         </span>
       </div>
-      <p className="text-xs text-black/45 mb-4">Effort is only half the picture. This is the other half.</p>
+      <p className="text-xs text-black/45 mb-4">Track the journey from first application to offer.</p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-2.5">
         {outcomes.map((o) => (
-          <div key={o.id} className="rounded-md border-[1.5px] border-black/15 bg-[#fbfbf7] px-3 py-2.5">
+          <div key={o.id} className="rounded-lg bg-[#f5f6ef] px-4 py-3">
             <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.06em] text-black/40">
               <o.icon className="h-3 w-3" />
               {o.label}
             </span>
-            <span className="mt-1 block text-xl font-bold text-primary tabular-nums">{o.value}</span>
+            <span className="mt-2 block text-2xl font-bold text-primary tabular-nums">{o.value}</span>
             <span className="block text-[11px] text-black/40">{o.caption}</span>
           </div>
         ))}
@@ -116,7 +116,7 @@ const ProofOfProgress: FC = () => {
         </Link>
         <Link
           href="/dashboard/coach"
-          className="inline-flex items-center gap-2 rounded-md bg-white px-3.5 py-2 text-sm font-semibold text-primary br-shadow-press">
+          className="inline-flex items-center gap-2 rounded-sm bg-white px-3.5 py-2 text-sm font-semibold text-primary br-shadow-press">
           Ask your coach what this means
           <ArrowRight className="h-3.5 w-3.5 flex-none" />
         </Link>

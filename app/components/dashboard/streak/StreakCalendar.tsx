@@ -57,7 +57,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="min-w-0">
           <p className={cn("text-sm font-bold truncate", dark ? "text-white" : "text-primary")}>{monthLabel(month)}</p>
-          <p className={cn("text-[11px]", dark ? "text-white/45" : "text-black/45")}>
+          <p className={cn("text-[11px]", dark ? "text-white/75" : "text-black/65")}>
             {monthDone} {monthDone === 1 ? "day" : "days"} logged
           </p>
         </div>
@@ -67,7 +67,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
             onClick={() => setMonthOffset((n) => n - 1)}
             aria-label="Previous month"
             className={cn(
-              "h-7 w-7 rounded-md border-[1.5px] flex items-center justify-center transition-all cursor-pointer",
+              "h-7 w-7 rounded-sm border-[1.5px] flex items-center justify-center transition-all cursor-pointer",
               dark
                 ? "border-white/20 text-white/60 hover:border-white hover:text-white active:translate-x-px active:translate-y-px"
                 : "text-black/50 hover:text-primary br-plain-press"
@@ -80,7 +80,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
             disabled={monthOffset >= 0}
             aria-label="Next month"
             className={cn(
-              "h-7 w-7 rounded-md border-[1.5px] flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:shadow-none",
+              "h-7 w-7 rounded-sm border-[1.5px] flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:shadow-none",
               dark
                 ? "border-white/20 text-white/60 hover:border-white hover:text-white active:translate-x-px active:translate-y-px"
                 : "text-black/50 hover:text-primary br-plain-press"
@@ -95,7 +95,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
         {WEEKDAY_HEADERS.map((d, i) => (
           <div
             key={i}
-            className={cn("h-5 flex items-center justify-center text-[10px] font-bold uppercase", dark ? "text-white/35" : "text-black/35")}>
+            className={cn("h-5 flex items-center justify-center text-[10px] font-bold uppercase", dark ? "text-white/75" : "text-black/65")}>
             {d}
           </div>
         ))}
@@ -126,18 +126,22 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
                   <motion.div
                     key={cell.key}
                     initial={reduceMotion ? undefined : { opacity: 0, scale: 0.82 }}
-                    animate={reduceMotion ? undefined : { opacity: muted ? 0.3 : 1, scale: 1 }}
+                    animate={reduceMotion ? undefined : { opacity: 1, scale: 1 }}
                     transition={{ duration: 0.2, delay: reduceMotion ? 0 : (wi * 7 + di) * 0.006, ease: "easeOut" }}
                     whileHover={reduceMotion ? undefined : { scale: 1.14, zIndex: 1 }}
                     title={`${shortDateLabel(cell.key)}: ${fullDay ? "Full day" : visual.label}${cell.day?.count ? ` (${cell.day.count})` : ""}`}
                     className={cn(
-                      "relative aspect-square rounded-md border-[1.5px] flex items-center justify-center text-[11px] font-bold cursor-default select-none",
+                      "relative aspect-square rounded-sm border-[1.5px] flex items-center justify-center text-[11px] font-bold cursor-default select-none",
                       visual.cell,
-                      muted && "opacity-30",
+                      !dark && status === "missed" && "border-[#a3aaa0] text-[#424a40] bg-white",
+                      !dark && status === "future" && "text-[#596153] bg-[#eef0e8]",
+                      !dark && status === "rest" && "text-[#424a40] bg-[#e6e9df]",
+                      muted && !dark && "text-[#606859] bg-[#e9ece3] border-transparent",
                       isOpenToday && "ring-2 ring-offset-1 ring-[#222325]",
-                      dark && status === "missed" && "bg-white/5 border-white/15 text-white/30",
-                      dark && status === "future" && "text-white/20",
-                      dark && status === "rest" && "bg-white/10 text-white/40",
+                      dark && status === "missed" && "bg-white/5 border-white/40 text-white/80",
+                      dark && status === "future" && "text-white/70",
+                      dark && status === "rest" && "bg-white/10 text-white/80",
+                      isOpenToday && !dark && "bg-[#e1f073] text-[#222325] border-[#222325]",
                       fullDay && "border-[#222325] ring-1 ring-[#222325]"
                     )}>
                     {/* Today's unlogged cell keeps a slow breathing ring */}
@@ -146,7 +150,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
                         aria-hidden
                         animate={{ opacity: [0.55, 0.12, 0.55], scale: [1, 1.22, 1] }}
                         transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
-                        className="pointer-events-none absolute inset-0 rounded-md border-2 border-[#e1f073]"
+                        className="pointer-events-none absolute inset-0 rounded-sm border-2 border-[#e1f073]"
                       />
                     )}
                     <span className="relative inline-flex items-center justify-center" style={visual.kind === "emoji" ? { fontSize: 12 } : undefined}>
@@ -167,7 +171,7 @@ const StreakCalendar: FC<StreakCalendarProps> = ({ dark = false, className }) =>
       </AnimatePresence>
 
       {/* Legend */}
-      <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[10px]", dark ? "text-white/40" : "text-black/40")}>
+      <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[10px]", dark ? "text-white/75" : "text-black/65")}>
         <span className="inline-flex items-center gap-1">
           <span className={cn("inline-flex h-3 w-3 items-center justify-center rounded-[2px]", tier.cell)}>
             <Check className="h-2 w-2 text-[#222325]" strokeWidth={5} />

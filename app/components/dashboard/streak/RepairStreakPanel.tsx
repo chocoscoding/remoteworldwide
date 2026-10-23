@@ -28,6 +28,7 @@ import { REPAIR_WINDOW_HOURS } from "@/app/lib/dashboard/credits";
 const RepairStreakPanel: FC = () => {
   const {
     repair,
+    repairOpen,
     longest,
     applications,
     restoreStreak,
@@ -41,7 +42,7 @@ const RepairStreakPanel: FC = () => {
   } = useActivity();
   const reduceMotion = useReducedMotion();
 
-  if (!repair) return null;
+  if (!repair || !repairOpen) return null;
 
   const { brokenStreak, hoursSinceBreak, priceCredits, restoreHeld: hasRestore, freeHalfAvailable, halfDays: half } = repair;
   const inWindow = hoursSinceBreak <= REPAIR_WINDOW_HOURS;

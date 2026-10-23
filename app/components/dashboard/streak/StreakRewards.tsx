@@ -1,153 +1,56 @@
 "use client";
 
-// The reward ladder. Each rung shows what it costs in days, what it pays in
-// credits, and whether it is banked, in progress, or still locked.
-//
-// Micro-interactions: the in-progress rung fills its bar on mount and carries
-// a soft breathing glow; unlocked rungs lift on hover; locked rungs stay flat
-// and desaturated so the earned ones read as genuinely different.
-
-import { type FC } from "react";
-import { motion, useReducedMotion } from "motion/react";
-import { Check, Lock } from "lucide-react";
+import { useState, type FC } from "react";
+import { Check, Gift, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STREAK_MILESTONES, milestoneProgress, nextMilestone } from "@/app/lib/dashboard/streak";
-import { GIFT_CATALOGUE } from "@/app/lib/dashboard/gifts";
+import { milestonesUpTo, nextMilestone } from "@/app/lib/dashboard/streak";
+import { GIFT_CATALOGUE, GIFT_POOLS } from "@/app/lib/dashboard/gifts";
 import { milestoneGiftRef } from "@/app/lib/streak/types";
 import { useStreak } from "./StreakContext";
+import StreakEmblem from "./StreakEmblem";
 
 export interface StreakRewardsProps {
-  /** Renders on a dark surface. */
   dark?: boolean;
   className?: string;
 }
 
 const StreakRewards: FC<StreakRewardsProps> = ({ dark = false, className }) => {
   const { current, claimed, gifts } = useStreak();
-  const reduceMotion = useReducedMotion();
+  const [hovered, setHovered] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const upcoming = nextMilestone(current);
-  const progress = milestoneProgress(current);
-
+  const milestones = milestonesUpTo(current);
+  const ladder = milestones.some((m) => m.days === upcoming.days) ? milestones : [...milestones, upcoming];
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      {STREAK_MILESTONES.map((m) => {
-        const unlocked = claimed.includes(m.days) || current >= m.days;
-        const isNext = upcoming?.days === m.days;
-        const daysToGo = m.days - current;
-
+    <div className={cn("grid grid-cols-2 gap-2 sm:grid-cols-3", className)}>
+      {ladder.map((m) => {
+        const earned = claimed.includes(m.days) || current >= m.days;
+        const isNext = upcoming.days === m.days && !earned;
+        const drawn = gifts.find((g) => g.refId === milestoneGiftRef(m.days));
         return (
-          <motion.div
-            key={m.days}
-            whileHover={reduceMotion || (!unlocked && !isNext) ? undefined : { x: 2, y: -2 }}
-            transition={{ type: "spring", stiffness: 400, damping: 26 }}
-            // The ladder is where the colour lives. Banked rungs take a full
-            // lime fill, the rung in progress is white with a lime shadow and a
-            // partial lime track behind it, and locked rungs fade out — so the
-            // column reads top-to-bottom as a descending ramp of earned → in
-            // reach → far off. The calendar beside it stays deliberately quiet
-            // so this is the panel that carries the weight.
-            className={cn(
-              "relative overflow-hidden rounded-lg border-[1.5px] px-3.5 py-3",
-              unlocked
-                ? dark
-                  ? "border-secondary bg-secondary/15"
-                  : "bg-[#e1f073] br-shadow"
-                : isNext
-                  ? dark
-                    ? "border-white/40 bg-white/[0.07]"
-                    : "bg-white br-shadow br-lime"
-                  : dark
-                    ? "border-white/12 bg-white/[0.03]"
-                    : "border-black/12 bg-[#fbfbf7]"
-            )}>
-            {/* The in-progress rung fills a track behind its content */}
-            {isNext && (
-              <motion.div
-                aria-hidden
-                initial={reduceMotion ? { width: `${progress}%` } : { width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.9, ease: "easeOut" }}
-                className={cn("pointer-events-none absolute inset-y-0 left-0", dark ? "bg-secondary/12" : "bg-[#e1f073]/35")}
-              />
-            )}
-
-            <div className="relative flex items-center gap-3">
-              {/* Badge */}
-              <span
-                className={cn(
-                  "h-8 w-8 flex-none rounded-md border-[1.5px] flex items-center justify-center text-base",
-                  unlocked
-                    ? "border-[#222325] bg-white"
-                    : isNext
-                      ? dark
-                        ? "border-white/40 bg-white/10"
-                        : "border-[#222325] bg-white"
-                      : dark
-                        ? "border-white/15 bg-transparent grayscale opacity-45"
-                        : "border-black/12 bg-white grayscale opacity-45"
-                )}>
-                {m.emoji}
-              </span>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p
-                    className={cn(
-                      "text-[13px] font-bold truncate",
-                      unlocked ? (dark ? "text-white" : "text-primary") : dark ? "text-white/70" : "text-black/60"
-                    )}>
-                    {m.label}
-                  </p>
-                  <span
-                    className={cn(
-                      "flex-none text-[10px] font-bold uppercase tracking-[0.06em]",
-                      unlocked ? (dark ? "text-white/55" : "text-primary/60") : dark ? "text-white/35" : "text-black/35"
-                    )}>
-                    {m.days}d
-                  </span>
-                </div>
-                <p className={cn("text-[11px] truncate", unlocked ? (dark ? "text-white/55" : "text-primary/65") : dark ? "text-white/40" : "text-black/40")}>
-                  {/* Unearned rungs promise a surprise; earned ones show the
-                      gift actually drawn (the inventory holds the roll).
-                      Seeded history has no entry — fall back to the promise. */}
-                  {(() => {
-                    const drawn = gifts.find((g) => g.refId === milestoneGiftRef(m.days));
-                    if (!m.giftTier) return m.perk ?? "Bragging rights";
-                    const what = unlocked && drawn ? `\u{1F381} ${GIFT_CATALOGUE[drawn.kind].label}` : "\u{1F381} Surprise gift";
-                    return `${what}${m.perk ? ` · ${m.perk}` : ""}`;
-                  })()}
-                </p>
-              </div>
-
-              {/* Right-hand state */}
-              <span className="flex-none">
-                {unlocked ? (
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold",
-                      dark ? "bg-secondary text-primary" : "bg-[#222325] text-[#e1f073]"
-                    )}>
-                    <Check className="h-3 w-3" />
-                    Earned
-                  </span>
-                ) : isNext ? (
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full border-[1.5px] px-2 py-1 text-[10px] font-bold",
-                      dark ? "border-white/40 text-white" : "border-[#222325] text-primary"
-                    )}>
-                    {daysToGo} to go
-                  </span>
-                ) : (
-                  <Lock className={cn("h-3.5 w-3.5", dark ? "text-white/25" : "text-black/25")} />
-                )}
-              </span>
+          <div key={m.days} onMouseEnter={() => setHovered(m.days)} onMouseLeave={() => setHovered(null)} className={cn(
+            "relative rounded-lg border px-3 py-2",
+            earned ? "border-[#b1c44a] bg-[#edf4c8]" : isNext ? "border-[#b3c446] bg-white ring-2 ring-[#e1f073]/65" : dark ? "border-white/15 bg-white/[0.06]" : "border-black/10 bg-white",
+          )}>
+            <div className="flex items-center justify-between gap-1">
+              <span className={cn("text-[9px] font-bold uppercase tracking-wider", dark && !earned ? "text-white/60" : "text-black/50")}>Day {m.days}</span>
+              {earned ? <Check aria-label="Earned" className="h-3.5 w-3.5 text-[#526512]" /> : isNext ? <span className="text-[9px] font-bold text-[#5b6b13]">UP NEXT</span> : <Lock aria-label="Locked" className={cn("h-3 w-3", dark ? "text-white/40" : "text-black/30")} />}
             </div>
-          </motion.div>
+            <StreakEmblem days={m.days} active={hovered === m.days || expanded.has(m.days)} className={cn("mx-auto h-11 w-11", !earned && !isNext && "opacity-80")} />
+            <p className={cn("text-center text-sm font-bold", dark && !earned ? "text-white" : "text-primary")}>{m.label}</p>
+            <p className={cn("mt-1 flex items-center justify-center gap-1 text-center text-[10px]", dark && !earned ? "text-white/65" : "text-black/60")}>
+              {m.giftTier && <Gift className="h-3 w-3 shrink-0" />}
+              {drawn ? GIFT_CATALOGUE[drawn.kind].label : m.giftTier ? m.giftTier === "big" ? "Premium surprise gift" : "Surprise gift" : "Your first milestone"}
+            </p>
+            {isNext && <p className="mt-1 text-center text-[10px] font-bold text-[#5b6b13]">{m.days - current} {m.days - current === 1 ? "day" : "days"} to go</p>}
+            {(m.giftTier || m.perk) && <details onToggle={(event) => { const open = event.currentTarget.open; setExpanded((previous) => { const next = new Set(previous); if (open) next.add(m.days); else next.delete(m.days); return next; }); }} className={cn("mt-1 text-[10px]", dark && !earned ? "text-white/60" : "text-black/50")}>
+              <summary className="cursor-pointer text-center underline decoration-dotted underline-offset-2">Reward details</summary>
+              <p className="mt-2 leading-relaxed">{m.giftTier && <>One gift from: {GIFT_POOLS[m.giftTier].map((kind) => GIFT_CATALOGUE[kind].label).join(", ")}.</>} {m.perk && <>Also includes {m.perk.toLowerCase()}.</>} Earned once.</p>
+            </details>}
+          </div>
         );
       })}
     </div>
   );
 };
-
 export default StreakRewards;

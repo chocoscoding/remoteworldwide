@@ -14,6 +14,7 @@ import { useState, type FC } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { tierFor } from "@/app/lib/dashboard/streak";
+import { streakStatus } from "@/app/lib/dashboard/streak-status";
 import { useStreak } from "./StreakContext";
 import StreakFlame from "./StreakFlame";
 import StreakPanel from "./StreakPanel";
@@ -23,10 +24,15 @@ export interface StreakPillProps {
 }
 
 const StreakPill: FC<StreakPillProps> = ({ className }) => {
-  const { current, logPulse, loggedToday } = useStreak();
+  const streak = useStreak();
+  const { current, logPulse, repair, streakLoading } = streak;
+  const status = streakStatus(streak);
+  const label = repair ? "Recovery available" : status.label;
   const reduceMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
   const tier = tierFor(current);
+
+  if (streakLoading) return null;
 
   return (
     <>
@@ -37,7 +43,7 @@ const StreakPill: FC<StreakPillProps> = ({ className }) => {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`${current}-day streak. Open streak details`}
+        aria-label={`${current}-day streak. ${label}. Open streak details`}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold whitespace-nowrap cursor-pointer",
           tier.chip,
@@ -62,18 +68,7 @@ const StreakPill: FC<StreakPillProps> = ({ className }) => {
         </span>
         <span>{current === 1 ? "day" : "days"}</span>
 
-        {/* A quiet dot marks today as still open */}
-        {!loggedToday && (
-          <motion.span
-            aria-hidden
-            animate={reduceMotion ? undefined : { opacity: [1, 0.25, 1] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              tier.id === "wildfire" || tier.id === "supernova" || tier.id === "legend" ? "bg-[#e1f073]" : "bg-[#222325]",
-            )}
-          />
-        )}
+        {label !== "Secured today" && <span className="hidden sm:inline border-l border-current/25 pl-2 ml-0.5 text-[10px]">{label}</span>}
       </button>
 
       <StreakPanel open={open} onOpenChange={setOpen} />

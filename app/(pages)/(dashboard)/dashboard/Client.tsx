@@ -2,15 +2,18 @@
 
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Minus, Plus, ArrowRight, RotateCw, X } from "lucide-react";
+import { Minus, Plus, ArrowRight, RotateCw, X, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashCard from "@/app/components/dashboard/ui/DashCard";
+import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import StickerButton, { stickerButtonVariants } from "@/app/components/dashboard/ui/StickerButton";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import type { ProgressBarFillColor } from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
-import NeoCheckbox from "@/app/components/dashboard/ui/NeoCheckbox";
 import StreakPill from "@/app/components/dashboard/streak/StreakPill";
+import StreakEmblem from "@/app/components/dashboard/streak/StreakEmblem";
+import StreakPanel from "@/app/components/dashboard/streak/StreakPanel";
+import { streakStatus } from "@/app/lib/dashboard/streak-status";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import AtRiskBanner from "@/app/components/dashboard/streak/AtRiskBanner";
 import ProofOfProgress from "@/app/components/dashboard/ProofOfProgress";
@@ -19,7 +22,7 @@ import { useActivity } from "@/app/components/dashboard/activity/ActivityProvide
 import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { COLUMN_LABELS, STATUS_ORDER } from "@/app/components/dashboard/tracker/tracker-meta";
 import { ACTION_KINDS, type ActionKind } from "@/app/lib/dashboard/activity";
-import { dayKey, fromDayKey, addDays, weekdayIndex, dayVisual, tierFor } from "@/app/lib/dashboard/streak";
+import { dayKey, fromDayKey, addDays, weekdayIndex, dayVisual, tierFor, nextMilestone } from "@/app/lib/dashboard/streak";
 import { clampTarget, dailyMath, TARGET_STEP, HIGH_VOLUME_THRESHOLD, TARGET_MAX, TARGET_MIN } from "@/app/lib/dashboard/goals";
 import type { TrackerColumnId } from "@/app/lib/dashboard/types";
 import { BASIC_GATES } from "@/app/lib/settings/planGates";
@@ -95,6 +98,10 @@ const PIPELINE_FILL: Record<TrackerColumnId, ProgressBarFillColor> = {
 
 const HomeClient: FC = () => {
   const [goalsOpen, setGoalsOpen] = useState(false);
+  const [streakOpen, setStreakOpen] = useState(false);
+  const activity = useActivity();
+  const todayStatus = streakStatus(activity);
+  const nextReward = nextMilestone(activity.current);
 
   const {
     current: streak,
@@ -213,7 +220,8 @@ const HomeClient: FC = () => {
   }, [applications.data]);
 
   return (
-    <div className="min-h-screen bg-[#f6f6f6]">
+    <div className="min-h-screen bg-[#f7f8f2]">
+      <StreakPanel open={streakOpen} onOpenChange={setStreakOpen} />
       {/* Header */}
       <header className="sticky top-0 z-10 h-16 flex items-center justify-between gap-4 px-8 bg-white/85 backdrop-blur-sm border-b border-black/10">
         <div className="flex items-center gap-3 min-w-0">
@@ -231,17 +239,37 @@ const HomeClient: FC = () => {
 
       <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto">
         <AtRiskBanner />
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-black/45">Your next chapter</p>
+            <h2 className="text-3xl font-bold tracking-tight text-primary">Make your next move.</h2>
+          </div>
+          <Link href="/dashboard/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">Explore jobs <ArrowRight className="h-4 w-4" /></Link>
+        </div>
 
         {/* Hero row: weekly goal + today */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 items-stretch">
           {/* Weekly goal card */}
-          <div className="relative overflow-hidden rounded-[18px] bg-[#222325] text-white p-5 flex flex-col">
-            <div aria-hidden className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-secondary/25 blur-3xl pointer-events-none" />
+          <div className="relative overflow-hidden rounded-[16px] bg-[#222b23] text-white p-4 flex flex-col">
+            <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full border-[40px] border-secondary/[0.06]" />
 
             <div className="relative flex flex-col flex-1">
+              <div className="mb-3 flex items-center justify-between gap-5">
+                <div className="max-w-[350px]">
+                  <p className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-secondary"><span className="h-1.5 w-1.5 rounded-full bg-secondary" /> {activity.streakLoading ? "Today's opportunity" : todayStatus.label}</p>
+                  <h3 className="text-[26px] font-bold leading-[1.1] tracking-tight sm:text-[30px]">{activity.loggedToday ? <>Keep the<br />momentum.</> : <>One action.<br />Another step closer.</>}</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-white/65">{activity.loggedToday ? "Today's effort is on the board. Keep building." : "Send the application. Start the conversation."}</p>
+                </div>
+                <button type="button" onClick={() => setStreakOpen(true)} aria-label="View your streak and rewards" className="group flex shrink-0 flex-col items-center rounded-xl border border-secondary/25 bg-secondary/[0.08] px-4 py-2 transition-colors hover:bg-secondary/15">
+                  <StreakEmblem days={streak} className="-mt-1 h-8 w-8" />
+                  <span className="text-3xl font-bold tabular-nums text-secondary">{activity.streakLoading ? "—" : streak}</span>
+                  <span className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/60">day streak</span>
+                  <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-secondary">View rewards <ArrowRight className="h-3 w-3" /></span>
+                </button>
+              </div>
               {/* The derivation sits up here rather than under the bar: it's
                   context for the target, not a caption on the progress. */}
-              <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-start justify-between gap-4 mb-2">
                 <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-secondary">Weekly goal</p>
                 {goalsKnown ? (
                   goals.paused ? (
@@ -263,25 +291,25 @@ const HomeClient: FC = () => {
                 )}
               </div>
 
-              <div className="flex items-baseline gap-2.5 mb-5">
+              <div className="flex items-baseline gap-2.5 mb-2">
                 {goalReady ? (
                   <>
-                    <span className="text-[56px] font-bold leading-none tabular-nums">{loggedThisWeek}</span>
+                    <span className="text-[32px] font-bold leading-none tabular-nums">{loggedThisWeek}</span>
                     <span className="text-base text-white/55">of {weeklyTarget} applications</span>
                   </>
                 ) : (
                   <>
-                    <span aria-hidden className="h-14 w-16 self-end animate-pulse rounded-lg bg-white/10" />
+                    <span aria-hidden className="h-14 w-16 self-end animate-pulse rounded-md bg-white/10" />
                     <span aria-hidden className="h-4 w-36 self-end animate-pulse rounded bg-white/10" />
                     <span className="sr-only">Loading your weekly goal</span>
                   </>
                 )}
               </div>
 
-              <ProgressBar value={goalPct} dark height="h-[9px]" className="mb-6" />
+              <ProgressBar value={goalPct} dark height="h-[7px]" className="mb-3" />
 
               {/* 7-day M–S strip, lit from the live streak history */}
-              <div className="grid grid-cols-7 gap-1.5 mb-7">
+              <div className="grid grid-cols-7 gap-2 mb-3">
                 {weekDays.map((d) => {
                   const status = d.day?.status ?? "future";
                   const isDone = status === "logged" || status === "backfilled";
@@ -298,7 +326,7 @@ const HomeClient: FC = () => {
                       disabled={!d.isToday || isRest}
                       title={`${d.label}: ${isRest ? "rest day, nothing needed" : isDone ? "logged" : status === "freeze" ? "freeze used" : status === "missed" ? "missed" : d.isToday ? "still open, click to log" : "upcoming"}`}
                       className={cn(
-                        "relative h-11 rounded-lg flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-all",
+                        "relative h-10 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] font-bold transition-all",
                         // Rest days shrink back and fade out: they aren't days
                         // you're expected to work, so they shouldn't sit at the
                         // same visual weight as the ones you are. Scaled down
@@ -317,7 +345,7 @@ const HomeClient: FC = () => {
                       {isOpenToday && (
                         <span
                           aria-hidden
-                          className="pointer-events-none absolute inset-0 rounded-lg border-2 border-secondary animate-pulse"
+                          className="pointer-events-none absolute inset-0 rounded-md border-2 border-secondary animate-pulse"
                         />
                       )}
                       <span className="leading-none">{d.label}</span>
@@ -334,6 +362,7 @@ const HomeClient: FC = () => {
               </div>
 
               <div className="mt-auto flex flex-wrap items-center gap-2">
+                <StickerButton variant="secondary" size="md" onClick={openLog}>{activity.loggedToday ? "Log your next move" : "Log an application"}<ArrowRight className="h-4 w-4" /></StickerButton>
                 <button
                   type="button"
                   onClick={() => setGoalsOpen((v) => !v)}
@@ -341,6 +370,7 @@ const HomeClient: FC = () => {
                   {goalsOpen ? "Hide goals" : "Adjust goals"}
                 </button>
               </div>
+              {nextReward && !activity.streakLoading && <button type="button" onClick={() => setStreakOpen(true)} className="mt-3 flex items-center gap-2 border-t border-white/10 pt-2 text-left text-xs text-white/65 hover:text-secondary"><Trophy className="h-4 w-4 text-secondary" /><span><strong className="text-white">{nextReward.days - streak} days</strong> to {nextReward.label}</span><ArrowRight className="ml-auto h-3.5 w-3.5" /></button>}
             </div>
           </div>
 
@@ -352,32 +382,32 @@ const HomeClient: FC = () => {
               returns to normal flow, and the overflow is dropped so nothing is
               hidden behind a scrollbar on a short viewport. */}
           <div className="lg:relative">
-            <DashCard className="p-5 flex flex-col lg:absolute lg:inset-0">
+            <DashCard className="p-5 flex flex-col lg:absolute lg:inset-0 !rounded-[16px]">
               <div className="flex items-baseline justify-between gap-3 mb-1 flex-none">
-                <p className="text-[15px] font-bold text-primary">Today</p>
+                <p className="text-xl font-bold tracking-tight text-primary">Small moves. Real progress.</p>
                 <span className="text-xs font-semibold text-black/45">
                   {habitsDone} of {habitsToday.length} done
                 </span>
               </div>
+              <p className="mb-3 mt-2 text-xs text-black/50">Choose one thing to move your search forward.</p>
 
               <div className="flex flex-col gap-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto scrollbar-neo lg:-mr-1 lg:pr-1">
                 {habitsToday.map((h) => {
                   const spec = ACTION_KINDS[h.kind];
                   const row = (
                     <>
-                      <NeoCheckbox checked={h.done} interactive={!h.done} />
                       <span className="min-w-0 flex-1">
                         <span className={cn("block text-sm", h.done ? "text-primary font-medium" : "text-black/70")}>{h.label}</span>
                         <span className="block text-[11px] text-black/40">
-                          {h.done ? "Done today" : `Needs: ${spec.artifact.toLowerCase()}`}
+                          {h.done ? "Done today" : "Take the next step"}
                         </span>
                       </span>
-                      {!h.done && <ArrowRight className="h-3.5 w-3.5 flex-none text-black/30" />}
+                      {h.done ? <NeoCheckbox checked interactive={false} size="sm" /> : <ArrowRight className="h-3.5 w-3.5 flex-none text-black/40" />}
                     </>
                   );
                   const cls = cn(
-                    "group flex flex-none items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                    h.done ? "border-black/10 bg-[#f6faea] cursor-default" : "border-black/12 hover:bg-[#f6f6f6] cursor-pointer",
+                    "group flex flex-none items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                    h.done ? "border-black/12 bg-white cursor-default" : "border-black/12 bg-white hover:bg-[#f6f6f6] cursor-pointer",
                   );
                   if (h.done)
                     return (
@@ -406,7 +436,7 @@ const HomeClient: FC = () => {
             "overflow-hidden transition-[max-height,opacity] duration-300 ease-out",
             goalsOpen ? "max-h-[1000px] opacity-100 mt-5" : "max-h-0 opacity-0",
           )}>
-          <div className="rounded-2xl bg-white br-bold br-lime p-6">
+          <div className="rounded-xl bg-white br-bold br-lime p-6">
             <div className="flex items-center justify-between mb-6">
               <p className="text-[15px] font-bold text-primary">Set your goals</p>
               <button
@@ -447,7 +477,7 @@ const HomeClient: FC = () => {
                       min={TARGET_MIN}
                       max={TARGET_MAX}
                       onChange={(e) => setWeeklyTarget(clampTarget(Number(e.target.value)))}
-                      className="w-[72px] rounded-md border border-black/15 px-2 py-1 text-center text-3xl font-bold text-primary tabular-nums outline-none transition-colors focus:border-[#222325] focus:shadow-[2px_2px_0_0_#e1f073] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="w-[72px] rounded-sm border border-black/15 px-2 py-1 text-center text-3xl font-bold text-primary tabular-nums outline-none transition-colors focus:border-[#222325] focus:shadow-[2px_2px_0_0_#e1f073] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                     <button
                       type="button"
@@ -483,7 +513,7 @@ const HomeClient: FC = () => {
                           type="button"
                           onClick={() => toggleRestDay(i)}
                           className={cn(
-                            // Squarer than the old rounded-lg, and it presses on
+                            // Squarer than the old rounded-md, and it presses on
                             // click — but with no shadow to press into, so it
                             // reads as a toggle rather than a raised control.
                             "h-9 w-9 rounded-sm text-xs font-bold flex items-center justify-center cursor-pointer",
@@ -525,7 +555,7 @@ const HomeClient: FC = () => {
                     this is where you decide what the habits are. */}
                 {/* Boxed so the editable list reads as one block rather than
                     floating loose against the goals column beside it. */}
-                <div className="rounded-lg border-[1.5px] border-[#222325] p-3.5">
+                <div className="rounded-md border-[1.5px] border-[#222325] p-3.5">
                   <div className="flex items-baseline justify-between gap-3 mb-1">
                     <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40">Daily habits</p>
                     <span className="text-[11px] font-semibold text-black/45">{habits.length} habits</span>
@@ -536,7 +566,7 @@ const HomeClient: FC = () => {
                       this reads as the list it is. */}
                   <div className="flex flex-col gap-0.5 -mx-1">
                     {habits.map((h) => (
-                      <div key={h.id} className="group flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-[#fbfbf7]">
+                      <div key={h.id} className="group flex items-center gap-2 rounded-sm px-1 py-1 transition-colors hover:bg-[#fbfbf7]">
                         <input
                           aria-label="Habit name"
                           value={h.label}
@@ -570,7 +600,7 @@ const HomeClient: FC = () => {
                     <button
                       type="button"
                       onClick={addHabit}
-                      className="mt-1 flex items-center gap-1.5 rounded-md border border-dashed border-black/20 px-2.5 py-1.5 text-xs font-semibold text-black/40 hover:border-black/40 hover:text-primary transition-colors cursor-pointer">
+                      className="mt-1 flex items-center gap-1.5 rounded-sm border border-dashed border-black/20 px-2.5 py-1.5 text-xs font-semibold text-black/40 hover:border-black/40 hover:text-primary transition-colors cursor-pointer">
                       <Plus className="h-3 w-3 flex-none" />
                       Add your own habit
                     </button>
@@ -620,12 +650,12 @@ const HomeClient: FC = () => {
                       <span className={cn("h-3 animate-pulse rounded bg-[#f0f0ea]", width)} />
                       <span className="h-2.5 w-1/3 animate-pulse rounded bg-[#f0f0ea]" />
                     </div>
-                    <span className="h-8 w-14 flex-none animate-pulse rounded-lg bg-[#f0f0ea]" />
+                    <span className="h-8 w-14 flex-none animate-pulse rounded-md bg-[#f0f0ea]" />
                   </div>
                 ))}
 
               {plan.isError && !plan.data && (
-                <div role="alert" className="flex items-center justify-between gap-3 rounded-xl bg-[#f0f0ea]/70 px-4 py-3">
+                <div role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-[#f0f0ea]/70 px-4 py-3">
                   <span className="text-sm text-black/60">Couldn&apos;t load your plan.</span>
                   <button type="button" onClick={() => void plan.refetch()} disabled={plan.isFetching} className={outlineLink}>
                     <RotateCw aria-hidden className={cn("h-3.5 w-3.5", plan.isFetching && "animate-spin")} />
@@ -635,7 +665,7 @@ const HomeClient: FC = () => {
               )}
 
               {plan.data && nextActions.length === 0 && (
-                <div className="flex flex-col items-start gap-3 rounded-xl bg-[#f0f0ea]/70 px-4 py-4">
+                <div className="flex flex-col items-start gap-3 rounded-lg bg-[#f0f0ea]/70 px-4 py-4">
                   <div>
                     <p className="text-sm font-semibold text-primary">Nothing open on your plan</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-black/50">

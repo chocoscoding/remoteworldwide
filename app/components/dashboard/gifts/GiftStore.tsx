@@ -1,142 +1,100 @@
 "use client";
 
-// Your gifts — the reward system's inventory. No shop, no prices: milestones
-// and strong moments GRANT these (freezes, backfills, rewrites, Pro days,
-// priority intros, restores), and the owner redeems them whenever they
-// choose. Referral credits are the invites page's story and never appear
-// here.
-//
-// Also the only surface that shows the gift history — every row has the
-// reason it was earned, so "where did this come from" is always answerable,
-// and what using it did (a day of Pro's end, a rewrite ready, an intro waiting).
-//
-// "Use" on a resume rewrite opens a picker instead (RewriteGiftDialog): the
-// gift is spent by the build it pays for, never on its own.
-
 import { useState, type FC } from "react";
-import { Gift } from "lucide-react";
+import { ArrowRight, Gift, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
+import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { GIFT_CATALOGUE, giftStatusLabel, heldOf, type GiftKind } from "@/app/lib/dashboard/gifts";
-import { shortDateLabel } from "@/app/lib/dashboard/streak";
+import { milestonesUpTo, nextMilestone, shortDateLabel } from "@/app/lib/dashboard/streak";
 import { proUntilLabel } from "@/app/lib/settings/boost";
 import RewriteGiftDialog from "./RewriteGiftDialog";
 
 const KINDS = Object.keys(GIFT_CATALOGUE) as GiftKind[];
 
 const GiftStore: FC = () => {
-  const { giftsOpen, closeGifts, gifts, giftsWaiting, redeemGift } = useActivity();
+  const { giftsOpen, closeGifts, gifts, redeemGift, current, claimed, openLog, streakLoading } = useActivity();
   const onHold = gifts.filter((g) => !g.usedAt && g.pendingUntil);
   const [rewriteOpen, setRewriteOpen] = useState(false);
+  const available = KINDS.map((kind) => ({ kind, count: heldOf(gifts, kind) })).filter((item) => item.count > 0);
+  const count = available.reduce((sum, item) => sum + item.count, 0);
+  const nextGift = milestonesUpTo(current).find((m) => m.giftTier && m.days > current && !claimed.includes(m.days))
+    ?? nextMilestone(Math.max(current, ...claimed));
 
-  const use = (kind: GiftKind) => {
+  const handleUseGift = (kind: GiftKind) => {
     if (kind === "rewrite") setRewriteOpen(true);
     else redeemGift(kind);
   };
 
   return (
-    <Dialog open={giftsOpen} onOpenChange={(o) => !o && closeGifts()}>
-      <DialogContent className="bg-white rounded-[20px] border-2 border-[#222325] p-0 max-w-2xl overflow-hidden gap-0 max-h-[90vh] overflow-y-auto scrollbar-neo">
-        {/* Header */}
-        <div className="relative overflow-hidden bg-primary px-7 pt-7 pb-6 text-white">
-          <div aria-hidden className="pointer-events-none absolute -bottom-10 right-6 h-28 w-28 rotate-12 rounded-2xl bg-secondary/10" />
-          <div className="relative">
-            <DialogTitle className="text-[11px] font-bold uppercase tracking-[0.12em] text-secondary mb-3">Your gifts</DialogTitle>
-            <div className="flex items-baseline gap-2">
-              <span className="text-[52px] font-extrabold leading-none tabular-nums">{giftsWaiting}</span>
-              <span className="text-base text-white/55">waiting</span>
+    <Dialog open={giftsOpen} onOpenChange={(open) => !open && closeGifts()}>
+      <DialogContent className="bg-[#f7f8f2] rounded-[16px] border border-black/15 p-0 max-w-lg gap-0 max-h-[90vh] overflow-y-auto scrollbar-neo">
+        <div className="rounded-t-[15px] bg-[#202820] px-7 pb-6 pt-6 text-white">
+          <DialogTitle className="text-[10px] font-bold uppercase tracking-[0.16em] text-secondary">Your gifts</DialogTitle>
+          <div className="mt-4 flex items-center gap-5">
+            <div aria-hidden className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-[14px] border border-secondary/25 bg-secondary/10">
+              <Gift className="h-10 w-10 text-secondary" strokeWidth={1.5} />
+              <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-orange-200" />
             </div>
-            <DialogDescription className="mt-2 text-sm text-white/55">
-              Earned by showing up and by real wins. Use them whenever you choose. They don&apos;t expire.
-            </DialogDescription>
+            <div>
+              <p className="text-2xl font-bold tracking-tight">{count > 0 ? count + (count === 1 ? " gift. All yours." : " gifts. All yours.") : "Good things ahead."}</p>
+              <DialogDescription className="mt-2 text-sm leading-relaxed text-white/65">{count > 0 ? "You've earned these. Use them when you're ready." : "Keep showing up. Turn your progress into perks."}</DialogDescription>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-7 px-7 py-6">
-          {/* Inventory */}
-          <div className="min-w-0">
-            <p className="text-[15px] font-bold text-primary mb-3">Waiting for you</p>
-            {giftsWaiting === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-black/20 px-4 py-8 text-center">
-                <Gift className="h-5 w-5 text-black/30" />
-                <p className="text-xs leading-relaxed text-black/55">
-                  Nothing waiting right now. Milestones, full weeks and real wins (interviews, offers, answered
-                  questions) all land here.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {KINDS.map((kind) => {
-                  const count = heldOf(gifts, kind);
-                  if (count === 0) return null;
-                  const spec = GIFT_CATALOGUE[kind];
-                  const Icon = spec.icon;
-                  return (
-                    <div key={kind} className="flex items-center gap-3 rounded-lg border border-black/12 bg-white px-3.5 py-3">
-                      <span className="flex h-9 w-9 flex-none items-center justify-center rounded-md border border-black/15 bg-[#f6faea] text-primary">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-primary">
-                          {spec.label}
-                          {count > 1 && <span className="ml-1.5 text-xs font-bold text-black/45">×{count}</span>}
-                        </p>
-                        <p className="truncate text-[11px] text-black/45">{spec.detail}</p>
-                      </div>
-                      <StickerButton variant="primary" size="sm" onClick={() => use(kind)}>
-                        Use
-                      </StickerButton>
+        <div className="px-7 py-5">
+          {available.length > 0 ? (
+            <div className="space-y-2">
+              {available.map(({ kind, count: held }) => {
+                const spec = GIFT_CATALOGUE[kind];
+                const Icon = spec.icon;
+                return (
+                  <div key={kind} className="rounded-lg border border-black/10 bg-white p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#edf3d1] text-[#46551c]"><Icon className="h-5 w-5" /></span>
+                      <p className="flex-1 text-sm font-bold text-primary">{spec.label}{held > 1 && <span className="ml-1.5 text-xs text-black/50">×{held}</span>}</p>
+                      <StickerButton variant="primary" size="sm" onClick={() => handleUseGift(kind)}>Use gift</StickerButton>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-            {onHold.length > 0 && (
-              <div className="mt-4">
-                <p className="text-[13px] font-bold text-primary mb-1">On its way</p>
-                <p className="text-xs text-black/45 mb-2">Interview and offer gifts land 3 days later if the card is still there.</p>
-                <div className="flex flex-col gap-1.5">
-                  {onHold.map((g) => (
-                    <p key={g.id} className="text-xs text-black/60" suppressHydrationWarning>
-                      {GIFT_CATALOGUE[g.kind].label}: {g.reason} · lands {proUntilLabel(g.pendingUntil!)}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* History. Gifts on hold show here with when they land. */}
-          <div className="min-w-0">
-            <p className="text-[15px] font-bold text-primary mb-1">History</p>
-            <p className="text-xs text-black/45 mb-3">Every gift has a reason.</p>
-            <div className="flex flex-col divide-y divide-black/[0.06]">
-              {[...gifts].reverse().map((g) => (
-                <div key={g.id} className="flex items-start gap-2 py-2">
-                  <span className="flex-none text-sm" aria-hidden>
-                    🎁
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs text-black/60">
-                      {GIFT_CATALOGUE[g.kind].label}: {g.reason}
-                    </span>
-                    {/* A day of Pro's end is local time: the server's render can't know the zone. */}
-                    <span className="block text-[10px] text-black/35" suppressHydrationWarning>
-                      {shortDateLabel(g.at.slice(0, 10))} · {giftStatusLabel(g, proUntilLabel)}
-                    </span>
-                  </span>
-                </div>
-              ))}
+                    <details className="ml-[52px] mt-1 text-xs text-black/60"><summary className="cursor-pointer">What it does</summary><p className="mt-2 leading-relaxed">{spec.detail}</p></details>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        </div>
+          ) : !streakLoading ? (
+            <div className="rounded-xl border border-black/10 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div><p className="text-[9px] font-bold uppercase tracking-wider text-black/55">Next streak gift</p><p className="mt-1 text-lg font-bold text-primary">{nextGift.label}<span className="ml-2 text-xs font-medium text-black/50">Day {nextGift.days}</span></p></div>
+                <span className="rounded-full bg-[#edf3d1] px-3 py-1.5 text-xs font-bold text-[#46551c]">{nextGift.days - current} days away</span>
+              </div>
+              <div className="mt-3"><ProgressBar value={Math.min(100, current / nextGift.days * 100)} height="h-1.5" /></div>
+              <p className="mt-2 text-xs text-black/55">A surprise gift, revealed when you reach it.</p>
+            </div>
+          ) : <p className="text-sm text-black/60">Gifts arrive with milestones and real wins.</p>}
 
-        {/* Inside the store's content, so it stacks over it and closing it lands back on "Use". */}
+          {onHold.length > 0 && <details className="mt-4 rounded-lg border border-black/10 bg-white p-3 text-xs">
+            <summary className="cursor-pointer font-semibold text-primary">{onHold.length} {onHold.length === 1 ? "gift" : "gifts"} on the way</summary>
+            <p className="mt-2 text-black/60">Interview and offer gifts land after 3 days if the card is still at that stage.</p>
+            {onHold.map((g) => <p key={g.id} className="mt-2 text-black/65" suppressHydrationWarning>{GIFT_CATALOGUE[g.kind].label} · {proUntilLabel(g.pendingUntil!)}</p>)}
+          </details>}
+
+          {count === 0 && <StickerButton variant="primary" size="md" className="mt-4 w-full" onClick={() => { closeGifts(); openLog(); }}>Log your next action<ArrowRight className="h-4 w-4" /></StickerButton>}
+
+          {gifts.length > 0 && <details className="mt-5 border-t border-black/10 pt-3">
+            <summary className="cursor-pointer text-xs font-semibold text-black/60">Gift history · {gifts.length}</summary>
+            <div className="mt-2 divide-y divide-black/10">
+              {[...gifts].reverse().map((g) => <div key={g.id} className="py-3 text-xs">
+                <p className="font-semibold text-primary">{GIFT_CATALOGUE[g.kind].label}</p>
+                <p className="mt-1 leading-relaxed text-black/65">{g.reason}</p>
+                <p className="mt-1 text-black/55" suppressHydrationWarning>{shortDateLabel(g.at.slice(0, 10))} · {giftStatusLabel(g, proUntilLabel)}</p>
+              </div>)}
+            </div>
+          </details>}
+        </div>
         <RewriteGiftDialog open={rewriteOpen} onOpenChange={setRewriteOpen} onDone={closeGifts} />
       </DialogContent>
     </Dialog>
   );
 };
-
 export default GiftStore;

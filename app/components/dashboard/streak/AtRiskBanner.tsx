@@ -9,8 +9,8 @@
 // "Local" is the user's own clock as the server reads it (their settings
 // timezone); the 4am grace hour is a kindness, never promised.
 //
-// A freeze covers one day at a time, so the line says which night this is: one
-// a freeze would catch, or one that ends the run.
+// Only an unprotected run gets this extra nudge. The streak display still
+// asks for today's action when a backup freeze is held.
 //
 // Three things it will not do: appear on a rest day, appear while the search
 // is paused, or say anything about a streak you have already lost. There is no
@@ -20,26 +20,22 @@ import { type FC } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import { weekdayIndex, fromDayKey } from "@/app/lib/dashboard/streak";
+import { streakStatus } from "@/app/lib/dashboard/streak-status";
 import { AT_RISK_HOUR } from "@/app/lib/dashboard/credits";
 
 const AtRiskBanner: FC = () => {
-  const { current, loggedToday, goals, todayKey, openLog, atRiskDismissed, dismissAtRisk, nowHour, freezeReady } = useActivity();
+  const streak = useActivity();
+  const { current, openLog, atRiskDismissed, dismissAtRisk, nowHour, streakLoading } = streak;
 
   if (atRiskDismissed) return null;
-  if (goals.paused) return null;
-  if (loggedToday || current === 0) return null;
-  // A rest day is protected — prompting on one would contradict the promise.
-  if (goals.restDays.includes(weekdayIndex(fromDayKey(todayKey)))) return null;
+  if (streakLoading || !streakStatus(streak).urgent) return null;
   if (nowHour < AT_RISK_HOUR) return null;
 
   return (
     <div className="mb-5 flex flex-wrap items-center gap-3 rounded-[14px] border-2 border-[#222325] bg-[#e1f073] px-4 py-3">
       <AlertTriangle className="h-4 w-4 flex-none text-primary" />
       <p className="min-w-0 flex-1 text-sm font-bold text-primary">
-        {freezeReady
-          ? `Today is still open on your ${current}-day streak. One application keeps it, and if today gets away from you, a freeze covers this one day.`
-          : `Your ${current}-day streak ends tonight. No freeze can cover today, so log one thing or it starts again from zero.`}
+        {`Keep your ${current}-day streak. Log an action today; no freeze can cover this day.`}
       </p>
       <StickerButton variant="primary" size="sm" onClick={openLog}>
         Log one
