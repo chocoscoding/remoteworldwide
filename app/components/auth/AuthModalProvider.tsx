@@ -1,15 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { usePathname, useRouter } from "next/navigation";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import LoginForm from "./LoginForm";
 import SignupForm from "./SignupForm";
 
 type AuthView = "login" | "signup";
 
 interface AuthModalContextType {
-  openAuthModal: (view?: AuthView) => void;
+  openAuthModal: (view?: AuthView, destination?: string) => void;
   closeAuthModal: () => void;
 }
 
@@ -20,25 +20,30 @@ export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
   const [view, setView] = useState<AuthView>("login");
   // OAuth redirects the whole page, so send the user back to where they opened the popup.
   const pathname = usePathname();
+  const router = useRouter();
+  const [destination, setDestination] = useState<string | null>(null);
 
-  const openAuthModal = useCallback((nextView: AuthView = "login") => {
+  const openAuthModal = useCallback((nextView: AuthView = "login", nextDestination?: string) => {
+    setDestination(nextDestination?.startsWith("/") && !nextDestination.startsWith("//") ? nextDestination : null);
     setView(nextView);
     setOpen(true);
   }, []);
 
   const closeAuthModal = useCallback(() => setOpen(false), []);
+  const onSuccess = () => { closeAuthModal(); if (destination) router.push(destination); };
 
   const value = useMemo(() => ({ openAuthModal, closeAuthModal }), [openAuthModal, closeAuthModal]);
 
   return (
     <AuthModalContext.Provider value={value}>
       <Dialog onOpenChange={setOpen} open={open}>
-        <DialogContent className="max-h-[90dvh] w-[92vw] max-w-lg  rounded-lg border-2 border-black bg-white p-0 shadow-none drop-shadow-primary2">
+        <DialogContent aria-describedby={undefined} className="max-h-[90dvh] w-[92vw] max-w-lg  rounded-lg border-2 border-black bg-white p-0 shadow-none drop-shadow-primary2">
+          <DialogTitle className="sr-only">{view === "login" ? "Log in to continue" : "Create an account"}</DialogTitle>
           {view === "login" && open ? (
             <LoginForm
               idPrefix="dialog-login"
-              oauthCallbackUrl={pathname}
-              onSuccess={closeAuthModal}
+              oauthCallbackUrl={destination ?? pathname}
+              onSuccess={onSuccess}
               onSwitchToSignup={() => setView("signup")}
             />
           ) : null}
@@ -47,8 +52,8 @@ export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
             <SignupForm
               embedded
               idPrefix="dialog-signup"
-              oauthCallbackUrl={pathname}
-              onSuccess={closeAuthModal}
+              oauthCallbackUrl={destination ?? pathname}
+              onSuccess={onSuccess}
               onSwitchToLogin={() => setView("login")}
             />
           ) : null}

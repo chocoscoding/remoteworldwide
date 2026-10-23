@@ -302,7 +302,9 @@ const ResumeScreen: FC = () => {
   // them here would unmount the editor to look up a resume it already holds.
   const [arrival] = useState(() => {
     const doc = paramMatching(params.get("doc"), OBJECT_ID);
-    return { doc, from: doc ? null : paramMatching(params.get("from"), VAULT_ID) };
+    // Job-context sources share `from` with vault links; they are not file IDs.
+    const jobSource = readJobContext(params, "tailor").from;
+    return { doc, from: doc || jobSource ? null : paramMatching(params.get("from"), VAULT_ID) };
   });
   const docParam = arrival.doc;
   const fromParam = arrival.from;

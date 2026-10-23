@@ -71,6 +71,7 @@ import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { BASIC_GATES } from "@/app/lib/settings/planGates";
 import DownloadModal, { type DownloadFormat } from "@/app/components/dashboard/modals/DownloadModal";
 import { printDocument, safeFileName, saveBlob, saveText } from "@/app/lib/export/save";
+import { downloadPdf } from "@/app/lib/export/pdf-download";
 import {
   coverToDocx,
   coverToMarkdown,
@@ -335,8 +336,7 @@ const CoverScreen: FC = () => {
   // which links it, so the next letter skips the import.
   //
   // With no readable master — no resume in My documents at all — the old order
-  // stands in: the most recent resume that parsed cleanly, then the newest from
-  // the editor, then the newest readable file. The import dedupes on the text,
+  // stands in: the newest active resume from the editor or My documents. The import dedupes on the text,
   // so it is free, and the next letter finds the row it made.
   const { data: ingested, isPending: ingestedPending } = useIngestedResumesQuery();
   const { docs, loading: docsLoading } = useDocuments();
@@ -376,18 +376,18 @@ const CoverScreen: FC = () => {
           }),
       };
     }
-    const ready = (ingested ?? []).find((row) => row.status === "ready");
-    if (ready) return { fileName: ready.fileName, resumeId: ready.resumeId };
-    const written = (library.data ?? []).find((doc) => resumeContentToText(doc.content) !== "");
-    if (written) {
+    const written = (library.data ?? [])
+      .filter((doc) => resumeContentToText(doc.content) !== "")
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+    const file = docs
+      .filter((doc) => doc.kind === "resume" && !doc.archived && mimeForFileName(fileNameOf(doc)) !== null)
+      .sort((a, b) => b.addedAt - a.addedAt)[0];
+    if (written && (!file || new Date(written.updatedAt).getTime() >= file.addedAt)) {
       return {
         fileName: written.label,
         resumeId: () => importResumeContent(written.content, written.label).then((row) => imported(row.resumeId)),
       };
     }
-    const file = docs
-      .filter((doc) => doc.kind === "resume" && !doc.archived && mimeForFileName(fileNameOf(doc)) !== null)
-      .sort((a, b) => b.addedAt - a.addedAt)[0];
     if (file) return { fileName: fileNameOf(file), resumeId: () => resolveResumeId(file, ingested ?? []).then(imported) };
     return null;
   }, [ingested, library.data, docs, masterResume.data, queryClient]);
@@ -409,6 +409,9 @@ const CoverScreen: FC = () => {
   // leaves the screen as it always opens.
   const params = useSearchParams();
   const context = readJobContext(params, "job");
+  const [directGenerate] = useState(() => params.get("generate") === "now" && !!params.get("job") && !params.get("letter"));
+  const directStarted = useRef(false);
+  const [directConsumed, setDirectConsumed] = useState(false);
   const letterParam = OBJECT_ID.test(params.get("letter") ?? "") ? params.get("letter") : null;
 
   // A link to a saved letter (?letter=<id>) opens it — adopted once, like a
@@ -583,7 +586,7 @@ const CoverScreen: FC = () => {
     queryKey: qk.letters.recent(),
     // Sliced as well: a service from before `limit` sends up to its whole page.
     queryFn: async ({ signal }) => (await listLetters("full", signal, RECENT_LETTERS)).slice(0, RECENT_LETTERS),
-    enabled: !started,
+    enabled: !started || (directGenerate && !directConsumed),
     staleTime: STALE_TIME.letters,
     // Someone's letters, held only while this screen is open.
     gcTime: 0,
@@ -617,6 +620,23 @@ const CoverScreen: FC = () => {
     },
     [resume, run],
   );
+
+  // The board tile explicitly requests generation. Consume that request before
+  // writing so a reload cannot generate and charge for the same click again.
+  useEffect(() => {
+    if (!directGenerate || directStarted.current || letterParam || contextPending || resumesPending || recent.isPending || !linkedJob || !resume || letter || writing) return;
+    const timer = window.setTimeout(() => {
+      if (directStarted.current) return;
+      directStarted.current = true;
+      setDirectConsumed(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("generate");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+      if (letterLimited) { coverLock.upgrade(); return; }
+      void write(linkedJob, tone);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [directGenerate, letterParam, contextPending, resumesPending, recent.isPending, linkedJob, resume, letter, writing, letterLimited, coverLock, write, tone]);
 
   const composeLetterText = () => {
     const lines: string[] = [];
@@ -670,7 +690,14 @@ const CoverScreen: FC = () => {
     const base = fileName;
     const body = letterBody();
     if (!body.trim()) throw new Error("There's no letter to download yet.");
-    if (format === "pdf") return printLetter(base);
+    if (format === "pdf") {
+      // The server renderer when the library holds what is on screen, so the PDF has real text an
+      // ATS can read (the print dialog's "Microsoft Print to PDF" leaves outlines; owner,
+      // 2026-10-22). Anything not saved yet prints through the dialog, as before.
+      const saved = letterId !== null && autosave.status.kind === "saved";
+      await downloadPdf({ source: saved ? { kind: "letter", id: letterId } : null, fileName: base, save: saveBlob, fallback: () => printLetter(base) });
+      return;
+    }
     if (format === "docx") saveBlob(await coverToDocx(body, letterheadInfo(), wordFontFor(font)), `${base}.docx`);
     else saveText(coverToMarkdown(body, letterheadInfo()), `${base}.md`);
   };
@@ -873,7 +900,7 @@ const CoverScreen: FC = () => {
       </header>
 
       <main className="px-8 py-7 pb-14 max-w-[760px] mx-auto flex flex-col gap-5">
-        {openingLinked ? (
+        {openingLinked || (directGenerate && !directConsumed && (resumesPending || recent.isPending)) ? (
           <div className="flex min-h-[420px] items-center justify-center">
             <p className="inline-flex items-center gap-2 text-sm text-black/50" role="status">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />

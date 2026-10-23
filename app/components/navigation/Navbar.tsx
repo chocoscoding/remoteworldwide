@@ -25,7 +25,7 @@ const BAR_LINK =
 
 /** What the bar used to link and no longer does, in the menu whether or not you're signed in. */
 const SITE_LINKS = [
-  // { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/jobs", label: "Jobs" },
   { href: "/tools", label: "Features" },
   { href: "/companies", label: "Companies" },
@@ -154,7 +154,10 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
           )}
           <div className="my-1 border-t border-primary/10" />
           {SITE_LINKS.map((item) => (
-            <Link key={item.href} href={item.href} onClick={close} className={MENU_ITEM}>
+            <Link key={item.href} href={item.href} onClick={(event) => {
+              close();
+              if (item.href === DASHBOARD && !signedIn) { event.preventDefault(); openAuthModal("login", DASHBOARD); }
+            }} className={MENU_ITEM}>
               {item.label}
             </Link>
           ))}
@@ -274,7 +277,7 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
     <div
       ref={root}
       // From sm up; a phone gets the hamburger (MobileMenu) instead.
-      className="relative hidden items-center gap-1 sm:flex"
+      className="relative hidden items-center gap-1 lg:flex"
       onPointerEnter={() => window.clearTimeout(closeTimer.current)}
       onPointerLeave={(e) => {
         if (e.pointerType !== "mouse") return;
@@ -443,7 +446,7 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
   }, [open]);
 
   return (
-    <div className="sm:hidden">
+    <div className="lg:hidden">
       <button
         ref={button}
         type="button"
@@ -460,8 +463,8 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
 
       {open ? (
         <>
-          {/* Under the sheet: a light frosted glow over the page (owner, 2026-10-15), and a tap on it closes the menu. */}
-          <div aria-hidden onClick={close} className="fixed inset-x-0 bottom-0 top-16 z-20 bg-white/50 backdrop-blur-sm" />
+          {/* Dim and blur the page beneath the sheet; tapping the backdrop closes the menu. */}
+          <div aria-hidden onClick={close} className="fixed inset-x-0 bottom-0 top-16 z-20 bg-black/20 backdrop-blur-sm" />
           <div
             id="mobile-menu"
             className="absolute inset-x-0 top-full z-30 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-primary/10 bg-white px-4 pb-5 pt-2">
@@ -533,7 +536,7 @@ const Navbar = () => {
   const pathname = usePathname();
   const { status, data } = useSession();
   const signedIn = status === "authenticated";
-  const dashboardHref = signedIn ? DASHBOARD : loginWithNext(DASHBOARD);
+  const { openAuthModal } = useAuthModal();
 
   const colorToShow = (() => {
     const currentPathname = pathname;
@@ -551,24 +554,26 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" aria-label="Remote Worldwide home" className={cn("block rounded-md py-2.5", FOCUS)}>
-              <LogoFull className="hidden h-[21px] w-auto sm:block" />
-              <LogoMini width={35} height={35} className="w-full !h-auto block sm:hidden" />
+              <LogoFull className="hidden h-[21px] w-auto lg:block" />
+              <LogoMini width={35} height={35} className="w-full !h-auto block lg:hidden" />
             </Link>
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-2">
             <NavMenu pathname={pathname} />
 
-            {/* <Link href={dashboardHref} aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined} className={cn(BAR_LINK, FOCUS)}>
+            <Link href={DASHBOARD} onClick={(event) => {
+              if (!signedIn) { event.preventDefault(); openAuthModal("login", DASHBOARD); }
+            }} aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined} className={cn(BAR_LINK, "hidden lg:inline-flex", FOCUS)}>
               Dashboard
-            </Link> */}
+            </Link>
 
             {/* The 44px link is the touch target; the pill inside is what you see. From sm up only:
                 a phone has it in the hamburger (owner, 2026-10-15). */}
             <Link
               href={WAITLIST}
               aria-current={pathname === WAITLIST ? "page" : undefined}
-              className={cn("group hidden h-10 items-center rounded-full sm:inline-flex", FOCUS)}>
+              className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
               <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
                 Waitlist
               </span>

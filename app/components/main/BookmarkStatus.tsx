@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { createBookmarkForUser, deleteBookmarkForUser } from "@/libs/query";
 import { toast } from "react-toastify";
 
-const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jobId, hasUserBookmarked }) => {
+const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean; onLogin?: () => void }> = ({ jobId, hasUserBookmarked, onLogin }) => {
   const [isBookmarked, setIsBookmarked] = useState(hasUserBookmarked ?? false);
   const [pendingAction, setPendingAction] = useState<boolean | null>(null); // To track the intended action
   const { status } = useSession();
@@ -37,6 +37,7 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jo
   const toggleBookmark = () => {
     toast.dismiss("bookmarkErr");
     if (status === "unauthenticated") {
+      if (onLogin) { onLogin(); return; }
       toast.error("Sign in to bookmark this job", {
         position: "top-center",
         style: { top: "0.5rem", width: "fit-content" },
@@ -53,7 +54,11 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jo
   };
 
   return (
-    <div
+    <button
+      type="button"
+      aria-label={isBookmarked ? "Unsave job" : "Save job"}
+      aria-pressed={isBookmarked}
+      disabled={status === "loading"}
       className={` flex-0 flex-shrink-0 flex border h-8 w-8 rounded-md items-center justify-center cursor-pointer  ${
         isBookmarked ? "border-primary/30 bg-black" : "hover:bg-gray-50"
       }`}
@@ -62,7 +67,7 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean }> = ({ jo
         fill={isBookmarked ? "#daec54" : "#ffffff"}
         className={`transition-all w-[1.2rem] ${isBookmarked ? "text-secondary" : "text-gray-500"}`}
       />
-    </div>
+    </button>
   );
 };
 

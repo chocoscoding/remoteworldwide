@@ -6,13 +6,12 @@ import { checkBookmarkForUser } from "@/libs/query";
 import { BOARD_TAGS, backendCachedOrNull } from "@/app/lib/backend";
 import type { JobAndCompany } from "@/types/main";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
-import OneJobClient from "@/app/(pages)/(general)/jobs/[id]/Client";
+import OneJobClient from "./Client";
 
 // Behind sign-in, so no SEO here: the public /jobs/[id] page owns the metadata and markup.
 export const metadata = { title: "Jobs", robots: { index: false, follow: false } };
 
-// One job inside the dashboard: the same body as the public /jobs/[id] page, framed by the
-// dashboard header with a way back to the list.
+// The redesigned job page is currently dashboard-only.
 export default async function DashboardJobPage({ params }: { params: Promise<{ id: string }> }) {
   const slug = decodeURIComponent((await params).id);
   const job = await backendCachedOrNull<JobAndCompany>(`/jobs/${encodeURIComponent(slug)}`, { revalidate: 43200, tags: [BOARD_TAGS.jobs] });
@@ -35,7 +34,7 @@ export default async function DashboardJobPage({ params }: { params: Promise<{ i
             <ArrowLeft className="h-4 w-4" />
             Jobs
           </Link>
-          <h1 className="truncate text-[17px] font-bold text-primary">{job.title}</h1>
+          <p className="truncate text-[17px] font-bold text-primary">{job.title}</p>
         </div>
         <div className="flex flex-none items-center gap-2.5">
           <NotificationBell />

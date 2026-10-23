@@ -420,6 +420,7 @@ const ReferralsScreen: FC = () => {
               )}
               <WebReferrals
                 key={job.id}
+                autoSearch={params.get("search") === "now" && job.id === context.savedJobId}
                 savedJobId={job.id}
                 company={job.company}
                 role={job.role}

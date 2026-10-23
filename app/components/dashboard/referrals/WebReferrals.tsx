@@ -3,7 +3,7 @@
 // Referral search results for one saved job: the people at its company that a
 // web search found, and how to reach the company.
 //
-// Nothing searches on its own. A search costs a credit, so it runs from a click
+// A search starts from a click here or the job page. It costs a credit
 // and is stored; opening the screen again shows the stored one for free, and
 // "Search again" is the only thing that spends another credit.
 //
@@ -16,7 +16,7 @@
 // or likely. Saving is idempotent, and whether each person is already kept is
 // asked of the backend with the same identity a save would use.
 
-import { FC, Fragment, useState, type ReactNode } from "react";
+import { FC, Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BookmarkCheck, BookmarkPlus, Copy, Globe, Linkedin, Loader2, Mail, PenLine, Phone, RotateCw, Search, SearchX } from "lucide-react";
 import TimeAgo from "timeago-react";
@@ -57,6 +57,7 @@ const hostOf = (url: string): string => {
 };
 
 export interface WebReferralsProps {
+  autoSearch?: boolean;
   savedJobId: string;
   company: string;
   role: string;
@@ -70,10 +71,25 @@ export interface WebReferralsProps {
 }
 
 /** Keyed by saved job at the call site, so a failed search never follows you to the next job. */
-const WebReferrals: FC<WebReferralsProps> = ({ savedJobId, company, role, askedIds, draftingId, onDraft, draft }) => {
+const WebReferrals: FC<WebReferralsProps> = ({ autoSearch = false, savedJobId, company, role, askedIds, draftingId, onDraft, draft }) => {
   const stored = useReferralSearch(savedJobId);
   const run = useRunReferralSearch();
   const search = stored.data ?? null;
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoSearch || autoStarted.current || stored.isPending || stored.isError) return;
+    const timer = window.setTimeout(() => {
+      if (autoStarted.current) return;
+      autoStarted.current = true;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("search");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+      // Reuse an existing result; the explicit Search again action refreshes it.
+      if (!search) run.mutate({ savedJobId, refresh: false });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [autoSearch, stored.isPending, stored.isError, search, run, savedJobId]);
 
   const start = (refresh: boolean) => run.mutate({ savedJobId, refresh });
 
