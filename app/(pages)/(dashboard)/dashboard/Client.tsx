@@ -240,31 +240,54 @@ const HomeClient: FC = () => {
       <main className="px-8 py-7 pb-14 max-w-[1320px] mx-auto">
         <AtRiskBanner />
         <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-black/45">Your next chapter</p>
-            <h2 className="text-3xl font-bold tracking-tight text-primary">Make your next move.</h2>
-          </div>
-          <Link href="/dashboard/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">Explore jobs <ArrowRight className="h-4 w-4" /></Link>
+          <Link href="/dashboard/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">
+            Explore jobs <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
         {/* Hero row: weekly goal + today */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 items-stretch">
           {/* Weekly goal card */}
           <div className="relative overflow-hidden rounded-[16px] bg-[#222b23] text-white p-4 flex flex-col">
-            <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full border-[40px] border-secondary/[0.06]" />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full border-[40px] border-secondary/[0.06]"
+            />
 
             <div className="relative flex flex-col flex-1">
               <div className="mb-3 flex items-center justify-between gap-5">
                 <div className="max-w-[350px]">
-                  <p className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-secondary"><span className="h-1.5 w-1.5 rounded-full bg-secondary" /> {activity.streakLoading ? "Today's opportunity" : todayStatus.label}</p>
-                  <h3 className="text-[26px] font-bold leading-[1.1] tracking-tight sm:text-[30px]">{activity.loggedToday ? <>Keep the<br />momentum.</> : <>One action.<br />Another step closer.</>}</h3>
-                  <p className="mt-2 text-xs leading-relaxed text-white/65">{activity.loggedToday ? "Today's effort is on the board. Keep building." : "Send the application. Start the conversation."}</p>
+                  <p className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-secondary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-secondary" />{" "}
+                    {activity.streakLoading ? "Today's opportunity" : todayStatus.label}
+                  </p>
+                  <h3 className="text-[26px] font-bold leading-[1.1] tracking-tight sm:text-[30px]">
+                    {activity.loggedToday ? (
+                      <>
+                        Keep the
+                        <br />
+                        momentum.
+                      </>
+                    ) : (
+                      <>
+                        One action.
+                        <br />
+                        Another step closer.
+                      </>
+                    )}
+                  </h3>
                 </div>
-                <button type="button" onClick={() => setStreakOpen(true)} aria-label="View your streak and rewards" className="group flex shrink-0 flex-col items-center rounded-xl border border-secondary/25 bg-secondary/[0.08] px-4 py-2 transition-colors hover:bg-secondary/15">
+                <button
+                  type="button"
+                  onClick={() => setStreakOpen(true)}
+                  aria-label="View your streak and rewards"
+                  className="group flex shrink-0 flex-col items-center rounded-xl border border-secondary/25 bg-secondary/[0.08] px-4 py-2 transition-colors hover:bg-secondary/15">
                   <StreakEmblem days={streak} className="-mt-1 h-8 w-8" />
                   <span className="text-3xl font-bold tabular-nums text-secondary">{activity.streakLoading ? "—" : streak}</span>
                   <span className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/60">day streak</span>
-                  <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-secondary">View rewards <ArrowRight className="h-3 w-3" /></span>
+                  <span className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-secondary">
+                    View rewards <ArrowRight className="h-3 w-3" />
+                  </span>
                 </button>
               </div>
               {/* The derivation sits up here rather than under the bar: it's
@@ -362,7 +385,10 @@ const HomeClient: FC = () => {
               </div>
 
               <div className="mt-auto flex flex-wrap items-center gap-2">
-                <StickerButton variant="secondary" size="md" onClick={openLog}>{activity.loggedToday ? "Log your next move" : "Log an application"}<ArrowRight className="h-4 w-4" /></StickerButton>
+                <StickerButton variant="secondary" size="md" onClick={openLog}>
+                  {activity.loggedToday ? "Log your next move" : "Log an application"}
+                  <ArrowRight className="h-4 w-4" />
+                </StickerButton>
                 <button
                   type="button"
                   onClick={() => setGoalsOpen((v) => !v)}
@@ -370,7 +396,18 @@ const HomeClient: FC = () => {
                   {goalsOpen ? "Hide goals" : "Adjust goals"}
                 </button>
               </div>
-              {nextReward && !activity.streakLoading && <button type="button" onClick={() => setStreakOpen(true)} className="mt-3 flex items-center gap-2 border-t border-white/10 pt-2 text-left text-xs text-white/65 hover:text-secondary"><Trophy className="h-4 w-4 text-secondary" /><span><strong className="text-white">{nextReward.days - streak} days</strong> to {nextReward.label}</span><ArrowRight className="ml-auto h-3.5 w-3.5" /></button>}
+              {nextReward && !activity.streakLoading && (
+                <button
+                  type="button"
+                  onClick={() => setStreakOpen(true)}
+                  className="mt-3 flex items-center gap-2 border-t border-white/10 pt-2 text-left text-xs text-white/65 hover:text-secondary">
+                  <Trophy className="h-4 w-4 text-secondary" />
+                  <span>
+                    <strong className="text-white">{nextReward.days - streak} days</strong> to {nextReward.label}
+                  </span>
+                  <ArrowRight className="ml-auto h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -398,11 +435,13 @@ const HomeClient: FC = () => {
                     <>
                       <span className="min-w-0 flex-1">
                         <span className={cn("block text-sm", h.done ? "text-primary font-medium" : "text-black/70")}>{h.label}</span>
-                        <span className="block text-[11px] text-black/40">
-                          {h.done ? "Done today" : "Take the next step"}
-                        </span>
+                        <span className="block text-[11px] text-black/40">{h.done ? "Done today" : "Take the next step"}</span>
                       </span>
-                      {h.done ? <NeoCheckbox checked interactive={false} size="sm" /> : <ArrowRight className="h-3.5 w-3.5 flex-none text-black/40" />}
+                      {h.done ? (
+                        <NeoCheckbox checked interactive={false} size="sm" />
+                      ) : (
+                        <ArrowRight className="h-3.5 w-3.5 flex-none text-black/40" />
+                      )}
                     </>
                   );
                   const cls = cn(
@@ -501,7 +540,9 @@ const HomeClient: FC = () => {
                 {/* Rest-day picker */}
                 <div>
                   <p className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-black/40 mb-1">Working days</p>
-                  <p className="text-xs text-black/45 mb-2.5">Filled days are the ones you work. Tap one to make it a rest day. Changes start tomorrow.</p>
+                  <p className="text-xs text-black/45 mb-2.5">
+                    Filled days are the ones you work. Tap one to make it a rest day. Changes start tomorrow.
+                  </p>
                   <div className="flex gap-1.5">
                     {WEEK_DAY_LABELS.map((day, i) => {
                       // Filled means active. The picker used to fill the *rest*
@@ -635,85 +676,85 @@ const HomeClient: FC = () => {
                 body="Tasks picked for your search, added by you or by your coach."
               />
             ) : (
-            <>
-            <p role="status" className="sr-only">
-              {plan.isPending ? "Loading your plan" : ""}
-            </p>
-            <div className="flex flex-col divide-y divide-black/8">
-              {plan.isPending &&
-                NEXT_ACTION_SKELETON_WIDTHS.map((width, i) => (
-                  <div key={width} aria-hidden className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
-                    <span className="h-6 w-6 flex-none rounded-full bg-[#f0f0ea] text-xs font-bold text-black/25 flex items-center justify-center">
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                      <span className={cn("h-3 animate-pulse rounded bg-[#f0f0ea]", width)} />
-                      <span className="h-2.5 w-1/3 animate-pulse rounded bg-[#f0f0ea]" />
+              <>
+                <p role="status" className="sr-only">
+                  {plan.isPending ? "Loading your plan" : ""}
+                </p>
+                <div className="flex flex-col divide-y divide-black/8">
+                  {plan.isPending &&
+                    NEXT_ACTION_SKELETON_WIDTHS.map((width, i) => (
+                      <div key={width} aria-hidden className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+                        <span className="h-6 w-6 flex-none rounded-full bg-[#f0f0ea] text-xs font-bold text-black/25 flex items-center justify-center">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                          <span className={cn("h-3 animate-pulse rounded bg-[#f0f0ea]", width)} />
+                          <span className="h-2.5 w-1/3 animate-pulse rounded bg-[#f0f0ea]" />
+                        </div>
+                        <span className="h-8 w-14 flex-none animate-pulse rounded-md bg-[#f0f0ea]" />
+                      </div>
+                    ))}
+
+                  {plan.isError && !plan.data && (
+                    <div role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-[#f0f0ea]/70 px-4 py-3">
+                      <span className="text-sm text-black/60">Couldn&apos;t load your plan.</span>
+                      <button type="button" onClick={() => void plan.refetch()} disabled={plan.isFetching} className={outlineLink}>
+                        <RotateCw aria-hidden className={cn("h-3.5 w-3.5", plan.isFetching && "animate-spin")} />
+                        Retry
+                      </button>
                     </div>
-                    <span className="h-8 w-14 flex-none animate-pulse rounded-md bg-[#f0f0ea]" />
-                  </div>
-                ))}
+                  )}
 
-              {plan.isError && !plan.data && (
-                <div role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-[#f0f0ea]/70 px-4 py-3">
-                  <span className="text-sm text-black/60">Couldn&apos;t load your plan.</span>
-                  <button type="button" onClick={() => void plan.refetch()} disabled={plan.isFetching} className={outlineLink}>
-                    <RotateCw aria-hidden className={cn("h-3.5 w-3.5", plan.isFetching && "animate-spin")} />
-                    Retry
-                  </button>
+                  {plan.data && nextActions.length === 0 && (
+                    <div className="flex flex-col items-start gap-3 rounded-lg bg-[#f0f0ea]/70 px-4 py-4">
+                      <div>
+                        <p className="text-sm font-semibold text-primary">Nothing open on your plan</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-black/50">
+                          Ask your coach what to focus on next. It can suggest steps to add.
+                        </p>
+                      </div>
+                      <Link href={FULL_PLAN_HREF} className={outlineLink}>
+                        Plan with your coach
+                      </Link>
+                    </div>
+                  )}
+
+                  {nextActions.map((task, i) => (
+                    <div key={task.id} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
+                      <span className="h-6 w-6 flex-none rounded-full bg-[#f0f0ea] text-xs font-bold text-primary flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex min-w-0 items-center gap-2">
+                          <span className="text-sm font-semibold text-primary truncate">{task.title}</span>
+                          {isUnseen(task) && (
+                            <>
+                              <span
+                                aria-hidden
+                                title="New"
+                                className="h-2 w-2 flex-none rounded-full bg-[#e1f073] ring-[1.5px] ring-[#222325]"
+                              />
+                              <span className="sr-only">(new)</span>
+                            </>
+                          )}
+                        </p>
+                        <p className="text-xs text-black/45 truncate">{task.detail || SOURCE_LINE[task.source.kind]}</p>
+                      </div>
+                      <Link href={taskHref(task) ?? FULL_PLAN_HREF} aria-label={`Open: ${task.title}`} className={outlineLink}>
+                        Open
+                      </Link>
+                    </div>
+                  ))}
                 </div>
-              )}
-
-              {plan.data && nextActions.length === 0 && (
-                <div className="flex flex-col items-start gap-3 rounded-lg bg-[#f0f0ea]/70 px-4 py-4">
-                  <div>
-                    <p className="text-sm font-semibold text-primary">Nothing open on your plan</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-black/50">
-                      Ask your coach what to focus on next. It can suggest steps to add.
-                    </p>
-                  </div>
-                  <Link href={FULL_PLAN_HREF} className={outlineLink}>
-                    Plan with your coach
+                {moreOnPlan > 0 && (
+                  <Link
+                    href={FULL_PLAN_HREF}
+                    className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-black/50 transition-colors hover:text-primary">
+                    +{moreOnPlan} more on your plan
+                    <ArrowRight aria-hidden className="h-3.5 w-3.5" />
                   </Link>
-                </div>
-              )}
-
-              {nextActions.map((task, i) => (
-                <div key={task.id} className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0">
-                  <span className="h-6 w-6 flex-none rounded-full bg-[#f0f0ea] text-xs font-bold text-primary flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex min-w-0 items-center gap-2">
-                      <span className="text-sm font-semibold text-primary truncate">{task.title}</span>
-                      {isUnseen(task) && (
-                        <>
-                          <span
-                            aria-hidden
-                            title="New"
-                            className="h-2 w-2 flex-none rounded-full bg-[#e1f073] ring-[1.5px] ring-[#222325]"
-                          />
-                          <span className="sr-only">(new)</span>
-                        </>
-                      )}
-                    </p>
-                    <p className="text-xs text-black/45 truncate">{task.detail || SOURCE_LINE[task.source.kind]}</p>
-                  </div>
-                  <Link href={taskHref(task) ?? FULL_PLAN_HREF} aria-label={`Open: ${task.title}`} className={outlineLink}>
-                    Open
-                  </Link>
-                </div>
-              ))}
-            </div>
-            {moreOnPlan > 0 && (
-              <Link
-                href={FULL_PLAN_HREF}
-                className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-black/50 transition-colors hover:text-primary">
-                +{moreOnPlan} more on your plan
-                <ArrowRight aria-hidden className="h-3.5 w-3.5" />
-              </Link>
-            )}
-            </>
+                )}
+              </>
             )}
           </DashCard>
 

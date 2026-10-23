@@ -25,7 +25,7 @@ const BAR_LINK =
 
 /** What the bar used to link and no longer does, in the menu whether or not you're signed in. */
 const SITE_LINKS = [
-  { href: "/dashboard", label: "Dashboard" },
+  // { href: "/dashboard", label: "Dashboard" },
   { href: "/jobs", label: "Jobs" },
   { href: "/tools", label: "Features" },
   { href: "/companies", label: "Companies" },
@@ -154,10 +154,17 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
           )}
           <div className="my-1 border-t border-primary/10" />
           {SITE_LINKS.map((item) => (
-            <Link key={item.href} href={item.href} onClick={(event) => {
-              close();
-              if (item.href === DASHBOARD && !signedIn) { event.preventDefault(); openAuthModal("login", DASHBOARD); }
-            }} className={MENU_ITEM}>
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={(event) => {
+                close();
+                if (item.href === DASHBOARD && !signedIn) {
+                  event.preventDefault();
+                  openAuthModal("login", DASHBOARD);
+                }
+              }}
+              className={MENU_ITEM}>
               {item.label}
             </Link>
           ))}
@@ -562,11 +569,11 @@ const Navbar = () => {
           <div className="flex items-center gap-0.5 sm:gap-2">
             <NavMenu pathname={pathname} />
 
-            <Link href={DASHBOARD} onClick={(event) => {
+            {/* <Link href={DASHBOARD} onClick={(event) => {
               if (!signedIn) { event.preventDefault(); openAuthModal("login", DASHBOARD); }
             }} aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined} className={cn(BAR_LINK, "hidden lg:inline-flex", FOCUS)}>
               Dashboard
-            </Link>
+            </Link> */}
 
             {/* The 44px link is the touch target; the pill inside is what you see. From sm up only:
                 a phone has it in the hamburger (owner, 2026-10-15). */}
