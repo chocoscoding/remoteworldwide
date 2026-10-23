@@ -9,10 +9,8 @@ import type { UploadProgress } from "@/hooks/mutations/useDocumentMutations";
 /**
  * The front door: choose how to scan, pick a resume, press Scan.
  *
- * Variant B of the 2026-10-18 canvas (owner-approved): the two ways to scan
- * are tickets on top and the scan bar sits right under them, so nothing that
- * matters is below the fold. Before this, the scan choices only appeared under
- * the list after a pick, and the pick looked like it did nothing.
+ * A job link already decides what to score against. The resume choice comes
+ * first, followed by a single scoring action and the selected resume's name.
  *
  * The resumes are one list, not a grid of cards (owner, 2026-10-09): with
  * uploads and every resume built here side by side there can be dozens, so it
@@ -51,7 +49,8 @@ interface Uploading {
 }
 
 const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload, onScoreGeneral, onScoreVsJob }) => {
-  const [mode, setMode] = useState<Mode>(job ? "job" : "general");
+  const [chosenMode, setMode] = useState<Mode>("general");
+  const mode: Mode = job ? "job" : chosenMode;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [uploading, setUploading] = useState<Uploading | null>(null);
@@ -91,8 +90,6 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
   const selected = ordered.find((r) => r.id === selectedId) ?? null;
 
   const jobLabel = job ? `${job.role} at ${job.company}` : null;
-  const plan = mode === "general" ? "General score" : jobLabel ? `Match with ${jobLabel}` : "Match with a job";
-  const against = jobLabel ?? "a job you pick next";
 
   function scan() {
     if (!selected) return;
@@ -106,12 +103,17 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
   return (
     <div className="mx-auto flex w-full max-w-[680px] flex-col gap-5 py-4 text-left">
       <div>
-        <h2 className="text-2xl font-extrabold text-primary">What should we score?</h2>
-        <p className="mt-1 text-sm text-black/55">Choose how, pick a resume, and the scan button names both.</p>
+        <h2 className="text-2xl font-extrabold text-primary">{job ? "Choose a resume to score" : "Check your resume"}</h2>
+        <p className="mt-1 text-sm text-black/55">Select a resume, then start your score. Selecting a resume does not start a scan.</p>
       </div>
 
       {/* How to scan */}
-      <div role="radiogroup" aria-label="How to scan" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {job ? (
+        <div className="flex items-start gap-3 rounded-xl border border-black/10 bg-white p-4">
+          <BriefcaseBusiness className="mt-0.5 h-5 w-5 shrink-0" />
+          <div><p className="text-xs font-semibold text-black/50">Scoring against this job</p><p className="text-sm font-bold text-primary">{jobLabel}</p></div>
+        </div>
+      ) : <div role="radiogroup" aria-label="How to scan" className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Ticket
           checked={mode === "general"}
           onSelect={() => setMode("general")}
@@ -126,34 +128,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
           title={job ? "Against this job" : "Against a job"}
           copy={jobLabel ? `${jobLabel}. We score the match.` : "Pick a saved listing or paste any posting, and we score the match."}
         />
-      </div>
-
-      {/* What will be scanned */}
-      <div className="flex items-center gap-4 rounded-[14px] bg-white py-2.5 pl-4 pr-2.5 br-bold">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-black/50">{selected ? "Ready" : "Pick a resume below"}</p>
-          <p className="truncate text-[15px] font-bold text-primary">
-            {selected && mode === "general" ? (
-              <>
-                General score of <span className="font-extrabold">{selected.name}</span>
-              </>
-            ) : selected ? (
-              <>
-                <span className="font-extrabold">{selected.name}</span> against {against}
-              </>
-            ) : (
-              plan
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={scan}
-          disabled={!selected}
-          className="h-11 flex-none cursor-pointer rounded-[10px] bg-[#222325] px-6 text-[15px] font-extrabold text-[#e1f073] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35">
-          Scan
-        </button>
-      </div>
+      </div>}
 
       {/* Which resume */}
       <div className="overflow-hidden rounded-[14px] border border-black/10 bg-white">
@@ -242,7 +217,7 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
                 onClick={() => setSelectedId(r.id)}
                 className={cn(
                   "flex w-full cursor-pointer items-center gap-3 border-b border-black/6 px-4 py-2.5 text-left transition-colors last:border-b-0",
-                  isSelected ? "bg-[#f6faea]" : "hover:bg-[#fbfbf7]",
+                  isSelected ? "bg-[#f1f8c4] ring-2 ring-inset ring-[#697719]" : "hover:bg-[#fbfbf7]",
                 )}>
                 <span
                   className={cn(
@@ -261,11 +236,11 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
                 </span>
                 <span className="flex-none text-right">
                   {isSelected ? (
-                    <span aria-label="Selected" className="grid h-6 w-6 place-content-center rounded-full bg-[#0fbc0f]">
+                    <span aria-label="Selected" className="grid h-6 w-6 place-content-center rounded-full bg-[#222325]">
                       <Check aria-hidden className="h-3.5 w-3.5 text-white" strokeWidth={3} />
                     </span>
                   ) : general == null ? (
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.06em] text-black/30">Not scored</span>
+                    <span aria-hidden className="block h-6 w-6 rounded-full border-2 border-black/20" />
                   ) : (
                     <>
                       <span className="block text-[15px] font-extrabold text-primary tabular-nums">{general}</span>
@@ -278,6 +253,15 @@ const AtsLanding: FC<AtsLandingProps> = ({ resumes, scores, job = null, onUpload
           })}
           {shown.length === 0 && needle && <p className="px-4 py-4 text-sm text-black/45">No resume matches “{query.trim()}”.</p>}
         </div>
+      </div>
+      <div className="flex flex-col gap-3 border-t border-black/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-black/60" aria-live="polite">
+          {selected ? <>Selected: <strong className="text-primary">{selected.name}</strong></> : "Select one resume above to continue."}
+        </p>
+        <button type="button" onClick={scan} disabled={!selected || !!uploading}
+          className="min-h-12 shrink-0 rounded-xl border border-[#222325] bg-[#e1f073] px-6 text-sm font-extrabold text-primary shadow-[3px_3px_0_#222325] transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:border-black/10 disabled:bg-black/5 disabled:text-black/40 disabled:shadow-none">
+          {selected ? mode === "job" ? "Score against this job" : "Score this resume" : "Choose a resume to continue"}
+        </button>
       </div>
     </div>
   );
