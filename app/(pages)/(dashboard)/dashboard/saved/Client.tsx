@@ -1,20 +1,15 @@
 "use client";
 
-// Saved jobs — every job you've saved, in one list.
-//
-// These are the same saved jobs the job picker offers on Apply, Ask about a
-// job, cover letters, the ATS scorer, referrals and prep: saving one anywhere
-// lands it here. This screen saves nothing new of its own — "Add a job" opens
-// that same picker — it is the place to see them all and take one straight to
-// the tool you need. (The job board's bookmarks and the tracker's "Saved"
-// column are separate things and stay where they are.)
-//
-// Most recently used first, searched on the server by company or role. The
-// server caps one read at SAVED_JOBS_SHOWN, so past that the search box is how
-// the rest are reached.
+// Saved jobs are the user's job-board bookmarks.
 
 import { FC, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { deleteBookmarkForUser, getAllBookmarksForUser } from "@/libs/query";
+import type { OneBookmarkType } from "@/types/main";
+import { saveJob } from "@/app/lib/jobs/api";
+import { qk } from "@/app/lib/query/keys";
 import { ArrowUpRight, FileText, Mail, Plus, ScanSearch, Search, SearchX, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -23,91 +18,65 @@ import DashCard from "@/app/components/dashboard/ui/DashCard";
 import DashEmptyState from "@/app/components/dashboard/ui/DashEmptyState";
 import { JobRowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import LogoMini from "@/app/components/svg/LogoMini";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
-import { useJobPicker } from "@/app/components/dashboard/jobs/JobPickerProvider";
 import { atsScoreHref, coverLetterHref, findReferralHref, tailorResumeHref, type JobContextFields } from "@/app/lib/dashboard/contextParams";
-import type { JobSource, RemoteType, SavedJobItem } from "@/app/lib/jobs/types";
-import { useDeleteSavedJob } from "@/hooks/mutations/useJobMutations";
-import { useDebouncedValue, useSavedJobsList } from "@/hooks/queries/useJobQueries";
 
-/** The server's ceiling for one read of saved jobs. */
-const SAVED_JOBS_SHOWN = 50;
+const BOOKMARKS_KEY = ["bookmarks"] as const;
+
+// Deleted listings can leave short pages. Follow the total rather than page length.
+async function listBookmarks() {
+  const first = await getAllBookmarksForUser(1);
+  const items = [...first.data];
+  for (let page = 2; page <= Math.ceil(first.count / 30); page++) {
+    const next = await getAllBookmarksForUser(page);
+    items.push(...next.data);
+  }
+  return items;
+}
 
 /** Quiet inline control — weight is reserved for the page's real actions. */
 const GHOST_BTN =
   "inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-black/55 cursor-pointer transition-colors hover:bg-black/[0.05] hover:text-primary";
 
-const SOURCE_LABELS: Record<JobSource, string> = {
-  platform: "Remote Worldwide listing",
-  link: "Saved from a link",
-  paste: "Pasted",
-  manual: "Added by hand",
-};
-
-const REMOTE_LABELS: Record<RemoteType, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
-
-const DAY_MS = 86_400_000;
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** "Used today", "Used 3 days ago", "Used 14 Aug" — a glance, not an audit trail. */
-function usedLabel(iso: string): string | null {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return null;
-  const days = Math.floor((Date.now() - at.getTime()) / DAY_MS);
-  if (days <= 0) return "Used today";
-  if (days === 1) return "Used yesterday";
-  if (days < 7) return `Used ${days} days ago`;
-  return `Used ${at.getDate()} ${MONTHS[at.getMonth()]}`;
-}
-
-/** The posting itself: our own listing page for a Remote Worldwide job, else the link it was saved from. */
-function postingOf(job: SavedJobItem): { href: string; external: boolean } | null {
-  if (job.source === "platform" && job.slug) return { href: `/jobs/${encodeURIComponent(job.slug)}`, external: false };
-  const link = job.applyUrl ?? job.url;
-  return link && /^https?:\/\//i.test(link) ? { href: link, external: true } : null;
-}
-
-/**
- * The Remote Worldwide listing a job the user saved themselves (a link, a paste,
- * the extension) was linked to by the server, because the posting was live on
- * the site when it was saved. A listing snapshot needs none: its Posting link
- * is already that page. Only the server sets `platformJobId` and `slug`.
- */
-function linkedListingOf(job: SavedJobItem): string | null {
-  return job.source !== "platform" && job.platformJobId && job.slug ? `/jobs/${encodeURIComponent(job.slug)}` : null;
-}
-
 const askHref = (id: string) => `/dashboard/jdqa?job=${encodeURIComponent(id)}`;
 
-const SavedJobRow: FC<{ job: SavedJobItem }> = ({ job }) => {
-  const remove = useDeleteSavedJob();
+const SavedJobRow: FC<{ job: OneBookmarkType["job"] }> = ({ job }) => {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const remove = useMutation({
+    mutationFn: deleteBookmarkForUser,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: BOOKMARKS_KEY }),
+    onError: () => toast.error("Couldn't remove this saved job. Try again."),
+  });
+  const openTool = useMutation({
+    mutationFn: async (href: (context: JobContextFields) => string) => {
+      const saved = await saveJob({ platformJobId: job.id });
+      queryClient.setQueryData(qk.savedJobs.detail(saved.id), saved);
+      void queryClient.invalidateQueries({ queryKey: qk.savedJobs.lists() });
+      router.push(href({ savedJobId: saved.id, company: saved.company, role: saved.role }));
+    },
+    onError: () => toast.error("Couldn't open this job. The listing may no longer be available."),
+  });
   const [confirming, setConfirming] = useState(false);
-
-  const title = job.role ?? "Untitled role";
-  const company = job.company ?? "Unknown company";
-  const context: JobContextFields = { savedJobId: job.id, company: job.company, role: job.role };
-  const posting = postingOf(job);
-  const listing = linkedListingOf(job);
-
-  const where = job.location ?? (job.regions.length > 0 ? job.regions.join(", ") : null);
-  const meta = [where, job.remoteType ? REMOTE_LABELS[job.remoteType] : null, job.salary, SOURCE_LABELS[job.source], usedLabel(job.lastUsedAt)]
-    .filter(Boolean)
-    .join(" · ");
+  const title = job.title || "Untitled role";
+  const company = job.company.name || "Unknown company";
+  const posting = `/jobs/${encodeURIComponent(job.slug)}`;
+  const meta = [job.region.join(", "), job.seniority, job.category, "Remote Worldwide listing"].filter(Boolean).join(" · ");
+  const openAsk = () => openTool.mutate((context) => askHref(context.savedJobId!));
 
   // "Back to the job" on each tool returns to the job's own screen (Ask about a job).
   const tools = [
-    { label: "Tailor resume", href: tailorResumeHref(context, "jdqa"), icon: FileText },
-    { label: "Cover letter", href: coverLetterHref(context, "jdqa"), icon: Mail },
-    { label: "ATS score", href: atsScoreHref(context, "jdqa"), icon: ScanSearch },
-    { label: "Find a referral", href: findReferralHref(context, "jdqa"), icon: Users },
+    { label: "Tailor resume", href: (context: JobContextFields) => tailorResumeHref(context, "jdqa"), icon: FileText },
+    { label: "Cover letter", href: (context: JobContextFields) => coverLetterHref(context, "jdqa"), icon: Mail },
+    { label: "ATS score", href: (context: JobContextFields) => atsScoreHref(context, "jdqa"), icon: ScanSearch },
+    { label: "Find a referral", href: (context: JobContextFields) => findReferralHref(context, "jdqa"), icon: Users },
   ];
 
   return (
     <div className={cn("flex flex-col gap-3 px-6 py-4", remove.isPending && "opacity-55")}>
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <Link href={askHref(job.id)} className="group/open flex min-w-0 flex-1 items-center gap-4 text-left" title={`Open ${title}`}>
-          <Avatar name={company} src={job.companyLogo} />
+        <button type="button" disabled={openTool.isPending} onClick={openAsk} className="group/open flex min-w-0 flex-1 items-center gap-4 text-left" title={`Open ${title}`}>
+          <Avatar name={company} src={job.company.logo} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-bold text-primary underline decoration-transparent decoration-2 underline-offset-4 transition-colors group-hover/open:decoration-[#222325]">
               {title}
@@ -115,27 +84,13 @@ const SavedJobRow: FC<{ job: SavedJobItem }> = ({ job }) => {
             <span className="mt-0.5 block truncate text-xs font-semibold text-black/65">{company}</span>
             {meta && <span className="mt-0.5 block truncate text-xs text-black/50">{meta}</span>}
           </span>
-        </Link>
+        </button>
 
         <div className="flex flex-none items-center gap-0.5">
-          {listing && (
-            <Link href={listing} className={GHOST_BTN}>
-              <LogoMini className="h-3.5 w-3.5" />
-              On Remote Worldwide
-            </Link>
-          )}
-          {posting &&
-            (posting.external ? (
-              <a href={posting.href} target="_blank" rel="noopener noreferrer" className={GHOST_BTN}>
-                <ArrowUpRight className="h-3.5 w-3.5" />
-                Posting
-              </a>
-            ) : (
-              <Link href={posting.href} className={GHOST_BTN}>
-                <ArrowUpRight className="h-3.5 w-3.5" />
-                Posting
-              </Link>
-            ))}
+          <Link href={posting} className={GHOST_BTN}>
+            <ArrowUpRight className="h-3.5 w-3.5" />
+            Posting
+          </Link>
           {confirming ? (
             <>
               <span className="px-1 text-xs text-black/55">Remove it?</span>
@@ -161,19 +116,23 @@ const SavedJobRow: FC<{ job: SavedJobItem }> = ({ job }) => {
 
       {/* The job's tools, each opened with this job already chosen. */}
       <div className="flex flex-wrap items-center gap-1.5 sm:pl-[60px]">
-        <Link
-          href={askHref(job.id)}
+        <button
+          type="button"
+          disabled={openTool.isPending}
+          onClick={openAsk}
           className="inline-flex items-center gap-1.5 rounded-full bg-[#e1f073] px-3 py-1.5 text-xs font-bold text-[#222325] transition-colors hover:bg-[#d4e35f]">
           Ask about it
-        </Link>
+        </button>
         {tools.map(({ label, href, icon: Icon }) => (
-          <Link
+          <button
+            type="button"
+            disabled={openTool.isPending}
             key={label}
-            href={href}
+            onClick={() => openTool.mutate(href)}
             className="inline-flex items-center gap-1.5 rounded-full border border-black/12 bg-[#fbfbf7] px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:border-[#222325]">
             <Icon className="h-3.5 w-3.5 text-black/55" />
             {label}
-          </Link>
+          </button>
         ))}
       </div>
     </div>
@@ -195,23 +154,14 @@ const ListSkeleton: FC = () => (
 );
 
 const SavedJobsClient: FC = () => {
-  const { pickJob } = useJobPicker();
+  const router = useRouter();
   const [query, setQuery] = useState("");
-  const q = useDebouncedValue(query.trim());
-  const jobs = useSavedJobsList(q, SAVED_JOBS_SHOWN);
-
-  const list = jobs.data ?? [];
-  const atCap = list.length >= SAVED_JOBS_SHOWN;
-
-  /** The picker saves the job; the list refetches on its own (every save invalidates it). */
-  async function addJob() {
-    try {
-      const result = await pickJob("company, role", { title: "Save a job" });
-      if (result.status === "picked") toast.success(`${result.job.role} at ${result.job.company} is saved`);
-    } catch {
-      toast.error("The job picker hit a problem. Try again.");
-    }
-  }
+  const q = query.trim().toLowerCase();
+  const jobs = useQuery({ queryKey: BOOKMARKS_KEY, queryFn: listBookmarks, staleTime: 0 });
+  const list = (jobs.data ?? []).filter(({ job }) =>
+    !q || `${job.company.name} ${job.title}`.toLowerCase().includes(q),
+  );
+  const addJob = () => router.push("/");
 
   return (
     <div className="min-h-screen bg-[#f6f6f6]">
@@ -264,7 +214,7 @@ const SavedJobsClient: FC = () => {
             <DashEmptyState
               icon={Plus}
               title="No saved jobs yet"
-              body="Save a Remote Worldwide listing, a link or a pasted posting, and it lands here, ready for your resume, cover letter, ATS score and referrals."
+              body="Bookmark a job on Remote Worldwide and it lands here, ready for your resume, cover letter, ATS score and referrals."
               ctaLabel="Add a job"
               onCta={() => void addJob()}
             />
@@ -272,13 +222,11 @@ const SavedJobsClient: FC = () => {
         ) : (
           <>
             <p className="mb-3 text-xs text-black/55">
-              {atCap
-                ? `Your ${SAVED_JOBS_SHOWN} most recently used${q ? " matches" : ""}. Search to find the rest.`
-                : `${list.length} saved job${list.length === 1 ? "" : "s"}${q ? " match" : ""}, most recently used first.`}
+              {`${list.length} saved job${list.length === 1 ? "" : "s"}${q ? " match" : ""}, most recently saved first.`}
             </p>
             <DashCard className="overflow-hidden p-0">
               <div className="flex flex-col divide-y divide-black/8">
-                {list.map((job) => (
+                {list.map(({ job }) => (
                   <SavedJobRow key={job.id} job={job} />
                 ))}
               </div>
