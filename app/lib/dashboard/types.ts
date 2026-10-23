@@ -245,6 +245,11 @@ export interface ResumeAiFigure {
   line: string;
   /** ISO time it was accepted. */
   addedAt: string;
+  /**
+   * The person's own number, typed in answer to an Impact estimate (owner, 2026-10-22, fix plan
+   * 1d): sent so the AI service remembers it for the line, never shown in the AI numbers pill.
+   */
+  own?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +393,15 @@ export interface TrackerColumn {
 // ATS scorer
 // ---------------------------------------------------------------------------
 
+export interface ScoreFactor {
+  id: string;
+  value: number;
+  detail: string;
+  lines: string[];
+}
+
 export interface AtsMetric {
+  factors?: ScoreFactor[];
   id: string;
   label: string;
   /** 0-100, or null when it could not be measured this time (`checked: false`). */

@@ -1,3 +1,4 @@
+import { SCORING_VERSION } from "./scoring-version";
 // The ATS score on the website, kept apart from api.ts (which talks to the network) so it can be
 // tested on its own: its cap, "not checked", and the recipe the AI service scores by (owner,
 // 2026-10-19: 70% keyword match, 15% impact language, 10% parseability, 5% length & format).
@@ -53,13 +54,11 @@ export function expectedScore(report: Pick<ScanReport, "metrics" | "stuffingPena
   return Math.max(0, Math.min(MAX_SCAN_SCORE, made - (report.stuffingPenalty ?? 0)));
 }
 
-/**
- * Whether a stored report was scored by today's formula: its score is what its own numbers make.
- * One scored before 2026-10-19, when the score was keyword match alone, reads false, and is rescored
- * rather than compared with today's ("Up 18 since last change" would be the formula, not the
- * resume). A report too old to have all four metrics reads true: there is nothing to tell by.
+/** A report is comparable only when both its metric rules and arithmetic are current.
+ * Legacy reports have no version and must be rescored, even when their totals add up.
  */
-export function isCurrentScore(report: Pick<ScanReport, "score" | "metrics" | "stuffingPenalty">): boolean {
+export function isCurrentScore(report: Pick<ScanReport, "score" | "metrics" | "stuffingPenalty" | "scoringVersion">): boolean {
+  if (report.scoringVersion !== SCORING_VERSION) return false;
   const expected = expectedScore(report);
   return expected === null || expected === report.score;
 }
@@ -74,15 +73,15 @@ export function isCurrentScore(report: Pick<ScanReport, "score" | "metrics" | "s
  *   a rescore gives today's number, and nothing is projected from the old one.
  */
 export function scoreMakeup(
-  report: Pick<ScanReport, "score" | "metrics" | "stuffingPenalty">,
+  report: Pick<ScanReport, "score" | "metrics" | "stuffingPenalty" | "scoringVersion">,
   { keywordChecked }: { keywordChecked: boolean },
 ): { partial: string; current: boolean } {
   // A general scan's stored keyword match (a 0 before it could say "not checked") is not in its score.
   const shown = keywordChecked ? report : { ...report, metrics: report.metrics.filter((metric) => metric.id !== "keyword-match") };
   const expected = expectedScore(shown);
   return {
-    partial: keywordChecked ? "A rescore checks the rest." : "Until then, the score shows how the resume reads.",
-    current: expected === null || expected === report.score,
+    partial: keywordChecked ? "A rescore checks the rest." : "The overall score is available once the job match is fully checked.",
+    current: report.scoringVersion === SCORING_VERSION && (expected === null || expected === report.score),
   };
 }
 
@@ -126,9 +125,9 @@ export function projectedLifts(report: Pick<ScanReport, "verdicts" | "metrics">)
     // Met in the work with every example it names: nothing left to earn. Met only in the summary or
     // Skills, or without some of its examples: the rest of its credit.
     const examples = verdict.state === "satisfied" && typeof verdict.examples === "number" ? verdict.examples : 1;
-    if (verdict.state === "undetermined" || (verdict.state === "satisfied" && !verdict.mention && examples >= 1)) continue;
+    if (verdict.state === "undetermined" || (verdict.state === "satisfied" && (verdict.coverage ?? 1) >= 1 && !verdict.mention && examples >= 1)) continue;
     const earned =
-      REQUIREMENT_WEIGHTS.coverage[verdict.state] *
+      (verdict.coverage ?? REQUIREMENT_WEIGHTS.coverage[verdict.state]) *
       (verdict.mention ? REQUIREMENT_WEIGHTS.mention : 1) *
       (1 - REQUIREMENT_WEIGHTS.examples * (1 - examples)) *
       (REQUIREMENT_WEIGHTS.confidence[verdict.confidence] ?? 1);
@@ -136,3 +135,24 @@ export function projectedLifts(report: Pick<ScanReport, "verdicts" | "metrics">)
   }
   return lifts;
 }
+
+export function displayedScore(score: number | null, state: string): number | null {
+  return state === 'ready' || state === 'stale' ? score : null;
+}
+
+export function scanCoverage(report: Pick<ScanReport, "degraded" | "verdicts" | "metrics">): {
+  partial: boolean;
+  keywordUnchecked: boolean;
+  checked: number;
+  total: number;
+} {
+  const total = report.verdicts.length;
+  const checked = report.verdicts.filter((verdict) => verdict.state !== "undetermined" && verdict.resolvedBy !== "fallback").length;
+  const keyword = report.metrics.find((metric) => metric.id === "keyword-match");
+  const keywordUnchecked = isUnchecked(keyword) || (report.degraded && total > 0 && report.verdicts.every(verdict => verdict.state === "undetermined"));
+  return { partial: report.degraded || keywordUnchecked || checked < total, keywordUnchecked, checked, total };
+}
+
+/** "Only 1 of 8 keywords could be checked just now." */
+export const partialLine = ({ checked, total }: { checked: number; total: number }): string =>
+  total > 0 && checked < total ? `Only ${checked} of ${total} ${total === 1 ? "keyword" : "keywords"} could be checked just now.` : "The final match check couldn't finish just now.";

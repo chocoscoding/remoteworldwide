@@ -15,7 +15,7 @@ import type { ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 
 /** The numbers a score is made from: what tells a score of today's formula from an older one. */
-export type ScoreBasis = Pick<ScanReport, "metrics" | "stuffingPenalty">;
+export type ScoreBasis = Pick<ScanReport, "metrics" | "stuffingPenalty" | "scoringVersion">;
 
 export interface ApplyHistoryStep {
   id: string;
@@ -52,7 +52,7 @@ function bounded(steps: ApplyHistoryStep[], at: number): { history: ApplyHistory
   const keepFrom = history.length - REPORTS_KEPT;
   history = history.map((step, i) =>
     i < keepFrom && step.report
-      ? { ...step, report: null, basis: { metrics: step.report.metrics, stuffingPenalty: step.report.stuffingPenalty ?? 0 } }
+      ? { ...step, report: null, basis: { scoringVersion: step.report.scoringVersion, metrics: step.report.metrics, stuffingPenalty: step.report.stuffingPenalty ?? 0 } }
       : step,
   );
   return { history, at: index };

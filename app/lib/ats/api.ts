@@ -1,3 +1,4 @@
+import { toReport } from './report';
 // Browser-side calls for the ATS scorer.
 //
 // Every route lives in the AI service and goes through the session proxy at
@@ -247,37 +248,6 @@ const isNumber = (value: unknown): value is number => typeof value === "number" 
  * silently-missing `metrics` renders as an empty panel that looks like a
  * finished scan with nothing to say.
  */
-function toReport(data: unknown): ScanReport | null {
-  if (!isRecord(data)) return null;
-  if (typeof data.scanId !== "string" || !isNumber(data.score)) return null;
-  if (!Array.isArray(data.metrics) || !Array.isArray(data.gaps) || !Array.isArray(data.verdicts)) return null;
-
-  const listOf = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
-  return {
-    scanId: data.scanId,
-    resumeVersion: isNumber(data.resumeVersion) ? data.resumeVersion : 0,
-    // Nothing scores 100 (owner, 2026-10-18); a scan cached before the scorer said so still reads 99.
-    score: Math.max(0, Math.min(MAX_SCAN_SCORE, data.score)),
-    metrics: data.metrics as ScanReport["metrics"],
-    gaps: data.gaps as ScanReport["gaps"],
-    verdicts: data.verdicts as ScanReport["verdicts"],
-    degraded: data.degraded === true,
-    degradedReason: typeof data.degradedReason === "string" ? data.degradedReason : null,
-    // The notes beside the score: dropped here before 2026-10-18, so a live scan never showed them.
-    eligibility: listOf(data.eligibility),
-    traits: listOf(data.traits),
-    needs: listOf<string>(data.needs).filter((need) => typeof need === "string"),
-    stuffing: listOf<string>(data.stuffing).filter((reason) => typeof reason === "string"),
-    stuffingPenalty: isNumber(data.stuffingPenalty) ? data.stuffingPenalty : 0,
-    advice: listOf<ScanAdvice>(data.advice).filter((item) => isRecord(item) && typeof item.title === "string" && typeof item.detail === "string"),
-    explanation: typeof data.explanation === "string" ? data.explanation : null,
-    rewrites: Array.isArray(data.rewrites) ? (data.rewrites as BulletRewrite[]) : [],
-    ...(isRecord(data.stretch) && typeof data.stretch.leans === "string"
-      ? { stretch: { leans: data.stretch.leans, carryOver: listOf<string>(data.stretch.carryOver).filter((label) => typeof label === "string").slice(0, 2) } }
-      : {}),
-  };
-}
-
 /** An `explained` frame. Rewrites the service could not ground are already gone. */
 function toExplanation(data: unknown): { explanation: string; rewrites: BulletRewrite[] } | null {
   if (!isRecord(data) || typeof data.explanation !== "string" || !data.explanation.trim()) return null;
@@ -454,22 +424,7 @@ export function describeScanFailure(error: unknown): ScanFailure {
  * Read the same way for scans stored before keyword match could say "not checked": a reduced scan
  * that checked no requirement had stored a 0 for it.
  */
-export function scanCoverage(report: Pick<ScanReport, "degraded" | "verdicts" | "metrics">): {
-  partial: boolean;
-  keywordUnchecked: boolean;
-  checked: number;
-  total: number;
-} {
-  const total = report.verdicts.length;
-  const checked = report.verdicts.filter((verdict) => verdict.state !== "undetermined").length;
-  const keyword = report.metrics.find((metric) => metric.id === "keyword-match");
-  const keywordUnchecked = isUnchecked(keyword) || (report.degraded && total > 0 && checked === 0);
-  return { partial: report.degraded && (keywordUnchecked || checked < total), keywordUnchecked, checked, total };
-}
-
-/** "Only 1 of 8 keywords could be checked just now." */
-export const partialLine = ({ checked, total }: { checked: number; total: number }): string =>
-  total > 0 ? `Only ${checked} of ${total} ${total === 1 ? "keyword" : "keywords"} could be checked just now.` : "Part of this scan couldn't run just now.";
+export { scanCoverage, partialLine } from "./score";
 
 /**
  * The banding the whole dashboard shares.

@@ -18,9 +18,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { describeScanFailure, streamScan, type ScanFailure } from "@/app/lib/ats/api";
 import type { ScanReport } from "@/app/lib/ats/types";
+import { recoverScan } from "@/app/lib/ats/recover-scan";
 import { qk } from "@/app/lib/query/keys";
 
-export type ApplyScanStatus = "idle" | "scoring" | "explaining" | "done" | "failed";
+export type ApplyScanStatus = "idle" | "scoring" | "explaining" | "recovering" | "done" | "failed";
 
 export interface ApplyScanState {
   status: ApplyScanStatus;
@@ -73,15 +74,19 @@ export function useApplyScan() {
 
       setState({ status: "scoring", resumeId, report: null, failure: null });
       try {
-        const report = await streamScan(
+        const report = await recoverScan(() => streamScan(
           { resumeId, jdText, jobId, jobTitle },
           {
             signal: controller.signal,
             onScored: (scored) => {
-              if (current()) setState({ status: "explaining", resumeId, report: scored, failure: null });
+              if (current()) setState({ status: scored.degraded ? "scoring" : "explaining", resumeId, report: scored, failure: null });
             },
           },
-        );
+        ), controller.signal, undefined, {
+          background: true,
+          retryable: error => describeScanFailure(error).retryable,
+          onWaiting: report => { if (current()) setState({ status: "recovering", resumeId, report, failure: null }); },
+        });
         if (!current()) return null;
         setState({ status: "done", resumeId, report, failure: null });
         // A scan spends a credit, so the balance in the header is now behind.

@@ -200,7 +200,7 @@ const AtsResults: FC<AtsResultsProps> = ({
   const headroom = Math.max(0, MAX_SCAN_SCORE - base);
   // Closing a gap moves keyword match and nothing else, so a scan that could not check it projects nothing.
   // An old scan, scored when the score was keyword match alone, projects nothing: a rescore gives the real number.
-  const projecting = keywordChecked && headroom > 0 && makeup?.current !== false;
+  const projecting = !partial && keywordChecked && headroom > 0 && makeup?.current !== false;
   // What closing each gap is projected to add, the scorer's own arithmetic (`projectedLifts`). A real
   // rescore is the only thing that moves the real number, so this is shown and never written anywhere.
   const lifts = useMemo(() => (report ? projectedLifts(report) : new Map<string, number>()), [report]);
@@ -364,7 +364,7 @@ const AtsResults: FC<AtsResultsProps> = ({
 
             <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start">
               <div className="relative flex-none">
-                <ScoreRing value={displayed} size={164} fillColor={scoreStep(displayed).color} trackColor={scoreStepTrack(displayed)} />
+                {partial ? <div className="grid h-[164px] w-[164px] place-items-center rounded-full border-8 border-dashed border-gray-200 text-4xl text-gray-400" aria-label="Overall score pending">—</div> : <ScoreRing value={displayed} size={164} fillColor={scoreStep(displayed).color} trackColor={scoreStepTrack(displayed)} />}
                 {lift > 0 && (
                   <span className="absolute -right-1 -top-1 rounded-full border-[1.5px] border-[#222325] bg-[#e1f073] px-2 py-0.5 text-xs font-bold text-[#222325] tabular-nums">
                     +{lift}

@@ -29,8 +29,19 @@ registerHooks({
   },
 });
 
-const { expectedScore, isCurrentScore, projectedLifts, scoreMakeup } = await import("../app/lib/ats/score.ts");
+const { displayedScore, expectedScore, isCurrentScore, projectedLifts, scoreMakeup } = await import("../app/lib/ats/score.ts");
 const { strictness } = await import("../app/lib/ats/strictness.ts");
+const { toReport } = await import("../app/lib/ats/report.ts");
+const { scanBaseline } = await import("../app/lib/apply/state.ts");
+
+it('preserves serialized metric factors and scoring version; legacy reports and other resumes have no delta', () => {
+  const report = toReport(JSON.parse(JSON.stringify({scanId:'scan',score:75,resumeVersion:2,scoringVersion:18,metrics:[{id:'impact-language',label:'Impact',value:100,factors:[{id:'impact-evidence',value:100,detail:'Three examples',lines:['Built a reporting service']}]}],gaps:[],verdicts:[]})));
+  assert.equal(report.scoringVersion,18);
+  assert.deepEqual(report.metrics[0].factors[0].lines,['Built a reporting service']);
+  assert.equal(scanBaseline({resumeId:'a',version:2,report},'b',3).previousScore,null);
+  const legacy=toReport({...report,scoringVersion:undefined});
+  assert.equal(scanBaseline({resumeId:'a',version:2,report:legacy},'a',3).previousScore,null);
+});
 
 const metrics = (keyword, impact, parse, length) => [
   keyword === null ? { id: "keyword-match", label: "Keyword match", value: null, checked: false } : { id: "keyword-match", label: "Keyword match", value: keyword },
@@ -49,15 +60,15 @@ describe("the ATS score's recipe", () => {
   });
 
   it("tells a report scored by keyword match alone from one scored today", () => {
-    assert.equal(isCurrentScore({ score: 86, metrics: metrics(86, 69, 100, 100) }), true);
+    assert.equal(isCurrentScore({ scoringVersion: 22, score: 86, metrics: metrics(86, 69, 100, 100) }), true);
     // Before 2026-10-19 the same numbers scored 75 when keyword match was 75.
     assert.equal(isCurrentScore({ score: 75, metrics: metrics(75, 69, 100, 100) }), false);
     // Too old to have every metric: nothing to tell by.
-    assert.equal(isCurrentScore({ score: 60, metrics: [{ id: "keyword-match", label: "Keyword match", value: 60 }] }), true);
+    assert.equal(isCurrentScore({ score: 60, metrics: [{ id: "keyword-match", label: "Keyword match", value: 60 }] }), false);
   });
 
   it("never says the score's recipe on the page (owner, 2026-10-19: it read as a keyword matcher)", () => {
-    const made = scoreMakeup({ score: 86, metrics: metrics(86, 69, 100, 100) }, { keywordChecked: true });
+    const made = scoreMakeup({ scoringVersion: 22, score: 86, metrics: metrics(86, 69, 100, 100) }, { keywordChecked: true });
     assert.equal(made.current, true);
     assert.doesNotMatch(JSON.stringify(made), /%|keyword match/i);
     assert.equal(scoreMakeup({ score: 75, metrics: metrics(75, 69, 100, 100) }, { keywordChecked: true }).current, false);
@@ -75,7 +86,7 @@ describe("what meeting a missing requirement is projected to add", () => {
   });
 
   it("is its share of the checked weight, at keyword match's 70%, as a rescore would count it", () => {
-    // Two met, one missing, one partly met, all weight 4: 16 checked. Missing lacks 4 of 16 (70 x 4 / 16 = 17.5);
+    // Two met, one missing, one partly met, all weight 4: 16 checked. Missing lacks 4 of 16 (70 x 4 / 16 = 18.5);
     // partial lacks what the strictness level does not give it (balanced: 55%).
     const report = { metrics: metrics(63, 70, 90, 90), verdicts: [verdict("a", "satisfied"), verdict("b", "satisfied"), verdict("c", "missing"), verdict("d", "partial")] };
     const lifts = projectedLifts(report);
@@ -114,4 +125,47 @@ describe("what meeting a missing requirement is projected to add", () => {
   it("projects nothing when keyword match was not checked", () => {
     assert.equal(projectedLifts({ metrics: metrics(null, 70, 90, 90), verdicts: [verdict("c", "missing")] }).size, 0);
   });
+
+  it("uses actual coverage credit near a rerank boundary instead of the coarse state", () => {
+    const report = { metrics: metrics(70, 70, 90, 90), verdicts: [
+      { ...verdict("duty", "partial", 4, { category: "responsibility" }), coverage: 0.75 },
+      verdict("met", "satisfied", 2),
+    ] };
+    assert.equal(projectedLifts(report).get("duty"), 35 * 0.25);
+  });
+});
+
+it("rejects arithmetically valid reports from a missing or old scoring version", () => {
+  const report = { score: 86, metrics: metrics(86, 69, 100, 100) };
+  assert.equal(isCurrentScore(report), false);
+  assert.equal(isCurrentScore({ ...report, scoringVersion: 15 }), false);
+  assert.equal(isCurrentScore({ ...report, scoringVersion: 22 }), true);
+});
+
+it('marks provider fallback verdicts as partial even when they have coverage states', async () => {
+  const { scanCoverage } = await import('../app/lib/ats/score.ts');
+  const fallback = { state:'partial', resolvedBy:'fallback', confidence:'medium' };
+  assert.equal(scanCoverage({degraded:true,verdicts:[fallback],metrics:metrics(60,100,95,75)}).partial,true);
+  assert.equal(scanCoverage({degraded:false,verdicts:[{...fallback,resolvedBy:'rerank'}],metrics:metrics(60,100,95,75)}).partial,false);
+});
+
+it('corrects a uniquely matched merged header without replacing draft edits or IDs', async () => {
+  const { repairWorkHeaders } = await import('../app/lib/apply/import-repair.ts');
+  const current={summary:'Edited summary',skills:['Amplitude'],experience:[{id:'kept',role:'Senior Product DesignerFintech startup (remote)',company:'',dates:'2021–Present',bullets:['Candidate-confirmed example.']}]};
+  const original={experience:[{id:'new',role:'Senior Product Designer',company:'Fintech startup (remote)',dates:'2021–Present',bullets:['Original bullet.']}]};
+  const fixed=repairWorkHeaders(current,original);
+  assert.equal(fixed.experience[0].role,'Senior Product Designer');
+  assert.equal(fixed.experience[0].company,'Fintech startup (remote)');
+  assert.equal(fixed.experience[0].id,'kept');
+  assert.deepEqual(fixed.experience[0].bullets,current.experience[0].bullets);
+  assert.deepEqual(fixed.skills,current.skills);
+  assert.equal(fixed.summary,current.summary);
+  assert.equal(repairWorkHeaders(current,{experience:[...original.experience,...original.experience]}),null);
+  assert.equal(repairWorkHeaders(current,{experience:[{...original.experience[0],company:'Another employer'}]}),null);
+});
+
+it('incomplete checks never present a partial average as the ATS total', () => {
+ assert.equal(displayedScore(90, 'partial'), null);
+ assert.equal(displayedScore(50, 'ready'), 50);
+ assert.equal(displayedScore(50, 'stale'), 50);
 });

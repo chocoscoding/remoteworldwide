@@ -64,6 +64,8 @@ export interface Evidence {
 }
 
 export interface RequirementVerdict {
+  /** Base coverage used by the scorer, before confidence, mention and example weights. */
+  coverage?: number;
   requirement: Requirement;
   state: CoverageState;
   score: number;
@@ -106,6 +108,8 @@ export interface ScanAdvice {
  * with them absent.
  */
 export interface ScanReport {
+  /** Missing on legacy reports, which must be rescored before comparisons. */
+  scoringVersion?: number;
   scanId: string;
   resumeVersion: number;
   /**
