@@ -53,6 +53,7 @@ import { EXTENSION_URL } from "@/app/lib/extension/url";
 import { qk } from "@/app/lib/query/keys";
 import type { ApplyQuestion } from "@/app/lib/apply/state";
 import { applyLinkOf, hostOf, type StartedJob } from "../job";
+import ResumeIntegrityNotice from "../parts/ResumeIntegrityNotice";
 
 export interface SubmitStepProps {
   job: StartedJob;
@@ -345,6 +346,7 @@ const SubmitStep: FC<SubmitStepProps> = ({
 
   return (
     <div className="flex flex-col gap-5">
+      <ResumeIntegrityNotice resumeId={resumeId} onReview={() => onEditStep(2)} />
       {pasting ? (
         <section aria-label="Paste the application form" className="br-plain flex flex-col gap-3 rounded-2xl bg-white p-5">
           <div className="flex flex-col gap-1">
