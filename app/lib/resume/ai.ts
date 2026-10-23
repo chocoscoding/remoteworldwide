@@ -17,7 +17,7 @@
 // browser over the document on screen; these run in the service, where all six
 // reach a model and a credit can be charged — see the note on `FREE_TOOLS`.
 
-import { apiPost } from "@/app/lib/api/client";
+import { apiPost, apiPostWithMessage } from "@/app/lib/api/client";
 import type {
   AskResult,
   KeywordInjection,
@@ -122,6 +122,12 @@ export interface SuggestionInput {
    * 2026-10-18). Absent: everywhere.
    */
   places?: ResumePlace[] | null;
+  /**
+   * `keywords` and `tailor`: the open asks on the page (Tailor's and the posting's examples), which the
+   * AI never writes for the person while they answer (owner, 2026-10-22, fix plan B).
+   */
+  pending?: string[] | null;
+  confirmed?: Array<{ term: string; detail?: string; entryId?: string }>;
   /** `ask` only: the ATS report's findings to fix, from "Fix these in my resume" (`app/lib/ats/fix-handoff.ts`). */
   fixes?: string[] | null;
 }
@@ -173,9 +179,12 @@ export interface KeywordProposals {
   terms: string[];
 }
 
-const run = <T>(tool: SuggestionTool, input: SuggestionInput) =>
-  apiPost<T>(`${SUGGESTIONS_PATH}/${tool}`, {
+const run = <T>(tool: SuggestionTool, input: SuggestionInput) => apiPost<T>(`${SUGGESTIONS_PATH}/${tool}`, bodyOf(input));
+
+/** What every tool sends: the input, each absent field as null. */
+const bodyOf = (input: SuggestionInput) => ({
     content: input.content,
+    confirmed: input.confirmed ?? null,
     jdText: input.jdText ?? null,
     company: input.company ?? null,
     role: input.role ?? null,
@@ -197,7 +206,8 @@ const run = <T>(tool: SuggestionTool, input: SuggestionInput) =>
     // `ask` only: the ATS report's findings, from "Fix these in my resume".
     fixes: input.fixes && input.fixes.length > 0 ? input.fixes : null,
     places: input.places && input.places.length > 0 ? input.places : null,
-  });
+    pending: input.pending && input.pending.length > 0 ? input.pending : null,
+});
 
 /** Rewrites the summary and skills towards one posting. Needs `jdText`. */
 export const tailorToJob = (input: SuggestionInput) => run<TailorResult>("tailor", input);
@@ -222,8 +232,23 @@ export const injectKeywords = (input: SuggestionInput) => run<KeywordInjection>(
  */
 export const proposeKeywords = (input: SuggestionInput) => run<KeywordProposals>("keywords", { ...input, propose: true });
 
-/** Proposes a number for bullets that carry none. Proposing only — applying is `applyQuantify`, which stays local and pure. */
-export const quantifySuggestions = (input: SuggestionInput) => run<QuantifySuggestion[]>("quantify", input);
+/** Quantify's proposals; when there are none, `note` is the service's one line saying why. */
+export type QuantifyAnswer = QuantifySuggestion[] & { note?: string };
+
+/** The service's message on an answer with proposals: no reason, so never a note. */
+const QUANTIFY_DONE = "Suggested numbers for your bullets";
+
+/**
+ * Proposes a number for bullets that carry none. Proposing only — applying is `applyQuantify`, which stays local and pure.
+ * An empty answer carries why as `note` (owner, 2026-10-22, fix plan 1a: "That line already carries a
+ * number" was said of a line skipped as a description, or a role of short lines).
+ */
+export const quantifySuggestions = async (input: SuggestionInput): Promise<QuantifyAnswer> => {
+  const { data, message } = await apiPostWithMessage<QuantifySuggestion[]>(`${SUGGESTIONS_PATH}/quantify`, bodyOf(input));
+  const answer: QuantifyAnswer = Array.isArray(data) ? data : [];
+  if (answer.length === 0 && message && message !== QUANTIFY_DONE) answer.note = message;
+  return answer;
+};
 
 export const shortenToOnePage = (input: SuggestionInput) => run<ShortenResult>("shorten", input);
 

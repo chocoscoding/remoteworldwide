@@ -37,6 +37,7 @@ export interface TailorResult {
   changed?: FitChange[];
   /** "Tailor to this job": what the job asks for that the resume does not show, to ask the person about. */
   couldAdd?: FitAddition[];
+  reconciledQuestions?: string[];
 }
 
 /** One line "Tailor to this job" changed: lightly ("tune") or led with what the job wants ("reframe"). */
@@ -79,6 +80,7 @@ export interface RewriteVariant {
 // ---------------------------------------------------------------------------
 
 export interface KeywordInjection {
+  outcomes?: Array<{ term: string; status: "added" | "already_supported" | "awaiting_answer" | "unsupported" | "rejected"; reason: string }>;
   content: ResumeContent;
   /** The terms actually added. Decided from the resume, never claimed by a model. */
   added: string[];
@@ -94,6 +96,12 @@ export interface KeywordInjection {
   skillsOnly?: string[];
   /** Picked terms only: the added terms the resume did not already show, each with a word on backing it in an interview. */
   advice?: TermAdvice[];
+  /**
+   * Terms an open ask names, held back or taken back out of what the AI wrote: waiting for the
+   * person's answer, never refused (owner, 2026-10-22, fix plan B). Shown as "Answer the question
+   * about Google Analytics first".
+   */
+  awaitingAnswer?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +119,14 @@ export interface QuantifySuggestion {
   after: string;
   /** A point of this custom section (`content.customSections`) rather than a role's bullet. */
   customId?: string;
+  /**
+   * Nothing on the resume anchors the number (owner, 2026-10-22, fix plan 1e): the apply step asks
+   * `question` first, with the AI's line as "Use estimate"; the editor applies it with its nudge.
+   */
+  estimate?: boolean;
+  /** The question for the person when `estimate`: "How many web funnels did you build?". */
+  question?: string;
+  evidence?: { status: "source" | "unconfirmed"; source: string; role: string; company: string; metric: string; unit: string; period: string; value: string };
 }
 
 /**

@@ -5,12 +5,15 @@
 // change did (with the points stuffing took off), then the Missing / Working tabs and what to do
 // next. Everything here is drawn from props; ResumeStep decides what the buttons do.
 
-import { useState, type FC, type ReactNode } from "react";
-import { AlertCircle, ArrowDown, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, MoreHorizontal, Plus, RotateCw, X } from "lucide-react";
+import { Fragment, useLayoutEffect, useRef, useState, type FC, type ReactNode } from "react";
+import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, MoreHorizontal, Plus, RotateCw, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { METRIC_GROUPS, fixFirstId, scoreColorOf, type WorkingItem } from "@/app/lib/apply/fixes";
+import type { ScoreDrop } from "@/app/lib/apply/score-changes";
+import { capAsks } from "@/app/lib/apply/ask-cap";
 import type { ScanReport } from "@/app/lib/ats/types";
+import { displayedScore } from "@/app/lib/ats/score";
 import type { ResumePlace } from "@/app/lib/resume/ai";
 
 // ---- The score ------------------------------------------------------------------------------
@@ -25,7 +28,7 @@ export type ScoreState =
    * posting (owner, 2026-10-19: "73 instead of 89"). Said as it is, with Rescore; never kept as a
    * step's score.
    */
-  | { kind: "partial"; checked: number; total: number }
+  | { kind: "partial"; checked: number; total: number; recovering?: boolean }
   | { kind: "failed"; message: string; retryable: boolean; credits: boolean };
 
 const C = 94.2;
@@ -121,7 +124,7 @@ const ScoreSide: FC<{
   onRescore?: () => void;
   creditsHref: string;
 }> = ({ state, score, previous, onRescore, creditsHref }) => {
-  const shown = state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? score : null;
+  const shown = displayedScore(score, state.kind);
   const delta = state.kind === "ready" && shown !== null && previous !== null ? Math.round(shown) - Math.round(previous) : 0;
   return (
     <div className="flex min-w-0 flex-none items-center gap-4 lg:w-[280px]">
@@ -158,10 +161,10 @@ const ScoreSide: FC<{
           <>
             <span className="flex items-center gap-1.5 text-xs font-extrabold text-[#a06f00]">
               <AlertCircle className="h-3 w-3" strokeWidth={2.4} />
-              Partly checked
+              {state.recovering ? "Finishing checks automatically" : "Partly checked"}
             </span>
             <span className="text-xs text-[#8a8b85]">
-              {state.total > 0 ? `${state.checked} of ${state.total} checked` : "Part of it couldn't run"}
+              {state.total > 0 && state.checked < state.total ? `${state.checked} of ${state.total} checked` : "Final match check incomplete"}
             </span>
           </>
         )}
@@ -174,7 +177,7 @@ const ScoreSide: FC<{
             <span className="text-xs text-[#8a8b85]">{state.credits ? state.message : "Nothing was charged."}</span>
           </>
         )}
-        {(state.kind === "stale" || state.kind === "partial") && onRescore && (
+        {(state.kind === "stale" || (state.kind === "partial" && !state.recovering)) && onRescore && (
           <button
             type="button"
             onClick={onRescore}
@@ -280,23 +283,57 @@ export const ScoreRow: FC<{
   report: ScanReport | null;
   previousScore: number | null;
   previousMetrics?: Record<string, number>;
+  progress?: string[];
   onRescore?: () => void;
   creditsHref: string;
-}> = ({ state, report, previousScore, previousMetrics, onRescore, creditsHref }) => (
+  drops?: ScoreDrop[];
+  onShowDrop?: (lines: string[]) => void;
+  onUndoChange?: () => void;
+}> = ({ state, report, previousScore, previousMetrics, progress = [], onRescore, creditsHref, drops = [], onShowDrop, onUndoChange }) => (
   // Never the score's recipe under it (owner, 2026-10-19: "70% keyword match" read as a keyword matcher).
-  <div className="flex flex-col items-stretch gap-4 lg:flex-row">
-    <ScoreSide
-      state={state}
-      score={report ? report.score : null}
-      previous={previousScore}
-      onRescore={onRescore}
-      creditsHref={creditsHref}
-    />
-    <StagePanels
-      report={state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? report : null}
-      previousMetrics={state.kind === "ready" ? previousMetrics : undefined}
-      partial={state.kind === "partial"}
-    />
+  <div className="flex flex-col gap-3">
+    <div className="flex flex-col items-stretch gap-4 lg:flex-row">
+      <ScoreSide
+        state={state}
+        score={report ? report.score : null}
+        previous={previousScore}
+        onRescore={onRescore}
+        creditsHref={creditsHref}
+      />
+      <StagePanels
+        report={state.kind === "ready" || state.kind === "stale" || state.kind === "partial" ? report : null}
+        previousMetrics={state.kind === "ready" ? previousMetrics : undefined}
+        partial={state.kind === "partial"}
+      />
+    </div>
+    {state.kind === "ready" && progress.length > 0 && (
+      <p className="text-xs text-[#5f6062]" role="status">
+        Stronger evidence for: {progress.join(", ")}.
+        {report?.score === previousScore ? " Your overall score is unchanged." : ""}
+      </p>
+    )}
+    {state.kind === "ready" && previousScore !== null && report?.score === previousScore && progress.length === 0 && drops.length === 0 && (
+      <details className="text-xs text-[#73746d]">
+        <summary className="cursor-pointer">Saved · score unchanged</summary>
+        <p className="mt-1 max-w-2xl leading-relaxed">The edit is saved. This scan did not change your rounded overall score. Adding a skill can strengthen the resume without changing a requirement's existing credit; experience shows how you used it.</p>
+      </details>
+    )}
+    {state.kind === "ready" && drops.length > 0 && (
+      <details key={report?.scanId} className="rounded-lg border border-[#222325]/10 px-3 py-2 text-xs text-[#5f6062]">
+        <summary className="cursor-pointer font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4">Why did it change? <span className="ml-1 font-normal text-[#73746d]">{drops.length} {drops.length === 1 ? "check" : "checks"} lower</span></summary>
+        <div className="mt-3 flex flex-col gap-3">
+          {drops.map(drop => <div key={drop.id} className="min-w-0">
+            <p className="font-semibold text-primary">{drop.label} <span className="ml-1 font-normal">{drop.before} → {drop.after}{drop.id === "repetition" ? " points deducted" : ""}</span></p>
+            {drop.reasons.map(reason => <p key={reason} className="mt-1 max-w-3xl leading-relaxed">{reason}</p>)}
+            {drop.lines.length > 0 && onShowDrop && <button type="button" onClick={() => onShowDrop(drop.lines)} className="mt-1.5 inline-flex cursor-pointer items-center gap-1 font-semibold text-primary underline underline-offset-2"><Eye className="h-3 w-3" />Show supporting text</button>}
+          </div>)}
+          <div className="flex flex-wrap items-center gap-3 border-t border-black/8 pt-2">
+            <span>You can keep this edit or undo it.</span>
+            {onUndoChange && <button type="button" onClick={onUndoChange} className="cursor-pointer font-semibold text-primary underline underline-offset-2">Undo last change</button>}
+          </div>
+        </div>
+      </details>
+    )}
   </div>
 );
 
@@ -353,7 +390,7 @@ export const StuffingNote: FC<{
       </>
     );
   return (
-    <div className="flex min-h-10 items-center gap-2.5 rounded-[10px] bg-[#fff7e6] px-3 py-1.5">
+    <div className="flex min-h-10 flex-wrap items-center gap-2.5 rounded-[10px] bg-[#fff7e6] px-3 py-1.5">
       <span className="flex h-5 flex-none items-center whitespace-nowrap rounded-full bg-[#d99a00] px-2 text-[11px] font-extrabold text-white">
         −{note.points} {note.points === 1 ? "pt" : "pts"}
       </span>
@@ -424,6 +461,36 @@ const ShowInResume: FC<{ onClick: () => void }> = ({ onClick }) => (
 const MENU_ROW =
   "flex w-full cursor-pointer items-center gap-2.5 border-b border-black/8 px-3.5 py-2.5 text-left text-xs font-semibold text-primary last:border-b-0 hover:bg-[#fbfbf7]";
 
+/** A row's answer box and its button: Enter sends it too, and a click inside never lights the row. */
+const RowInput: FC<{ input: NonNullable<Suggestion["input"]>; disabled: boolean }> = ({ input, disabled }) => {
+  const [value, setValue] = useState(input.initialValue ?? "");
+  const send = () => {
+    if (value.trim()) input.onSubmit(value.trim());
+  };
+  return (
+    <span className="flex flex-none items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+      <input
+        type="text"
+        inputMode={input.mode ?? "decimal"}
+        maxLength={input.mode === "text" ? 500 : 30}
+        value={value}
+        disabled={disabled}
+        placeholder={input.placeholder}
+        aria-label={input.placeholder}
+        onChange={(event) => setValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") send();
+        }}
+        style={input.mode === "text" ? { width: "min(240px, 45vw)" } : undefined}
+        className="h-[30px] w-[72px] rounded-lg border border-[#222325]/22 bg-white px-2 text-xs font-bold text-primary outline-none placeholder:font-semibold placeholder:text-[#8a8b85] focus:border-[#222325]"
+      />
+      <button type="button" disabled={disabled || !value.trim()} onClick={send} className={ROW_BUTTON}>
+        {input.label}
+      </button>
+    </span>
+  );
+};
+
 // ---- Missing / Working ----------------------------------------------------------------------
 
 export interface GapChip {
@@ -451,7 +518,99 @@ export interface Suggestion {
   choices?: Array<{ label: string; onClick: () => void }>;
   /** A note in the list, not a fix: a dark row with no button ("You've reached your best match…"). */
   note?: boolean;
+  /** A Yes/No ask (Tailor's, or a posting's example): four show, the rest behind "Show N more". */
+  ask?: boolean;
+  /**
+   * A small box for the person's own answer, before any `choices` (owner, 2026-10-22, fix plan 1e:
+   * "How many web funnels did you build?" takes their number, "Add" puts it in the line).
+   */
+  input?: { placeholder: string; label: string; mode?: "text" | "decimal"; initialValue?: string; onSubmit: (value: string) => void };
+  /** A Yes/No ask that can be ticked with others and answered together: its term (owner, 2026-10-22). */
+  batch?: string;
+  placement?: { initialDetail?: string; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: Array<{ id: string; label: string }>; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
 }
+
+/** A small square tick box, the light-brutalism way: hairline when off, lime with a check when on. */
+const TickBox: FC<{ on: boolean }> = ({ on }) => (
+  <span
+    aria-hidden
+    className={cn(
+      "grid h-4 w-4 flex-none place-content-center rounded-[4px] border-[1.5px] border-[#222325]",
+      on ? "bg-[#e1f073]" : "bg-white",
+    )}>
+    {on && <Check className="h-2.5 w-2.5 text-primary" strokeWidth={3.4} />}
+  </span>
+);
+
+/** Choose destinations together before committing a single resume change. */
+const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolean; onSelect?: () => void }> = ({ row, disabled, selected, onSelect }) => {
+  const [skills, setSkills] = useState(row.placement?.useSkills ?? !row.placement?.skillsAdded);
+  const [experience, setExperience] = useState(row.placement?.useExperience ?? false);
+  const [entryId, setEntryId] = useState(row.placement?.entryId ?? "");
+  const [detail, setDetail] = useState(row.placement?.initialDetail ?? "");
+  const detailRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const field = detailRef.current;
+    if (!field) return;
+    const resize = () => {
+      field.style.height = "0px";
+      // 20px per line, 12px vertical padding and 2px border: at most two lines.
+      field.style.height = `${Math.min(54, Math.max(34, field.scrollHeight + 2))}px`;
+    };
+    resize();
+    let width = field.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (field.clientWidth === width) return;
+      width = field.clientWidth;
+      resize();
+    });
+    observer.observe(field);
+    return () => observer.disconnect();
+  }, [detail, experience]);
+  const destination = skills && experience ? "both" : experience ? "Experience" : "Skills";
+  return (
+    <div className="rounded-[10px] bg-[#f6f6f6] pl-3 pr-2 py-1.5">
+      <div className="flex min-h-8 flex-wrap items-center gap-2">
+        {onSelect && <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select: ${row.title}`} disabled={disabled} onClick={onSelect} className="cursor-pointer"><TickBox on={selected} /></button>}
+        <strong className="min-w-0 flex-1 text-[13px]">{row.title}</strong>
+        <span className="text-xs text-[#5f6062]">Use in:</span>
+        {([{ label: "Skills", on: skills, toggle: () => setSkills(!skills) }, { label: "Experience", on: experience, toggle: () => setExperience(!experience) }]).map(option => (
+          <button key={option.label} type="button" aria-pressed={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled} onClick={option.toggle}
+            className={cn("flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-[11px] font-semibold disabled:opacity-50", option.on ? "border-[#dce89c] bg-[#f2f9c9] text-[#343a18]" : "border-black/15 bg-white text-[#55564f]")}>
+            {option.on && <Check aria-hidden className="h-2.5 w-2.5" />}{option.label}
+          </button>
+        ))}
+        {row.placement?.skillsAdded && <span className="text-[11px] text-[#63761a]">In Skills</span>}
+        <button type="button" disabled={disabled || (!skills && !experience) || (experience && (!detail.trim() || !entryId))}
+          aria-label={`Add ${row.title} to ${destination}`}
+          onClick={() => row.placement?.onApply(skills, experience, detail.trim(), entryId)}
+          className="ml-2 flex h-6 cursor-pointer items-center gap-1 rounded-md bg-[#222325] px-2 text-[11px] font-bold text-white disabled:cursor-default disabled:opacity-40">
+          Add <ArrowRight aria-hidden className="h-3 w-3" />
+        </button>
+        {row.choices?.filter(choice => choice.label === "No").map(choice => <span key={choice.label} className="ml-3 flex shrink-0 items-center border-l border-[#222325]/15 pl-3">
+          <button type="button" disabled={disabled} aria-label={`Dismiss ${row.title} suggestion`} title={`Dismiss ${row.title} suggestion`} onClick={choice.onClick} className="grid h-6 w-6 cursor-pointer place-content-center rounded text-[#777870] hover:bg-black/5 hover:text-primary disabled:opacity-50"><X aria-hidden className="h-3.5 w-3.5" /></button>
+        </span>)}
+      </div>
+      {experience && <div className="mt-2 border-t border-black/8 pt-2 pb-1 pr-1">
+        <label className="mb-2 flex items-center gap-2 text-xs text-[#5f6062]">Role
+          <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => setEntryId(event.target.value)} disabled={disabled} className="min-w-0 max-w-full rounded-md border border-black/15 bg-white px-2 py-1 text-xs text-primary">
+            <option value="">Choose a role</option>
+            {row.placement?.roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}
+          </select>
+        </label>
+        <label className="block text-xs font-semibold text-primary">
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span>How did you use {row.title}?</span>
+            <span className="text-[11px] font-normal text-[#73746d]">Describe your work in the selected role. You can edit the result.</span>
+          </span>
+          <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => setDetail(event.target.value)} disabled={disabled} rows={1} maxLength={500}
+            placeholder={`For example: At Acme, I used ${row.title} to…`}
+            className="mt-1.5 block w-full resize-none overflow-y-auto rounded-lg border border-black/20 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-primary outline-none focus:border-[#222325] focus:ring-1 focus:ring-[#222325] disabled:opacity-50" />
+        </label>
+      </div>}
+    </div>
+  );
+};
 
 const PLACE_LABELS: Record<ResumePlace, string> = { summary: "Summary", bullets: "Bullets", skills: "Skills" };
 const PLACES: ResumePlace[] = ["summary", "bullets", "skills"];
@@ -468,6 +627,7 @@ const TOOL_BUTTON =
   "flex h-[32px] flex-none cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-extrabold disabled:cursor-default";
 
 export const FixesTabs: FC<{
+  hasScoreDrop?: boolean;
   gaps: GapChip[];
   skillsOnly: GapChip[];
   picked: ReadonlySet<string>;
@@ -488,7 +648,10 @@ export const FixesTabs: FC<{
   /** Keywords a partly checked scan could not check: never read as matched. */
   unchecked?: number;
   onRescore?: () => void;
+  /** Answers the ticked asks together: yes adds them all in one change, no marks them all answered. */
+  onAnswerAsks?: (terms: string[], yes: boolean) => void;
 }> = ({
+  hasScoreDrop = false,
   gaps,
   skillsOnly,
   picked,
@@ -507,9 +670,31 @@ export const FixesTabs: FC<{
   note,
   unchecked = 0,
   onRescore,
+  onAnswerAsks,
 }) => {
   const [tab, setTab] = useState<"missing" | "working">("missing");
-  const missingCount = gaps.length + skillsOnly.length;
+  const [asksOpen, setAsksOpen] = useState(false);
+  const capped = capAsks(suggestions, (row) => row.ask === true, asksOpen);
+  // Ticked asks (owner, 2026-10-22: "batch select this, not one by one"); an answered ask leaves the
+  // list, so only terms still showing count.
+  const batchTerms = onAnswerAsks ? suggestions.flatMap((row) => (row.batch ? [row.batch] : [])) : [];
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
+  const tickedNow = batchTerms.filter((term) => ticked.has(term));
+  const allTicked = batchTerms.length > 0 && tickedNow.length === batchTerms.length;
+  const firstSelectableIndex = capped.rows.findIndex((row) => Boolean(row.batch));
+  const tick = (term: string) =>
+    setTicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(term)) next.delete(term);
+      else next.add(term);
+      return next;
+    });
+  const answerTicked = (yes: boolean) => {
+    if (!onAnswerAsks || tickedNow.length === 0) return;
+    onAnswerAsks(tickedNow, yes);
+    setTicked(new Set());
+  };
+  const missingCount = new Set([...gaps.map(gap => gap.label.toLowerCase()), ...skillsOnly.map(gap => gap.label.toLowerCase()), ...suggestions.flatMap(row => row.id === "punctuation" ? ["fix:punctuation"] : [])]).size;
   const pickedCount = gaps.filter((gap) => picked.has(gap.id) && !gap.choices).length;
   const bulletsOn = places.includes("bullets");
   const prove = skillsOnly.length > 0;
@@ -533,7 +718,7 @@ export const FixesTabs: FC<{
                   "flex h-[30px] cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[13px]",
                   on ? "bg-white font-extrabold text-primary shadow-[0_0_0_1px_#222325]" : "font-bold text-[#5f6062]",
                 )}>
-                {id === "missing" ? "Missing" : "Working"}
+                {id === "missing" ? "To improve" : "Working"}
                 <span
                   className={cn(
                     "rounded-full px-1.5 text-[11px]",
@@ -541,6 +726,7 @@ export const FixesTabs: FC<{
                   )}>
                   {id === "missing" ? missingCount : working.length}
                 </span>
+                {id === "missing" && batchTerms.length > 0 && <span className="ml-1 text-[11px] font-normal text-[#73746d]">· {batchTerms.length} {batchTerms.length === 1 ? "question" : "questions"}</span>}
               </button>
             );
           })}
@@ -555,7 +741,7 @@ export const FixesTabs: FC<{
       )}
 
       {tab === "missing" && !busy && unchecked > 0 && (
-        <div className="flex min-h-10 items-center gap-2.5 rounded-[10px] bg-[#fff7e6] px-3 py-1.5 text-[13px]">
+        <div className="flex min-h-10 flex-wrap items-center gap-2.5 rounded-[10px] bg-[#fff7e6] px-3 py-1.5 text-[13px]">
           <AlertCircle className="h-3.5 w-3.5 flex-none text-[#a06f00]" strokeWidth={2.4} />
           <strong className="flex-1">{unchecked} couldn&apos;t be checked.</strong>
           {onRescore && (
@@ -569,11 +755,11 @@ export const FixesTabs: FC<{
 
       {/* Owner, 2026-10-19: "there should be a point where it's like, nothing left to add, move on". */}
       {tab === "missing" && !busy && missingCount === 0 && unchecked === 0 && suggestions.length === 0 && !note && (
-        <div className="flex items-center gap-2.5 rounded-xl bg-[#f4f9c9] px-3.5 py-3 text-[13px]">
-          <span className="grid h-[22px] w-[22px] flex-none place-content-center rounded-full border-[1.5px] border-[#222325] bg-[#e1f073]">
-            <Check className="h-3 w-3 text-primary" strokeWidth={3} />
+        <div className={cn("flex items-center gap-2.5 rounded-xl px-3.5 py-3 text-[13px]", hasScoreDrop ? "bg-[#f6f6f6]" : "bg-[#f4f9c9]")}>
+          <span className={cn("grid h-[22px] w-[22px] flex-none place-content-center rounded-full", hasScoreDrop ? "text-[#73746d]" : "border-[1.5px] border-[#222325] bg-[#e1f073]")}>
+            {hasScoreDrop ? <AlertCircle className="h-4 w-4" /> : <Check className="h-3 w-3 text-primary" strokeWidth={3} />}
           </span>
-          <strong className="flex-1">Nothing left to add. You&apos;re good to move on.</strong>
+          <strong className="flex-1">{hasScoreDrop ? "No missing requirements. Review the score change above." : "Nothing left to add. You’re good to move on."}</strong>
         </div>
       )}
 
@@ -603,12 +789,36 @@ export const FixesTabs: FC<{
 
       {tab === "missing" && !busy && suggestions.length > 0 && (
         <div className="mt-1 flex flex-col gap-1.5">
-          {suggestions.map((row) => (
+          {capped.rows.map((row, index) => (
+            <Fragment key={row.id}>
+          {batchTerms.length > 1 && index === firstSelectableIndex && (
+            <div className="flex min-h-9 flex-wrap items-center gap-2 px-3 text-xs">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setTicked(allTicked ? new Set() : new Set(batchTerms))}
+                className="flex cursor-pointer items-center gap-2 font-bold text-[#5f6062] hover:text-primary disabled:cursor-default">
+                <TickBox on={allTicked} />
+                {allTicked ? "Clear" : "Select all"}
+              </button>
+              {tickedNow.length > 0 && (
+                <>
+                  <span className="flex-1 font-bold text-primary">{tickedNow.length} selected</span>
+                  <button type="button" disabled={disabled} onClick={() => answerTicked(true)} className={ROW_BUTTON}>
+                    Yes, add {tickedNow.length}
+                  </button>
+                  <button type="button" disabled={disabled} onClick={() => answerTicked(false)} className={ROW_BUTTON}>
+                    No to {tickedNow.length}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+            {row.batch ? <ConfirmationRow row={row} disabled={disabled} selected={ticked.has(row.batch)} onSelect={onAnswerAsks ? () => tick(row.batch!) : undefined} /> : (
             <div
-              key={row.id}
               onClick={row.onShow}
               className={cn(
-                "flex min-h-10 items-center gap-2.5 rounded-[10px] px-3 py-1.5",
+                "flex min-h-10 flex-wrap items-center gap-2.5 rounded-[10px] px-3 py-1.5",
                 row.note ? "mt-[10px] bg-[#222325] py-2.5 text-white" : "bg-[#f6f6f6]",
                 row.onShow && "cursor-pointer hover:bg-[#f0f0ea]",
               )}>
@@ -616,6 +826,20 @@ export const FixesTabs: FC<{
                 <span className="grid h-[18px] w-[18px] flex-none place-content-center rounded-full bg-[#e1f073]">
                   <Check className="h-2.5 w-2.5 text-primary" strokeWidth={3.4} />
                 </span>
+              ) : row.batch && onAnswerAsks ? (
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={ticked.has(row.batch)}
+                  aria-label={`Select: ${row.title}`}
+                  disabled={disabled}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (row.batch) tick(row.batch);
+                  }}
+                  className="flex-none cursor-pointer disabled:cursor-default">
+                  <TickBox on={ticked.has(row.batch)} />
+                </button>
               ) : (
                 <span className="h-1.5 w-1.5 flex-none rounded-full bg-[#d99a00]" />
               )}
@@ -624,6 +848,7 @@ export const FixesTabs: FC<{
                 {row.detail && <span className={row.note ? "text-[#d3d1c7]" : "text-[#5f6062]"}> {row.detail}</span>}
               </span>
               {row.onShow && <ShowInResume onClick={row.onShow} />}
+              {row.input && <RowInput input={row.input} disabled={disabled} />}
               {row.choices?.map((choice) => (
                 <button
                   key={choice.label}
@@ -655,6 +880,17 @@ export const FixesTabs: FC<{
                 </button>
               )}
             </div>
+            )}
+            {index === capped.toggleAfter && (
+              <button
+                type="button"
+                aria-expanded={asksOpen}
+                onClick={() => setAsksOpen((open) => !open)}
+                className="cursor-pointer self-start px-3 py-0.5 text-xs font-bold text-[#5f6062] underline decoration-black/25 underline-offset-2 hover:text-primary hover:decoration-[#222325]">
+                {asksOpen ? "Show less" : `Show ${capped.hidden} more`}
+              </button>
+            )}
+            </Fragment>
           ))}
         </div>
       )}
@@ -663,7 +899,7 @@ export const FixesTabs: FC<{
         <div className="flex flex-col gap-1.5">
           {working.length === 0 && <p className="text-[13px] text-[#5f6062]">Nothing yet.</p>}
           {working.map((row) => (
-            <div key={row.title} className="flex min-h-10 items-center gap-2.5 rounded-[10px] bg-[#f6f6f6] px-3">
+            <div key={row.title} className="flex min-h-10 flex-wrap items-center gap-2.5 rounded-[10px] bg-[#f6f6f6] px-3">
               <span className="grid h-[18px] w-[18px] flex-none place-content-center rounded-full bg-[#e1f073]">
                 <Check className="h-2.5 w-2.5 text-primary" strokeWidth={3.4} />
               </span>

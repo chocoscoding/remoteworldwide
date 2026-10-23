@@ -51,6 +51,7 @@ const {
   worthGapChip,
   fitGap,
   exampleAsks,
+  askedFor,
   bulletsWithoutResult,
   fixFirstId,
   matchMoves,
@@ -61,6 +62,7 @@ const {
   workingItems,
 } = await import("../app/lib/apply/fixes.ts");
 const { impactMisses, openingWord } = await import("../app/lib/apply/impact.ts");
+const { chipAsks } = await import("../app/lib/apply/chip-asks.ts");
 
 const content = (overrides = {}) => ({
   name: "Ada Obi",
@@ -83,6 +85,7 @@ const report = {
   scanId: "s1",
   resumeVersion: 2,
   score: 61,
+  scoringVersion: 24,
   metrics: [],
   gaps: [],
   verdicts: [],
@@ -110,6 +113,9 @@ describe("reading a session's state", () => {
         sendDraft: true,
         creatorDocId: null,
         creatorSeen: null,
+          impactAsks: [],
+          impactOwner: null,
+          impactDismissed: [],
         history: [],
         historyAt: 0,
         worked: [],
@@ -446,6 +452,63 @@ describe("the score card's fixes", () => {
     );
   });
 
+  it("knows a chip an open ask already names (fix plan 3c, 2026-10-22: Mandarin, Web3, PMM team hiring)", () => {
+    const asks = [{ term: "Mandarin Chinese" }, { term: "Web3 and DeFi" }, { term: "Hiring for the PMM team" }, { term: "Gaming industry" }];
+    // Either holds the other as whole words.
+    assert.equal(askedFor("Mandarin", asks), true);
+    assert.equal(askedFor("Web3", asks), true);
+    assert.equal(askedFor("Gaming industry experience", asks), true);
+    // Every word that carries the shorter's meaning is in the longer, folded and singular.
+    assert.equal(askedFor("PMM team hiring", asks), true);
+    assert.equal(askedFor("Cross‑functional PMM teams hiring", [{ term: "PMM team hiring" }]), true);
+    // Folding: case, hyphens and punctuation never decide it.
+    assert.equal(askedFor("web-3", [{ term: "Web 3" }]), true);
+    // A word inside another word is no match ("Go" is not "Google Ads", "AI" not "email").
+    assert.equal(askedFor("Go", [{ term: "Google Ads" }]), false);
+    assert.equal(askedFor("AI", [{ term: "Email marketing" }]), false);
+    assert.equal(askedFor("Python", asks), false);
+    assert.equal(askedFor("PMM", [{ term: "PMM team hiring" }]), true);
+    assert.equal(askedFor("Team leadership", [{ term: "PMM team hiring" }]), false);
+    assert.equal(askedFor("Mandarin", []), false);
+    assert.equal(askedFor("", asks), false);
+    // "+" and "#" are part of a name: C#, C++ and C are three languages (review, 2026-10-22).
+    assert.equal(askedFor("C#", [{ term: "C++" }]), false);
+    assert.equal(askedFor("C++", [{ term: "C" }]), false);
+    assert.equal(askedFor("C++", [{ term: "C++" }]), true);
+    assert.equal(askedFor("C# experience", [{ term: "C#" }]), true);
+    // A short example ask ("such as Go, Python") hides only the chip that is exactly it.
+    assert.equal(askedFor("Go-to-market leadership", [{ term: "Go" }]), false);
+    assert.equal(askedFor("R&D collaboration", [{ term: "R" }]), false);
+    assert.equal(askedFor("C-suite communication", [{ term: "C" }]), false);
+    assert.equal(askedFor("Go", [{ term: "Go" }]), true);
+    assert.equal(askedFor("R", [{ term: "r" }]), true);
+    // The page's own rows read the same.
+    const rows = exampleAsks(
+      { verdicts: [{ requirement: { id: "lang", text: "Speaks Mandarin", category: "skill", type: "required", proof: [] }, state: "missing", evidence: [], unnamed: ["Mandarin"] }] },
+      { skills: [] },
+      [],
+    );
+    assert.equal(askedFor("Mandarin language skills", rows), true);
+  });
+
+  it("keeps a chip away once its ask was answered No (review, 2026-10-22)", () => {
+    const all = [
+      { term: "Web3", no: true },
+      { term: "PMM team hiring", no: true },
+      { term: "Mandarin", no: false },
+    ];
+    const open = all.filter((ask) => !ask.no);
+    const asks = chipAsks(open, all, [{ term: "Java" }]);
+    assert.deepEqual(asks.map((ask) => ask.term), ["Mandarin", "Web3", "PMM team hiring", "Java"]);
+    // Declined: the chip stays hidden, so picking every chip never writes it in.
+    assert.equal(askedFor("Web3", asks), true);
+    assert.equal(askedFor("PMM team hiring", asks), true);
+    // Never asked: its chip shows.
+    assert.equal(askedFor("Python", asks), false);
+    // Open asks alone (before the fix) let the declined chip back.
+    assert.equal(askedFor("Web3", open), false);
+  });
+
   it("colours a score by the design's bands", () => {
     assert.equal(scoreHue(49), "low");
     assert.equal(scoreHue(50), "mid");
@@ -642,6 +705,25 @@ describe("AI changes keep what proves a requirement", () => {
     assert.deepEqual(result.kept, []);
   });
 
+  it("does not undo an exact compression approved by the factual reviewer", () => {
+    const oldLine = "Designed two-sided marketplace platforms with profiles serving both sides of the market.";
+    const newLine = "Designed two-sided marketplace platforms with profiles.";
+    const original = content({experience:[{id:'x1',role:'Designer',company:'Kite',dates:'',bullets:[oldLine]}]});
+    const after = {...original,experience:[{...original.experience[0],bullets:[newLine]}]};
+    const report = {verdicts:[verdict('Both sides of the market','satisfied',oldLine,'experience',['both','sides','market'])]};
+    assert.equal(keepProof(original,after,report,[newLine]).content.experience[0].bullets[0],newLine);
+    // Approval is for the exact output, not for arbitrary subsequent changes.
+    assert.equal(keepProof(original,after,report,['A different sentence']).content.experience[0].bullets[0],oldLine);
+  });
+
+  it("lets a summary prioritize another strength when its proof survives elsewhere", () => {
+    const original = content({ summary: "Designer with copywriting and research experience.", skills: ["Copywriting"] });
+    const after = { ...original, summary: "Designer creating marketplace comparison flows." };
+    const report = { verdicts: [verdict("Copywriting", "satisfied", original.summary, "summary", ["copywriting"])] };
+    assert.equal(keepProof(original, after, report).content.summary, after.summary);
+    assert.equal(keepProof(original, { ...after, skills: [], hiddenParts: ['exp:x1'] }, report).content.summary, original.summary);
+  });
+
   it("leaves missing requirements alone", () => {
     const after = content({ experience: [{ id: "x1", role: "CSM", company: "Kite", dates: "", bullets: ["Something new", "Ran research"] }] });
     const result = keepProof(before, after, { verdicts: [verdict("Copywriting", "missing", "Wrote copywriting for onboarding emails")] });
@@ -674,7 +756,7 @@ describe("a language level the posting asks for", () => {
 describe("what Impact language marks down", () => {
   const role = (bullets, extra = {}) => ({ id: "x1", role: "CSM", company: "Kite", dates: "2022 – 2024", bullets, ...extra });
 
-  it("names each bullet that opens weakly or has no number, as the scorer reads them", () => {
+  it("suggests evidence improvements without calling unfamiliar action verbs weak", () => {
     const misses = impactMisses(
       content({
         experience: [
@@ -689,9 +771,9 @@ describe("what Impact language marks down", () => {
         ],
       }),
     );
-    assert.deepEqual(misses.weakOpeners, ["Held a 4.8/5 average rating on onboarding calls.", "Acted as a trusted advisor to customers."]);
+    assert.deepEqual(misses.weakOpeners, []);
     assert.deepEqual(misses.noNumber, ["Acted as a trusted advisor to customers.", "Partner directly with leadership on retention strategy.", "Led onboarding in 2021."]);
-    assert.equal(misses.lines.length, 4);
+    assert.equal(misses.lines.length, 3);
     assert.equal(openingWord("Acted as a trusted advisor."), "Acted");
   });
 
@@ -699,7 +781,7 @@ describe("what Impact language marks down", () => {
     const misses = impactMisses(
       content({ experience: [role(["Acted as an advisor.", "Took tickets from 45 to 35."])], hiddenParts: ["exp:x1:0"] }),
     );
-    assert.deepEqual(misses.lines, ["Took tickets from 45 to 35."]);
+    assert.deepEqual(misses.lines, []);
   });
 });
 
@@ -713,9 +795,9 @@ describe("scores made by an older formula", () => {
     { id: "length-format", label: "Length & format", value: length },
   ];
   // Today's formula makes round(56 + 3 + 7 + 3) = 69 of these; the old one said 80, the keyword match.
-  const oldReport = { ...report, scanId: "old", score: 80, metrics: metricsOf(80, 20, 70, 60) };
+  const oldReport = { ...report, scoringVersion: 21, scanId: "old", score: 80, metrics: metricsOf(80, 20, 70, 60) };
   const newReport = { ...report, scanId: "new", score: 69, metrics: metricsOf(80, 20, 70, 60) };
-  const basisOf = (scored) => ({ metrics: scored.metrics, stuffingPenalty: 0 });
+  const basisOf = (scored) => ({ scoringVersion: scored.scoringVersion, metrics: scored.metrics, stuffingPenalty: 0 });
 
   it("reads a history step's score only when today's formula made it, never worked out again", () => {
     const { history } = readApplyState({

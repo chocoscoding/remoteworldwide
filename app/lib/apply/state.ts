@@ -9,7 +9,7 @@
 
 import { isCurrentScore } from "@/app/lib/ats/score";
 import type { CoverageState, ScanReport } from "@/app/lib/ats/types";
-import type { TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
+import type { TermAdvice, QuantifySuggestion } from "@/app/lib/dashboard/resume/ai-tools";
 import type { CoverTone } from "@/app/lib/cover/api";
 import { DEFAULT_LETTER_DESIGN, LETTERHEAD_OPTIONS, LETTER_FONT_OPTIONS, SPACING_OPTIONS, THEME_OPTIONS } from "@/app/lib/cover/presentation";
 import type { AtsMetric, LetterDesign, ResumeContent } from "@/app/lib/dashboard/types";
@@ -56,6 +56,9 @@ export interface ApplyProposal {
 }
 
 export interface ApplyResumeState {
+  impactAsks?: QuantifySuggestion[];
+  impactOwner?: string | null;
+  impactDismissed?: string[];
   /** The resume this application started from: picked, uploaded, or the master by default. */
   baseId: string | null;
   baseName: string | null;
@@ -104,6 +107,15 @@ export interface ApplyResumeState {
 }
 
 export interface FitAsk {
+  /** An editorial review replaced or resolved this unanswered label. */
+  superseded?: boolean;
+  /** The candidate confirmed this fact, independently of insertion success or undo. */
+  confirmed?: boolean;
+  /** Optional role and example, supplied by the candidate rather than inferred from the posting. */
+  detail?: string;
+  entryId?: string;
+  useSkills?: boolean;
+  useExperience?: boolean;
   term: string;
   ifTrue: string;
   /** Where a "Yes" puts it: a line of the experience, or Skills for a tool, language or certification. */
@@ -217,6 +229,7 @@ const readNumbers = (value: Record<string, unknown>): Record<string, number> =>
 function readBasis(value: unknown): ScoreBasis | null {
   if (!isRecord(value) || !Array.isArray(value.metrics)) return null;
   return {
+    scoringVersion: typeof value.scoringVersion === "number" ? value.scoringVersion : undefined,
     metrics: value.metrics.filter(isRecord) as unknown as AtsMetric[],
     stuffingPenalty: typeof value.stuffingPenalty === "number" ? value.stuffingPenalty : 0,
   };
@@ -243,8 +256,8 @@ function readWorked(value: unknown): WorkedTerm[] {
     .slice(-MAX_WORKED);
 }
 
-/** The most asks kept: a Tailor returns at most four, and it can run again after an undo. */
-const MAX_ASKS = 16;
+/** Keep active questions plus retired labels so older scans cannot resurrect them. */
+const MAX_ASKS = 80;
 
 function readAsks(value: unknown): FitAsk[] {
   if (!Array.isArray(value)) return [];
@@ -256,7 +269,13 @@ function readAsks(value: unknown): FitAsk[] {
       place: item.place === "skills" ? ("skills" as const) : ("experience" as const),
       fromStep: str(item.fromStep),
       no: item.no === true,
+      ...(item.superseded === true ? { superseded: true } : {}),
       addedIn: str(item.addedIn),
+      ...(item.confirmed === true ? { confirmed: true } : {}),
+      ...(typeof item.detail === "string" ? { detail: item.detail.slice(0, 500) } : {}),
+      ...(typeof item.entryId === "string" ? { entryId: item.entryId.slice(0, 120) } : {}),
+      ...(typeof item.useSkills === "boolean" ? { useSkills: item.useSkills } : {}),
+      ...(typeof item.useExperience === "boolean" ? { useExperience: item.useExperience } : {}),
       ...(Array.isArray(item.near)
         ? { near: item.near.filter((word): word is string => typeof word === "string" && word.trim() !== "").slice(0, 12).map((word) => word.slice(0, 120)) }
         : {}),
@@ -356,6 +375,9 @@ export function readApplyState(raw: unknown): ApplyState {
       ...readHistory(resume.history, resume.historyAt),
       worked: readWorked(resume.worked),
       asks: readAsks(resume.asks),
+      impactAsks: Array.isArray(resume.impactAsks) ? resume.impactAsks.filter((item): item is QuantifySuggestion => isRecord(item) && Number.isInteger(item.entryIndex) && Number.isInteger(item.bulletIndex) && typeof item.before === "string" && typeof item.after === "string" && typeof item.role === "string" && item.estimate === true).slice(0, 50) : [],
+      impactOwner: str(resume.impactOwner),
+      impactDismissed: Array.isArray(resume.impactDismissed) ? resume.impactDismissed.filter((item): item is string => typeof item === "string").slice(0, 100) : [],
       fitAt: str(resume.fitAt),
     },
     scan:
@@ -413,7 +435,7 @@ type ScanBaseline = Pick<NonNullable<ApplyState["scan"]>, "previousScore" | "pre
  * the formula, not the resume).
  */
 export function scanBaseline(last: ApplyState["scan"], resumeId: string, version: number): ScanBaseline {
-  if (!last || !isCurrentScore(last.report)) return { previousScore: null };
+  if (!last || last.resumeId !== resumeId || !isCurrentScore(last.report)) return { previousScore: null };
   if (last.resumeId === resumeId && last.version === version) {
     return {
       previousScore: last.previousScore,

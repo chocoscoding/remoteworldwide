@@ -26,6 +26,7 @@ import { highlightMarks, highlightTexts, resumeChanges, type HighlightMark, type
 import { cn } from "@/lib/utils";
 
 const HIGHLIGHT = "rww-resume-change";
+const HOVER = "rww-resume-change-hover";
 /** "Show in resume": the lines a card means, leaf green over the change marks, for `FLASH_MS`. */
 const FLASH = "rww-resume-flash";
 const FLASH_MS = 2_600;
@@ -38,6 +39,7 @@ export const highlightRegistry = (): HighlightRegistry | null =>
 
 /** Every paper's ranges, so two on screen (the inline preview and a popup) don't wipe each other's marks. */
 const rangesByPaper = new Map<symbol, Range[]>();
+const hoveredByPaper = new Map<symbol, Range[]>();
 
 function publish() {
   const registry = highlightRegistry();
@@ -45,6 +47,19 @@ function publish() {
   const all = [...rangesByPaper.values()].flat();
   if (all.length > 0) registry.set(HIGHLIGHT, new Highlight(...all));
   else registry.delete(HIGHLIGHT);
+  const hovered = [...hoveredByPaper.values()].flat();
+  if (hovered.length > 0) registry.set(HOVER, new Highlight(...hovered));
+  else registry.delete(HOVER);
+}
+
+/** Headings address their group; body text addresses only its own line or paragraph. */
+function hoverScope(target: EventTarget | null, paper: HTMLElement): Element | null {
+  if (!(target instanceof Element) || !paper.contains(target)) return null;
+  if (target.closest("[data-resume-keep-with-next]")) {
+    return target.closest("[data-resume-entry], [data-resume-section]");
+  }
+  return target.closest('[data-resume-bullet], [role="textbox"], p, li')
+    ?? target.closest("[data-resume-entry], [data-resume-section]");
 }
 
 /** A changed string counts only as whole words, never inside another ("Java" in "JavaScript", 2026-10-22). */
@@ -182,17 +197,37 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
   }, [box]);
 
   useEffect(() => {
-    if (!highlightRegistry()) return;
+    const root = paperRef.current;
+    if (!highlightRegistry() || !root) return;
     const key = Symbol("paper");
+    let scope: Element | null = null;
+    const setScope = (next: Element | null) => {
+      if (next === scope) return;
+      scope = next;
+      hoveredByPaper.set(key, (rangesByPaper.get(key) ?? []).filter((range) =>
+        next?.contains(range.startContainer) && next.contains(range.endContainer),
+      ));
+      publish();
+    };
+    const onOver = (event: PointerEvent) => setScope(hoverScope(event.target, root));
+    const onLeave = () => setScope(null);
+    root.addEventListener("pointerover", onOver);
+    root.addEventListener("pointerleave", onLeave);
     // Wait a frame: a paper that just mounted (a section opening, a dialog) isn't laid out yet.
     const frame = requestAnimationFrame(() => {
-      if (!paperRef.current) return;
-      rangesByPaper.set(key, changeRanges(paperRef.current, marks));
+      rangesByPaper.set(key, changeRanges(root, marks));
+      // A refresh can finish while the pointer is already over the paper.
+      const hovered = Array.from(root.querySelectorAll(":hover")).at(-1);
+      scope = null;
+      if (hovered) setScope(hoverScope(hovered, root));
       publish();
     });
     return () => {
       cancelAnimationFrame(frame);
+      root.removeEventListener("pointerover", onOver);
+      root.removeEventListener("pointerleave", onLeave);
       rangesByPaper.delete(key);
+      hoveredByPaper.delete(key);
       publish();
     };
   }, [marks, pages]);

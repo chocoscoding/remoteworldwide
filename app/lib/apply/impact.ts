@@ -1,5 +1,6 @@
+import { descriptiveAction, descriptiveContext, explicitWeakOpening, impactPortfolio } from "./impact-evidence";
 // What the ATS scorer's Impact language reads in a bullet (owner, 2026-10-19: "show me what impact
-// language looks at"): a strong opening verb (55% of a line's credit) and a number (45%). A copy of
+// language looks at"): an action (55%) and quantitative or concrete application evidence (45%). A copy of
 // the AI service's checks (scoringService.ts STRONG_VERBS, opensWithStrongVerb, carriesNumber, and
 // resumeWriter.ts IRREGULAR_PAST), so the apply step can light the exact lines that lose points as the
 // person edits, without a rescore. Its contract test (frontend-impact.test.ts) fails if they drift.
@@ -8,6 +9,7 @@ import type { ResumeContent } from "@/app/lib/dashboard/types";
 
 /** The openings the scorer counts as a claim, in the past tense. */
 export const STRONG_VERBS: ReadonlySet<string> = new Set([
+  "replaced", "ran", "aligned", "lifted", "shaped",
   "accelerated",
   "achieved",
   "acquired",
@@ -182,17 +184,24 @@ export const opensWithStrongVerb = (text: string): boolean => {
   return (irregular !== undefined && STRONG_VERBS.has(irregular)) || pastOf(present).some((form) => STRONG_VERBS.has(form));
 };
 
+/** Shared writing signals. Unknown vocabulary is not an explicit weakness. */
+export const hasImpactAction = (text: string): boolean => opensWithStrongVerb(text) || descriptiveAction(text);
+export const hasAppliedContext = (text: string): boolean => hasImpactAction(text) && descriptiveContext(text);
+export const hasImpactEvidence = (text: string): boolean => carriesNumber(text) || hasAppliedContext(text);
+export const measureImpact = (bullets: string[]) => impactPortfolio(bullets, text =>
+  (hasImpactAction(text) ? 0.55 : 0) + (hasImpactEvidence(text) ? 0.45 : 0));
+
 export interface ImpactMisses {
-  /** Bullets that open with a verb the scorer does not count, as written. */
+  /** Bullets with explicit weak openings; unfamiliar verbs are not automatically weak. */
   weakOpeners: string[];
-  /** Bullets with no number, as written. */
+  /** Bullets missing both quantitative evidence and concrete application context. */
   noNumber: string[];
-  /** Every bullet that loses Impact points, once each, in resume order. */
+  /** Optional improvement candidates, once each, in resume order. */
   lines: string[];
 }
 
 /**
- * The bullets that lose Impact language points, across the roles shown: never a role or a line
+ * Candidate improvements to the evidence portfolio, across the roles shown: never a role or a line
  * hidden for this job. Reads `content` as it is, so it follows the person's edits.
  */
 export function impactMisses(content: ResumeContent): ImpactMisses {
@@ -200,8 +209,8 @@ export function impactMisses(content: ResumeContent): ImpactMisses {
   const bullets = content.experience
     .filter((entry) => !entry.hidden && !hidden.has(`exp:${entry.id}`))
     .flatMap((entry) => entry.bullets.filter((bullet, index) => bullet.trim() && !hidden.has(`exp:${entry.id}:${index}`)));
-  const weakOpeners = bullets.filter((bullet) => !opensWithStrongVerb(bullet));
-  const noNumber = bullets.filter((bullet) => !carriesNumber(bullet));
+  const weakOpeners = bullets.filter((bullet) => explicitWeakOpening(bullet));
+  const noNumber = bullets.filter((bullet) => !hasImpactEvidence(bullet));
   return { weakOpeners, noNumber, lines: bullets.filter((bullet) => weakOpeners.includes(bullet) || noNumber.includes(bullet)) };
 }
 

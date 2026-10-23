@@ -214,10 +214,10 @@ const MAX_EXAMPLE_ASKS = 4;
 export function exampleAsks(
   report: Pick<ScanReport, "verdicts">,
   content: Pick<ResumeContent, "skills">,
-  asked: ReadonlyArray<Pick<FitAsk, "term" | "no">>,
+  asked: ReadonlyArray<Pick<FitAsk, "term" | "no" | "superseded">>,
 ): FitAsk[] {
   const listed = new Set(content.skills.map(fold));
-  const declined = new Set(asked.filter((ask) => ask.no).map((ask) => fold(ask.term)));
+  const declined = new Set(asked.filter((ask) => ask.no || ask.superseded).map((ask) => fold(ask.term)));
   const seen = new Set<string>();
   const out: FitAsk[] = [];
   const ordered = [...report.verdicts].sort((a, b) => Number(b.requirement.type === "required") - Number(a.requirement.type === "required"));
@@ -232,6 +232,39 @@ export function exampleAsks(
     }
   }
   return out.slice(0, MAX_EXAMPLE_ASKS);
+}
+
+/** As `fold`, keeping "+" and "#" as the AI's keyword guard does: "C++", "C#" and "C" are three names (review, 2026-10-22). */
+const foldName = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}+#]+/gu, " ")
+    .trim();
+const coreName = (label: string): string => foldName(label).replace(LABEL_FILLER, " ").replace(/\s+/g, " ").trim() || foldName(label);
+/** Up to this many characters, a name matches only a name that is exactly it. */
+const SHORT_NAME_CHARS = 2;
+
+/**
+ * Whether an open ask already names a gap chip's term (fix plan 3c, owner 2026-10-22: Mandarin, Web3
+ * and "PMM team hiring" were asked, then written in anyway by the chips). Such a chip is not shown:
+ * the person answers the ask, and a yes puts it in. Both are folded to letters and digits; they match
+ * when either holds the other as whole words ("Mandarin" in "Mandarin Chinese"), or when every word
+ * that carries the shorter's meaning is in the longer ("PMM team hiring", "Hiring for the PMM team").
+ */
+export function askedFor(label: string, asks: ReadonlyArray<{ term: string }>): boolean {
+  const mine = foldName(label);
+  if (!mine) return false;
+  const myWords = termWords(coreName(label));
+  return asks.some((ask) => {
+    const theirs = foldName(ask.term ?? "");
+    if (!theirs) return false;
+    // An ask this short ("Go", "R", "C") is only ever itself: "Go" asked is no "Go-to-market leadership".
+    if (theirs.length <= SHORT_NAME_CHARS) return mine === theirs || coreName(label) === theirs;
+    if (` ${mine} `.includes(` ${theirs} `) || ` ${theirs} `.includes(` ${mine} `)) return true;
+    const askWords = termWords(coreName(ask.term));
+    const [shorter, longer] = myWords.length <= askWords.length ? [myWords, new Set(askWords)] : [askWords, new Set(myWords)];
+    return shorter.length > 0 && shorter.every((word) => longer.has(word));
+  });
 }
 
 /** The keywords matched only in Skills, by name. */
@@ -296,7 +329,7 @@ export function unbackedSkills(content: ResumeContent, report: Pick<ScanReport, 
 }
 
 /** A line with a number in it: what Impact language counts as a result. */
-const hasNumber = (line: string): boolean => /\d/.test(line);
+const hasNumber = (line: string): boolean => /(?:\b\d+(?:[.,]\d+)?\+?\s*(?:%|percent|customers?|users?|weeks?|days?|teams?|hours?|months?|orders?|clients?)\b|\b\d+(?:[.,]\d+)?%|[$€£]\s*\d)/i.test(line);
 
 /**
  * The bullets with no number, across the roles shown: never a role or a line hidden for this job
@@ -402,11 +435,14 @@ export interface KeptProof {
  * evidence for a met or partly met requirement, which the change rewrote so it no longer carries at
  * least half of the words that showed it, goes back to how it was. Everything else in the change stays.
  */
-export function keepProof(before: ResumeContent, after: ResumeContent, report: Pick<ScanReport, "verdicts">): KeptProof {
+export function keepProof(before: ResumeContent, after: ResumeContent, report: Pick<ScanReport, "verdicts">, reviewedCompressions: readonly string[] = []): KeptProof {
   let content = after;
   const kept = new Set<string>();
   const lost = (was: string, now: string, verdict: RequirementVerdict): boolean => {
     if (sameLine(now, was)) return false;
+    // The backend separately approved preservation of meaning for these exact
+    // shortened lines. Lexical overlap cannot overrule that semantic decision.
+    if (reviewedCompressions.includes(now)) return false;
     const proving = provingWords(was, verdict);
     if (proving.length === 0) return false;
     const words = meaningWords(now);
@@ -422,7 +458,14 @@ export function keepProof(before: ResumeContent, after: ResumeContent, report: P
         evidence.section === "summary" &&
         before.summary &&
         sameLine(before.summary, evidence.text) &&
-        lost(before.summary, content.summary, verdict)
+        lost(before.summary, content.summary, verdict) &&
+        // A summary prioritizes the job; proof can remain in visible Experience or Skills.
+        // Do not force the overview to repeat facts the rest of the resume still carries.
+        lost(before.summary, [content.summary,
+          ...(!content.hiddenParts?.includes('skills') ? content.skills : []),
+          ...content.experience.filter(entry => !entry.hidden && !content.hiddenParts?.includes(`exp:${entry.id}`))
+            .flatMap(entry => entry.bullets.filter((_, index) => !content.hiddenParts?.includes(`exp:${entry.id}:${index}`))),
+        ].join(' '), verdict)
       ) {
         content = { ...content, summary: before.summary };
         kept.add(nameOf(verdict));

@@ -146,7 +146,7 @@ export interface AiToolsListProps {
   /** Quantify's per-bullet upgrades and which have been applied. */
   quantify: QuantifySuggestion[] | null;
   quantifyApplied: Set<number>;
-  onApplyQuantify: (index: number) => void;
+  onApplyQuantify: (index: number, confirmed?: string) => void;
   onApplyAllQuantify: () => void;
   /** Missing keywords the standing job check found, when there is one — said on the keywords row. */
   keywordsFound?: number | null;
@@ -384,6 +384,9 @@ const AiToolsList: FC<AiToolsListProps> = ({
   // Per-card navigation.
   const [take, setTake] = useState(0);
   const [qAt, setQAt] = useState(0);
+  const [ownWording, setOwnWording] = useState("");
+  const [wordingPreview, setWordingPreview] = useState(false);
+  useEffect(() => { setOwnWording(""); setWordingPreview(false); }, [qAt, quantify]);
   const [leftOut, setLeftOut] = useState<ReadonlySet<string>>(() => new Set());
   useEffect(() => setTake(0), [rewriteVariants]);
   useEffect(() => setQAt(0), [quantify]);
@@ -725,12 +728,14 @@ const AiToolsList: FC<AiToolsListProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    onApplyQuantify(at);
+                    if (q.estimate && !wordingPreview) { setWordingPreview(true); return; }
+                    onApplyQuantify(at, q.estimate ? ownWording.trim() : undefined);
                     nextOpen();
                   }}
+                  disabled={q.estimate && ownWording.trim().split(/\s+/).length < 5}
                   className={MAIN_ACTION}
                 >
-                  Apply
+                  {q.estimate ? wordingPreview ? "Confirm wording" : "Preview wording" : "Apply"}
                 </button>
               )}
               {!applied && at < quantify.length - 1 && (
@@ -743,13 +748,13 @@ const AiToolsList: FC<AiToolsListProps> = ({
                 </button>
               )}
               <span className="flex-1" />
-              {left > 1 && (
+              {quantify.filter((item, i) => !item.estimate && !quantifyApplied.has(i)).length > 1 && (
                 <button
                   type="button"
                   onClick={onApplyAllQuantify}
                   className={QUIET_ACTION}
                 >
-                  Apply all {left}
+                  Apply verified suggestions
                 </button>
               )}
               <button
@@ -806,6 +811,13 @@ const AiToolsList: FC<AiToolsListProps> = ({
             <span className="text-[12.5px] font-bold leading-relaxed text-primary">
               {q.after}
             </span>
+            {q.estimate && <div className="space-y-2 text-xs">
+              <p>This proposed number is unconfirmed. {q.question || "What changed after this work?"} You can skip and keep the original.</p>
+              <label className="block">Your complete sentence, including the actual value, unit and period
+                <textarea value={ownWording} onChange={event => { setOwnWording(event.target.value); setWordingPreview(false); }} className="mt-1 w-full rounded border p-2" />
+              </label>
+              {wordingPreview && <p role="status"><strong>Preview: </strong>{ownWording.trim()}</p>}
+            </div>}
           </div>
         </ResultCard>
       );

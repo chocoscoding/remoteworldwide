@@ -97,11 +97,17 @@ const stillThere = (figure: ResumeAiFigure, lines: readonly string[]): boolean =
   });
 };
 
-/** The AI's numbers still waiting to be checked: none once cleared, and only those still on the resume. */
+/** The AI's numbers still waiting to be checked: none once cleared, and only those still on the resume. The person's own are not the AI's. */
 export const pendingAiFigures = (content: ResumeContent): ResumeAiFigure[] => {
   if (content.aiFiguresCleared) return [];
   const lines = linesOf(content);
-  return (content.aiFigures ?? []).filter((figure) => stillThere(figure, lines));
+  return (content.aiFigures ?? []).filter((figure) => !figure.own && stillThere(figure, lines));
+};
+
+/** The person's own numbers still on the resume (`own`), kept through the AI list's changes. */
+const ownFigures = (content: ResumeContent): ResumeAiFigure[] => {
+  const lines = linesOf(content);
+  return (content.aiFigures ?? []).filter((figure) => figure.own && stillThere(figure, lines));
 };
 
 /**
@@ -113,8 +119,21 @@ export const withAiFigures = (content: ResumeContent, accepted: ReadonlyArray<{ 
   const fresh: ResumeAiFigure[] = accepted.flatMap(({ before, after }) => addedFigures(before, after).map((figure) => ({ figure, line: after, addedAt })));
   if (fresh.length === 0) return content;
   const kept = content.aiFiguresCleared ? [] : pendingAiFigures(content);
-  return { ...content, aiFigures: [...kept, ...fresh], aiFiguresCleared: false };
+  return { ...content, aiFigures: [...ownFigures(content), ...kept, ...fresh], aiFiguresCleared: false };
 };
 
-/** "I've checked them": the list is emptied and marked cleared. */
-export const clearAiFigures = (content: ResumeContent): ResumeContent => ({ ...content, aiFigures: [], aiFiguresCleared: true });
+/**
+ * The content with the person's own numbers for a line recorded (`own`), the ones they typed in
+ * answer to an Impact estimate (owner, 2026-10-22, fix plan 1d). The AI service remembers them for
+ * the line, so the next application uses the person's number, never the AI's guess again. Never
+ * shown in the AI numbers pill.
+ */
+export const withOwnFigures = (content: ResumeContent, before: string, after: string): ResumeContent => {
+  const addedAt = new Date().toISOString();
+  const fresh: ResumeAiFigure[] = addedFigures(before, after).map((figure) => ({ figure, line: after, addedAt, own: true }));
+  if (fresh.length === 0) return content;
+  return { ...content, aiFigures: [...(content.aiFigures ?? []), ...fresh] };
+};
+
+/** "I've checked them": the AI's list is emptied and marked cleared; the person's own numbers stay. */
+export const clearAiFigures = (content: ResumeContent): ResumeContent => ({ ...content, aiFigures: ownFigures(content), aiFiguresCleared: true });

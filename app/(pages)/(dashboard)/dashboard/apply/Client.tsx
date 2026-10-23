@@ -66,6 +66,13 @@ import {
   type ApplyState,
   type ApplyStepNum,
 } from "@/app/lib/apply/state";
+import {
+  attachApplyWizard,
+  rememberApplySnapshot,
+  restoreApplySnapshot,
+  savedApplySnapshot,
+  updateApplySnapshot,
+} from "@/app/lib/apply/snapshots";
 import { qk } from "@/app/lib/query/keys";
 import { keepDraftResume, updateDraftResume, visibleContent } from "@/app/lib/resume/api";
 import type { IngestedResumeDetail } from "@/app/lib/ats/types";
@@ -300,15 +307,35 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
   // for this RWW listing. `dataUpdatedAt` is the clock, as the tracker's is: none is read in render.
   const alreadyTracked = isTrackedSamePosting(duplicate.data, duplicate.dataUpdatedAt);
 
-  const [step, setStep] = useState<ApplyStepNum>(() => readStep(session.step));
+  // A remount (a dev hot reload, 2026-10-22: an Impact step went missing from history) starts from
+  // the latest state this page had, saved or not, rather than the session as it was first fetched.
+  const [restored] = useState(() => restoreApplySnapshot<ApplyState>(session.id, session.updatedAt));
+  const [step, setStep] = useState<ApplyStepNum>(() => readStep(restored ? restored.step : session.step));
   const [visited, setVisited] = useState<ReadonlySet<ApplyStepNum>>(
-    () => new Set<ApplyStepNum>([...readVisited(session.visited, readStep(session.step)), 2]),
+    () => new Set<ApplyStepNum>([...readVisited(restored ? restored.visited : session.visited, readStep(restored ? restored.step : session.step)), 2]),
   );
-  const [state, setState] = useState<ApplyState>(() => readApplyState(session.state));
+  const [state, setState] = useState<ApplyState>(() => (restored ? restored.state : readApplyState(session.state)));
   const [status, setStatus] = useState<ApplySessionStatus>(session.status);
   const [closedElsewhere, setClosedElsewhere] = useState(false);
   const editable = status === "active" && !state.tracked && !closedElsewhere;
-  const update = useCallback((recipe: (current: ApplyState) => ApplyState) => setState((prev) => recipe(prev)), []);
+  // A change that lands after this wizard unmounted (a tool run that outlived a remount) goes to the
+  // wizard mounted now, or into the snapshot the next one starts from (`updateApplySnapshot`).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    const detach = attachApplyWizard<ApplyState>(session.id, (recipe) => setState((prev) => recipe(prev)));
+    return () => {
+      mounted.current = false;
+      detach();
+    };
+  }, [session.id]);
+  const update = useCallback(
+    (recipe: (current: ApplyState) => ApplyState) => {
+      if (mounted.current) setState((prev) => recipe(prev));
+      else updateApplySnapshot<ApplyState>(session.id, recipe);
+    },
+    [session.id],
+  );
 
   // ---- Autosave ---------------------------------------------------------------------------------
   // The step, the visited steps and the whole state go up together, a moment after the last change,
@@ -320,6 +347,9 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
   useEffect(() => {
     latest.current = { step, visited, state };
   });
+  useEffect(() => {
+    rememberApplySnapshot(session.id, { step, visited, state }, session.updatedAt);
+  }, [session.id, session.updatedAt, step, visited, state]);
   const dirty = useRef(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -331,11 +361,12 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
         const now = latest.current;
         if (!keepalive) setSaveStatus("saving");
         try {
-          await saveApplySession(
+          const saved = await saveApplySession(
             session.id,
             { step: now.step, visited: [...now.visited], state: now.state as unknown as Record<string, unknown> },
             { keepalive },
           );
+          savedApplySnapshot(session.id, now, saved?.updatedAt);
           if (!keepalive) setSaveStatus("saved");
         } catch (error) {
           // Finished or set aside elsewhere (another tab, "start a new one"): nothing more is saved here.
@@ -354,7 +385,8 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
     [session.id],
   );
 
-  const seeded = useRef(false);
+  // A restored state that never reached the server is saved on the first run, not skipped as seeded.
+  const seeded = useRef(restored !== null && !restored.saved);
   useEffect(() => {
     // What the session was opened with is what the server already holds.
     if (!seeded.current) {
@@ -453,7 +485,10 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
 
     if (state.resume.sendDraft && state.resume.draftId) {
       const draftId = state.resume.draftId;
-      const name = state.resume.draftName ?? `Resume for ${job.company}`;
+      const legacySuffix = ` for ${job.company}`;
+      const name = state.resume.draftName?.endsWith(legacySuffix)
+        ? `${state.resume.draftName.slice(0, -legacySuffix.length)}_${job.company}`
+        : state.resume.draftName ?? `Resume_${job.company}`;
       // What was hidden for this application (the resume step's eyes) is not part of the version
       // that went out: kept without it. Its text is unchanged, so this costs no new version.
       const draftContent = queryClient.getQueryData<IngestedResumeDetail>(qk.ats.resume(draftId))?.content ?? null;
@@ -585,9 +620,9 @@ const ApplyWizard: FC<{ session: ApplySessionItem; onLeave: () => void }> = ({ s
           on the steps that edit a draft, a second line for that draft: Saved, undo, redo, history. */}
       <header className="sticky top-0 z-10 border-b border-black/10 border-t-4 border-t-[#e1f073] bg-white">
         <div className="flex h-16 items-center gap-4 px-8">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <CompanyLogo company={job.company} logo={savedJob.data?.companyLogo ?? null} />
-            <h1 className="min-w-0 truncate text-[17px] font-extrabold text-primary">
+            <h1 className="min-w-0 truncate text-sm font-semibold text-primary">
               {job.role} <span className="font-medium text-black/45">at</span> {job.company}
             </h1>
             <JobMenu onChangeJob={onLeave} />
@@ -724,7 +759,7 @@ const CompanyLogo: FC<{ company: string; logo: string | null }> = ({ company, lo
         src={src}
         alt=""
         onError={() => setBroken(true)}
-        className="h-8 w-8 flex-none rounded-full border border-black/10 bg-white object-contain p-0.5"
+        className="h-6 w-6 flex-none rounded-full border border-black/10 bg-white object-contain p-0.5"
       />
     );
   }
@@ -736,7 +771,7 @@ const CompanyLogo: FC<{ company: string; logo: string | null }> = ({ company, lo
       .map((word) => word[0]?.toUpperCase() ?? "")
       .join("") || "?";
   return (
-    <span aria-hidden className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[#222325] text-[11px] font-extrabold text-white">
+    <span aria-hidden className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#222325] text-[9px] font-bold text-white">
       {initials}
     </span>
   );
