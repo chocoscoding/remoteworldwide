@@ -117,13 +117,11 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     q: "How do I get started?",
     a: (
       <>
-        We&apos;re letting people in from the{" "}
-        <Link
-          href="/waitlist"
-          className="font-bold underline decoration-secondary2 decoration-2 underline-offset-2 hover:decoration-primary">
-          waitlist
-        </Link>{" "}
-        in batches. Join, and when your spot opens you&apos;ll pick a plan and we&apos;ll walk you through the rest.
+        <Link href="/signup" className="font-bold underline decoration-secondary2 decoration-2 underline-offset-2 hover:decoration-primary">
+          Create a free account
+        </Link>
+        , and you start on Free straight away. Choose a plan whenever you&apos;re ready: you pay by card on Stripe&apos;s secure
+        checkout, and your credits land as soon as it goes through.
       </>
     ),
   },
@@ -368,15 +366,15 @@ export default async function PricingPage() {
             />
             <div className="relative">
               <h2 className="text-balance text-3xl font-bold tracking-tight md:text-5xl">
-                Not ready to pick? <span className="text-secondary">Save your spot.</span>
+                Not ready to pick? <span className="text-secondary">Start free.</span>
               </h2>
               <p className="mx-auto mt-4 max-w-[520px] text-white/75">
-                Joining the waitlist is free. We&apos;ll email you when your spot opens. Then choose a plan, or don&apos;t.
+                30 credits a month, no card needed. Upgrade when your search picks up, or don&apos;t.
               </p>
               <Link
-                href="/waitlist"
+                href="/signup"
                 className="group mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-secondary px-7 text-sm font-bold text-primary transition-colors duration-150 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
-                Join the waitlist
+                Create a free account
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
               </Link>
             </div>

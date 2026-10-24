@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -36,11 +36,18 @@ const RETURN_REFETCH_MS = [1500, 4000, 9000];
 
 /**
  * @param initialBilling The billing picked on /pricing, when the visitor came from there (`?billing=year`).
+ * @param pickedPlan The plan picked on /pricing (`?plan=`), whose checkout opens on arrival.
  * @param returned Back from Stripe: Checkout paid ("success"), abandoned ("canceled"), or the portal ("portal").
  * @param sessionId The Checkout session Stripe sent back with "success", which the backend confirms.
  */
-const BillingClient: FC<{ initialBilling?: BillingInterval; returned?: "success" | "canceled" | "portal"; sessionId?: string }> = ({
+const BillingClient: FC<{
+  initialBilling?: BillingInterval;
+  pickedPlan?: string;
+  returned?: "success" | "canceled" | "portal";
+  sessionId?: string;
+}> = ({
   initialBilling,
+  pickedPlan,
   returned,
   sessionId,
 }) => {
@@ -106,6 +113,26 @@ const BillingClient: FC<{ initialBilling?: BillingInterval; returned?: "success"
     pro && pro.monthlyCredits > 0 && plans.findIndex((p) => p.key === RECOMMENDED_PLAN) > currentIndex
       ? `On ${pro.name} a credit works out at ${perCredit(pro.priceCents, pro.monthlyCredits, pro.currency)}.`
       : null;
+
+  // Arriving from a plan button on /pricing: open Stripe's checkout for that plan, as the button
+  // promised. Only for someone not yet paying by card, whose choice goes to Stripe's page and charges
+  // nothing until they pay there. A card subscriber's "Upgrade" charges at once, so that never fires
+  // on page load: they get the plans in view and press it themselves, as they do for anything this
+  // screen would not offer (a lower plan, or payments not on).
+  const pickHandled = useRef(false);
+  useEffect(() => {
+    if (!pickedPlan || returned || pickHandled.current) return;
+    pickHandled.current = true;
+    // Dropped first, so Back from Stripe's page lands here without opening it again.
+    router.replace("/dashboard/settings/billing", { scroll: false });
+    const index = plans.findIndex((p) => p.key === pickedPlan);
+    const picked = plans[index];
+    const checkout = payments && !manageBilling && picked !== undefined && picked.priceCents > 0 && (onFree || index > currentIndex);
+    if (checkout) buyPlan(picked.key, billing);
+    else document.getElementById("plans")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Once per visit, with what the page opened on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

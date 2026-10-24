@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import AuthNotice from "@/app/components/auth/AuthNotice";
 import { brutalistLink } from "@/app/components/auth/authStyles";
 import { ONBOARDING_PATH } from "@/app/lib/next-url";
+import { takeCheckout } from "@/app/lib/pricing/pendingCheckout";
 
 type Phase = "confirming" | "waiting" | "failed";
 
@@ -66,8 +67,9 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
       // The session still says unverified until its token refreshes, and the backend re-reads that
       // flag while it is false — so a full navigation is what lets the next page open. That page is
       // setup (a resume and a profile), where a confirmed new account goes first; anyone already
-      // done there is told so and offered Continue.
-      window.location.href = ONBOARDING_PATH;
+      // done there is told so and offered Continue. Someone who signed up from a plan on /pricing
+      // goes to that plan's checkout instead.
+      window.location.href = takeCheckout() ?? ONBOARDING_PATH;
     })();
   }, [token]);
 
@@ -105,7 +107,7 @@ export default function VerifyEmailClient({ token, email }: { token?: string; em
       }
       if (payload?.data?.sent === false) {
         // Already verified, on a tab left open since before it was: on to setup, as a fresh confirmation goes.
-        window.location.href = ONBOARDING_PATH;
+        window.location.href = takeCheckout() ?? ONBOARDING_PATH;
         return;
       }
 
