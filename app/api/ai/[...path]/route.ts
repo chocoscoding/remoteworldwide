@@ -26,6 +26,10 @@ const AI_TOKEN = process.env.AI_SERVICE_TOKEN ?? "";
 
 const TIMEOUT_MS = 60_000;
 
+// Vercel stops a function at its plan default (15 s) unless told otherwise, which answered a
+// Tailor run (15-21 s) with a 504 while the AI service was still writing it. Matches TIMEOUT_MS.
+export const maxDuration = 60;
+
 /** Streamed responses pass through untouched; JSON is buffered. */
 const STREAMED = new Set(["text/event-stream"]);
 
