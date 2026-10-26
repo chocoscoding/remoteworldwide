@@ -41,10 +41,10 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
       <div className="p-6 md:p-8">
         <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary/65">
           <Calculator className="h-4 w-4" aria-hidden />
-          Credit estimator
+          Application planner
         </p>
         <h3 className="mt-2 text-2xl font-bold tracking-tight text-primary md:text-3xl">What would your month take?</h3>
-        <p className="mt-1.5 text-sm text-primary/70">Drag to match how hard you&apos;re searching.</p>
+        <p className="mt-1.5 text-sm text-primary/70">Plan applications first. Each assumes one resume build (3 credits) and one ATS scan (1). Add optional letters and interviews below. Autofill, saved answers, drafts and tracking are free; revisions and new AI answers use extra credits.</p>
 
         <div className="mt-7 flex flex-col gap-6">
           {ESTIMATOR_ITEMS.map((item) => {
@@ -83,10 +83,10 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
 
       <div className="relative flex flex-col justify-between gap-8 bg-primary p-6 text-white md:p-8" aria-live="polite">
         <div className="relative">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">You&apos;d use about</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">Your monthly application plan</p>
           <p className="mt-1 flex items-baseline gap-2">
-            <span className="text-6xl font-bold tracking-tight text-secondary tabular-nums">{total}</span>
-            <span className="text-base font-semibold text-white/70">credits a month</span>
+            <span className="text-6xl font-bold tracking-tight text-secondary tabular-nums">{counts.applications}</span>
+            <span className="text-base font-semibold text-white/70">tailored applications</span>
           </p>
         </div>
 

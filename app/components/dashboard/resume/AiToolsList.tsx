@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import { cn } from "@/lib/utils";
-import { SUGGESTION_CREDITS, type SuggestionTool } from "@/app/lib/resume/ai";
+import { SUGGESTION_CREDITS, costsCredit, type SuggestionTool } from "@/app/lib/resume/ai";
 import type {
   QuantifySuggestion,
   RewriteVariant,
@@ -447,12 +447,13 @@ const AiToolsList: FC<AiToolsListProps> = ({
       case "rewrite":
         return { text: "3 takes", tone: "muted" };
       case "quantify":
+        if (quantify) return { text: `${quantify.length} suggested improvement${quantify.length === 1 ? "" : "s"} to review`, tone: "muted" };
         return linesWithoutNumber > 0
           ? {
-              text: `${linesWithoutNumber} line${linesWithoutNumber === 1 ? " lacks" : "s lack"} a number`,
+              text: `${linesWithoutNumber} line${linesWithoutNumber === 1 ? " has" : "s have"} no digits · optional review`,
               tone: "bad",
             }
-          : { text: "Every line has one ✓", tone: "good" };
+          : { text: "Review measurable outcomes", tone: "muted" };
       case "shorten":
         return pageCount > 1
           ? { text: `${pageCount} pages`, tone: "bad" }
@@ -481,7 +482,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
     <button
       type="button"
       aria-label={label}
-      title={`${label} · ${SUGGESTION_CREDITS} credit`}
+      title={`${label} · ${costsCredit(id) ? `${SUGGESTION_CREDITS} credit` : "Included"}`}
       onClick={() => onRun(id)}
       disabled={busy}
       className={ICON_ACTION}
@@ -1145,7 +1146,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
           AI tools
         </h2>
         <span className="text-xs text-[#8a8b85]">
-          {SUGGESTION_CREDITS} credit a run
+          Editing included · tailoring {SUGGESTION_CREDITS} credit
         </span>
       </div>
       <FreeUsesNote

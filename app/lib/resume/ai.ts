@@ -50,13 +50,8 @@ export const MAX_ASK_INSTRUCTION_CHARS = 500;
 /** What one generative run costs, for the copy that warns before spending it. */
 export const SUGGESTION_CREDITS = 1;
 
-/**
- * Tools that never cost a credit. Empty now: `shorten` and `tone` used to be
- * fixed rules (keep two bullets per role; a typo table) and were free, and are
- * real rewrites now, priced like the other four. The service still answers some
- * runs for free — nothing to add, nothing to cut — and says so in the result.
- */
-export const FREE_TOOLS: ReadonlySet<SuggestionTool> = new Set<SuggestionTool>();
+/** Editing is included within the plan's resume-help allowance; job tailoring uses credits. */
+export const FREE_TOOLS: ReadonlySet<SuggestionTool> = new Set<SuggestionTool>(["tone", "rewrite", "quantify", "shorten"]);
 
 /** True when running this tool will spend `SUGGESTION_CREDITS`. */
 export const costsCredit = (tool: SuggestionTool): boolean => !FREE_TOOLS.has(tool);

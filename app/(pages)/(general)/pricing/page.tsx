@@ -75,7 +75,7 @@ const PLAN_GRID: Record<number, string> = {
 const FAQ: { q: string; a: React.ReactNode }[] = [
   {
     q: "What do I get on Free?",
-    a: "30 credits every month, topped back up to 30 at the start of each month, for ATS scans, your cover letter, questions about a job and autofill. You also get the resume builder for one resume, one cover letter, application tracking and drafts, and streaks. AI help inside the resume builder, the career coach, the daily plan, pods and recommendations to companies come with Basic, and interview prep with Pro.",
+    a: "30 credits every month, topped back up to 30 at the start of each month, for ATS scans, your cover letter, questions about a job and drafting new AI answers. Filling your profile and approved saved answers is free. You also get the resume builder for one resume, one cover letter, application tracking and drafts, and streaks. Free includes limited monthly AI resume help, coaching, planning, recommendations and interview practice. Basic expands resume help, coaching and planning; Pro expands interview practice. Grammar, rewrite, quantify and shorten use no credits within your plan allowance.",
   },
   {
     q: "Do unused credits roll over?",
@@ -91,11 +91,11 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "What happens if I run out of credits?",
-    a: "Top up with a credit pack, or wait for your allowance to refill. The free parts keep working either way: the job board, importing jobs, saved answers and autofill, and on a paid plan your first 15 coach replies each day.",
+    a: "Top up with a credit pack, or wait for your allowance to refill. The free parts keep working either way: the job board, importing jobs, drafts, tracking, and autofill from your profile and approved saved answers. Generating new AI answers uses credits; and on a paid plan your first 15 coach replies each day.",
   },
   {
     q: "How are voice mock interviews billed?",
-    a: "Interview prep is on Pro and Ultra. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
+    a: "Free and Basic include one session a month; Pro and Ultra support more practice. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
   },
   {
     q: "Can I earn credits instead of buying them?",
@@ -140,7 +140,7 @@ const HIDDEN_FEATURE = /referral/i;
  */
 function PlanCard({ plan }: { plan: PricingPlan }) {
   const featured = plan.key === RECOMMENDED_PLAN;
-  const features = plan.features.filter((feature) => !HIDDEN_FEATURE.test(feature));
+  const features = ["Free autofill, saved answers, drafts and tracker", ...(plan.key === "ultra" ? [`${plan.monthlyCredits} credits for a higher-volume search`, "More tailored applications and interview practice each month"] : []), ...plan.features.filter((feature) => !HIDDEN_FEATURE.test(feature) && !(plan.key === "ultra" && /credits|early access/i.test(feature)))];
   const Icon = PLAN_ICONS[plan.key] ?? Sparkle;
   return (
     <div className={cn("flex flex-col rounded-[20px] p-6 text-primary", featured ? "bg-secondary" : "border border-primary/10 bg-white")}>
@@ -206,7 +206,7 @@ export default async function PricingPage() {
             </span>
           </h1>
           <p className="mx-auto mt-5 max-w-[520px] text-balance text-base text-primary/70 md:text-lg">
-            Start free with 30 credits a month. Upgrade when your search picks up.
+            Autofill your details, reuse approved answers, resume application drafts and track every job for free. Upgrade for tailored applications and interview practice.
           </p>
           <BillingToggle saving={yearlySavingLabel(plans)} className="mt-8" />
           <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-primary/70">

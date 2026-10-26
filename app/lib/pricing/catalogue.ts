@@ -143,11 +143,11 @@ export const CREDIT_COSTS: CreditCost[] = [
   // No typed practice interview: the website only starts voice sessions (PrepLive), so it isn't sold here.
   { action: "AI coach reply", detail: "On Basic and up, the first 15 replies every day are free. Free gets 5 replies a month.", credits: 0, label: "15 free / day" },
   { action: "ATS scan", detail: "Score your resume against a posting, keyword by keyword.", credits: 1 },
-  { action: "Resume suggestion", detail: "Add missing keywords, quantify bullets, or shorten to a page.", credits: 1 },
+  { action: "Resume suggestion", detail: "Tailor to a posting or add missing keywords. Grammar, rewrite, quantify and shorten use no credits within your plan allowance.", credits: 1 },
   { action: "Ask about a job", detail: "An answer grounded in the posting and your profile.", credits: 1 },
   { action: "Likely interview questions", detail: "A tailored question set for the role you're prepping.", credits: 1 },
   // Referral search (1 credit) is hidden from the public pages for now.
-  { action: "Autofill an answer", detail: "Draft an application answer from your resume, in the extension.", credits: 1 },
+  { action: "Draft new AI answers", detail: "Draft up to eight new answers per batch. Profile and approved saved-answer autofill are free.", credits: 1 },
   { action: "Cover letter revision", detail: "Rework a letter you've drafted, to your own note.", credits: 1 },
   { action: "Cover letter", detail: "A first draft from the posting and your resume.", credits: 2 },
   { action: "Resume build", detail: "A full resume rebuilt around a target role.", credits: 3 },
@@ -180,7 +180,7 @@ export interface EstimatorItem {
 
 /** What the estimator on /pricing multiplies by. Kept next to CREDIT_COSTS so the two can't disagree. */
 export const ESTIMATOR_ITEMS: EstimatorItem[] = [
-  { key: "scans", label: "ATS scans", unit: "scan", credits: 1, max: 80, initial: 20 },
+  { key: "applications", label: "Applications with a tailored resume", unit: "application", credits: 4, max: 80, initial: 10, limits: { free: 1 } },
   { key: "letters", label: "Cover letters", unit: "letter", credits: 2, max: 40, initial: 10, limits: { free: 1 } },
   { key: "interviews", label: "Voice mock interviews", unit: "interview", credits: 5, max: 30, initial: 6, limits: { free: 1, basic: 1 } },
 ];

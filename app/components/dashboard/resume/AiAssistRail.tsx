@@ -52,6 +52,7 @@ import { scoreColor, scoreTrackColor } from "@/app/lib/apply/score";
 import {
   MAX_ASK_INSTRUCTION_CHARS,
   SUGGESTION_CREDITS,
+  costsCredit,
   type SuggestionTool,
 } from "@/app/lib/resume/ai";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
@@ -730,7 +731,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
                             </button>
                             {tool !== null && (
                               <span className="ml-auto text-[11px] font-semibold text-[#8a8b85]">
-                                {SUGGESTION_CREDITS} credit
+                                {costsCredit(tool) ? `${SUGGESTION_CREDITS} credit` : "Included"}
                               </span>
                             )}
                           </div>
