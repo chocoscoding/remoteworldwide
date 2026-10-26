@@ -1,4 +1,5 @@
 "use client";
+import { overlappingRoles } from "@/app/lib/resume/date-overlaps";
 
 // The screen's actual body — header, 3-column layout, and every tab. Lives
 // INSIDE the per-document `ResumeDesignProvider` (see Client.tsx), so it's
@@ -1560,6 +1561,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       </header>
 
       <main className="px-6 py-7 pb-14 max-w-[2200px] mx-auto">
+        {overlappingRoles(content.experience.filter(entry => !entry.hidden)).map((notice) => <p key={notice} role="status" className="mb-2 rounded-lg bg-[#fff4df] p-3 text-xs text-primary">Date review: {notice}</p>)}
         {banner && <div className="mb-4">{banner}</div>}
         <div className={cn("grid gap-4 items-start", gridCols(atsPlace, sidebarCollapsed, docTab))}>
           {/* LEFT SIDEBAR — Overview has none; its old "N pages · N roles ·
