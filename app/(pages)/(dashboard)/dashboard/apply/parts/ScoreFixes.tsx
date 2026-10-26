@@ -6,6 +6,7 @@
 // next. Everything here is drawn from props; ResumeStep decides what the buttons do.
 
 import { Fragment, useLayoutEffect, useRef, useState, type FC, type ReactNode } from "react";
+import { experienceDraft, suggestedExperienceRole, type DraftRole } from "@/app/lib/apply/experience-draft";
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, MoreHorizontal, Plus, RotateCw, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,7 @@ import { METRIC_GROUPS, fixFirstId, scoreColorOf, type WorkingItem } from "@/app
 import type { ScoreDrop } from "@/app/lib/apply/score-changes";
 import { capAsks } from "@/app/lib/apply/ask-cap";
 import type { ScanReport } from "@/app/lib/ats/types";
-import { displayedScore } from "@/app/lib/ats/score";
+import { displayedScore, HEADLINE_SHARES } from "@/app/lib/ats/score";
 import type { ResumePlace } from "@/app/lib/resume/ai";
 
 // ---- The score ------------------------------------------------------------------------------
@@ -136,8 +137,11 @@ const ScoreSide: FC<{
         {state.kind === "ready" && delta === 0 && (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#6c7a1e]">
             <span className="h-[7px] w-[7px] rounded-full bg-[#6c7a1e]" />
-            Up to date
+            {shown !== null && shown < 60 ? "Needs improvement" : "Latest score"}
           </span>
+        )}
+        {state.kind === "ready" && shown !== null && shown < 60 && (
+          <span className="text-xs text-[#b23c26]">Review the missing requirements below before applying. Add only experience you can support.</span>
         )}
         {state.kind === "ready" && delta > 0 && (
           <span className="flex items-center gap-1.5 text-xs font-extrabold text-[#6c7a1e]">
@@ -217,6 +221,8 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
     (report?.metrics ?? []).filter((metric) => !(partial && metric.id === "keyword-match")).map((metric) => [metric.id, metric]),
   );
   const first = report && !partial ? fixFirstId(report) : null;
+  const keyword = byId.get("keyword-match");
+  const weighted = keyword?.checked !== false && typeof keyword?.value === "number";
   return (
     <>
       {METRIC_GROUPS.map((group) => (
@@ -241,7 +247,7 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
             return (
               <div key={id} className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="flex-1 text-[13px] font-bold text-primary">{label}</span>
+                  <span className="flex-1 text-[13px] font-bold text-primary">{label}<span className="ml-1 text-[10px] font-normal text-black/50">{weighted ? `${HEADLINE_SHARES[id as keyof typeof HEADLINE_SHARES]}% of total` : id === "keyword-match" ? "not included" : "⅓ of general score"}</span></span>
                   {first === id && (
                     <span className="rounded-full bg-[#fbe9e5] px-[7px] text-[11px] font-extrabold text-[#b23c26]">Fix first</span>
                   )}
@@ -527,7 +533,7 @@ export interface Suggestion {
   input?: { placeholder: string; label: string; mode?: "text" | "decimal"; initialValue?: string; onSubmit: (value: string) => void };
   /** A Yes/No ask that can be ticked with others and answered together: its term (owner, 2026-10-22). */
   batch?: string;
-  placement?: { initialDetail?: string; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: Array<{ id: string; label: string }>; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
+  placement?: { initialDetail?: string; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: DraftRole[]; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
 }
 
 /** A small square tick box, the light-brutalism way: hairline when off, lime with a check when on. */
@@ -546,8 +552,11 @@ const TickBox: FC<{ on: boolean }> = ({ on }) => (
 const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolean; onSelect?: () => void }> = ({ row, disabled, selected, onSelect }) => {
   const [skills, setSkills] = useState(row.placement?.useSkills ?? !row.placement?.skillsAdded);
   const [experience, setExperience] = useState(row.placement?.useExperience ?? false);
-  const [entryId, setEntryId] = useState(row.placement?.entryId ?? "");
-  const [detail, setDetail] = useState(row.placement?.initialDetail ?? "");
+  const suggestedRole = suggestedExperienceRole(row.title, row.placement?.roles ?? []);
+  const initialRole = row.placement?.roles.find(role => role.id === row.placement?.entryId) ?? suggestedRole;
+  const [entryId, setEntryId] = useState(initialRole?.id ?? "");
+  const [detail, setDetail] = useState(row.placement?.initialDetail || (initialRole ? experienceDraft(row.title, initialRole) : ""));
+  const [editedDetail, setEditedDetail] = useState(Boolean(row.placement?.initialDetail));
   const detailRef = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const field = detailRef.current;
@@ -593,7 +602,11 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
       </div>
       {experience && <div className="mt-2 border-t border-black/8 pt-2 pb-1 pr-1">
         <label className="mb-2 flex items-center gap-2 text-xs text-[#5f6062]">Role
-          <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => setEntryId(event.target.value)} disabled={disabled} className="min-w-0 max-w-full rounded-md border border-black/15 bg-white px-2 py-1 text-xs text-primary">
+          <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => {
+            setEntryId(event.target.value);
+            const role = row.placement?.roles.find(item => item.id === event.target.value);
+            if (!editedDetail) setDetail(role ? experienceDraft(row.title, role) : "");
+          }} disabled={disabled} className="min-w-0 max-w-full rounded-md border border-black/15 bg-white px-2 py-1 text-xs text-primary">
             <option value="">Choose a role</option>
             {row.placement?.roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}
           </select>
@@ -601,9 +614,9 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
         <label className="block text-xs font-semibold text-primary">
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span>How did you use {row.title}?</span>
-            <span className="text-[11px] font-normal text-[#73746d]">Describe your work in the selected role. You can edit the result.</span>
+            <span className="text-[11px] font-normal text-[#73746d]">Suggested draft. Confirm the role and wording; replace brackets only with facts you can support.</span>
           </span>
-          <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => setDetail(event.target.value)} disabled={disabled} rows={1} maxLength={500}
+          <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => { setDetail(event.target.value); setEditedDetail(true); }} disabled={disabled} rows={1} maxLength={500}
             placeholder={`For example: At Acme, I used ${row.title} to…`}
             className="mt-1.5 block w-full resize-none overflow-y-auto rounded-lg border border-black/20 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-primary outline-none focus:border-[#222325] focus:ring-1 focus:ring-[#222325] disabled:opacity-50" />
         </label>

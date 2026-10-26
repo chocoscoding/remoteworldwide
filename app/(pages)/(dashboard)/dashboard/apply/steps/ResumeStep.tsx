@@ -1513,7 +1513,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         useSkills: item.useSkills,
         useExperience: item.useExperience,
         skillsAdded: content?.skills.some(skill => skill.trim().toLowerCase() === item.term.trim().toLowerCase()),
-        roles: (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({ id: entry.id, label: [entry.role, entry.company, entry.dates].filter(Boolean).join(" · ") })),
+        roles: (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({ id: entry.id, role: entry.role, company: entry.company, context: entry.bullets.join(" "), label: [entry.role, entry.company, entry.dates].filter(Boolean).join(" · ") })),
         onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => applyConfirmed([
           ...(skills ? [{ ...item, place: "skills" as const, useSkills: skills, useExperience: experience, entryId, detail: detail.slice(0, 500) }] : []),
           ...(experience ? [{ ...item, place: "experience" as const, useSkills: skills, useExperience: experience, entryId, detail: detail.slice(0, 500) }] : []),
@@ -1813,6 +1813,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
         />
         {/* A job outside the resume's field: one line on what carries over, never a stop (owner, 2026-10-21). */}
+        {report?.titleFit?.kind === "unrelated" && (
+          <p role="status" className="rounded-lg bg-[#fff4df] p-3 text-sm text-primary">Possible career change: your resume describes {report.titleFit.resumeTitle}, while this job is {report.titleFit.jobTitle}. Check the core requirements and explain transferable experience. Tailoring cannot replace missing experience.</p>
+        )}
         {report?.stretch && (
           <p className="text-[13px] leading-snug text-[#5f6062]">
             This role leans {report.stretch.leans}.
@@ -2054,7 +2057,7 @@ const ResumeCard: FC<{
         <span className={cn("truncate text-sm text-primary", selected ? "font-extrabold" : "font-bold")}>{name}</span>
         <span className="truncate text-xs text-[#5f6062]">{meta}</span>
       </span>
-      {selected && <span className="flex-none rounded-full bg-[#e1f073] px-[9px] py-0.5 text-xs font-extrabold text-primary">Sending</span>}
+      {selected && <span className="flex-none rounded-full bg-[#e1f073] px-[9px] py-0.5 text-xs font-extrabold text-primary">Selected</span>}
     </button>
     {menu && menu.length > 0 && <RowMenu name={name} entries={menu} />}
   </div>
