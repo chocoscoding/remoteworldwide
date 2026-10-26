@@ -51,8 +51,8 @@ const AccountClient: FC<{ verified: boolean; accountEmail: string | null }> = ({
               id="a-email"
               type="email"
               className={cn(INPUT, "flex-1 min-w-[220px]")}
-              value={profile.email}
-              onChange={(e) => setProfile({ email: e.target.value })}
+              value={accountEmail ?? methods?.email ?? ""}
+              readOnly
             />
             {verified ? (
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#f0f0ea] px-3 py-2 text-xs font-bold text-[#6c7a1e]">

@@ -103,8 +103,12 @@ const ProfileClient: FC = () => {
           </div>
         </div>
 
-        <SettingsRow label="Full name" stacked htmlFor="p-name">
-          <input id="p-name" className={INPUT} value={profile.fullName} onChange={(e) => setProfile({ fullName: e.target.value })} />
+        <SettingsRow label="Name for job applications" hint="Choose the name to use on your CVs, cover letters and application forms." stacked htmlFor="p-name">
+          <input id="p-name" autoComplete="name" maxLength={120} className={INPUT} value={profile.fullName} onChange={(e) => setProfile({ fullName: e.target.value })} />
+        </SettingsRow>
+
+        <SettingsRow label="Email for job applications" hint="Employers will use this address to contact you. Your sign-in email stays the same." stacked htmlFor="p-application-email">
+          <input id="p-application-email" type="email" autoComplete="email" maxLength={254} className={INPUT} value={profile.email} onChange={(e) => setProfile({ email: e.target.value })} />
         </SettingsRow>
 
         <SettingsRow label="Headline" hint="One line. This sits under your name everywhere." stacked htmlFor="p-headline">
