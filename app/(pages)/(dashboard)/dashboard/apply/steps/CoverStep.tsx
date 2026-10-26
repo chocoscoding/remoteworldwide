@@ -366,8 +366,8 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
             ariaLabel="Cover letter"
             toolbarLeading={
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <ToolbarSelect label="Theme" value={design.theme} options={THEME_OPTIONS} onChange={(v) => setDesign({ theme: v as LetterDesign["theme"] })} />
-                <ToolbarSelect label="Font" value={design.font} options={LETTER_FONT_OPTIONS} onChange={(v) => setDesign({ font: v as LetterDesign["font"] })} />
+                <ToolbarSelect label="Theme" value={design.theme} options={THEME_OPTIONS} onChange={(v) => setDesign({ theme: v as LetterDesign["theme"], ...(v === "ats" && design.font === "mono" ? { font: "manrope" } : {}) })} />
+                <ToolbarSelect label="Font" value={design.font} options={LETTER_FONT_OPTIONS.filter(option => design.theme !== "ats" || option.id !== "mono" || design.font === "mono")} onChange={(v) => setDesign({ font: v as LetterDesign["font"] })} />
                 <ToolbarSelect
                   label="Spacing"
                   value={design.spacing}

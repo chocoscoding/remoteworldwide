@@ -1131,8 +1131,8 @@ const CoverScreen: FC = () => {
               ariaLabel="Cover letter body"
               toolbarLeading={
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => setTheme(v as LetterThemeId)} />
-                  <ToolbarSelect label="Font" value={font} options={LETTER_FONT_OPTIONS} onChange={(v) => setFont(v as LetterFontId)} />
+                  <ToolbarSelect label="Theme" value={theme} options={THEME_OPTIONS} onChange={(v) => { setTheme(v as LetterThemeId); if (v === "ats" && font === "mono") setFont("manrope"); }} />
+                  <ToolbarSelect label="Font" value={font} options={LETTER_FONT_OPTIONS.filter(option => theme !== "ats" || option.id !== "mono" || font === "mono")} onChange={(v) => setFont(v as LetterFontId)} />
                   <ToolbarSelect
                     label="Spacing"
                     value={spacing}
