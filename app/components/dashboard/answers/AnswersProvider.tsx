@@ -145,7 +145,7 @@ export const AnswersProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }
 
   function saveEdit(id: string, text: string) {
-    update.mutateAsync({ id, patch: { a: text } }).then(
+    update.mutateAsync({ id, patch: { a: text, draft: null } }).then(
       () => toast.success("Answer saved", { description: "Used everywhere from now on." }),
       quietly,
     );

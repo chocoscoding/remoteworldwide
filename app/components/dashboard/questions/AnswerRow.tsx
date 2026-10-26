@@ -12,6 +12,9 @@ import TokenTextarea from "@/app/components/dashboard/answers/TokenTextarea";
 import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
 import type { QaItem } from "@/app/lib/dashboard/types";
 import AnswerText from "./AnswerText";
+import LinkDestination, { useLinkDestination } from "./LinkDestination";
+import { useUpdateAnswer, useDeleteAnswer } from "@/hooks/mutations/useAnswerMutations";
+import { webLink } from "@/app/lib/answers/profile-links";
 
 /** Quiet inline control — reserved weight goes to the row's real decisions. */
 const GHOST_BTN =
@@ -41,22 +44,40 @@ export interface AnswerRowProps {
  * restored a stale draft the user thought they'd walked away from.
  */
 const AnswerEditor: FC<{ item: QaItem; onDone: () => void }> = ({ item, onDone }) => {
-  const { saveEdit } = useAnswers();
-  const [draft, setDraft] = useState(item.a);
+  const update = useUpdateAnswer();
+  const remove = useDeleteAnswer();
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState(item.kind === "review" ? item.draft ?? item.a : item.a);
 
+  const destination = useLinkDestination(item.q, draft);
+  const needsChoice = destination.loading || destination.failed || Boolean(destination.field && !destination.choice);
+  async function save() {
+    if (saving || needsChoice || !draft.trim()) return;
+    setSaving(true);
+    try {
+      if (destination.choice === "profile") {
+        await destination.saveProfile();
+        try { await remove.mutateAsync(item.id); }
+        catch { toast.error("Profile updated, but the separate answer couldn’t be removed. Reopen this answer and retry moving it to your profile."); return; }
+      } else {
+        await update.mutateAsync({id:item.id, patch:{a:draft.trim(), draft:null, ...(destination.choice === "question" ? {cat:"links" as const} : {})}});
+        toast.success("Answer saved");
+      }
+      onDone();
+    } catch { /* Mutation hooks show errors; leave the editor open. */ }
+    finally { setSaving(false); }
+  }
   return (
     <div>
       <TokenTextarea value={draft} onChange={setDraft} rows={4} aria-label={`Answer to: ${item.q}`} />
+      <LinkDestination state={destination} existing />
       <div className="mt-3 flex items-center gap-2.5">
         <StickerButton
           variant="primary"
           size="sm"
-          disabled={!draft.trim()}
-          onClick={() => {
-            saveEdit(item.id, draft.trim());
-            onDone();
-          }}>
-          Save answer
+          disabled={!draft.trim() || saving || needsChoice}
+          onClick={() => void save()}>
+          {saving ? "Saving…" : destination.choice === "profile" ? "Move link to profile" : "Save answer"}
         </StickerButton>
         <button type="button" className={cn(GHOST_BTN, "hover:bg-[#fdeae6] hover:text-[#b23c26]")} onClick={onDone}>
           Cancel
@@ -105,7 +126,7 @@ const AnswerRow: FC<AnswerRowProps> = ({ item, open, onToggle }) => {
 
       {open && (
         <div className="border-t border-black/8 px-5 pb-5 pt-4">
-          {item.kind === "review" ? (
+          {item.kind === "review" && !editing ? (
             <>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-black/10 bg-[#fbfbf7] p-4">
@@ -121,13 +142,14 @@ const AnswerRow: FC<AnswerRowProps> = ({ item, open, onToggle }) => {
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2.5">
-                <StickerButton variant="primary" size="sm" onClick={() => resolveReview(item.id, "mine")}>
+                {item.a && <StickerButton variant="primary" size="sm" onClick={() => resolveReview(item.id, "mine")}>
                   Use mine from now on
+                </StickerButton>}
+                <StickerButton variant="outline" size="sm" onClick={() => webLink(item.draft ?? "") ? setEditing(true) : resolveReview(item.id, "draft")}>
+                  Approve this answer
                 </StickerButton>
-                <StickerButton variant="outline" size="sm" onClick={() => resolveReview(item.id, "draft")}>
-                  Keep ours
-                </StickerButton>
-                <span className="text-xs text-black/40">Either choice clears this from your review queue.</span>
+                <button type="button" className={GHOST_BTN} onClick={() => setEditing(true)}>Edit draft</button>
+                <span className="text-xs text-black/50">Check every claim against your experience before approving.</span>
               </div>
             </>
           ) : editing ? (
@@ -137,6 +159,7 @@ const AnswerRow: FC<AnswerRowProps> = ({ item, open, onToggle }) => {
               <div className="rounded-xl border border-black/8 bg-[#fbfbf7] p-4">
                 <AnswerText text={item.a} />
               </div>
+              {item.cat === "links" && <p className="mt-2 text-xs text-black/55">Work samples &amp; other links · used only for matching question wording. Your default profile links stay in Settings.</p>}
               {skippedByExtension && (
                 <p className="mt-2 text-xs text-black/40">
                   The browser extension leaves demographics blank. Allow it in extension settings if you&apos;d rather it filled these.

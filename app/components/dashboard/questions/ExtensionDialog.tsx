@@ -31,7 +31,7 @@ export const EXTENSION_TOGGLES: { key: keyof SavedExtensionSettings; label: stri
     label: "Fill as the form loads",
     hint: "Off: nothing is typed until you press the RemoteWorldwide button on the form. On: your profile and saved answers go in as it appears. A saved draft always waits for you.",
   },
-  { key: "draftNewQuestions", label: "Draft answers it hasn't seen", hint: "Write a first pass, labelled “AI answered” here so you can check it." },
+  { key: "draftNewQuestions", label: "Draft answers it hasn't seen", hint: "Write a first pass. Reusable answers need your review and approval here." },
   { key: "fillDemographics", label: "Fill demographic questions", hint: "Off by default. Only an answer you've saved is ever used, never a guess." },
 ];
 

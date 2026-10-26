@@ -83,9 +83,6 @@ const nextRowNumber = (rows: readonly QuestionRow[]): number =>
 /** How the drafter's echo is matched back to a row: it collapses whitespace, and case never mattered. */
 const norm = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
 
-/** Below this a drafted answer is flagged for a second look. */
-const CHECK_BELOW = 0.6;
-
 /** As many questions as the form reader returns: "Answer all" drafts them in batches. */
 const MAX_ROWS = FORM_QUESTIONS_MAX;
 
@@ -118,8 +115,7 @@ const tagOf = (row: QuestionRow): Tag => {
   if (row.drafted.cat === "demographics") return { label: "Yours to answer", tone: "dashed" };
   if (!row.answer.trim()) return { label: "Needs you", tone: "dashed" };
   if (row.drafted.confidence >= 1) return { label: "Your saved answer", tone: "lime" };
-  if (row.drafted.confidence < CHECK_BELOW) return { label: "Check this one", tone: "dashed" };
-  return null;
+  return { label: "Needs review", tone: "dashed" };
 };
 
 /** The featured action of each view: small and lime, with the hard shadow at rest. */
@@ -176,8 +172,9 @@ const SubmitStep: FC<SubmitStepProps> = ({
   // The dashboard pings the extension once (AnswersProvider); "checking" shows neither line.
   const extensionStatus = useAnswers().extension.status;
   const asked = rows.filter((row) => row.question.trim());
+  const reviewCount = rows.filter(row => tagOf(row)?.label === "Needs review").length;
   const answered: ApplicationAnswer[] = rows
-    .filter((row) => row.question.trim() && row.answer.trim())
+    .filter((row) => row.question.trim() && row.answer.trim() && tagOf(row)?.label !== "Needs review")
     .slice(0, APPLICATION_LIMITS.answersMax)
     .map((row) => ({
       question: row.question.trim().slice(0, APPLICATION_LIMITS.questionMax),
@@ -347,6 +344,9 @@ const SubmitStep: FC<SubmitStepProps> = ({
   return (
     <div className="flex flex-col gap-5">
       <ResumeIntegrityNotice resumeId={resumeId} onReview={() => onEditStep(2)} />
+      {reviewCount > 0 && <p role="status" className="text-sm text-[#a06f00]">{reviewCount} AI answer{reviewCount === 1 ? " needs" : "s need"} your review before copying or recording this application.</p>}
+      {atsScore !== null && atsScore < 60 && <div role="status" className="rounded-xl bg-[#fff4df] p-4 text-sm">Your ATS score is {atsScore}/100. Review missing requirements before applying. <button type="button" className="font-bold underline" onClick={() => onEditStep(2)}>Improve resume</button></div>}
+      {extensionStatus === "installed" && link && <div className="rounded-xl bg-[#f0f4da] p-4 text-sm">Your extension can read and fill the form directly. <a className="font-bold underline" href={link} target="_blank" rel="noopener noreferrer">Open the form and use RemoteWorldwide</a>. Manual paste below is an optional fallback.</div>}
       {pasting ? (
         <section aria-label="Paste the application form" className="br-plain flex flex-col gap-3 rounded-2xl bg-white p-5">
           <div className="flex flex-col gap-1">
@@ -461,6 +461,7 @@ const SubmitStep: FC<SubmitStepProps> = ({
                 onChange={(answer) => patchRow(row.id, { answer, edited: true, drafted: null })}
                 onWriteAgain={() => writeAgain(row)}
                 onCopy={() => void copy(row.answer, row.id)}
+                onApprove={() => patchRow(row.id, { edited: true, drafted: null })}
               />
             ) : (
               <FoundRow
@@ -582,6 +583,7 @@ const SubmitStep: FC<SubmitStepProps> = ({
                 size="md"
                 shadowColor="rgba(255,255,255,.3)"
                 className="border-white/25 bg-transparent text-white hover:border-white"
+                disabled={reviewCount > 0}
                 onClick={() => onTrack(answered)}>
                 <Check className="h-4 w-4" />
                 Track as applied
@@ -681,7 +683,8 @@ const AnswerRow: FC<{
   onChange: (answer: string) => void;
   onWriteAgain: () => void;
   onCopy: () => void;
-}> = ({ row, number, open, focus, busy, copied, onOpen, onCollapse, onChange, onWriteAgain, onCopy }) => {
+  onApprove: () => void;
+}> = ({ row, number, open, focus, busy, copied, onOpen, onCollapse, onChange, onWriteAgain, onCopy, onApprove }) => {
   const tag = tagOf(row);
   const blank = !row.answer.trim();
   // A saved answer comes back as it is, and a self-ID one is never drafted: writing either again changes nothing.
@@ -722,7 +725,7 @@ const AnswerRow: FC<{
             <RotateCw className="h-[15px] w-[15px]" />
           </button>
         )}
-        <button type="button" aria-label={`Copy answer ${number}`} disabled={blank} onClick={onCopy} className={ICON_BUTTON}>
+        <button type="button" aria-label={`Copy answer ${number}`} disabled={blank || tag?.label === "Needs review"} onClick={onCopy} className={ICON_BUTTON}>
           {copied ? <Check className="h-[15px] w-[15px]" /> : <Copy className="h-[15px] w-[15px]" />}
         </button>
         {!blank && (
@@ -752,6 +755,7 @@ const AnswerRow: FC<{
         }
         className="ml-8 w-[calc(100%-2rem)] rounded-lg border border-black/15 bg-white px-3 py-2 text-sm leading-relaxed text-primary outline-none placeholder:text-black/35 focus:border-[#222325]"
       />
+      {tag?.label === "Needs review" && <div className="ml-8 text-xs"><p>Check every claim against your experience before using this answer.</p><button type="button" className={FEATURED} onClick={onApprove}>Approve answer</button></div>}
     </div>
   );
 };

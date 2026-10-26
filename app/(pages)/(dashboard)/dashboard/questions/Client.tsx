@@ -274,12 +274,12 @@ const QuestionsClient: FC = () => {
           <DashCard className="bg-[#fbfbf7] p-5">
             <p className="mb-2 text-sm font-bold text-primary">How this library is used</p>
             <p className="mb-3 text-sm leading-relaxed text-black/60">
-              Whenever we draft answers for an application, everything saved here comes first, word for word. Only a question you
-              haven&apos;t answered gets a drafted answer. It&apos;s added here marked &ldquo;AI answered&rdquo; so you can check it, and
-              editing it makes it yours.
+              Approved, reusable answers come first, word for word. Employer-specific answers need review for each company.
+              Questions without a reusable answer can get a new draft, marked &ldquo;Needs review&rdquo;.
+              Check every claim and approve or edit the draft before it can be reused.
             </p>
             <ul className="flex flex-col gap-1.5 text-xs text-black/55">
-              <li>• Matches the same question however a form words or punctuates it</li>
+              <li>• Matches saved questions after normalizing punctuation, spacing and case. Different wording may need a new answer.</li>
               <li>
                 • Swaps <code className="rounded bg-[#f0f0ea] px-1 font-mono text-[11px]">{"{company}"}</code> for whoever you&apos;re
                 applying to

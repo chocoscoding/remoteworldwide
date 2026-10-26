@@ -15,7 +15,7 @@ export interface QaItem {
   q: string;
   a: string;
   kind: "saved" | "ai" | "review";
-  cat: "screening" | "demographics";
+  cat: "screening" | "demographics" | "eligibility" | "logistics" | "links";
   /** Only present on kind "review" items — the AI's new draft that differs from the saved answer. */
   draft?: string;
 }

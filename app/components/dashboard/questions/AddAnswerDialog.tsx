@@ -2,13 +2,14 @@
 
 import { FC, FormEvent, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import DashTooltip from "@/app/components/dashboard/ui/DashTooltip";
 import TokenTextarea from "@/app/components/dashboard/answers/TokenTextarea";
 import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
+import LinkDestination, { useLinkDestination } from "./LinkDestination";
 import type { QaItem } from "@/app/lib/dashboard/types";
 
 export interface AddAnswerDialogProps {
@@ -26,8 +27,11 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
   const [a, setA] = useState("");
   const [cat, setCat] = useState<QaItem["cat"]>("screening");
   const [saving, setSaving] = useState(false);
+  const destination = useLinkDestination(q, a);
+  const needsChoice = destination.loading || destination.failed || Boolean(destination.field && !destination.choice);
 
   function reset() {
+    destination.clear();
     setQ("");
     setA("");
     setCat("screening");
@@ -35,10 +39,19 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!q.trim() || !a.trim() || saving) return;
+    if (!q.trim() || !a.trim() || saving || needsChoice) return;
 
     setSaving(true);
-    const result = await addAnswer({ q, a, cat });
+    if (destination.choice === "profile") {
+      try {
+        await destination.saveProfile();
+        reset();
+        onOpenChange(false);
+      } catch { /* The settings mutation shows the failure; preserve this form. */ }
+      finally { setSaving(false); }
+      return;
+    }
+    const result = await addAnswer({ q, a, cat: destination.choice === "question" ? "links" : cat });
     setSaving(false);
     // Null: the save failed and the provider already said why. The dialog stays
     // open with what was typed, so nothing is lost.
@@ -64,7 +77,7 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
       }}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[#222325]/45 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-[460px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-white br-bold duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-[460px] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white br-bold duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <form onSubmit={submit} className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -99,19 +112,19 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                 <label className={LABEL} htmlFor="new-a">
                   Answer
                 </label>
-                <TokenTextarea id="new-a" value={a} onChange={setA} rows={4} required placeholder="Write the answer you want saved…" />
-                <p className="mt-1.5 text-xs text-black/40">
+                <TokenTextarea id="new-a" value={a} onChange={setA} rows={destination.field ? 2 : 4} required placeholder="Write the answer you want saved…" />
+                {!destination.field && <p className="mt-1.5 text-xs text-black/40">
                   Type <code className="rounded bg-[#859c03] px-1 font-mono text-[14px]">{"{company}"}</code> anywhere and it&apos;s swapped
                   for whoever you&apos;re applying to.
-                </p>
+                </p>}
               </div>
               <div>
                 <div className={cn(LABEL, "flex items-center gap-1.5")}>
-                  Category
+                  <label htmlFor="new-category">Category</label>
                   <DashTooltip label="What these categories mean">
                     <span className="block text-xs font-semibold normal-case tracking-normal text-primary">Screening</span>
                     <span className="mt-0.5 block text-xs font-normal normal-case leading-relaxed tracking-normal text-black/55">
-                      The role and logistics questions almost every employer asks: notice period, salary, work authorisation.
+                      Screening covers role questions. Eligibility covers work authorization; logistics covers notice, location and salary; work samples & other links covers project demos, writing samples and question-specific URLs. Standard profile links live in Settings.
                     </span>
                     <span className="mt-2.5 block text-xs font-semibold normal-case tracking-normal text-primary">Demographics</span>
                     <span className="mt-0.5 block text-xs font-normal normal-case leading-relaxed tracking-normal text-black/55">
@@ -120,35 +133,37 @@ const AddAnswerDialog: FC<AddAnswerDialogProps> = ({ open, onOpenChange }) => {
                     </span>
                   </DashTooltip>
                 </div>
-                <div className="inline-flex items-center gap-0.5 rounded-lg bg-[#f0f0ea] p-1">
-                  {(["screening", "demographics"] as const).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCat(c)}
-                      aria-pressed={cat === c}
-                      className={cn(
-                        "rounded-md px-3 py-1.5 text-xs font-bold capitalize transition-colors cursor-pointer",
-                        cat === c ? "bg-[#222325] text-white" : "text-black/55 hover:text-primary",
-                      )}>
-                      {c}
-                    </button>
-                  ))}
+                <div className="relative">
+                  <select
+                    id="new-category"
+                    value={cat}
+                    onChange={(event) => setCat(event.target.value as QaItem["cat"])}
+                    className={cn(FIELD, "h-10 cursor-pointer appearance-none pr-10")}>
+                    <option value="screening">Screening</option>
+                    <option value="eligibility">Work eligibility</option>
+                    <option value="logistics">Logistics</option>
+                    <option value="links">Work samples &amp; other links</option>
+                    <option value="demographics">Demographics</option>
+                  </select>
+                  <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/50" />
                 </div>
               </div>
+              {cat === "links" && !destination.field && <p className="text-xs text-black/55">For project demos, writing samples and other question-specific links. Manage your default LinkedIn, GitHub and portfolio in Settings → Profile.</p>}
+              <LinkDestination state={{ ...destination, choose: (choice) => { destination.choose(choice); if (choice === "question") setCat("links"); } }} />
             </div>
 
             <div className="mt-6 flex items-center gap-2.5">
-              <StickerButton type="submit" variant="primary" size="md" disabled={!q.trim() || !a.trim() || saving}>
-                {saving ? "Saving…" : "Save answer"}
+              <StickerButton type="submit" variant="primary" size="md" disabled={!q.trim() || !a.trim() || saving || needsChoice}>
+                {saving ? "Saving…" : destination.choice === "profile" ? "Update profile link" : "Save answer"}
               </StickerButton>
               <button
                 type="button"
-                onClick={() => onOpenChange(false)}
+                onClick={() => { reset(); onOpenChange(false); }}
                 className="cursor-pointer rounded-lg px-3 py-2 text-xs font-semibold text-black/50 transition-colors hover:bg-[#fdeae6] hover:text-[#b23c26]">
                 Cancel
               </button>
             </div>
+            {(!q.trim() || !a.trim()) && <p className="mt-2 text-xs text-black/55" role="status">Enter both a question and an answer to save.</p>}
           </form>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
