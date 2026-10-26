@@ -20,7 +20,7 @@
 // the screen itself. The setup screen runs the same pick to say what's coming.
 
 import { pickQuestionsForSession } from "@/app/lib/dashboard/prep-engine";
-import { QUESTIONS_FOR_LENGTH, type Difficulty, type QuestionBankEntry, type SessionFormat, type SessionLength } from "@/app/lib/dashboard/prep-data";
+import { QUESTION_BANK, QUESTIONS_FOR_LENGTH, type Difficulty, type QuestionBankEntry, type SessionFormat, type SessionLength } from "@/app/lib/dashboard/prep-data";
 import type { LikelyQuestion } from "./types";
 
 export interface SessionQuestion {
@@ -81,6 +81,8 @@ function fromBank(entry: QuestionBankEntry): SessionQuestion {
 }
 
 export interface PickSessionQuestionsInput {
+  salaryContext?: string;
+  salaryBenchmarkContext?: string;
   formats: SessionFormat[];
   /** The preset whose question count the session asks: the chosen length, or the shorter one a partial balance covers. */
   lengthMinutes: SessionLength;
@@ -140,7 +142,15 @@ export function pickSessionQuestions(input: PickSessionQuestionsInput): SessionQ
   const middle = pickRoleQuestions(input)
     .filter((q) => !CORE_QUESTION.test(q.text))
     .slice(0, Math.max(1, count - 2));
-  return [OPENING_QUESTION, ...middle, CLOSING_QUESTION];
+  const salaryIds = new Set([...QUESTION_BANK.salary.map(q => q.id), ...(input.likely ?? []).filter(q => q.format === "salary").map(q => q.id)]);
+  const facts = input.salaryContext?.trim().slice(0, 250);
+  const benchmark = input.salaryBenchmarkContext?.trim().slice(0, 500);
+  const grounded = middle.map(q => {
+    if ((!facts && !benchmark) || !salaryIds.has(q.id)) return q;
+    const lead = [facts ? `Negotiation details you supplied: ${facts}.` : "", benchmark].filter(Boolean).join(" ") + " ";
+    return { ...q, text: lead + (lead.length + q.text.length <= SNAPSHOT_QUESTION_TEXT_MAX ? q.text : "How would you justify your target and respond to a lower offer?"), sub: "Practice using your negotiation facts and selected salary context" };
+  });
+  return [OPENING_QUESTION, ...grounded, CLOSING_QUESTION];
 }
 
 /**

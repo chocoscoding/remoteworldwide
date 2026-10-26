@@ -32,6 +32,7 @@ import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import { usePlanGate } from "@/app/components/dashboard/billing/UpgradeModal";
 import { useFreeUsage } from "@/hooks/queries/useFreeUsage";
 import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
+import SalaryBenchmark from "./SalaryBenchmark";
 
 const FORMAT_ICON: Record<SessionFormat, LucideIcon> = { behavioural: MessageCircle, portfolio: Presentation, salary: DollarSign };
 
@@ -54,6 +55,8 @@ export const MAX_SESSIONS_PER_TRACK = 6;
 const SESSION_CAP_WINDOW_MS = 7 * 24 * 60 * 60_000;
 
 export interface SessionConfig {
+  salaryContext?: string;
+  salaryBenchmarkContext?: string;
   /** One or more formats — a session can drill several in one run. */
   formats: SessionFormat[];
   difficulty: Difficulty;
@@ -119,6 +122,8 @@ export interface PrepSetupProps {
 }
 
 const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQuestions, onStart }) => {
+  const [salaryContext, setSalaryContext] = useState("");
+  const [salaryBenchmarkContext, setSalaryBenchmarkContext] = useState("");
   const [formats, setFormats] = useState<SessionFormat[]>(initialFormats?.length ? initialFormats : ["behavioural"]);
   // One free session a month below Pro: only the chip says it is a Pro feature, and the AI service's
   // refusal past the free session opens the upgrade popup.
@@ -180,6 +185,8 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   const likely = useLikelyQuestions(saved ? track.id : null);
   const likelySet = likely.data?.set ?? null;
   const plan = pickSessionQuestions({
+    salaryContext,
+    salaryBenchmarkContext,
     formats,
     lengthMinutes: voiceQuestionLength,
     seed: `${track.id}-${formats.join(",")}-${voiceQuestionLength}`,
@@ -299,6 +306,8 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
     // than parsing the file again. A failure stays on this screen, said.
     if (resumeGate === "store-master" && !(await resume.storeDefault())) return;
     onStart({
+      ...(formats.includes("salary") && salaryContext.trim() ? { salaryContext: salaryContext.trim() } : {}),
+      ...(formats.includes("salary") && salaryBenchmarkContext ? { salaryBenchmarkContext } : {}),
       formats,
       difficulty,
       lengthMinutes: voiceQuestionLength,
@@ -325,6 +334,12 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
         </p>
       </div>
 
+      {formats.includes("salary") && <DashCard className="p-6">
+        <label htmlFor="salary-context" className="text-sm font-bold text-primary">Your salary negotiation facts</label>
+        <p className="my-2 text-xs text-black/60">Add your target, any actual offer or advertised range, currency and pay period. Current pay is optional. These details ground your practice questions and are saved with the session. Without them, this is general practice, not a salary benchmark.</p>
+        <textarea id="salary-context" value={salaryContext} onChange={event => setSalaryContext(event.target.value)} maxLength={250} rows={3} className="w-full rounded-lg border border-black/20 p-3 text-sm" placeholder="Target: … per year in …; offer / advertised range: …; priorities: …" />
+        <SalaryBenchmark role={track.role} onContext={setSalaryBenchmarkContext} />
+      </DashCard>}
       {saved && (
         <DashCard className="p-6">
           <div className="flex items-baseline justify-between gap-3 mb-3">

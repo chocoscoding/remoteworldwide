@@ -428,6 +428,8 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
           seed: `${track.id}-${config.formats.join(",")}-${config.lengthMinutes}`,
           likely: likelyQuestions,
           difficulty: config.difficulty,
+          salaryContext: config.salaryContext,
+          salaryBenchmarkContext: config.salaryBenchmarkContext,
         })
   );
   const tailoredSession = questions.some((q) => q.tailored);

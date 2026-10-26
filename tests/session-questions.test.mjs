@@ -29,6 +29,23 @@ registerHooks({
 
 const { pickSessionQuestions, OPENING_QUESTION, CLOSING_QUESTION } = await import("../app/lib/prep/sessionQuestions.ts");
 
+it("grounds salary questions in supplied facts without changing other formats", () => {
+  const input = {formats:["salary"], lengthMinutes:15, seed:"salary-audit", likely:[], salaryContext:"Target USD 90,000 per year; offer USD 80,000 per year"};
+  const questions = pickSessionQuestions(input);
+  assert.equal(questions[0].text, OPENING_QUESTION.text);
+  assert.ok(questions.slice(1,-1).some(q => q.text.includes(input.salaryContext)));
+  assert.ok(questions.every(q => q.text.length <= 1000));
+  assert.ok(pickSessionQuestions({...input, formats:["behavioural"]}).every(q => !q.text.includes(input.salaryContext)));
+});
+
+it("keeps candidate figures and advertised comparisons distinct and bounded", () => {
+  const input = {formats:["salary"], lengthMinutes:15, seed:"salary-audit", likely:[], salaryContext:"My offer: USD 80,000/year", salaryBenchmarkContext:"RWW advertised median bounds: USD 90,000–110,000/year, 5 employers"};
+  const middle = pickSessionQuestions(input).slice(1,-1);
+  assert.ok(middle.some(q => q.text.includes(input.salaryContext) && q.text.includes(input.salaryBenchmarkContext)));
+  assert.ok(pickSessionQuestions({...input,salaryContext:"x".repeat(250),salaryBenchmarkContext:"y".repeat(700)}).every(q => q.text.length <= 1000));
+  assert.ok(pickSessionQuestions({...input,formats:["portfolio"]}).every(q => !q.text.includes("advertised median")));
+});
+
 /** A likely question: `p3` is the third led by the posting, `r2` the second led by the resume; `!` marks it sharp. */
 const q = (tag, format = "behavioural") => {
   const sharp = tag.endsWith("!");
@@ -100,4 +117,12 @@ describe("the session's mix of job and resume questions", () => {
       ["p1", "p3", "r1", "p4", "p2"]
     );
   });
+});
+
+const { normalizeDraftCompanies } = await import("../app/lib/drafts/company-names.ts");
+it("normalizes company spelling across drafts without merging different postings", () => {
+ const common = {role:"Engineer",answers:[],answerCount:0,updatedAt:"2026-10-26",createdAt:"2026-10-26"};
+ const rows = normalizeDraftCompanies([{...common,id:"a",company:"chilipiper",postingKey:"a"},{...common,id:"b",company:"Chili Piper",postingKey:"b"}]);
+ assert.equal(rows.length,2);
+ assert.deepEqual(rows.map(row => row.company),["Chili Piper","Chili Piper"]);
 });
