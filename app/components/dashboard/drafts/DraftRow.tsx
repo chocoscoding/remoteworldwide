@@ -167,7 +167,7 @@ const DraftRow: FC<DraftRowProps> = ({ draft }) => {
   const panelId = useId();
 
   const applied = draft.status === "applied";
-  const title = draft.role ?? "Untitled role";
+  const title = /^(general interest|general application|open application|talent community)$/i.test(draft.role?.trim() ?? "") ? "General application · no specific role" : draft.role ?? "Untitled role";
   // With no company read off the page, the site stands in for it (and leaves the line below).
   const company = draft.company ?? draft.host;
   const answers = shownAnswers(draft.answers);
@@ -176,10 +176,9 @@ const DraftRow: FC<DraftRowProps> = ({ draft }) => {
   const meta = [
     draft.company ? draft.host : null,
     draft.location,
-    `${count} answer${count === 1 ? "" : "s"}`,
+    draft.completion ? `${draft.completion.filled}/${draft.completion.total} observed fields filled at last answer save` : `${count} saved field${count === 1 ? "" : "s"} · form completion unknown`,
     at ? `${applied ? "applied" : "saved"} ${at}` : null,
     // A draft for a job that is neither saved nor tracked is deleted 30 days after its last save.
-    !applied && draft.expiresAt ? `deleted ${ago(draft.expiresAt)} unless you save the job` : null,
   ]
     .filter(Boolean)
     .join(" · ");

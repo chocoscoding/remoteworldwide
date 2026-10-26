@@ -134,6 +134,7 @@ const DraftsClient: FC = () => {
                   </>
                 )}
               </p>
+              {tab === "draft" && <p className="mb-3 text-xs text-black/55">Unsaved jobs expire 30 days after the draft was last updated. Save the job to keep it. Progress covers observed application fields on the last saved page, excluding demographics and consent; later steps may remain. Older drafts have no progress measurement.</p>}
               <DashCard className="overflow-hidden p-0">
                 <div className="flex flex-col divide-y divide-black/8">
                   {list.map((draft) => (

@@ -53,6 +53,8 @@ export interface ApplicationDraftItem {
   appliedAt: string | null;
   answers: ApplicationDraftAnswer[];
   answerCount: number;
+  /** Fields observed on the current form page at the last answer save; not the whole application. */
+  completion?: { filled: number; total: number } | null;
   createdAt: string;
   updatedAt: string;
   /** Null while the job is saved or on the tracker: the draft then lasts as long as the job does. */
@@ -60,6 +62,7 @@ export interface ApplicationDraftItem {
 }
 
 export interface SaveDraftInput {
+  completion?: { filled: number; total: number } | null;
   url: string;
   pageUrl?: string | null;
   company?: string | null;

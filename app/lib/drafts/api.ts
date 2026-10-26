@@ -17,6 +17,7 @@
 // one row per job, however many drafts the service holds for it.
 
 import { apiDelete, apiGet, apiPost } from "@/app/lib/api/client";
+import { normalizeDraftCompanies } from "./company-names";
 import { BackendError } from "@/app/lib/api/core";
 import { APPLICATION_LIMITS, type ApplicationAnswer } from "@/app/lib/applications/types";
 import type { ApplicationDraftAnswer, ApplicationDraftItem, ApplicationDraftStatus, FuseDraftInput, FuseDraftResult } from "./types";
@@ -167,6 +168,7 @@ function mergedAnswers(drafts: ApplicationDraftItem[]): ApplicationDraftAnswer[]
  * did, which in a list sorted newest-first is its newest.
  */
 export function collapseSameJob(drafts: ApplicationDraftItem[]): ListedDraft[] {
+  drafts = normalizeDraftCompanies(drafts);
   const groups = new Map<string, ApplicationDraftItem[]>();
   for (const draft of drafts) {
     // Prefixed, so no posting key can ever collide with a draft id.
