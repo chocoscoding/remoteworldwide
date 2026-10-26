@@ -141,7 +141,7 @@ const AnswersTable: FC<{ delivery: DeliveryReport; turns: PrepSession["transcrip
               <th scope="col" className="py-2 pr-3 font-bold">Answer</th>
               <th scope="col" className="py-2 pr-3 text-right font-bold">Pace</th>
               <th scope="col" className="py-2 pr-3 text-right font-bold">Pitch range</th>
-              <th scope="col" className="py-2 pr-3 text-right font-bold">Energy</th>
+              <th scope="col" className="py-2 pr-3 text-right font-bold">Relative energy</th>
               <th scope="col" className="py-2 pr-3 text-right font-bold">Lead-in</th>
               <th scope="col" className="py-2 pr-3 text-right font-bold">Fillers</th>
               <th scope="col" className="py-2 pr-3 text-right font-bold">Findings</th>
@@ -154,12 +154,12 @@ const AnswersTable: FC<{ delivery: DeliveryReport; turns: PrepSession["transcrip
             {answers.map((a, i) => (
               <tr key={a.turnId} className="border-t border-black/[0.08]">
                 <th scope="row" className="py-2 pr-3 font-bold">
-                  {numbers.get(a.turnId) ?? i + 1} <span className="ml-1 font-normal text-black/50">· {formatDuration(a.endMs - a.startMs)}</span>
+                  {numbers.get(a.turnId) ?? i + 1} <span className="ml-1 font-normal text-black/50">· {formatDuration(a.endMs - a.startMs)} answer window</span>
                 </th>
                 <td className="py-2 pr-3 text-right">{a.wpm === null ? dash : `${Math.round(a.wpm)} wpm`}</td>
                 <td className="py-2 pr-3 text-right">{a.pitchRangeSt === null ? dash : formatMeasureValue(a.pitchRangeSt, "st")}</td>
-                <td className="py-2 pr-3 text-right">{a.energyDeltaDb === null ? dash : `${formatSigned(a.energyDeltaDb - (first ?? 0))} dB`}</td>
-                <td className="py-2 pr-3 text-right">{a.leadInMs === null ? dash : formatMeasureValue(a.leadInMs, "ms")}</td>
+                <td className="py-2 pr-3 text-right">{a.energyDeltaDb === null ? dash : i === answers.findIndex(row => row.energyDeltaDb !== null) ? "Baseline" : `${formatSigned(a.energyDeltaDb - (first ?? 0))} dB`}</td>
+                <td className="py-2 pr-3 text-right">{a.leadInMs === null ? dash : a.leadInMs < 100 ? "< 0.1 s" : formatMeasureValue(a.leadInMs, "ms")}</td>
                 <td className="py-2 pr-3 text-right">{delivery.metrics.fillersPer100Words === null ? dash : a.fillers}</td>
                 <td className="py-2 pr-3 text-right">{flagsByTurn.get(a.turnId) ?? 0}</td>
                 <td className="py-2 text-right">
@@ -172,7 +172,7 @@ const AnswersTable: FC<{ delivery: DeliveryReport; turns: PrepSession["transcrip
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-black/50">
         Energy is each answer&apos;s loudness against your first answer. Pitch range is how far your pitch moved within the answer. Lead-in is the time from the end
-        of the question to your first word.
+        of the question to your first word. Answer windows include pauses; transcript durations cover the transcribed speech. A dash means no measurement was available.
       </p>
     </>
   );
