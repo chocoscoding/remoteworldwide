@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { signOut } from "@/app/lib/authClient";
 import Image from "next/image";
-import { ChevronDown, LoaderCircle, Menu, UserRound, X } from "lucide-react";
+import { ArrowRight, Bookmark, ChevronDown, LoaderCircle, LogOut, Menu, PenLine, Shield, UserRound, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
@@ -19,25 +19,33 @@ const WAITLIST = "/waitlist";
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 // 36px rows: compact, as a menu's should be (owner, 2026-10-02: same text size, less height).
 const MENU_ITEM =
-  "flex min-h-9 w-full items-center px-4 text-left text-sm font-medium text-primary hover:bg-primary2 focus-visible:bg-primary2 focus-visible:outline-none";
-const BAR_LINK =
-  "inline-flex h-11 items-center rounded-full px-2 text-sm font-semibold text-primary/80 transition-colors hover:bg-primary2 hover:text-primary sm:px-3";
+  "flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm font-medium text-primary hover:bg-primary2 focus-visible:bg-primary2 focus-visible:outline-none";
+// Both menus: a white card with the ink hairline and the 2px hard shadow, nothing softer.
+const MENU_CARD = "rounded-xl bg-white br-shadow";
 
-/** What the bar used to link and no longer does, in the menu whether or not you're signed in. */
-const SITE_LINKS = [
-  // { href: "/dashboard", label: "Dashboard" },
-  { href: "/jobs", label: "Jobs" },
-  { href: "/tools", label: "Features" },
-  { href: "/companies", label: "Companies" },
-  { href: "/blogs", label: "Blog" },
-  { href: "/pricing", label: "Pricing" },
-];
+/** Each list's width, fixed so the panel never measures (and clips) a half-laid-out list. Features is two columns. */
+const LIST_WIDTH: Record<string, string> = { Jobs: "w-[300px]", Features: "w-[560px]", Company: "w-[300px]" };
+/** A group's overview page: a footer link under its rows instead of a row of its own. */
+const OVERVIEW: Record<string, { title: string; href: string }> = { Features: { title: "See all features", href: "/tools" } };
 
 /**
- * The user icon and its menu, below it. Signed out: Log in and Sign up, then the site's other pages.
- * Signed in, behind the avatar: Bookmarks, Writer or Admin by role, the same pages, and Logout.
+ * The user icon and its menu, below it. The site's pages live in the bar (and the hamburger on a
+ * phone), so this is only about you: signed out, Log in and Sign up; signed in, who you are, then
+ * Bookmarks, Writer or Admin by role, and Log out.
  */
-const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: string | null; role?: string | null }) => {
+const AccountMenu = ({
+  signedIn,
+  image,
+  role,
+  name,
+  email,
+}: {
+  signedIn: boolean;
+  image?: string | null;
+  role?: string | null;
+  name?: string | null;
+  email?: string | null;
+}) => {
   const { isOpen2: open, toggleNavbar2: toggle, closeNavbar2: close } = useNavbar();
   const { replace } = useRouter();
   const { openAuthModal } = useAuthModal();
@@ -102,24 +110,52 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
       </button>
 
       {open ? (
-        <div
-          id="account-menu"
-          className="absolute right-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-xl border border-primary/10 bg-white py-1 shadow-[0_8px_24px_-12px_rgba(34,35,37,0.25)] !br-shadow">
+        <div id="account-menu" className={cn("absolute right-0 top-full z-30 mt-2 w-64 p-1.5", MENU_CARD)}>
           {signedIn ? (
             <>
+              <div className="flex items-center gap-3 px-2.5 pb-3 pt-2">
+                <Image
+                  width={36}
+                  height={36}
+                  src={image ?? "/images/noimage.png"}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="h-9 w-9 shrink-0 rounded-full border border-primary/15 object-cover"
+                />
+                <div className="min-w-0">
+                  {name ? <p className="truncate text-sm font-bold text-primary">{name}</p> : null}
+                  {email ? <p className="truncate text-xs text-primary/60">{email}</p> : null}
+                </div>
+              </div>
+              <div className="mb-1.5 border-t border-primary/10" />
               <Link href="/bookmarks" onClick={close} className={MENU_ITEM}>
+                <Bookmark className="h-4 w-4 text-primary/60" aria-hidden />
                 Bookmarks
               </Link>
               {role === "AUTHOR" ? (
                 <Link href="/heroshima/blogs" onClick={close} className={MENU_ITEM}>
+                  <PenLine className="h-4 w-4 text-primary/60" aria-hidden />
                   Writer
                 </Link>
               ) : null}
               {role === "ADMIN" ? (
                 <Link href="/heroshima" onClick={close} className={MENU_ITEM}>
+                  <Shield className="h-4 w-4 text-primary/60" aria-hidden />
                   Admin
                 </Link>
               ) : null}
+              <div className="my-1.5 border-t border-primary/10" />
+              <button
+                type="button"
+                onClick={async () => {
+                  close();
+                  await signOut();
+                  replace("/");
+                }}
+                className={cn(MENU_ITEM, "cursor-pointer")}>
+                <LogOut className="h-4 w-4 text-primary/60" aria-hidden />
+                Log out
+              </button>
             </>
           ) : onAuthPage ? (
             <>
@@ -152,34 +188,6 @@ const AccountMenu = ({ signedIn, image, role }: { signedIn: boolean; image?: str
               </button>
             </>
           )}
-          <div className="my-1 border-t border-primary/10" />
-          {SITE_LINKS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={(event) => {
-                close();
-                if (item.href === DASHBOARD && !signedIn) {
-                  event.preventDefault();
-                  openAuthModal("login", DASHBOARD);
-                }
-              }}
-              className={MENU_ITEM}>
-              {item.label}
-            </Link>
-          ))}
-          {signedIn ? (
-            <button
-              type="button"
-              onClick={async () => {
-                close();
-                await signOut();
-                replace("/");
-              }}
-              className={cn(MENU_ITEM, "mt-1 border-t border-primary/10")}>
-              Logout
-            </button>
-          ) : null}
         </div>
       ) : null}
     </div>
@@ -215,6 +223,8 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
   const lists = useRef<(HTMLDivElement | null)[]>([]);
   const closeTimer = useRef<number | undefined>(undefined);
   const lastOpen = useRef<number | null>(null);
+  // One menu at a time: opening a list closes the account menu, and opening that closes the list.
+  const { isOpen2: accountOpen, closeNavbar2: closeAccount } = useNavbar();
 
   const here = SITE_NAV.findIndex((group) => group.links.some((link) => pathname?.startsWith(link.href)));
   const lineAt = hover ?? open ?? (here >= 0 ? here : null);
@@ -277,6 +287,13 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
     };
   }, [open]);
   useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  useEffect(() => {
+    if (open !== null) closeAccount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  useEffect(() => {
+    if (accountOpen) close();
+  }, [accountOpen]);
 
   const toggle = (i: number) => setOpen((current) => (current === i ? null : i));
 
@@ -367,7 +384,7 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
         style={{ left: panel.left, transition: panel.instant ? "none" : `left 300ms ${EASE}` }}>
         <div
           id="nav-panel"
-          className="relative overflow-hidden rounded-md border border-primary/10 bg-white shadow-[0_8px_24px_-12px_rgba(34,35,37,0.25)] !br-shadow"
+          className={cn("relative overflow-hidden", MENU_CARD)}
           style={{
             width: panel.width,
             height: panel.height,
@@ -383,6 +400,8 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
             // The list going out drifts away from the one coming in, which arrives from the side
             // its word is on.
             const offset = showing || open === null ? 0 : i < open ? -24 : 24;
+            const overview = OVERVIEW[group.label];
+            const rows = group.links.filter((link) => link.href !== overview?.href);
             return (
               <div
                 key={group.label}
@@ -390,27 +409,47 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
                   lists.current[i] = el;
                 }}
                 aria-hidden={!showing}
-                className="absolute left-0 top-0 w-max min-w-[200px] py-1"
+                className={cn("absolute left-0 top-0 p-1.5", LIST_WIDTH[group.label] ?? "w-[300px]")}
                 style={{
                   opacity: showing ? 1 : 0,
                   visibility: showing ? "visible" : "hidden",
                   transform: `translateX(${offset}px)`,
                   transition: `opacity 200ms, transform 300ms ${EASE}, visibility 200ms`,
                 }}>
-                <ul>
-                  {group.links.map((link) => (
-                    <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        onClick={close}
-                        tabIndex={showing ? undefined : -1}
-                        aria-current={pathname === link.href ? "page" : undefined}
-                        className={cn(MENU_ITEM, "whitespace-nowrap pr-6", pathname === link.href && "font-bold")}>
-                        {link.title}
-                      </Link>
-                    </li>
-                  ))}
+                <ul className={cn("grid gap-0.5", rows.length > 4 && "grid-cols-2")}>
+                  {rows.map((link) => {
+                    const current = pathname === link.href;
+                    return (
+                      <li key={link.href}>
+                        <Link
+                          href={link.href}
+                          onClick={close}
+                          tabIndex={showing ? undefined : -1}
+                          aria-current={current ? "page" : undefined}
+                          className={cn(
+                            "block rounded-lg px-2.5 py-2 hover:bg-primary2 focus-visible:bg-primary2 focus-visible:outline-none",
+                            current && "bg-primary2",
+                          )}>
+                            <span className={cn("block text-sm text-primary", current ? "font-bold" : "font-semibold")}>
+                              {link.title}
+                            </span>
+                          {link.blurb ? <span className="block text-xs leading-snug text-primary/60">{link.blurb}</span> : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
+                {overview ? (
+                  <Link
+                    href={overview.href}
+                    onClick={close}
+                    tabIndex={showing ? undefined : -1}
+                    aria-current={pathname === overview.href ? "page" : undefined}
+                    className="group/all mx-1 mt-1.5 flex items-center justify-between border-t border-primary/10 px-1.5 pb-1.5 pt-3 text-sm font-semibold text-primary hover:underline focus-visible:underline focus-visible:outline-none">
+                    {overview.title}
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover/all:translate-x-0.5" aria-hidden />
+                  </Link>
+                ) : null}
               </div>
             );
           })}
@@ -592,7 +631,13 @@ const Navbar = () => {
                 <LoaderCircle className="h-3.5 w-3.5 animate-spin text-primary/60" aria-hidden />
               </span>
             ) : (
-              <AccountMenu signedIn={signedIn} image={data?.user?.image} role={data?.user?.role} />
+              <AccountMenu
+                signedIn={signedIn}
+                image={data?.user?.image}
+                role={data?.user?.role}
+                name={data?.user?.name}
+                email={data?.user?.email}
+              />
             )}
 
             <MobileMenu pathname={pathname} />
