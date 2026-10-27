@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Globe, Instagram, Linkedin, Twitter } from "lucide-react";
 import { getAuthorProfile } from "@/app/lib/blog/data";
-import { absoluteUrl, publisherNode, SITE_NAME, SITE_URL } from "@/app/lib/seo";
+import { absoluteUrl, jsonLd as serializeJsonLd, publisherNode, SITE_NAME, SITE_URL } from "@/app/lib/seo";
 import PostGrid from "@/app/components/blog/PostGrid";
 
 type Params = { params: Promise<{ id: string }> };
@@ -56,7 +56,7 @@ const Page = async ({ params }: Params) => {
 
   return (
     <div className="min-h-screen bg-white">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <header
         className="relative overflow-hidden border-b-2 border-primary bg-primary2"

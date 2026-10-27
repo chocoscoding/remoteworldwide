@@ -6,7 +6,7 @@ import NoImage from "./NoImage";
 import type { BlogCategory } from "@/app/lib/blog/categories";
 import type { RenderedPost } from "@/app/lib/blog/render";
 import type { AuthorProfile, BlogStatus, Cta, LeadMagnet, PostCard as PostCardData } from "@/app/lib/blog/types";
-import { absoluteUrl, publisherNode, SITE_URL } from "@/app/lib/seo";
+import { absoluteUrl, jsonLd as serializeJsonLd, publisherNode, SITE_URL } from "@/app/lib/seo";
 import AuthorCard from "./AuthorCard";
 import AuthorStack from "./AuthorStack";
 import CtaCard, { ctaHref } from "./CtaCard";
@@ -107,7 +107,7 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
       {structured && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structured) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(structured) }}
         />
       )}
       {toolbar}

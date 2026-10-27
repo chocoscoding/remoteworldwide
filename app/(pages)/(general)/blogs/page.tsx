@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BLOG_CATEGORIES, categoryBySlug } from "@/app/lib/blog/categories";
 import { getCategoriesWithCounts, getFeaturedPosts, getOffers, getPublishedPosts } from "@/app/lib/blog/data";
-import { absoluteUrl, SITE_NAME, SITE_URL, publisherNode } from "@/app/lib/seo";
+import { absoluteUrl, jsonLd as serializeJsonLd, SITE_NAME, SITE_URL, publisherNode } from "@/app/lib/seo";
 import CategoryNav from "@/app/components/blog/CategoryNav";
 import CtaCard from "@/app/components/blog/CtaCard";
 import PostCard from "@/app/components/blog/PostCard";
@@ -99,7 +99,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
 
   return (
     <div className="min-h-screen bg-white">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <header
         className="relative w-full overflow-hidden border-b-2 border-primary bg-primary2"

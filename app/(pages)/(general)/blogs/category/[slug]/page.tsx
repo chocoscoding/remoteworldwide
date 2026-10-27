@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { BLOG_CATEGORIES, categoryBySlug } from "@/app/lib/blog/categories";
 import { getCategoriesWithCounts, getOffers, getPublishedPosts } from "@/app/lib/blog/data";
-import { absoluteUrl, SITE_NAME, SITE_URL, publisherNode } from "@/app/lib/seo";
+import { absoluteUrl, jsonLd as serializeJsonLd, SITE_NAME, SITE_URL, publisherNode } from "@/app/lib/seo";
 import CategoryNav from "@/app/components/blog/CategoryNav";
 import CtaCard from "@/app/components/blog/CtaCard";
 import LeadMagnetCard from "@/app/components/blog/LeadMagnetCard";
@@ -80,7 +80,7 @@ const CategoryPage = async ({ params, searchParams }: Props) => {
 
   return (
     <div className="min-h-screen bg-white">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <section className="border-b-2 border-primary/10 bg-primary2">
         <div className="mx-auto grid max-w-[1120px] gap-10 px-4 pb-12 pt-12 md:pt-16 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-center lg:gap-14">
