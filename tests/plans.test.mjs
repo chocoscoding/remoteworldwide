@@ -36,7 +36,7 @@ registerHooks({
   },
 });
 
-const { ESTIMATOR_ITEMS, FALLBACK_CATALOGUE, FEATURE_GROUPS, RECOMMENDED_PLAN, rowIncludes, yearlySavingLabel } = await import(
+const { AUTOFILL_ATS, DEFAULT_BILLING, ESTIMATOR_ITEMS, FALLBACK_CATALOGUE, FEATURE_GROUPS, RECOMMENDED_PLAN, perMonthCents, periodCents, rowIncludes, savingLabel, savingPercent } = await import(
   "../app/lib/pricing/catalogue.ts"
 );
 const { AD_FREE_FROM, PLAN_TIERS, PLAN_TIER_NAMES, freeLeftLabel, freeResetsLabel, leadTierFor, tierAllows, upgradeTierFor } = await import("../app/lib/settings/types.ts");
@@ -60,12 +60,12 @@ const plansWith = (label) => PLAN_TIERS.filter((tier) => rowIncludes(row(label),
 describe("the four plans", () => {
   it("are the tiers, cheapest first, at the owner's prices and credits", () => {
     assert.deepEqual(
-      FALLBACK_CATALOGUE.plans.map((p) => [p.key, p.name, p.priceCents, p.yearlyPriceCents ?? null, p.monthlyCredits]),
+      FALLBACK_CATALOGUE.plans.map((p) => [p.key, p.name, p.priceCents, p.quarterlyPriceCents ?? null, p.yearlyPriceCents ?? null, p.monthlyCredits]),
       [
-        ["free", "Free", 0, null, 30],
-        ["basic", "Basic", 1700, 18000, 100],
-        ["pro", "Pro", 3100, 33600, 200],
-        ["ultra", "Ultra", 5500, 60000, 400],
+        ["free", "Free", 0, null, null, 30],
+        ["basic", "Basic", 1700, 4500, 16300, 100],
+        ["pro", "Pro", 3100, 8000, 29900, 200],
+        ["ultra", "Ultra", 5700, 15000, 54900, 400],
       ],
     );
     assert.deepEqual(FALLBACK_CATALOGUE.plans.map((p) => p.key), [...PLAN_TIERS]);
@@ -78,14 +78,37 @@ describe("the four plans", () => {
     assert.deepEqual(FALLBACK_CATALOGUE.plans.filter((p) => p.monthlyCredits === most).map((p) => p.key), ["ultra"]);
   });
 
-  it("works the yearly badge out from the plans: about 10% across Basic, Pro and Ultra", () => {
-    assert.equal(yearlySavingLabel(FALLBACK_CATALOGUE.plans), "Save ~10%");
-    // Every plan on the 10% rule: one figure, said exactly.
-    const flat = FALLBACK_CATALOGUE.plans.map((p) => ({ ...p, yearlyPriceCents: undefined }));
-    assert.equal(yearlySavingLabel(flat), "Save 10%");
-    // A yearly price changed in Mongo moves the badge with it.
-    assert.equal(yearlySavingLabel([{ ...plan("pro"), yearlyPriceCents: 3100 * 12 * 0.8 }]), "Save 20%");
-    assert.equal(yearlySavingLabel([plan("free")]), null);
+  it("opens on Quarterly, and works the badges out from the plans (owner, 2026-10-26)", () => {
+    assert.equal(DEFAULT_BILLING, "quarter");
+    assert.deepEqual(
+      ["basic", "pro", "ultra"].map((key) => [savingPercent(plan(key), "quarter"), savingPercent(plan(key), "year")]),
+      [
+        [12, 20],
+        [14, 20],
+        [12, 20],
+      ],
+    );
+    assert.equal(savingLabel(FALLBACK_CATALOGUE.plans, "quarter"), "Save up to 14%");
+    assert.equal(savingLabel(FALLBACK_CATALOGUE.plans, "year"), "Save 20%");
+    assert.equal(savingLabel(FALLBACK_CATALOGUE.plans, "month"), null);
+    assert.equal(savingLabel([plan("free")], "year"), null);
+    // A price changed in Mongo moves the badge with it.
+    assert.equal(savingLabel([{ ...plan("pro"), yearlyPriceCents: 3100 * 12 * 0.9 }], "year"), "Save 10%");
+  });
+
+  it("charges the real period and says what it comes to a month", () => {
+    assert.deepEqual(["month", "quarter", "year"].map((billing) => periodCents(plan("pro"), billing)), [3100, 8000, 29900]);
+    assert.deepEqual(["month", "quarter", "year"].map((billing) => perMonthCents(plan("pro"), billing)), [3100, 2667, 2492]);
+    assert.equal(periodCents(plan("free"), "quarter"), 0);
+    // A backend without quarterly prices yet falls back to the 12% rule, rounded up to a whole
+    // dollar (owner, 2026-10-27): $44.88 shows as $45, $81.84 as $82, $145.20 as $146.
+    const fallback = (key, priceCents) => periodCents({ ...plan(key), priceCents, quarterlyPriceCents: undefined }, "quarter");
+    assert.deepEqual([fallback("basic", 1700), fallback("pro", 3100), fallback("ultra", 5500)], [4500, 8200, 14600]);
+  });
+
+  it("lists each autofill vendor once", () => {
+    assert.equal(new Set(AUTOFILL_ATS).size, AUTOFILL_ATS.length);
+    assert.ok(AUTOFILL_ATS.length >= 10);
   });
 });
 
@@ -100,14 +123,16 @@ describe("the comparison table's gates", () => {
   it("Pro: interview prep in full, one session a month below it", () => {
     const prep = FEATURE_GROUPS.find((group) => group.title === "Interview prep").rows;
     assert.ok(prep.some((r) => r.label === "Voice mock interviews"));
-    for (const r of prep) assert.deepEqual(plansWith(r.label), ["free", "basic", "pro", "ultra"], r.label);
+    for (const r of prep.filter((r) => r.label !== "Salary negotiation prep")) assert.deepEqual(plansWith(r.label), ["free", "basic", "pro", "ultra"], r.label);
+    assert.deepEqual(plansWith("Salary negotiation prep"), ["pro", "ultra"]);
     assert.deepEqual(row("Voice mock interviews").values, { free: "1 a month", basic: "1 a month" });
     assert.deepEqual(ESTIMATOR_ITEMS.find((item) => item.key === "interviews").limits, { free: 1, basic: 1 });
   });
 
-  it("Ultra: priority support and early access", () => {
-    assert.deepEqual(plansWith("Priority support"), ["ultra"]);
-    assert.deepEqual(plansWith("Early access to new tools"), ["ultra"]);
+  it("Ultra: recommendations to partner companies, the human CV review and priority support", () => {
+    for (const label of ["Recommended to partner companies", "Human CV review", "Priority support"]) assert.deepEqual(plansWith(label), ["ultra"], label);
+    assert.equal(row("Recommended to partner companies").values, undefined);
+    assert.equal(row("Early access to new tools"), undefined);
   });
 
   it("names only plans that exist", () => {
@@ -185,13 +210,14 @@ describe("the backend's seeds (remoteworldwidebackend config/billing.ts)", { ski
   it("are what the fallback copies", () => {
     const seeds = [
       ...billing.matchAll(
-        /key: "(\w+)",\s*name: "([^"]+)",\s*priceCents: (\d+),\s*yearlyPriceCents: (\d+|null),\s*monthlyCredits: (\d+),\s*prioritySupport: (true|false),\s*sortOrder: \d+,\s*features: \[([^\]]*)\]/g,
+        /key: "(\w+)",\s*name: "([^"]+)",\s*priceCents: (\d+),\s*yearlyPriceCents: (\d+|null),\s*quarterlyPriceCents: (\d+|null),\s*monthlyCredits: (\d+),\s*prioritySupport: (true|false),\s*sortOrder: \d+,\s*features: \[([^\]]*)\]/g,
       ),
-    ].map(([, key, name, price, yearly, credits, priority, features]) => ({
+    ].map(([, key, name, price, yearly, quarterly, credits, priority, features]) => ({
       key,
       name,
       priceCents: Number(price),
       yearlyPriceCents: yearly === "null" ? null : Number(yearly),
+      quarterlyPriceCents: quarterly === "null" ? null : Number(quarterly),
       monthlyCredits: Number(credits),
       prioritySupport: priority === "true",
       features: [...features.matchAll(/"([^"]+)"/g)].map((entry) => entry[1]),
@@ -203,6 +229,7 @@ describe("the backend's seeds (remoteworldwidebackend config/billing.ts)", { ski
         name: p.name,
         priceCents: p.priceCents,
         yearlyPriceCents: p.yearlyPriceCents ?? null,
+        quarterlyPriceCents: p.quarterlyPriceCents ?? null,
         monthlyCredits: p.monthlyCredits,
         prioritySupport: p.prioritySupport,
         features: p.features,

@@ -15,8 +15,8 @@ const RANGE =
   "[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[1.5px] [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:bg-white";
 
 /**
- * "How many credits would my month take?" — sliders over the priced actions
- * people use most, and the smallest plan that covers the total and includes
+ * "How many jobs are you applying to?" (owner, 2026-10-26): sliders in jobs, letters and
+ * interviews, turned into credits behind the scenes, and the smallest plan that covers the total and includes
  * every tool in use (voice interviews only count plans that include them, and more than one cover
  * letter skips Free). Past the biggest plan
  * it says how much would come from top-ups rather than inventing a plan that
@@ -43,8 +43,8 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
           <Calculator className="h-4 w-4" aria-hidden />
           Application planner
         </p>
-        <h3 className="mt-2 text-2xl font-bold tracking-tight text-primary md:text-3xl">What would your month take?</h3>
-        <p className="mt-1.5 text-sm text-primary/70">Plan applications first. Each assumes one resume build (3 credits) and one ATS scan (1). Add optional letters and interviews below. Autofill, saved answers, drafts and tracking are free; revisions and new AI answers use extra credits.</p>
+        <h3 className="mt-2 text-2xl font-bold tracking-tight text-primary md:text-3xl">How many jobs are you applying to?</h3>
+        <p className="mt-1.5 text-sm text-primary/70">Set a normal month of your search, with any cover letters and mock interviews. We&apos;ll pick the plan that covers it.</p>
 
         <div className="mt-7 flex flex-col gap-6">
           {ESTIMATOR_ITEMS.map((item) => {
@@ -57,11 +57,8 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
                   <label htmlFor={id} className="text-sm font-semibold text-primary">
                     {item.label}
                   </label>
-                  <span className="text-xs font-medium text-primary/65 tabular-nums">
-                    <span className="mr-1 inline-block min-w-[2.25rem] rounded-md border border-primary/15 bg-primary2 px-1.5 py-0.5 text-center text-sm font-semibold text-primary">
-                      {value}
-                    </span>
-                    × {item.credits} = {value * item.credits}
+                  <span className="inline-block min-w-[2.25rem] rounded-md border border-primary/15 bg-primary2 px-1.5 py-0.5 text-center text-sm font-semibold text-primary tabular-nums">
+                    {value}
                   </span>
                 </div>
                 <input
@@ -70,7 +67,7 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
                   min={0}
                   max={item.max}
                   value={value}
-                  aria-valuetext={`${value} ${item.unit}${value === 1 ? "" : "s"} a month, ${value * item.credits} credits`}
+                  aria-valuetext={`${value} ${item.unit}${value === 1 ? "" : "s"} a month`}
                   onChange={(e) => setCounts((prev) => ({ ...prev, [item.key]: Number(e.target.value) }))}
                   className={RANGE}
                   style={{ background: `linear-gradient(to right, #e1f073 ${pct}%, #f1f0e8 ${pct}%)` }}
@@ -83,10 +80,10 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
 
       <div className="relative flex flex-col justify-between gap-8 bg-primary p-6 text-white md:p-8" aria-live="polite">
         <div className="relative">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">Your monthly application plan</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">Your month</p>
           <p className="mt-1 flex items-baseline gap-2">
             <span className="text-6xl font-bold tracking-tight text-secondary tabular-nums">{counts.applications}</span>
-            <span className="text-base font-semibold text-white/70">tailored applications</span>
+            <span className="text-base font-semibold text-white/70">{counts.applications === 1 ? "job" : "jobs"} applied to</span>
           </p>
         </div>
 
@@ -109,8 +106,10 @@ const CreditEstimator: FC<{ plans: PricingPlan[] }> = ({ plans }) => {
             </div>
             <p className="mt-2 text-xs text-white/65 tabular-nums">
               {shortfall > 0
-                ? `${plan.monthlyCredits} included, plus about ${shortfall} from top-up packs.`
-                : `${total} of ${plan.monthlyCredits} credits, ${plan.monthlyCredits - total} to spare.`}
+                ? "More than any plan includes: the rest comes from a top-up pack."
+                : usedPct >= 80
+                  ? "Covers it, with a little to spare."
+                  : "Covers it, with room to spare."}
             </p>
           </div>
         ) : (

@@ -1,9 +1,10 @@
 // The Basic gates (owner, 2026-10-01): the career coach, talking it through by
 // voice (the coach and Ask about a job; typed Ask about a job stays free), a
-// coach plan on the daily plan, the job-search pod and being recommended to
-// companies start at Basic, and Free keeps one cover letter. Streaks stay on
-// Free. Since 2026-10-15 Free gets every one of them a little each month
-// (`freeMonthly`) except the pod, and the daily plan itself is open to all.
+// coach plan on the daily plan and the job-search pod start at Basic, and Free
+// keeps one cover letter. Streaks stay on Free. Since 2026-10-15 Free gets every
+// one of them a little each month (`freeMonthly`) except the pod, and the daily
+// plan itself is open to all. Being recommended to partner companies moved to
+// Ultra on 2026-10-26 (ULTRA_GATES), with no free one below it.
 //
 // Checked here: each lock on the site names the same plan, in the same words,
 // as the refusal behind it (app/lib/settings/planGates.ts against the AI
@@ -43,7 +44,7 @@ registerHooks({
   },
 });
 
-const { BASIC_GATES, FREE_ALLOWANCE_GATES } = await import("../app/lib/settings/planGates.ts");
+const { BASIC_GATES, FREE_ALLOWANCE_GATES, ULTRA_GATES } = await import("../app/lib/settings/planGates.ts");
 const { TALK_PROBLEM_KINDS, problemAction, problemCopy } = await import("../app/lib/voice/talkState.ts");
 const { ELIGIBILITY_REQUIREMENTS } = await import("../app/lib/recommendations/types.ts");
 
@@ -80,14 +81,20 @@ describe("the Basic gates", () => {
       ["app/components/dashboard/pod/PodLocked.tsx", ["pod"]],
       ["app/components/dashboard/modals/ShareWinModal.tsx", ["pod"]],
       ["app/components/dashboard/tracker/JobTimelineDialog.tsx", ["pod"]],
-      ["app/(pages)/(dashboard)/dashboard/recommend/Client.tsx", ["recommendations"]],
-      ["app/(pages)/(dashboard)/dashboard/recommend/[id]/Client.tsx", ["recommendations"]],
       ["app/(pages)/(dashboard)/dashboard/cover/Client.tsx", ["coverLetters"]],
       ["app/(pages)/(dashboard)/dashboard/apply/steps/CoverStep.tsx", ["coverLetters"]],
     ]) {
       const source = site(file);
       for (const gate of gates) assert.ok(source.includes(`BASIC_GATES.${gate}`), `${file} no longer reads BASIC_GATES.${gate}`);
     }
+    for (const file of ["app/(pages)/(dashboard)/dashboard/recommend/Client.tsx", "app/(pages)/(dashboard)/dashboard/recommend/[id]/Client.tsx"]) {
+      assert.ok(site(file).includes("ULTRA_GATES.recommendations"), `${file} no longer reads ULTRA_GATES.recommendations`);
+    }
+  });
+
+  it("put recommendations on Ultra, locked up front with no free one below it", () => {
+    assert.deepEqual(ULTRA_GATES.recommendations, { plan: "ultra", message: "Being recommended to partner companies is on Ultra.", freeMonthly: 0 });
+    assert.equal(BASIC_GATES.recommendations, undefined);
   });
 
   it("keep the mic: Talk below Basic opens the upgrade popup instead of starting a call", () => {
@@ -100,7 +107,7 @@ describe("the Basic gates", () => {
     assert.ok(site("app/(pages)/(dashboard)/dashboard/Client.tsx").includes("useTasks(planPeriod, undefined, { enabled: !planLock.locked })"));
     assert.ok(site("app/components/dashboard/plan/AddToPlanButton.tsx").includes("useTasks(period, undefined, { enabled: !lock.locked })"));
     assert.ok(site("app/components/dashboard/modals/ShareWinModal.tsx").includes("usePodOverview({ enabled: open && !podLock.locked })"));
-    // Below Basic only for someone holding a redeemed priority intro (a streak gift), which the backend admits.
+    // Below Ultra only for someone holding a redeemed priority intro (a streak gift), which the backend admits.
     const recommend = site("app/(pages)/(dashboard)/dashboard/recommend/Client.tsx");
     assert.ok(recommend.includes("const locked = lock.locked && !holdsPriorityIntro(gifts);") && recommend.includes("useRecommendations({ enabled: !locked })"));
     // The pod's first paint is the server's: a refusal there is the locked screen, not an error page.
@@ -191,10 +198,12 @@ describe("the backend's refusals (remoteworldwidebackend)", { skip: !existsSync(
     assert.ok(backend("services/planGate.ts").includes("`${feature} is on ${PLAN_NAMES[min]} and up.`"));
     assert.ok(backend("routes/pod.routes.ts").includes(`requirePlan("basic", "The job-search pod")`));
     assert.equal(sentence("The job-search pod"), BASIC_GATES.pod.message);
-    // The daily plan is open to every tier; recommendations give Free one a month through eligibility.
+    // The daily plan is open to every tier; recommendations are Ultra's through eligibility, with no free one.
     assert.doesNotMatch(backend("routes/task.routes.ts"), /requirePlan/);
     assert.doesNotMatch(backend("routes/recommendation.routes.ts"), /requirePlan/);
-    assert.match(backend("services/recommendationEligibility.ts"), /\|\| !recommendedThisMonth/);
+    const eligibility = backend("services/recommendationEligibility.ts");
+    assert.match(eligibility, /RECOMMENDATIONS_PLAN: PlanKey = "ultra"/);
+    assert.doesNotMatch(eligibility, /recommendedThisMonth/);
   });
 
   it("leave streaks, leaving a pod and the internal routes alone", () => {

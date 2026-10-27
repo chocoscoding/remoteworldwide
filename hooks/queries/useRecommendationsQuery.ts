@@ -22,7 +22,7 @@ import { useContacts } from "./useContactsQuery";
 import { platformJobSearchQuery } from "./useJobQueries";
 
 /**
- * Every recommendation, live and closed, newest first. Recommendations are on Basic and up, so a
+ * Every recommendation, live and closed, newest first. Recommendations are on Ultra, so a
  * screen below it passes `enabled: false` rather than a request the backend would refuse.
  */
 export function useRecommendations({ enabled = true }: { enabled?: boolean } = {}) {

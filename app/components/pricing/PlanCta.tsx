@@ -13,7 +13,7 @@ import { rememberCheckout } from "@/app/lib/pricing/pendingCheckout";
  * A plan card's button. A paid plan goes to Billing with the plan picked (`?plan=`), where Stripe's
  * checkout opens for it; signed out, it goes there by way of signup, since paying needs an account.
  * Free goes to signup, or to the dashboard for an account that already has it. Either way it carries
- * the page's Monthly / Yearly choice. Renders the signed-out version until the session is known, so
+ * the page's Monthly / Quarterly / Yearly choice. Renders the signed-out version until the session is known, so
  * the static page never flashes a button it has to take back.
  */
 const PlanCta: FC<{ planKey: string; planName: string; featured?: boolean }> = ({ planKey, planName, featured }) => {
@@ -23,7 +23,7 @@ const PlanCta: FC<{ planKey: string; planName: string; featured?: boolean }> = (
   // Free is what every signed-in account already has, so it leads to the dashboard, not a checkout.
   const free = planKey === "free";
   const query = new URLSearchParams({ plan: planKey });
-  if (!free && billing === "year") query.set("billing", "year");
+  if (!free && billing !== "month") query.set("billing", billing);
   const checkout = `/dashboard/settings/billing?${query}`;
   const href = free ? (signedIn ? "/dashboard" : "/signup") : signedIn ? checkout : signupWithNext(checkout);
   const label = free ? (signedIn ? "Open dashboard" : "Start free") : `Choose ${planName}`;

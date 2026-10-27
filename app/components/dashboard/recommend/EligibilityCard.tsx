@@ -35,7 +35,7 @@ const TO_DO: Record<EligibilityRequirement, (label: string) => string> = {
   targetRoles: () => "Add a target role",
   masterResume: () => "Choose a master resume",
   discoverable: () => "Turn on “Let recruiters find me”",
-  plan: () => "Upgrade to Basic",
+  plan: () => "Upgrade to Ultra",
 };
 
 /** Why it matters, in a few words, under the one to start with. */
@@ -49,7 +49,7 @@ const WHY: Record<EligibilityRequirement, string> = {
   targetRoles: "What you want next",
   masterResume: "The one reviewers read",
   discoverable: "So reviewers can see you",
-  plan: "Recommendations start on Basic",
+  plan: "Recommendations come with Ultra",
 };
 
 /** The master resume first: it is what a reviewer actually reads. Then the server's order. */
@@ -58,7 +58,7 @@ const byPriority = (items: EligibilityItem[]) => [...items].sort((a, b) => Numbe
 /**
  * Shown only while someone is not eligible: reviewers only pick from complete
  * profiles with a master resume, from people who left "Let recruiters find me"
- * on, on Basic or higher. It is step one on the screen, so it leads: how much
+ * on, on Ultra. It is step one on the screen, so it leads: how much
  * is left, then each open item as a link straight to the screen that fixes it.
  * What's done folds away behind "Show the N done".
  */
@@ -78,7 +78,7 @@ const EligibilityCard: FC<{ eligibility: RecommendationEligibility }> = ({ eligi
           {left} thing{left === 1 ? "" : "s"} left before reviewers can pick you
         </h2>
         <p className="text-sm text-[#55564f]">
-          Reviewers only pick complete profiles with a master resume and recruiter visibility on, on Basic or higher.
+          Reviewers only pick complete profiles with a master resume and recruiter visibility on, on Ultra.
         </p>
         <div className="mt-1 flex items-center gap-3">
           <div

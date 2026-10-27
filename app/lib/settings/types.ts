@@ -178,15 +178,20 @@ export interface Plan {
   priceCents: number;
   currency: string;
   interval: string;
-  /** A year paid up front (backend: 10% off twelve months unless set by hand); 0 for Free. */
+  /** Three months paid up front; 0 for Free. Absent from an older backend. */
+  quarterlyPriceCents?: number;
+  /** A year paid up front; 0 for Free. */
   yearlyPriceCents: number;
   monthlyCredits: number;
   features: string[];
   prioritySupport: boolean;
 }
 
-/** How a paid plan is paid for. Its credits refill every month either way. */
-export type BillingInterval = "month" | "year";
+/**
+ * How a paid plan is paid for. Its credits refill every month on all three; on quarterly, unused
+ * allowance rolls over until the quarter ends.
+ */
+export type BillingInterval = "month" | "quarter" | "year";
 
 export interface CreditPack {
   key: string;
@@ -296,6 +301,8 @@ export interface Subscription {
   /** Credits spent this period, net of refunds (billing overview only; absent on an older backend). */
   periodSpent?: number;
   cancelAtPeriodEnd: boolean;
+  /** A shorter billing booked for when this period ends (quarterly back to monthly); absent on an older backend. */
+  scheduledInterval?: BillingInterval | null;
   provider: string | null;
 }
 
@@ -324,6 +331,9 @@ export interface Checkout {
   url?: string;
   /** An upgrade of a Stripe subscription that was charged and applied in place: no page to visit. */
   upgraded?: boolean;
+  /** A billing switch booked for the period's end (`at`), or called off (`at` null). Nothing charged. */
+  scheduled?: boolean;
+  at?: string | null;
 }
 
 export interface BillingOverview {

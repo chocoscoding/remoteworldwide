@@ -112,7 +112,7 @@ export function heldGifts(gifts: GiftEvent[]): GiftEvent[] {
 /**
  * A priority referral intro has been redeemed (waiting for a reviewer, or delivered). The backend
  * lets such an account read and answer its recommendations on any plan, so the screens that lock
- * recommendations below Basic stay open for it.
+ * recommendations below Ultra stay open for it.
  */
 export function holdsPriorityIntro(gifts: GiftEvent[]): boolean {
   return gifts.some((g) => g.kind === "referral-intro" && Boolean(g.usedAt));

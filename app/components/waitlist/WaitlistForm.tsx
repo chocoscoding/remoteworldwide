@@ -42,9 +42,10 @@ export const WaitlistFormFromParams: FC<FormLook> = (look) => {
   const params = useSearchParams();
   const plan = params.get("plan");
   const known = isPlanTier(plan) ? plan : null;
-  // Yearly only means something beside a paid plan, as the pricing page sends it.
-  const yearly = known !== null && known !== "free" && params.get("billing") === "year";
-  return <WaitlistForm initialPlan={known} initialYearly={yearly} {...look} />;
+  // Quarterly or yearly only means something beside a paid plan, as the pricing page sends it.
+  const asked = params.get("billing");
+  const billing = known !== null && known !== "free" && (asked === "year" || asked === "quarter") ? asked : "month";
+  return <WaitlistForm initialPlan={known} initialBilling={billing} {...look} />;
 };
 
 type FormLook = {
@@ -55,9 +56,9 @@ type FormLook = {
   className?: string;
 };
 
-const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean } & FormLook> = ({
+const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialBilling?: "month" | "quarter" | "year" } & FormLook> = ({
   initialPlan,
-  initialYearly = false,
+  initialBilling = "month",
   tone = "light",
   inputId = HERO_INPUT_ID,
   className,
@@ -97,7 +98,7 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, plan, billing: plan ? (initialYearly ? "year" : "month") : null, website }),
+        body: JSON.stringify({ email, plan, billing: plan ? initialBilling : null, website }),
       });
       // Over the sign-up limit the answer is plain text, not the JSON envelope.
       if (res.status === 429) {
@@ -202,7 +203,7 @@ const WaitlistForm: FC<{ initialPlan: PlanTier | null; initialYearly?: boolean }
       {plan ? (
         <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-white py-1 pl-3 pr-1 text-xs font-bold text-primary">
           Interested in {PLAN_TIER_NAMES[plan]}
-          {initialYearly ? ", billed yearly" : null}
+          {initialBilling === "year" ? ", billed yearly" : initialBilling === "quarter" ? ", billed quarterly" : null}
           <button
             type="button"
             onClick={() => setPlan(null)}

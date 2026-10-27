@@ -20,7 +20,9 @@ export interface PricingPlan {
   priceCents: number;
   currency: string;
   interval: string;
-  /** A year up front, from the backend. Absent from the fallback copy, which works it out. */
+  /** Three months up front, from the backend. Absent from an older backend, which falls back to the discount rule. */
+  quarterlyPriceCents?: number;
+  /** A year up front, from the backend. */
   yearlyPriceCents?: number;
   monthlyCredits: number;
   features: string[];
@@ -43,38 +45,109 @@ export interface PricingCatalogue {
 export const RECOMMENDED_PLAN = "pro";
 
 /**
- * Yearly billing for a plan that carries no `yearlyPriceCents`: twelve months at the monthly price,
- * less this share. The backend owns the real figure (each seeded plan sets its own yearly price) and
- * sends it; this is only a fallback.
+ * How a paid plan is paid for (owner, 2026-10-26): monthly, every three months, or yearly. Credits
+ * refill every month on all three; on quarterly, unused allowance rolls over until the quarter ends.
  */
-export const YEARLY_DISCOUNT = 0.1;
+export type BillingInterval = "month" | "quarter" | "year";
 
-export type BillingInterval = "month" | "year";
+/** The billing /pricing opens on (owner, 2026-10-26): most searches take two or three months. */
+export const DEFAULT_BILLING: BillingInterval = "quarter";
 
-/** What a plan costs for a year up front, to the cent. */
-export const yearlyCents = (plan: PricingPlan) => plan.yearlyPriceCents ?? Math.round(plan.priceCents * 12 * (1 - YEARLY_DISCOUNT));
+/** Shortest first: a plan may only move to the same billing or a longer one. */
+export const BILLING_ORDER: BillingInterval[] = ["month", "quarter", "year"];
 
-/** What a plan comes to per month on the chosen billing: its price, or its yearly price over twelve. */
-export const perMonthCents = (plan: PricingPlan, billing: BillingInterval) =>
-  billing === "year" ? Math.round(yearlyCents(plan) / 12) : plan.priceCents;
+/** How many months one paid period covers. */
+export const MONTHS_IN: Record<BillingInterval, number> = { month: 1, quarter: 3, year: 12 };
 
 /**
- * What paying yearly saves, as the Monthly / Yearly switch says it, worked out from the plans: "Save
- * 10%" when every paid plan saves the same (rounded down, so it never claims more than a plan gives),
- * or "Save ~10%" when they differ, the plans' average saving to the nearest point (owner,
- * 2026-10-01: Basic, Pro and Ultra save about 12%, 10% and 9%).
+ * Discounts for a plan that carries no quarterly or yearly price of its own. The backend owns the
+ * real figures (each seeded plan sets its own) and sends them; these are only a fallback.
  */
-export const yearlySavingLabel = (plans: PricingPlan[]): string | null => {
-  const savings = plans
-    .filter((plan) => plan.priceCents > 0)
-    .map((plan) => (1 - yearlyCents(plan) / (plan.priceCents * 12)) * 100)
-    .filter((percent) => percent > 0);
-  if (savings.length === 0) return null;
-  // The nudge keeps an exact 10% (1 - 0.9 is 0.0999… in floating point) from reading as 9%.
-  const whole = savings.map((percent) => Math.floor(percent + 1e-6));
-  if (whole.every((percent) => percent === whole[0])) return `Save ${whole[0]}%`;
-  return `Save ~${Math.round(savings.reduce((sum, percent) => sum + percent, 0) / savings.length)}%`;
+export const QUARTERLY_DISCOUNT = 0.12;
+export const YEARLY_DISCOUNT = 0.2;
+
+/** A worked-out price is rounded UP to a whole dollar (owner, 2026-10-27: $44.88 shows as $45), never cents. */
+const wholeDollarsUp = (cents: number) => Math.ceil(Math.round(cents) / 100) * 100;
+
+/** What a plan costs for three months up front. */
+export const quarterlyCents = (plan: PricingPlan) => plan.quarterlyPriceCents || wholeDollarsUp(plan.priceCents * 3 * (1 - QUARTERLY_DISCOUNT));
+
+/** What a plan costs for a year up front. */
+export const yearlyCents = (plan: PricingPlan) => plan.yearlyPriceCents || wholeDollarsUp(plan.priceCents * 12 * (1 - YEARLY_DISCOUNT));
+
+/** What one period of a plan costs on the chosen billing: the real charge. */
+export const periodCents = (plan: PricingPlan, billing: BillingInterval) =>
+  plan.priceCents <= 0 ? 0 : billing === "year" ? yearlyCents(plan) : billing === "quarter" ? quarterlyCents(plan) : plan.priceCents;
+
+/** What a plan comes to per month on the chosen billing. */
+export const perMonthCents = (plan: PricingPlan, billing: BillingInterval) => Math.round(periodCents(plan, billing) / MONTHS_IN[billing]);
+
+/**
+ * What a plan saves on the chosen billing against paying monthly, as a whole percent, or 0. Rounded
+ * to the nearest point, the way the owner's price sheet states them (2026-10-26: quarterly saves 12%
+ * on Basic and Ultra and 14% on Pro, yearly about 20% on each).
+ */
+export const savingPercent = (plan: PricingPlan, billing: BillingInterval): number => {
+  if (billing === "month" || plan.priceCents <= 0) return 0;
+  const percent = Math.round((1 - periodCents(plan, billing) / (plan.priceCents * MONTHS_IN[billing])) * 100);
+  return percent > 0 ? percent : 0;
 };
+
+/**
+ * The badge on a billing option, worked out from the plans: "Save 20%" when every paid plan saves
+ * the same, "Save up to 14%" when they differ, or null when nothing is saved.
+ */
+export const savingLabel = (plans: PricingPlan[], billing: BillingInterval): string | null => {
+  const savings = plans.filter((plan) => plan.priceCents > 0).map((plan) => savingPercent(plan, billing)).filter((percent) => percent > 0);
+  if (savings.length === 0) return null;
+  const most = Math.max(...savings);
+  return savings.every((percent) => percent === most) ? `Save ${most}%` : `Save up to ${most}%`;
+};
+
+/** Both badges, for the billing switch. */
+export const savingLabels = (plans: PricingPlan[]): Partial<Record<BillingInterval, string | null>> => ({
+  quarter: savingLabel(plans, "quarter"),
+  year: savingLabel(plans, "year"),
+});
+
+/** Whole dollars, for "about $27 a month". */
+export const aboutMoney = (cents: number, currency = "USD") => money(Math.round(cents / 100) * 100, currency);
+
+/** The vendors autofill is listed as working on, under the /pricing hero. Prune any that fail the extension's autofill tests. */
+export const AUTOFILL_ATS = [
+  "Workday",
+  "Greenhouse",
+  "Lever",
+  "Ashby",
+  "iCIMS",
+  "SmartRecruiters",
+  "BambooHR",
+  "Workable",
+  "Oracle Taleo",
+  "SAP SuccessFactors",
+  "Jobvite",
+  "JazzHR",
+  "Breezy HR",
+  "Recruitee",
+  "Teamtailor",
+  "Personio",
+  "Pinpoint",
+  "Rippling",
+  "Gem",
+  "Dover",
+  "Paylocity",
+  "UKG",
+  "ADP",
+  "Bullhorn",
+  "Comeet",
+  "Freshteam",
+  "Zoho Recruit",
+  "Manatal",
+  "Homerun",
+  "Polymer",
+  "Wellfound",
+  "JOIN",
+] as const;
 
 export const FALLBACK_CATALOGUE: PricingCatalogue = {
   plans: [
@@ -86,40 +159,62 @@ export const FALLBACK_CATALOGUE: PricingCatalogue = {
       interval: "month",
       monthlyCredits: 30,
       prioritySupport: false,
-      features: ["30 AI credits a month", "Every AI tool, a little each month", "1 interview prep session a month", "One resume and one cover letter"],
+      features: ["Job board, autofill and saved answers", "Application tracking and drafts", "1 resume and 1 cover letter", "30 AI credits a month"],
     },
     {
       key: "basic",
       name: "Basic",
       priceCents: 1700,
-      yearlyPriceCents: 18000,
+      quarterlyPriceCents: 4500,
+      yearlyPriceCents: 16300,
       currency: "USD",
       interval: "month",
       monthlyCredits: 100,
       prioritySupport: false,
-      features: ["100 AI credits a month", "No ads and unlimited resumes", "AI help in the resume builder", "AI career coach and daily plan", "Job-search pod and recommendations"],
+      features: [
+        "A tailored resume and cover letter for every job",
+        "Unlimited resumes and no ads",
+        "AI help in the resume builder",
+        "Career coach and daily plan",
+        "Job-search pod",
+        "100 AI credits a month",
+      ],
     },
     {
       key: "pro",
       name: "Pro",
       priceCents: 3100,
-      yearlyPriceCents: 33600,
+      quarterlyPriceCents: 8000,
+      yearlyPriceCents: 29900,
       currency: "USD",
       interval: "month",
       monthlyCredits: 200,
       prioritySupport: false,
-      features: ["200 AI credits a month", "Everything in Basic", "Interview prep and voice mock interviews", "Likely interview questions for each role"],
+      features: [
+        "Everything in Basic",
+        "Mock interviews with your likely interviewer, with a delivery report and follow-ups",
+        "Likely questions for each role",
+        "Salary negotiation prep",
+        "200 AI credits a month",
+      ],
     },
     {
       key: "ultra",
       name: "Ultra",
-      priceCents: 5500,
-      yearlyPriceCents: 60000,
+      priceCents: 5700,
+      quarterlyPriceCents: 15000,
+      yearlyPriceCents: 54900,
       currency: "USD",
       interval: "month",
       monthlyCredits: 400,
       prioritySupport: true,
-      features: ["400 AI credits a month", "Everything in Pro", "Priority support", "Early access to new tools"],
+      features: [
+        "Everything in Pro",
+        "We recommend you directly to partner companies hiring on Remote Worldwide",
+        "A human review of your CV every month, back within 48 hours",
+        "Priority support",
+        "400 AI credits a month",
+      ],
     },
   ],
   creditPacks: [
@@ -156,8 +251,9 @@ export const CREDIT_COSTS: CreditCost[] = [
 
 /**
  * Every paid plan: no ads (app/lib/ads.ts) and more than one resume start at Basic (owner,
- * 2026-10-01). The AI tools, the coach, voice talk and recommendations are on Free a little each
- * month (owner, 2026-10-15; `freeMonthly`), and only the pod has none. Streaks stay on Free.
+ * 2026-10-01). The AI tools, the coach and voice talk are on Free a little each month (owner,
+ * 2026-10-15; `freeMonthly`), and the pod has none. Recommendations to partner companies are
+ * Ultra's alone (owner, 2026-10-26). Streaks stay on Free.
  */
 const PAID_PLANS = ["basic", "pro", "ultra"];
 
@@ -178,9 +274,12 @@ export interface EstimatorItem {
   limits?: Record<string, number>;
 }
 
-/** What the estimator on /pricing multiplies by. Kept next to CREDIT_COSTS so the two can't disagree. */
+/**
+ * What the estimator on /pricing multiplies by. Kept next to CREDIT_COSTS so the two can't disagree.
+ * It asks in jobs, not credits (owner, 2026-10-26): a job is a tailored resume (3) and an ATS scan (1).
+ */
 export const ESTIMATOR_ITEMS: EstimatorItem[] = [
-  { key: "applications", label: "Applications with a tailored resume", unit: "application", credits: 4, max: 80, initial: 10, limits: { free: 1 } },
+  { key: "applications", label: "Jobs you apply to", unit: "job", credits: 4, max: 80, initial: 10, limits: { free: 1 } },
   { key: "letters", label: "Cover letters", unit: "letter", credits: 2, max: 40, initial: 10, limits: { free: 1 } },
   { key: "interviews", label: "Voice mock interviews", unit: "interview", credits: 5, max: 30, initial: 6, limits: { free: 1, basic: 1 } },
 ];
@@ -209,10 +308,9 @@ export const CREDIT_ROWS: FeatureRow[] = [
 /**
  * The comparison table under the plan cards. Free's limits (one resume, one letter, a little of each
  * AI tool a month: services/planService.ts FREE_MONTHLY) and interview prep on Pro (one session a
- * month below it) are enforced by the AI service, the coaching tools and recommendations on Basic
- * by the AI service and backend (one recommendation a month below it), the pod on Basic by the
- * backend, and ads by app/lib/ads.ts; priority support and early access are the Ultra plan's
- * promise. Referral search is left out for now.
+ * month below it) are enforced by the AI service, the coaching tools on Basic by the AI service,
+ * the pod on Basic and recommendations on Ultra by the backend, and ads by app/lib/ads.ts; the
+ * human CV review and priority support are the Ultra plan's promise. Referral search is left out.
  */
 export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
@@ -246,7 +344,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
       { label: "Autofill from your profile", note: "Your details and saved answers · free", plans: "all" },
       { label: "AI answers in the extension", note: "New questions answered from your resume · 1 credit", plans: "all" },
       { label: "Application drafts", note: "Pick an application back up later", plans: "all" },
-      { label: "Recommendations to companies", note: "Reviewers put strong profiles in front of hiring teams", plans: "all", values: freeMonthly("1") },
+      { label: "Recommended to partner companies", note: "We recommend you directly to partner companies hiring on Remote Worldwide", plans: ["ultra"] },
     ],
   },
   {
@@ -258,6 +356,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
       { label: "Interview reports", note: "Scores, transcript and recording playback", plans: "all" },
       { label: "Delivery analysis", note: "Long pauses, filler words and pitch", plans: "all" },
       { label: "Positioning, diction and grammar", note: "Every point backed by a quote from your answers", plans: "all" },
+      { label: "Salary negotiation prep", note: "Rehearse the offer conversation for the role", plans: ["pro", "ultra"] },
     ],
   },
   {
@@ -275,8 +374,8 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     title: "Support",
     rows: [
       { label: "Email support", plans: "all" },
+      { label: "Human CV review", note: "1 a month, back within 48 hours", plans: ["ultra"] },
       { label: "Priority support", plans: ["ultra"] },
-      { label: "Early access to new tools", plans: ["ultra"] },
     ],
   },
 ];

@@ -9,8 +9,8 @@ import { apiPost } from "@/app/lib/api/client";
 import { Check, CreditCard, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
-import { BillingSwitch } from "@/app/components/pricing/BillingInterval";
-import { RECOMMENDED_PLAN, perCredit, yearlyCents, yearlySavingLabel } from "@/app/lib/pricing/catalogue";
+import { BillingSwitch, PERIOD_SUFFIX, PERIOD_WORDS } from "@/app/components/pricing/BillingInterval";
+import { BILLING_ORDER, RECOMMENDED_PLAN, aboutMoney, perCredit, perMonthCents, periodCents, savingLabels } from "@/app/lib/pricing/catalogue";
 import { boostEndsAt, proUntilLabel } from "@/app/lib/settings/boost";
 import type { BillingInterval, Plan } from "@/app/lib/settings/types";
 import { useBilling } from "../BillingProvider";
@@ -26,16 +26,20 @@ const day = (date: Date | null) => (date ? date.toLocaleDateString("en-US", { da
 const CREDITS_FEATURE = /^\s*[\d,]+\s+(ai\s+)?credits\b/i;
 
 /** What one period of a plan costs on the given billing. */
-const periodPrice = (p: Plan, billing: BillingInterval) => (billing === "year" ? yearlyCents(p) : p.priceCents);
+const periodPrice = (p: Plan, billing: BillingInterval) => periodCents(p, billing);
 
-/** "Ultra", or "Ultra, billed yearly". */
-const planLabel = (name: string, billing: BillingInterval | null) => (billing === "year" ? `${name}, billed yearly` : name);
+/** "Ultra", "Ultra, billed quarterly" or "Ultra, billed yearly". */
+const planLabel = (name: string, billing: BillingInterval | null) =>
+  billing === "year" ? `${name}, billed yearly` : billing === "quarter" ? `${name}, billed quarterly` : name;
+
+/** Shortest billing first, as the up-only rule reads it. */
+const billingRank = (billing: BillingInterval) => BILLING_ORDER.indexOf(billing);
 
 /** If the confirm call is slow or the webhook is what lands, look again a few times. */
 const RETURN_REFETCH_MS = [1500, 4000, 9000];
 
 /**
- * @param initialBilling The billing picked on /pricing, when the visitor came from there (`?billing=year`).
+ * @param initialBilling The billing picked on /pricing, when the visitor came from there (`?billing=quarter|year`).
  * @param pickedPlan The plan picked on /pricing (`?plan=`), whose checkout opens on arrival.
  * @param returned Back from Stripe: Checkout paid ("success"), abandoned ("canceled"), or the portal ("portal").
  * @param sessionId The Checkout session Stripe sent back with "success", which the backend confirms.
@@ -142,7 +146,11 @@ const BillingClient: FC<{
           onFree
             ? `You're on Free: ${monthlyCredits || "a few"} credits a month, topped back up at the start of each month. Pick a plan below for more.`
             : plan
-              ? `${plan.name}: ${money(periodPrice(plan, interval), plan.currency)} a ${interval === "year" ? "year" : plan.interval}. Credits refill every month and don't roll over.`
+              ? `${plan.name}: ${money(periodPrice(plan, interval), plan.currency)} ${PERIOD_WORDS[interval]}. ${
+                  interval === "quarter"
+                    ? "Credits refill every month, and unused ones roll over until the quarter ends."
+                    : "Credits refill every month and don't roll over."
+                }`
               : "Your plan is active."
         }
         action={
@@ -181,7 +189,13 @@ const BillingClient: FC<{
                 Next {monthlyCredits} credits {nextRefill}
               </p>
             ) : null}
-            {renews && !subscription.cancelAtPeriodEnd ? <p>Renews {renews}</p> : renews ? <p>Ends {renews}</p> : null}
+            {renews && subscription.cancelAtPeriodEnd ? (
+              <p>Ends {renews}</p>
+            ) : renews && subscription.scheduledInterval === "month" ? (
+              <p>Monthly billing from {renews}</p>
+            ) : renews ? (
+              <p>Renews {renews}</p>
+            ) : null}
           </div>
         </div>
 
@@ -208,8 +222,8 @@ const BillingClient: FC<{
       <SettingsSection
         id="plans"
         title="Plans"
-        description="Pay monthly, or yearly for less. Credits refill every month either way. Change or cancel whenever."
-        action={<BillingSwitch value={billing} onChange={setBilling} saving={yearlySavingLabel(plans)} size="sm" />}>
+        description="Pay monthly, quarterly or yearly for less. Credits refill every month on all three, and on quarterly unused ones roll over until the quarter ends. Cancel whenever."
+        action={<BillingSwitch value={billing} onChange={setBilling} savings={savingLabels(plans)} size="sm" />}>
         <div className="grid gap-3 py-1 sm:grid-cols-2 xl:grid-cols-4">
           {plans.map((p, index) => {
             const samePlan = p.key === currentKey;
@@ -217,11 +231,30 @@ const BillingClient: FC<{
             const current = samePlan && (onFree || billing === interval);
             // With card payments a pending row is only an open Checkout, which may have been closed.
             const pending = !payments && p.key === pendingPlanKey && pendingInterval === billing;
-            const yearly = billing === "year" && p.priceCents > 0;
-            // Plans only move up (the backend refuses the rest): a higher plan, or monthly to yearly.
-            // Never a lower plan, never yearly back to monthly.
-            const allowed = onFree || (interval === "year" && billing === "month" ? false : index > currentIndex || (samePlan && interval === "month" && billing === "year"));
-            const action = current || !allowed || p.priceCents <= 0 ? null : samePlan ? "Switch to yearly" : onFree ? `Choose ${p.name}` : `Upgrade to ${p.name}`;
+            const longer = billing !== "month" && p.priceCents > 0;
+            // Plans only move up (the backend refuses the rest): billing only gets longer (monthly,
+            // quarterly, yearly), on a higher plan or the same plan. The one way back is the same plan
+            // from quarterly to monthly (owner, 2026-10-26), booked for the quarter's end.
+            const switchBack = !onFree && samePlan && interval === "quarter" && billing === "month" && !subscription.cancelAtPeriodEnd;
+            const booked = subscription.scheduledInterval === "month";
+            const allowed =
+              onFree ||
+              switchBack ||
+              (billingRank(billing) >= billingRank(interval) && (index > currentIndex || (samePlan && billingRank(billing) > billingRank(interval))));
+            const action =
+              current && booked
+                ? "Keep quarterly"
+                : current || !allowed || p.priceCents <= 0 || (switchBack && booked)
+                  ? null
+                  : switchBack
+                    ? "Switch to monthly"
+                    : samePlan
+                      ? billing === "year"
+                        ? "Switch to yearly"
+                        : "Switch to quarterly"
+                      : onFree
+                        ? `Choose ${p.name}`
+                        : `Upgrade to ${p.name}`;
             // The credits line under the price says it once; the features don't repeat it.
             const features = p.features.filter((f) => !CREDITS_FEATURE.test(f));
             // Pro leads for anyone below it (owner, 2026-10-17), the way it does on /pricing.
@@ -242,15 +275,15 @@ const BillingClient: FC<{
                   ) : null}
                 </div>
                 <p className="mt-3 text-3xl font-bold leading-none text-primary tabular-nums">
-                  {money(yearly ? Math.round(yearlyCents(p) / 12) : p.priceCents, p.currency)}
-                  <span className="ml-1 text-xs font-semibold text-black/45">/month</span>
+                  {money(longer ? periodPrice(p, billing) : p.priceCents, p.currency)}
+                  <span className="ml-1 text-xs font-semibold text-black/45">{longer ? PERIOD_SUFFIX[billing] : "/month"}</span>
                 </p>
                 <p className="mt-2 text-xs text-black/55 tabular-nums">
                   <span className="font-semibold text-primary">{p.monthlyCredits} credits</span> every month
                   {p.priceCents > 0 && p.monthlyCredits > 0 ? (
-                    <span className="block text-black/45">{perCredit(periodPrice(p, billing) / (billing === "year" ? 12 : 1), p.monthlyCredits, p.currency)} per credit</span>
+                    <span className="block text-black/45">{perCredit(perMonthCents(p, billing), p.monthlyCredits, p.currency)} per credit</span>
                   ) : null}
-                  {yearly ? <span className="block text-black/45">{money(yearlyCents(p), p.currency)} billed yearly</span> : null}
+                  {longer ? <span className="block text-black/45">about {aboutMoney(perMonthCents(p, billing), p.currency)} a month</span> : null}
                 </p>
                 <ul className="mt-4 flex flex-1 flex-col gap-2 border-t border-black/8 pt-4">
                   {features.map((f) => (
@@ -262,8 +295,13 @@ const BillingClient: FC<{
                     </li>
                   ))}
                 </ul>
+                {switchBack && booked ? (
+                  <p className="mt-5 text-xs font-semibold text-black/55">Starts {renews}</p>
+                ) : switchBack && !booked ? (
+                  <p className="mt-5 text-xs text-black/45">From {renews}, when your quarter ends</p>
+                ) : null}
                 {action ? (
-                  <button type="button" className={cn(BUTTON_SOLID, "mt-5")} onClick={() => buyPlan(p.key, billing)} disabled={busy || pending}>
+                  <button type="button" className={cn(BUTTON_SOLID, switchBack ? "mt-2" : "mt-5")} onClick={() => buyPlan(p.key, billing)} disabled={busy || pending}>
                     {pending ? "Reserved" : action}
                   </button>
                 ) : null}
@@ -331,7 +369,7 @@ const BillingClient: FC<{
               label={day(inv.completedAt) ?? day(inv.createdAt) ?? ""}
               hint={
                 inv.kind === "subscription"
-                  ? `${plans.find((p) => p.key === inv.planKey)?.name ?? inv.planKey} plan${inv.interval === "year" ? ", yearly" : ""}`
+                  ? `${plans.find((p) => p.key === inv.planKey)?.name ?? inv.planKey} plan${inv.interval === "year" ? ", yearly" : inv.interval === "quarter" ? ", quarterly" : ""}`
                   : `${inv.credits} credits`
               }>
               <span className="text-sm font-semibold text-primary tabular-nums">{money(inv.amountCents, inv.currency)}</span>

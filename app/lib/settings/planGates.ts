@@ -21,11 +21,10 @@ export interface PlanGateSpec {
 
 /**
  * On Basic (owner, 2026-10-01): the career coach, talking it through by voice (the coach and Ask
- * about a job; typed Ask about a job stays free), a coach plan on the daily plan, the job-search pod
- * and being recommended to companies; Free keeps one cover letter. Streaks stay on Free. Since
- * 2026-10-15 every one but the pod has a monthly free allowance below Basic (`freeMonthly`, the
- * AI service's FREE_MONTHLY and the backend's one recommendation a month), and the daily plan itself
- * is open to everyone. Each message is the service's refusal past the allowance, minus its "You've
+ * about a job; typed Ask about a job stays free), a coach plan on the daily plan and the job-search
+ * pod; Free keeps one cover letter. Streaks stay on Free. Since 2026-10-15 every one but the pod has
+ * a monthly free allowance below Basic (`freeMonthly`, the AI service's FREE_MONTHLY), and the daily
+ * plan itself is open to everyone. Being recommended to companies moved to Ultra (ULTRA_GATES). Each message is the service's refusal past the allowance, minus its "You've
  * used this month's free …" opening (tests/basic-gates.test.mjs).
  */
 export const BASIC_GATES = {
@@ -33,12 +32,20 @@ export const BASIC_GATES = {
   voice: { plan: "basic", message: "Talking it through by voice is on Basic and up.", freeMonthly: 1 },
   dailyPlan: { plan: "basic", message: "The daily plan is on Basic and up.", freeMonthly: 1 },
   pod: { plan: "basic", message: "The job-search pod is on Basic and up.", freeMonthly: 0 },
-  recommendations: { plan: "basic", message: "Being recommended to companies is on Basic and up.", freeMonthly: 1 },
   coverLetters: {
     plan: "basic",
     message: "Free keeps one cover letter. Edit or revise it, delete it to start another, or upgrade to Basic to write more.",
     freeMonthly: 0,
   },
+} as const satisfies Record<string, PlanGateSpec>;
+
+/**
+ * On Ultra alone (owner, 2026-10-26): being recommended directly to partner companies, with no free
+ * one below it. The backend's eligibility holds the plan requirement (services/recommendationEligibility.ts);
+ * a redeemed priority intro, a streak gift, still stands in for the plan there and here.
+ */
+export const ULTRA_GATES = {
+  recommendations: { plan: "ultra", message: "Being recommended to partner companies is on Ultra.", freeMonthly: 0 },
 } as const satisfies Record<string, PlanGateSpec>;
 
 /** The AI tools and interview prep, with their monthly free uses below the plan they are on. */

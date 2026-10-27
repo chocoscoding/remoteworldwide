@@ -19,6 +19,8 @@ import { absoluteUrl } from "@/app/lib/seo";
 import PlanCta from "@/app/components/pricing/PlanCta";
 import CreditEstimator from "@/app/components/pricing/CreditEstimator";
 import FaqList from "@/app/components/pricing/FaqList";
+import PlanComparison from "@/app/components/pricing/PlanComparison";
+import AtsMarquee from "@/app/components/pricing/AtsMarquee";
 import CheckChip from "@/app/components/marketing/CheckChip";
 import Eyebrow from "@/app/components/marketing/Eyebrow";
 import { BillingIntervalProvider, BillingToggle, PlanCardPrice } from "@/app/components/pricing/BillingInterval";
@@ -28,7 +30,7 @@ import {
   fetchCatalogue,
   money,
   perCredit,
-  yearlySavingLabel,
+  savingLabels,
   type PricingPlan,
 } from "@/app/lib/pricing/catalogue";
 
@@ -38,7 +40,7 @@ export const revalidate = 3600;
 // The page title takes the root template ("%s | Remote Worldwide"); social cards get the full name.
 const TITLE = "Pricing | Remote Worldwide";
 const DESCRIPTION =
-  "Simple monthly or yearly plans for Remote Worldwide's AI job-search toolkit: resume tailoring, ATS scans, cover letters and voice mock interviews. Cancel anytime.";
+  "Monthly, quarterly or yearly plans for Remote Worldwide: one-click autofill, a tailored resume and cover letter for every job, and voice mock interviews with your likely interviewer. Cancel anytime.";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -52,13 +54,6 @@ export const metadata: Metadata = {
     images: [absoluteUrl("/api/og/job")],
   },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
-};
-
-const TAGLINES: Record<string, string> = {
-  free: "To get started",
-  basic: "For a steady search",
-  pro: "For a focused search",
-  ultra: "For an all-out search",
 };
 
 /** The small brand square beside each plan's name. A plan the page doesn't know gets the sparkle. */
@@ -75,27 +70,43 @@ const PLAN_GRID: Record<number, string> = {
 const FAQ: { q: string; a: React.ReactNode }[] = [
   {
     q: "What do I get on Free?",
-    a: "30 credits every month, topped back up to 30 at the start of each month, for ATS scans, your cover letter, questions about a job and drafting new AI answers. Filling your profile and approved saved answers is free. You also get the resume builder for one resume, one cover letter, application tracking and drafts, and streaks. Free includes limited monthly AI resume help, coaching, planning, recommendations and interview practice. Basic expands resume help, coaching and planning; Pro expands interview practice. Grammar, rewrite, quantify and shorten use no credits within your plan allowance.",
+    a: "The job board, autofill from your profile and saved answers, application tracking and drafts, one resume and one cover letter, and 30 AI credits a month, topped back up to 30 at the start of each month. Credits pay for ATS scans, questions about a job and new AI answers. Free also includes a little AI resume help, coaching, planning and interview practice each month. Basic expands resume help, coaching and planning; Pro expands interview practice.",
+  },
+  {
+    q: "Is autofill free, or does it use credits?",
+    a: "Filling a form from your profile and your approved saved answers is free on every plan, as often as you like. Credits are only used when you ask the AI to draft a new answer to a question you haven't answered before.",
+  },
+  {
+    q: "How does quarterly billing work?",
+    a: "You pay for three months at once, for less than three monthly payments: Basic $45, Pro $80 and Ultra $150. Your monthly allowance still arrives every month, and unused credits roll over to the next month until the quarter ends. Then the leftover allowance resets and a fresh quarter starts. Most searches take 2–3 months, so one quarter usually covers yours.",
   },
   {
     q: "Do unused credits roll over?",
-    a: "Your monthly allowance refills at the start of each period and doesn't roll over. Credits from top-up packs never expire, and they're only spent once the month's allowance runs out.",
-  },
-  {
-    q: "Can I change or cancel my plan?",
-    a: "Whenever you like. Pay monthly, or yearly for less, and nothing is locked in. Cancel and your plan runs to the end of the period you've paid for.",
+    a: "On quarterly plans, yes, within the quarter: what you don't use one month is still there the next, until the quarter ends. On monthly and yearly plans the allowance refills each month and doesn't roll over. Credits from top-up packs never expire on any plan, and they're only spent once your allowance runs out.",
   },
   {
     q: "Do yearly plans get a year of credits at once?",
-    a: "No. A yearly plan is paid once a year, and its credits refill every month, exactly like a monthly plan. Unused monthly credits don't roll over; top-up packs never expire.",
+    a: "No. A yearly plan is paid once a year, for about 20% less than paying monthly (Basic $163, Pro $299, Ultra $549), and its credits refill every month, exactly like a monthly plan. Unused monthly credits don't roll over; top-up packs never expire.",
+  },
+  {
+    q: "Can I change or cancel my plan?",
+    a: "Cancel whenever you like, and your plan runs to the end of the period you've paid for. You can move up to a bigger plan or a longer billing at any time. To pay less, cancel and choose again when the period ends.",
   },
   {
     q: "What happens if I run out of credits?",
-    a: "Top up with a credit pack, or wait for your allowance to refill. The free parts keep working either way: the job board, importing jobs, drafts, tracking, and autofill from your profile and approved saved answers. Generating new AI answers uses credits; and on a paid plan your first 15 coach replies each day.",
+    a: "Top up with a credit pack, or wait for your allowance to refill. The free parts keep working either way: the job board, importing jobs, drafts, tracking, and autofill from your profile and approved saved answers. New AI answers use credits, and so do coach replies past your first 15 each day on a paid plan.",
+  },
+  {
+    q: "Why not just use ChatGPT?",
+    a: "You can, and plenty of people do. Remote Worldwide does the job-search work around the writing: it tailors your resume and cover letter to the real posting and scores them against it, fills the application form for you, keeps every application in a tracker, and runs a voice mock interview with the kind of interviewer you're likely to meet, then reports on your answers and your delivery. No copying and pasting between tabs, and nothing lost between applications.",
   },
   {
     q: "How are voice mock interviews billed?",
     a: "Free and Basic include one session a month; Pro and Ultra support more practice. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
+  },
+  {
+    q: "What does Ultra add?",
+    a: "Everything in Pro, plus: we recommend you directly to partner companies hiring on Remote Worldwide, a person reviews your CV once a month and sends it back within 48 hours, and your support requests go first. It also has the most credits, 400 a month. A recommendation puts you in front of a hiring team; it isn't a promise of an interview.",
   },
   {
     q: "Can I earn credits instead of buying them?",
@@ -131,7 +142,16 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
 // const creditLabel = (credits: number, label?: string) => label ?? (credits === 0 ? "Free" : `${credits} credit${credits === 1 ? "" : "s"}`);
 
 /** Plan copy lives in Mongo; referral search is off the public pages for now, so its line is hidden here. */
-const HIDDEN_FEATURE = /referral/i;
+const HIDDEN_FEATURE = /referral|early access/i;
+
+/** A feature that only restates the plan's monthly credits ("200 AI credits a month"): it goes last. */
+const CREDITS_FEATURE = /^\s*[\d,]+\s+(ai\s+)?credits\b/i;
+
+/** Outcomes first, AI credits last (owner, 2026-10-26), whatever order the rows were written in. */
+const cardFeatures = (plan: PricingPlan): string[] => {
+  const shown = plan.features.filter((feature) => !HIDDEN_FEATURE.test(feature));
+  return [...shown.filter((feature) => !CREDITS_FEATURE.test(feature)), ...shown.filter((feature) => CREDITS_FEATURE.test(feature))];
+};
 
 /**
  * One plan, after the owner's reference (2026-10-01): flat and simple. The recommended plan is
@@ -140,7 +160,7 @@ const HIDDEN_FEATURE = /referral/i;
  */
 function PlanCard({ plan }: { plan: PricingPlan }) {
   const featured = plan.key === RECOMMENDED_PLAN;
-  const features = ["Free autofill, saved answers, drafts and tracker", ...(plan.key === "ultra" ? [`${plan.monthlyCredits} credits for a higher-volume search`, "More tailored applications and interview practice each month"] : []), ...plan.features.filter((feature) => !HIDDEN_FEATURE.test(feature) && !(plan.key === "ultra" && /credits|early access/i.test(feature)))];
+  const features = cardFeatures(plan);
   const Icon = PLAN_ICONS[plan.key] ?? Sparkle;
   return (
     <div className={cn("flex flex-col rounded-[20px] p-6 text-primary", featured ? "bg-secondary" : "border border-primary/10 bg-white")}>
@@ -164,12 +184,10 @@ function PlanCard({ plan }: { plan: PricingPlan }) {
 
       <PlanCardPrice plan={plan} featured={featured} />
 
-      <p className={cn("mt-3 text-sm", featured ? "text-primary/80" : "text-primary/70")}>{TAGLINES[plan.key] ?? " "}</p>
 
-      <hr className={cn("my-5 border-t", featured ? "border-primary/15" : "border-primary/10")} />
+      <hr className={cn("my-6 border-t", featured ? "border-primary/15" : "border-primary/10")} />
 
-      <p className="text-sm font-semibold">What&apos;s included:</p>
-      <ul className="mb-7 mt-3.5 flex flex-1 flex-col gap-3">
+      <ul className="mb-7 flex flex-1 flex-col gap-3">
         {features.map((feature) => (
           <li key={feature} className="flex items-start gap-3 text-sm leading-snug">
             <CheckChip tone={featured ? "white" : "lime"} className="mt-px" />
@@ -192,38 +210,40 @@ export default async function PricingPage() {
     <BillingIntervalProvider>
       <div className="bg-[#f9f8f1] text-primary">
         {/* Hero: flat, centred, the way the owner's reference opens (2026-10-01). */}
-        <section className="mx-auto max-w-[1140px] px-4 pb-12 pt-14 text-center md:pb-16 md:pt-20">
-          <Eyebrow>Pricing &amp; plans</Eyebrow>
-          {/* The lime marker stays (owner, 2026-10-01): behind the words in an isolated heading, so the ink text keeps its contrast. */}
-          <h1 className="isolate mx-auto mt-5 max-w-[760px] text-balance text-[2.5rem] font-bold leading-[1.04] tracking-tight sm:text-6xl">
-            Pick a plan.{" "}
+        <section className="mx-auto max-w-[1440px] px-4 pb-10 pt-14 text-center md:pb-12 md:pt-20">
+          {/* Short and on one line (owner, 2026-10-27): the size follows the viewport from a tablet up so
+              the sentence fits; a phone wraps it. The lime marker stays behind the last words. */}
+          <h1 className="isolate mx-auto text-balance text-[2rem] font-bold leading-[1.1] tracking-tight sm:whitespace-nowrap sm:text-[clamp(1.75rem,4.4vw,3.5rem)]">
+            Apply in one click. Interview{" "}
             <span className="relative inline-block whitespace-nowrap">
               <span
                 className="absolute inset-x-[-0.12em] bottom-[0.06em] top-[0.5em] -z-10 -rotate-1 rounded-md bg-secondary"
                 aria-hidden
               />
-              Land the job.
+              already rehearsed.
             </span>
           </h1>
-          <p className="mx-auto mt-5 max-w-[520px] text-balance text-base text-primary/70 md:text-lg">
-            Autofill your details, reuse approved answers, resume application drafts and track every job for free. Upgrade for tailored applications and interview practice.
-          </p>
-          <BillingToggle saving={yearlySavingLabel(plans)} className="mt-8" />
-          <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-primary/70">
-            <li className="flex items-center gap-2">
-              <RefreshCcw className="h-4 w-4" aria-hidden /> Cancel anytime
-            </li>
-            <li className="flex items-center gap-2">
-              <InfinityIcon className="h-4 w-4" aria-hidden /> Top-ups never expire
-            </li>
-            <li className="flex items-center gap-2">
-              <Check className="h-4 w-4" aria-hidden /> Job board always free
-            </li>
-          </ul>
         </section>
 
-        {/* Plans */}
+        <AtsMarquee className="pb-12 md:pb-16" />
+
+        {/* Plans: the billing switch sits right above the cards it changes (owner, 2026-10-27). */}
         <section className="mx-auto max-w-[1180px] px-4" aria-label="Plans">
+          <div className="mb-6 flex flex-col items-center gap-4">
+            <BillingToggle savings={savingLabels(plans)} />
+            {/* Free autofill is said once here rather than on every card (owner, 2026-10-26). */}
+            <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-primary/70">
+              <li className="flex items-center gap-2">
+                <Check className="h-4 w-4 flex-none" aria-hidden /> Free autofill, saved answers, drafts and tracker on every plan
+              </li>
+              <li className="flex items-center gap-2">
+                <RefreshCcw className="h-4 w-4 flex-none" aria-hidden /> Cancel anytime
+              </li>
+              <li className="flex items-center gap-2">
+                <InfinityIcon className="h-4 w-4 flex-none" aria-hidden /> Top-ups never expire
+              </li>
+            </ul>
+          </div>
           <div className={cn("grid gap-5", PLAN_GRID[plans.length] ?? "md:grid-cols-3")}>
             {plans.map((plan) => (
               <PlanCard key={plan.key} plan={plan} />
@@ -242,6 +262,11 @@ export default async function PricingPage() {
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
             </Link>
           </div>
+        </section>
+
+        {/* Comparison: back on the page (owner, 2026-10-27), every feature plan by plan, no heading block. */}
+        <section className="mx-auto max-w-[1180px] px-4 pt-10" aria-label="Compare plans">
+          <PlanComparison plans={plans} />
         </section>
 
         {/* Top-ups */}

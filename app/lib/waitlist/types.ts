@@ -42,7 +42,7 @@ export const WAITLIST_ADMIN_PAGE_SIZE = 50;
 export const WAITLIST_ADMIN_PAGE_MAX = 100;
 
 export type WaitlistPlan = "free" | "basic" | "pro" | "ultra";
-export type WaitlistBilling = "month" | "year";
+export type WaitlistBilling = "month" | "quarter" | "year";
 
 export interface WaitlistAdminItem {
   id: string;

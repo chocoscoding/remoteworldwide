@@ -46,13 +46,23 @@ export function useBuyPlan(onCheckout: (checkout: Checkout) => void) {
     ({ planKey, interval }) => apiPost<Checkout>("/api/billing/checkout/plan", { planKey, interval }),
     (checkout) => {
       // An upgrade of a card subscription: the difference was charged and the plan has moved.
+      // Quarterly back to monthly: booked for the quarter's end, or called off. Nothing is charged.
+      if (checkout.scheduled) {
+        if (checkout.at) {
+          const on = new Date(checkout.at).toLocaleDateString(undefined, { day: "numeric", month: "long" });
+          toast.success("Monthly billing booked", { description: `Your quarter runs to ${on}, then you pay monthly. Nothing is charged now.` });
+        } else {
+          toast.success("Switch called off", { description: "Your billing stays as it is." });
+        }
+        return;
+      }
       if (checkout.upgraded) {
         toast.success("Plan upgraded", { description: "The difference for this period was charged to your card, and the extra credits are in." });
         return;
       }
       if (goToStripe(checkout)) return;
       onCheckout(checkout);
-      toast.success(checkout.interval === "year" ? "Plan reserved, billed yearly" : "Plan reserved", { description: PENDING_NOTE });
+      toast.success(checkout.interval === "year" ? "Plan reserved, billed yearly" : checkout.interval === "quarter" ? "Plan reserved, billed quarterly" : "Plan reserved", { description: PENDING_NOTE });
     },
   );
 }

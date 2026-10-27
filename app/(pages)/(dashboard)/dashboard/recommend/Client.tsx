@@ -20,7 +20,7 @@
 // listings. Not yet: "Step one" (the checklist) leads, how it works runs under
 // it, and the listings say which of their four signals matched.
 //
-// Being recommended is on Basic and up (owner, 2026-10-01). Below it the list
+// Being recommended is on Ultra (owner, 2026-10-26; Basic and up before). Below it the list
 // is not read, its section says what the plan adds, and the eligibility
 // checklist carries the plan as one more thing to do. Worth watching stays.
 
@@ -36,7 +36,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
 import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
 import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
-import { BASIC_GATES } from "@/app/lib/settings/planGates";
+import { ULTRA_GATES } from "@/app/lib/settings/planGates";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings } from "../settings/SettingsProvider";
 import AvailabilityPill from "@/app/components/dashboard/recommend/AvailabilityPill";
@@ -142,7 +142,7 @@ const NoCompaniesRow: FC<{ body: string; side: ReactNode }> = ({ body, side }) =
 const RecommendClient: FC = () => {
   const { goals, pausedDaysLeft, resumeSearch, gifts } = useActivity();
   const { preferences, profile } = useSettings();
-  const lock = usePlanLock(BASIC_GATES.recommendations);
+  const lock = usePlanLock(ULTRA_GATES.recommendations);
   // A redeemed priority intro (a streak gift) opens recommendations on any plan, as the backend does.
   const locked = lock.locked && !holdsPriorityIntro(gifts);
   const recommendations = useRecommendations({ enabled: !locked });
@@ -251,10 +251,10 @@ const RecommendClient: FC = () => {
     if (locked) {
       return ineligible ? (
         <NoCompaniesRow
-          body="Recommendations come with Basic. Anything already made for you is kept."
+          body="Recommendations come with Ultra. Anything already made for you is kept."
           side={
             <StickerButton variant="outline" size="sm" onClick={lock.upgrade}>
-              Upgrade to Basic
+              Upgrade to Ultra
             </StickerButton>
           }
         />
@@ -262,9 +262,9 @@ const RecommendClient: FC = () => {
         <section aria-label="Companies you're in front of" className="flex flex-col gap-3">
           <h2 className="text-base font-extrabold text-primary">Companies you&apos;re in front of</h2>
           <PlanLockNote
-            gate={BASIC_GATES.recommendations}
-            title="Recommendations come with Basic"
-            body="On Basic and up, reviewers can put a strong profile like yours in front of a hiring team. Anything already made for you is kept."
+            gate={ULTRA_GATES.recommendations}
+            title="Recommendations come with Ultra"
+            body="On Ultra, we recommend you directly to partner companies hiring on Remote Worldwide. Anything already made for you is kept."
           />
         </section>
       );
@@ -311,7 +311,7 @@ const RecommendClient: FC = () => {
         <Pill variant="neutral" className="hidden sm:inline-flex">
           Picked by our reviewers
         </Pill>
-        {locked && <PlanChip plan="basic" className="flex-none" />}
+        {locked && <PlanChip plan="ultra" className="flex-none" />}
         <div className="flex-1" />
         {/* Drawn once the server has said where you stand, so it never flips from "available" to "not yet". */}
         {(paused || !eligibility.isPending) && (
