@@ -59,6 +59,9 @@ export const metadata: Metadata = {
     ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
     ...(process.env.BING_SITE_VERIFICATION ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } } : {}),
   },
+  // AdSense site ownership (owner, 2026-10-29): a tag on every page that loads nothing. The ad
+  // script itself still loads only where an ad box renders (app/components/main/GoogleAd.tsx).
+  other: { "google-adsense-account": "ca-pub-6630162015653294" },
 };
 
 // Light only: tells browsers (and the ones that darken pages on their own) not to restyle the site.
