@@ -1,30 +1,13 @@
 "use client";
-import CompanySection from "@/app/components/main/job/CompanySection";
-import JobDescription from "@/app/components/main/job/JobDescription";
-import { JobAndCompany } from "@/types/main";
-import type { Job } from "@/types/main";
-import { FC } from "react";
+import type { FC } from "react";
+import type { JobAndCompany } from "@/types/main";
+import JobPage from "@/app/components/main/job/JobPage";
 
-const OneJobClient: FC<{ Job: JobAndCompany; hasUserBookmarked: boolean | undefined }> = ({ Job, hasUserBookmarked }) => {
-  const { company: companyDetails, ..._jobDetails } = Job;
-  const jobDetails = _jobDetails as unknown as Job;
-  return (
-    <main className="min-h-screen w-full">
-      <section className="w-full m-auto max-w-[1200px] min-h-screen my-2 p-3">
-        {/* main section */}
-        <section className="grid grid-cols-1 md:grid-cols-10 h-full w-full gap-5 md:gap-10">
-          {/* |-job info */}
-          <div className="col-span-full md:col-span-7 h-fit">
-            <JobDescription hasUserBookmarked={hasUserBookmarked} showBookmark={true} data={jobDetails} />
-          </div>
-          {/* |-company info */}
-          <div className="col-span-full -order-1 md:order-2 md:col-span-3 h-fit">
-            <CompanySection companyDetails={companyDetails} />
-          </div>
-        </section>
-      </section>
-    </main>
-  );
-};
+// The redesigned job page, the dashboard's (owner, 2026-10-28): the apply bar, "Before you apply"
+// (apply with AI, ATS score, cover letter, referrals, a resume, the tracker), copy link and bookmark.
+// Signed out, a tool opens the sign-in popup from the (general) layout's AuthModalProvider.
+const OneJobClient: FC<{ Job: JobAndCompany; hasUserBookmarked: boolean | undefined }> = ({ Job, hasUserBookmarked }) => (
+  <JobPage job={Job} hasUserBookmarked={hasUserBookmarked} />
+);
 
 export default OneJobClient;
