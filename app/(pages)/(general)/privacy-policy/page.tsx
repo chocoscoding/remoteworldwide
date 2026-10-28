@@ -6,7 +6,7 @@ import { absoluteUrl, SITE_NAME, SITE_URL } from "@/app/lib/seo";
 const COMPANY = "Remote Worldwide";
 const CONTACT_EMAIL = "contact@remoteworldwide.net";
 const JURISDICTION = "Nigeria";
-const LAST_UPDATED = "9 October 2026";
+const LAST_UPDATED = "28 October 2026";
 
 // The page title takes the root template ("%s | Remote Worldwide"); social cards don't, so they get the full name.
 const TITLE = "Privacy Policy";
@@ -39,6 +39,10 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
         </p>
         <ul>
           <li>We collect what you give us (your account, resumes, documents, answers and contacts) and some data about how you use the site.</li>
+          <li>
+            We track how you use the product (pages, presses and features) to improve it. Those records leave out your personal content, such as
+            what you type and what your documents say.
+          </li>
           <li>We use it to run the service, and send parts of it to the providers behind the AI and voice tools, only when you use those tools.</li>
           <li>We do not sell your data and we do not share it with advertisers.</li>
           <li>
@@ -97,9 +101,17 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           post you found it on, and when you consented.
         </p>
         <p>
-          <strong>Usage.</strong> Pages you view, recorded by the analytics tools listed in{" "}
-          <a href="#cookies">Cookies and browser storage</a>, plus the technical data any web server receives: IP address, browser, device and
-          approximate location.
+          <strong>How you use {SITE_NAME}.</strong> To improve the product, we record how it is used: the pages you open, the buttons and links
+          you press, the forms you send, the features you use and the changes you save, with the time, and your browser, operating system and
+          whether you are on a phone. These records don&rsquo;t include your personal content: never what you type into a field, the text of your
+          resumes, cover letters, answers or documents, or the details in a web address. When you are signed in, they are kept with your account
+          so we can understand how people use each feature and fix what gets in their way. They are seen only by our team, kept for 180 days, and
+          deleted with your account. If you are signed out, we record them only after you accept analytics cookies, under a random id rather than
+          your name or email.
+        </p>
+        <p>
+          <strong>Other usage.</strong> Pages you view, recorded by the analytics tools listed in <a href="#cookies">Cookies and browser storage</a>
+          , plus the technical data any web server receives: IP address, browser, device and approximate location.
         </p>
         <p>We do not take card payments on the site, so we do not collect payment card details.</p>
       </>
@@ -398,6 +410,11 @@ const sections: { id: string; title: string; body: ReactNode }[] = [
           <strong>Analytics.</strong> Google Analytics sets cookies and records which pages are visited. It loads only after you accept analytics
           cookies, and not at all if you reject them or haven&rsquo;t chosen yet. Vercel Analytics measures visits and page speed without cookies,
           so it runs on every page. We don&rsquo;t use Hotjar.
+        </p>
+        <p>
+          <strong>Our own usage records.</strong> If you are signed out and accept analytics cookies, your browser keeps a random id (
+          <code>rww_track_anon</code>) so the pages and presses of one visitor can be told apart; see{" "}
+          <a href="#what-we-collect">What we collect</a>. Each tab also keeps a random visit id (<code>rww_track_session</code>) until it is closed.
         </p>
         <p>
           <strong>Your choice.</strong> Change it any time from &ldquo;Cookie settings&rdquo; at the bottom of every page. Turning analytics off
