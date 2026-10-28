@@ -2,7 +2,7 @@
 //
 // Checked here: the site's mirrors of the backend's contracts agree with it (track kinds, ad slots,
 // where those repos are checked out beside this one); `ago` reads times the way the admin screens
-// show them; the ad slots on the pages stay switched off until launch, and the AdSlot asks the
+// show them; the /jobs list has tall side slots and a bottom banner, and the AdSlot asks the
 // backend rather than deciding who sees ads itself; the pages a lower plan has none of render the
 // plan card instead of themselves; and the admin data goes only through admin-guarded server actions.
 //
@@ -32,7 +32,7 @@ registerHooks({
 });
 
 const { TRACK_KINDS, ago } = await import("../app/lib/tracking/types.ts");
-const { AD_SLOTS } = await import("../app/lib/ads/types.ts");
+const { AD_SLOTS, ADSENSE_UNITS, ADVERTISE_HREF, adsenseUnit } = await import("../app/lib/ads/types.ts");
 
 const site = (path) => readFileSync(fileURLToPath(new URL(path, ROOT)), "utf8");
 const BACKEND = fileURLToPath(new URL("../../remoteworldwidebackend/src/", import.meta.url));
@@ -62,20 +62,36 @@ describe("ago", () => {
 });
 
 describe("ads", () => {
-  it("keep every slot on the pages commented out until launch", () => {
-    for (const file of ["app/(pages)/(general)/jobs/Client.tsx", "app/components/main/job/JobPage.tsx"]) {
-      const live = site(file)
-        .split("\n")
-        .filter((line) => line.includes("<AdSlot") && !line.trim().startsWith("{/*"));
-      assert.deepEqual(live, [], `${file} renders an ad slot`);
-    }
+  it("flank the jobs list with tall slots and put a banner under it, only for viewers who get ads", () => {
+    const jobs = site("app/(pages)/(general)/jobs/Client.tsx");
+    assert.match(jobs, /showAds \? <AdSlot slot="jobs-left" shape="tall"/);
+    assert.match(jobs, /showAds \? <AdSlot slot="jobs-right" shape="tall"/);
+    assert.match(jobs, /showAds \? <AdSlot slot="jobs-bottom" shape="banner"/);
+    const job = site("app/components/main/job/JobPage.tsx");
+    assert.match(job, /<AdSlot slot="job-sidebar" only="desktop"/);
+    assert.match(job, /\{apply\(true\)\}\s*<AdSlot slot="job-bottom" shape="banner" only="mobile"/);
   });
 
-  it("ask the backend for the slot's ad, which decides who sees one", () => {
+  it("ask the backend for the slot, which decides who sees ads, and show a custom ad before Google", () => {
     const slot = site("app/components/main/AdSlot.tsx");
     assert.match(slot, /\/api\/ads\?slot=/);
+    assert.match(slot, /if \(!answer\?\.show \|\| \(!ad && !unit && !preview\)\) return null;/);
+    // The empty dashed box is a local-development aid only.
+    assert.match(slot, /const preview = !ad && !unit && process\.env\.NODE_ENV === "development";/);
+    assert.ok(slot.indexOf("{ad ? (") < slot.indexOf("<GoogleAd"), "a custom ad comes first");
     assert.match(slot, /rel="sponsored noopener noreferrer"/);
     assert.match(site("next.config.mjs"), /source: "\/api\/ads\/:path\*"/);
+  });
+
+  it("keep the 'Want your ads here?' email link ready but commented out", () => {
+    const slot = site("app/components/main/AdSlot.tsx");
+    assert.match(slot, /\{\/\*[^]*?<a href=\{ADVERTISE_HREF\}[^>]*text-left[^]*?Want your ads here\?[^]*?\*\/\}/);
+    assert.match(ADVERTISE_HREF, /^mailto:contact@remoteworldwide\.net\?subject=/);
+  });
+
+  it("read the AdSense unit per slot, off without a publisher id", () => {
+    assert.equal(adsenseUnit("jobs-left"), process.env.NEXT_PUBLIC_ADSENSE_CLIENT ? ADSENSE_UNITS["jobs-left"] : null);
+    for (const name of AD_SLOTS) assert.ok(name in ADSENSE_UNITS);
   });
 });
 

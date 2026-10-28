@@ -11,7 +11,6 @@ import { toast } from "react-toastify";
 import type { JobAndCompany } from "@/types/main";
 import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
 import BookmarkStatus from "../BookmarkStatus";
-// eslint-disable-next-line unused-imports/no-unused-imports, @typescript-eslint/no-unused-vars -- used by the commented-out ad slot in the sidebar
 import AdSlot from "../AdSlot";
 import { saveJob } from "@/app/lib/jobs/api";
 import { apiMessage } from "@/app/lib/api/core";
@@ -187,13 +186,13 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
           <div><small>Job by</small><h2>{company.name}<ArrowUpRight size={16} /></h2><p>{company.about}</p></div>
         </Link>
         <div className={styles.desktopTools}>{tools()}</div>
-        {/* Built and switched off until ads launch: uncomment to show the admin's job-sidebar ad
-            (/heroshima/ads). The backend sends one only to signed-out visitors and Free accounts. */}
-        {/* <AdSlot slot="job-sidebar" /> */}
+        {/* The backend sends ads only to signed-out visitors and Free accounts. */}
+        <AdSlot slot="job-sidebar" only="desktop" />
       </aside>
     </div>
     <div ref={barAnchor} className={styles.barAnchor} />
     {apply(true)}
+    <AdSlot slot="job-bottom" shape="banner" only="mobile" className="px-4 pb-5" />
   </main>;
 }
 
