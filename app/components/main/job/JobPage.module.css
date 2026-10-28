@@ -41,7 +41,7 @@
   .actions .actionIcon{flex:none;width:24px;height:24px;border:0;border-radius:50%}
   .actions .actionIcon svg{width:14px;height:14px}
   .actions .actionArrow{display:none}
-  .mobileToggle{display:grid;place-items:center;flex:none;width:38px;height:38px;border:1px solid #22232533;border-radius:10px;background:#f0f0ea}
+  .mobileToggle{display:grid;place-items:center;flex:none;width:28px;height:28px;border:1px solid #22232533;border-radius:8px;background:#f0f0ea}.mobileToggle svg{width:14px;height:14px}
   .expanded{display:block;padding-bottom:25px;margin-bottom:36px}
   .expanded .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;mask-image:none;gap:10px;padding:0 3px 0 0}
   .expanded .actions>button{flex-direction:column;align-items:flex-start;gap:8px;white-space:normal;min-height:82px;padding:10px 12px;border:1px solid #222325;border-radius:12px;box-shadow:3px 3px 0 #222325;font-size:13px}
@@ -49,7 +49,7 @@
   .expanded .actions>button:first-child{grid-column:1/-1}
   .expanded .actionIcon{width:30px;height:30px;border:1px solid #22232526;border-radius:8px}
   .expanded .actionArrow{display:block}
-  .expanded .mobileToggle{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);box-shadow:0 0 0 5px white}
+  .expanded .mobileToggle{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);box-shadow:0 0 0 5px white}
   .body{border:0;padding:0!important;min-height:0;font-size:14px!important;line-height:1.72!important}
   .body>:last-child{margin-bottom:0!important}
   .barAnchor{display:block;height:0}
