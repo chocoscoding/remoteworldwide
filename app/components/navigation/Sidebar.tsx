@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles, LifeBuoy, Hourglass } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles, LifeBuoy, Hourglass, Users, Activity, Megaphone } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -22,6 +22,10 @@ const blogSubItems = (role: "ADMIN" | "AUTHOR", hasProfile: boolean): SubItem[] 
 
 const menuItemsForAdmin: MenuItem[] = [
   { name: "Home", icon: Home, path: "/", section: "home" },
+  // Everyone with an account, and what each of them does on the site.
+  { name: "Users", icon: Users, path: "/users", section: "users" },
+  // What everyone is doing: active people, features, pages, presses, the live feed.
+  { name: "Activity", icon: Activity, path: "/activity", section: "activity" },
   {
     name: "Company",
     icon: Building,
@@ -76,6 +80,8 @@ const menuItemsForAdmin: MenuItem[] = [
   { name: "Coverage requests", icon: LifeBuoy, path: "/coverage", section: "coverage" },
   // Early access: who joined /waitlist, and giving them a Pro month with 100 credits.
   { name: "Waitlist", icon: Hourglass, path: "/waitlist", section: "waitlist" },
+  // Ads placed in the site's slots (shown to signed-out visitors and Free accounts).
+  { name: "Ads", icon: Megaphone, path: "/ads", section: "ads" },
   { name: "STT lab", icon: AudioLines, path: "/stt-lab", section: "stt-lab" },
 ];
 const menuItemsForAuthor: MenuItem[] = [
@@ -116,6 +122,12 @@ const Sidebar = ({ hasAuthorProfile, sttLab }: { hasAuthorProfile: boolean; sttL
       setOpenAccordion("coverage");
     } else if (pathname.includes("/waitlist")) {
       setOpenAccordion("waitlist");
+    } else if (pathname.includes("/heroshima/users")) {
+      setOpenAccordion("users");
+    } else if (pathname.includes("/heroshima/activity")) {
+      setOpenAccordion("activity");
+    } else if (pathname.includes("/heroshima/ads")) {
+      setOpenAccordion("ads");
     } else {
       setOpenAccordion("home");
     }

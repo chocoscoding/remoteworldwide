@@ -285,6 +285,24 @@ const nextConfig = {
         source: "/api/waitlist",
         destination: `${backend}/api/waitlist`,
       },
+      // The tracker's batches (app/lib/tracking): page views, presses and form sends, for the
+      // admin's users and activity screens. Session cookie when signed in; signed out, only with
+      // analytics consent. The admin screens read them back through server actions, not here.
+      {
+        source: "/api/track",
+        destination: `${backend}/api/track`,
+      },
+      // An ad slot asking for its ad (the backend decides from the viewer's plan whether to send
+      // one) and counting a view or a press (app/components/main/AdSlot.tsx). /api/ads/admin under
+      // it needs an ADMIN session there; the admin screen uses server actions (libs/ads-admin.ts).
+      {
+        source: "/api/ads",
+        destination: `${backend}/api/ads`,
+      },
+      {
+        source: "/api/ads/:path*",
+        destination: `${backend}/api/ads/:path*`,
+      },
       {
         source: "/api/subscribers/export",
         destination: `${backend}/api/blog/admin/subscribers.csv`,

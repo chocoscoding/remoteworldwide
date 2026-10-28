@@ -7,6 +7,7 @@ import NextTopLoader from "nextjs-toploader";
 import { SessionProvider } from "next-auth/react";
 import AuthSessionLogger from "./components/AuthSessionLogger";
 import QueryProvider from "@/app/components/providers/QueryProvider";
+import ActivityTracker from "@/app/components/providers/ActivityTracker";
 import { ToastContainer, Slide } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import SiteJsonLd from "./components/SiteJsonLd";
@@ -118,6 +119,7 @@ export default function RootLayout({
         />
         <SessionProvider>
           <AuthSessionLogger />
+          <ActivityTracker />
           {/* Inside SessionProvider so anything that reads the session is
               available to queries; outside everything else so one cache serves
               the whole app. */}
