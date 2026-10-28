@@ -62,7 +62,7 @@ describe("the four plans", () => {
     assert.deepEqual(
       FALLBACK_CATALOGUE.plans.map((p) => [p.key, p.name, p.priceCents, p.quarterlyPriceCents ?? null, p.yearlyPriceCents ?? null, p.monthlyCredits]),
       [
-        ["free", "Free", 0, null, null, 30],
+        ["free", "Free", 0, null, null, 45],
         ["basic", "Basic", 1700, 4500, 16300, 100],
         ["pro", "Pro", 3100, 8000, 29900, 200],
         ["ultra", "Ultra", 5700, 15000, 54900, 400],

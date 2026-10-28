@@ -51,7 +51,7 @@ export default function ToolsPage() {
             they share one profile, so you only tell your story once.
           </p>
           <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 text-sm font-medium text-primary/75">
-            {["Start free, no card", "30 AI credits a month on Free", "You approve every word"].map((item) => (
+            {["Start free, no card", "45 AI credits a month on Free", "You approve every word"].map((item) => (
               <li key={item} className="flex min-h-[44px] items-center gap-2.5">
                 <CheckChip size="sm" />
                 {item}

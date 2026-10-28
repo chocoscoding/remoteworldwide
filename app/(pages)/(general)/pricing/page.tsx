@@ -70,7 +70,7 @@ const PLAN_GRID: Record<number, string> = {
 const FAQ: { q: string; a: React.ReactNode }[] = [
   {
     q: "What do I get on Free?",
-    a: "The job board, autofill from your profile and saved answers, application tracking and drafts, one resume and one cover letter, and 30 AI credits a month, topped back up to 30 at the start of each month. Credits pay for ATS scans, questions about a job and new AI answers. Free also includes a little AI resume help, coaching, planning and interview practice each month. Basic expands resume help, coaching and planning; Pro expands interview practice.",
+    a: "The job board, autofill from your profile and saved answers, application tracking and drafts, one resume and one cover letter, and 45 AI credits a month, topped back up to 45 at the start of each month. Credits pay for ATS scans, questions about a job and new AI answers. Free also includes a little AI resume help, coaching, planning and interview practice each month. Basic expands resume help, coaching and planning; Pro expands interview practice.",
   },
   {
     q: "Is autofill free, or does it use credits?",
@@ -394,7 +394,7 @@ export default async function PricingPage() {
                 Not ready to pick? <span className="text-secondary">Start free.</span>
               </h2>
               <p className="mx-auto mt-4 max-w-[520px] text-white/75">
-                30 credits a month, no card needed. Upgrade when your search picks up, or don&apos;t.
+                45 credits a month, no card needed. Upgrade when your search picks up, or don&apos;t.
               </p>
               <Link
                 href="/signup"

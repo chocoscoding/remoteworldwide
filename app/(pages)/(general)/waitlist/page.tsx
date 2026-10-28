@@ -107,7 +107,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: "What's free, and what needs a plan?",
     a: (
       <>
-        Free comes with 30 credits a month, one resume, one cover letter, ATS scans, application tracking and streaks. Resume AI, the career
+        Free comes with 45 credits a month, one resume, one cover letter, ATS scans, application tracking and streaks. Resume AI, the career
         coach, the daily plan and pods start at Basic, and interview prep at Pro. Everything is on the{" "}
         <Link
           href="/pricing"
