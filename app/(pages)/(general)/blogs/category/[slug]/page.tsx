@@ -20,6 +20,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const category = categoryBySlug((await params).slug);
   if (!category) return { title: "Category not found", robots: { index: false } };
   const page = Math.max(1, Number.parseInt((await searchParams).page ?? "1", 10) || 1);
+  // A category with no posts is a thin page: kept out of the index (and the sitemap) until it has one.
+  const empty = await getCategoriesWithCounts()
+    .then((counts) => (counts.find((c) => c.slug === category.slug)?.count ?? 0) === 0)
+    .catch(() => false);
   const title = `${category.name} | ${SITE_NAME} Blog`;
   const description = `${category.tagline} Practical ${category.name.toLowerCase()} guides for people applying to remote roles.`;
   return {
@@ -27,7 +31,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     title: { absolute: title },
     description,
     alternates: { canonical: absoluteUrl(`/blogs/category/${category.slug}`) },
-    robots: page > 1 ? { index: false, follow: true } : undefined,
+    robots: page > 1 || empty ? { index: false, follow: true } : undefined,
     openGraph: {
       type: "website",
       title,

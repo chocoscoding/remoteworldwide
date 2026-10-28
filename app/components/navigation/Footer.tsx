@@ -7,14 +7,18 @@ import { LinkedInIcon } from "@/components/ui/linkedin-icon";
 import { TwitterIcon } from "@/components/ui/twitter-icon";
 import CookieSettingsButton from "@/app/components/consent/CookieSettingsButton";
 import { SITE_NAV } from "@/app/lib/navigation/siteNav";
+import { FOOTER_LANDINGS } from "@/app/lib/landing/catalogue";
 
 // The site's crawlable links, in three columns (owner, 2026-10-15): the navbar's three groups
 // (SITE_NAV, so the words stay the same in both, as Google wants for sitelinks), Features first, plus
 // the links only the footer carries. `external` opens in a new tab; a mailto: is a plain link.
+// The Jobs column also lists the job landing pages, with the company ones under their own
+// Companies heading (owner's screenshot, 2026-10-28; app/lib/landing/catalogue.ts, live pages only).
 type FooterLink = { title: string; href: string; external?: boolean };
+type FooterSection = { heading: string; links: FooterLink[] };
 
 const FOOTER_ONLY: Record<string, FooterLink[]> = {
-  Jobs: [{ title: "Daily jobs on Telegram", href: "https://t.me/worldwideremote", external: true }],
+  Jobs: [...FOOTER_LANDINGS.Jobs, { title: "Daily jobs on Telegram", href: "https://t.me/worldwideremote", external: true }],
   Company: [
     { title: "Contact", href: "mailto:contact@remoteworldwide.net" },
     { title: "Privacy Policy", href: "/privacy-policy" },
@@ -23,9 +27,14 @@ const FOOTER_ONLY: Record<string, FooterLink[]> = {
 };
 
 const COLUMN_ORDER = ["Features", "Jobs", "Company"];
-const COLUMNS: { heading: string; links: FooterLink[] }[] = COLUMN_ORDER.map((label) => {
+/** A second heading inside a column, under its first list. */
+const SUB_SECTIONS: Record<string, FooterSection> = {
+  Jobs: { heading: "Companies", links: FOOTER_LANDINGS.Companies },
+};
+const COLUMNS: (FooterSection & { more?: FooterSection })[] = COLUMN_ORDER.map((label) => {
   const group = SITE_NAV.find((g) => g.label === label);
-  return { heading: label, links: [...(group?.links ?? []), ...(FOOTER_ONLY[label] ?? [])] };
+  const more = SUB_SECTIONS[label];
+  return { heading: label, links: [...(group?.links ?? []), ...(FOOTER_ONLY[label] ?? [])], ...(more?.links.length ? { more } : {}) };
 });
 
 const SOCIALS = [
@@ -99,6 +108,18 @@ const Footer = () => {
                   </li>
                 )}
               </ul>
+              {column.more ? (
+                <>
+                  <h2 className="mt-8 text-xs font-bold uppercase tracking-[0.14em] text-secondary">{column.more.heading}</h2>
+                  <ul className="mt-4 grid gap-y-0.5">
+                    {column.more.links.map((link) => (
+                      <li key={link.href}>
+                        <FooterLinkItem link={link} />
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
             </nav>
           ))}
         </div>

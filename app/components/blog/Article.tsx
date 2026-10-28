@@ -71,9 +71,10 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
         {
           "@context": "https://schema.org",
           "@type": "BlogPosting",
-          headline: post.title.slice(0, 110),
+          headline: post.title.replace(/\s+/g, " ").trim().slice(0, 110),
           description: post.description,
-          image: { "@type": "ImageObject", url: post.coverImage },
+          // An empty url is invalid markup; with no cover the post simply names no image.
+          ...(post.coverImage ? { image: { "@type": "ImageObject", url: post.coverImage } } : {}),
           datePublished: published.toISOString(),
           dateModified: new Date(post.updatedAt).toISOString(),
           author: post.authors.map((a) => ({ "@type": "Person", name: a.name, url: absoluteUrl(`/author/${a.slug}`) })),

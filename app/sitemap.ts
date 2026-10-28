@@ -4,7 +4,9 @@ import { backend } from "@/app/lib/backend";
 import { MetadataRoute } from "next";
 import { SITE_URL } from "@/app/lib/seo";
 import { BLOG_CATEGORIES } from "@/app/lib/blog/categories";
-import { getSitemapEntries } from "@/app/lib/blog/data";
+import { getCategoriesWithCounts, getSitemapEntries } from "@/app/lib/blog/data";
+import { LANDINGS, isLive, landingPath } from "@/app/lib/landing/catalogue";
+import { indexableLandings } from "@/app/lib/landing/data";
 import { TOOLS, toolPath } from "@/app/lib/tools/catalogue";
 
 type SitemapEntry = { slug: string; updatedAt: Date };
@@ -36,8 +38,25 @@ const fetchBlogMetaData = async () => {
   }
 };
 
+/** Blog categories that have a post: an empty one is noindexed (blogs/category/[slug]), so it stays out. On a failed read, all of them. */
+const fetchFilledCategories = async () => {
+  try {
+    const counts = await getCategoriesWithCounts();
+    return new Set(counts.filter((c) => c.count > 0).map((c) => c.slug));
+  } catch {
+    return new Set(BLOG_CATEGORIES.map((c) => c.slug));
+  }
+};
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [{ posts: blogs, authors }, jobs, companies] = await Promise.all([fetchBlogMetaData(), fetchJobMetaData_Jobs(), fetchCompaniesMetaData()]);
+  const [{ posts: blogs, authors }, jobs, companies, filledCategories, landings] = await Promise.all([
+    fetchBlogMetaData(),
+    fetchJobMetaData_Jobs(),
+    fetchCompaniesMetaData(),
+    fetchFilledCategories(),
+    // Live landing pages whose list is long enough to index (app/lib/landing/catalogue.ts).
+    indexableLandings(LANDINGS.filter(isLive)),
+  ]);
 
   const now = new Date();
   const newestPost = blogs.reduce<Date | null>((latest, b) => (!latest || b.updatedAt > latest ? b.updatedAt : latest), null);
@@ -55,7 +74,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "/privacy-policy", changeFrequency: "yearly", priority: 0.2, lastModified: now },
   ];
 
+  for (const landing of landings) {
+    routes.push({ url: landingPath(landing), changeFrequency: "daily", priority: landing.slug === "latest" ? 0.8 : 0.7, lastModified: now });
+  }
+
   for (const category of BLOG_CATEGORIES) {
+    if (!filledCategories.has(category.slug)) continue;
     routes.push({ url: `/blogs/category/${category.slug}`, changeFrequency: "weekly", priority: 0.7, lastModified: newestPost ?? now });
   }
 

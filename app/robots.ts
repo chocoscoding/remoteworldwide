@@ -6,7 +6,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
+        // The share cards (/api/og/*) are images that link previews and Google fetch; the rest of /api/ is not for crawlers.
+        allow: ["/", "/api/og/"],
         disallow: [
           "/go/",
           // A resume or letter's print page (token-only, 404 without one) and

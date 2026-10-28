@@ -18,9 +18,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     return { title: `${post.title} (draft)`, description: post.description, robots: { index: false, follow: false } };
   }
   const url = absoluteUrl(`/blogs/${post.slug}`);
-  const ogImage = blogOgImage({ title: post.title, author: post.author.name, description: post.description, image: post.coverImage });
+  // As typed in the editor: "Remote Work: Local vs Global " ended in a space, so the tab read "Global  | Remote Worldwide".
+  const title = post.title.replace(/\s+/g, " ").trim();
+  const ogImage = blogOgImage({ title, author: post.author.name, description: post.description, image: post.coverImage });
   return {
-    title: post.title,
+    title,
     description: post.description,
     keywords: post.tags,
     authors: post.authors.map((a) => ({ name: a.name, url: absoluteUrl(`/author/${a.slug}`) })),
@@ -28,16 +30,16 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     openGraph: {
       type: "article",
       siteName: SITE_NAME,
-      title: post.title,
+      title,
       description: post.description,
       url,
-      images: [{ url: ogImage, width: 1200, height: 630, alt: post.title }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       publishedTime: (post.publishedAt ?? post.createdAt).toISOString(),
       modifiedTime: post.updatedAt.toISOString(),
       authors: post.authors.map((a) => a.name),
       tags: post.tags,
     },
-    twitter: { card: "summary_large_image", title: post.title, description: post.description, images: [ogImage] },
+    twitter: { card: "summary_large_image", title, description: post.description, images: [ogImage] },
   };
 }
 

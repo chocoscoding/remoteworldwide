@@ -1,5 +1,6 @@
 import sanitizeHtml from "sanitize-html";
 import { normalizeEditorHtml } from "./editorHtml";
+import { PRODUCTION_ORIGIN, SITE_URL } from "@/app/lib/seo";
 
 export const MARKERS = {
   cta: "[[cta]]",
@@ -37,11 +38,24 @@ const EDGE_BLANKS_RE = /^(?:\s*<p><br \/><\/p>)+\s*|\s*(?:<p><br \/><\/p>\s*)+$/
 const ALLOWED_QL_CLASS = /^ql-(align-(center|right)|indent-[1-8]|syntax|video|table-rows(-head)?|line-height-(1|1-5|2))$/;
 const VIDEO_HOSTS = /^https:\/\/(www\.)?(youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/;
 
-// Off-site links open in a new tab and pass no ranking.
+// The site's own host without "www.", so a link to either spelling of the domain counts as ours.
+const OWN_HOSTS = new Set([SITE_URL, PRODUCTION_ORIGIN, process.env.NEXT_PUBLIC_SITE_URL ?? ""].flatMap((origin) => hostOf(origin) ?? []));
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+// Off-site links open in a new tab and pass no ranking. A link to this site (www or not, http or
+// https) stays a plain followed link: comparing the raw env value used to mark them nofollow
+// whenever it differed from the link by a "www." or the scheme.
 function externalLinkAttribs(href: string): Record<string, string> {
-  const site = process.env.NEXT_PUBLIC_SITE_URL;
-  const external = /^https?:\/\//i.test(href) && !(site && href.startsWith(site));
-  return external ? { target: "_blank", rel: "noopener noreferrer nofollow" } : {};
+  if (!/^https?:\/\//i.test(href)) return {};
+  const host = hostOf(href);
+  return host && OWN_HOSTS.has(host) ? {} : { target: "_blank", rel: "noopener noreferrer nofollow" };
 }
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
