@@ -1,27 +1,19 @@
 "use client";
 
 // The pod screen below Basic. The backend refused the overview (403
-// plan_required: the pod is on Basic and up), so this says what a pod is and
-// how to get one. A seat taken before the account moved to Free is kept, not
+// plan_required: the pod is on Basic and up), so the page is the plan card over
+// a faded stand-in (PlanPageLock): what a pod is and how to get one. A seat taken before the account moved to Free is kept, not
 // taken away, so leaving stays possible here: it is the one pod route Free can
 // still use, and it answers "You are not in a pod" for anyone who has none.
 
 import { useState, type FC } from "react";
 import { toast } from "sonner";
-import DashCard from "@/app/components/dashboard/ui/DashCard";
-import EmptyStateLottie from "@/app/components/dashboard/ui/EmptyStateLottie";
-import StickerButton from "@/app/components/dashboard/ui/StickerButton";
-import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
-import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
-import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import PlanPageLock from "@/app/components/dashboard/billing/PlanPageLock";
 import { apiPost } from "@/app/lib/api/client";
 import { apiMessage } from "@/app/lib/api/core";
 import { BASIC_GATES } from "@/app/lib/settings/planGates";
 
-const LOTTIE = "/Lottie/neobrutalism/Video_Online_Meetings_lottie.json";
-
 const PodLocked: FC = () => {
-  const { upgrade } = usePlanLock(BASIC_GATES.pod);
   const [leave, setLeave] = useState<"idle" | "confirm" | "busy" | "done">("idle");
 
   const confirmLeave = async () => {
@@ -37,64 +29,47 @@ const PodLocked: FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f6f6]">
-      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-black/10 bg-white/85 px-4 py-3 backdrop-blur-sm md:h-16 md:flex-nowrap md:px-8 md:py-0">
-        <div className="flex min-w-0 items-center gap-3">
-          <h1 className="whitespace-nowrap text-[17px] font-bold text-primary">Your pod</h1>
-          <PlanChip plan="basic" />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <NotificationBell />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1180px] px-4 py-7 pb-14 md:px-8">
-        <DashCard className="mx-auto mt-12 max-w-md px-6 pb-10 pt-4 text-center sm:px-10" data-pod-locked>
-          <EmptyStateLottie src={LOTTIE} size={180} />
-          <p className="text-lg font-bold text-primary">Pods come with Basic</p>
-          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-black/50">
-            A small group at your level, in your timezone, with weekly goals and wins to keep each other going. Your streak stays free either way.
-          </p>
-          <StickerButton variant="primary" size="md" className="mt-6" onClick={upgrade}>
-            Upgrade to Basic
-          </StickerButton>
-
-          {leave !== "done" && (
-            <p className="mt-5 text-xs text-black/50">
-              {leave === "idle" ? (
-                <>
-                  Still in a pod from before?{" "}
-                  <button
-                    type="button"
-                    onClick={() => setLeave("confirm")}
-                    className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
-                    Leave it
-                  </button>
-                </>
-              ) : (
-                <>
-                  Leave your pod? If you&apos;re the last one in it, it ends.{" "}
-                  <button
-                    type="button"
-                    onClick={() => void confirmLeave()}
-                    disabled={leave === "busy"}
-                    className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid disabled:cursor-default disabled:opacity-60">
-                    {leave === "busy" ? "Leaving…" : "Yes, leave"}
-                  </button>{" "}
-                  <button
-                    type="button"
-                    onClick={() => setLeave("idle")}
-                    disabled={leave === "busy"}
-                    className="cursor-pointer font-semibold text-black/50 hover:text-primary disabled:cursor-default disabled:opacity-60">
-                    Cancel
-                  </button>
-                </>
-              )}
-            </p>
+    <PlanPageLock
+      gate={BASIC_GATES.pod}
+      title="Your pod"
+      heading="Pods come with Basic"
+      body="A small group at your level, in your timezone, with weekly goals and wins to keep each other going. Your streak stays free either way."
+      footer={
+        leave !== "done" ? (
+        <p>
+          {leave === "idle" ? (
+            <>
+              Still in a pod from before?{" "}
+              <button
+                type="button"
+                onClick={() => setLeave("confirm")}
+                className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid">
+                Leave it
+              </button>
+            </>
+          ) : (
+            <>
+              Leave your pod? If you&apos;re the last one in it, it ends.{" "}
+              <button
+                type="button"
+                onClick={() => void confirmLeave()}
+                disabled={leave === "busy"}
+                className="cursor-pointer font-bold text-primary underline decoration-dotted underline-offset-2 hover:decoration-solid disabled:cursor-default disabled:opacity-60">
+                {leave === "busy" ? "Leaving…" : "Yes, leave"}
+              </button>{" "}
+              <button
+                type="button"
+                onClick={() => setLeave("idle")}
+                disabled={leave === "busy"}
+                className="cursor-pointer font-semibold text-black/50 hover:text-primary disabled:cursor-default disabled:opacity-60">
+                Cancel
+              </button>
+            </>
           )}
-        </DashCard>
-      </main>
-    </div>
+        </p>
+        ) : null
+      }
+    />
   );
 };
 

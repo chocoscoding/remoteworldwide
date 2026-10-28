@@ -36,6 +36,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PauseSearchDialog from "@/app/components/dashboard/PauseSearchDialog";
 import { PlanChip } from "@/app/components/dashboard/billing/UpgradeModal";
 import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import PlanPageLock from "@/app/components/dashboard/billing/PlanPageLock";
 import { ULTRA_GATES } from "@/app/lib/settings/planGates";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { useSettings } from "../settings/SettingsProvider";
@@ -139,7 +140,7 @@ const NoCompaniesRow: FC<{ body: string; side: ReactNode }> = ({ body, side }) =
   </section>
 );
 
-const RecommendClient: FC = () => {
+const RecommendScreen: FC = () => {
   const { goals, pausedDaysLeft, resumeSearch, gifts } = useActivity();
   const { preferences, profile } = useSettings();
   const lock = usePlanLock(ULTRA_GATES.recommendations);
@@ -399,6 +400,26 @@ const RecommendClient: FC = () => {
       <PauseSearchDialog open={pauseOpen} onOpenChange={setPauseOpen} />
     </div>
   );
+};
+
+/**
+ * Below Ultra, with no priority intro waiting, the whole page is the plan card (PlanPageLock): none
+ * of the screen is fetched or shown (owner, 2026-10-28).
+ */
+const RecommendClient: FC = () => {
+  const lock = usePlanLock(ULTRA_GATES.recommendations);
+  const { gifts } = useActivity();
+  if (lock.locked && !holdsPriorityIntro(gifts)) {
+    return (
+      <PlanPageLock
+        gate={ULTRA_GATES.recommendations}
+        title="Recommendations"
+        heading="Recommendations come with Ultra"
+        body="On Ultra, we recommend you directly to partner companies hiring on Remote Worldwide. Anything already made for you is kept."
+      />
+    );
+  }
+  return <RecommendScreen />;
 };
 
 export default RecommendClient;

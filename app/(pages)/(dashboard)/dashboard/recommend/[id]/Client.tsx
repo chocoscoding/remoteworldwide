@@ -8,6 +8,7 @@ import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import PipelineCard from "@/app/components/dashboard/recommend/PipelineCard";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import { PlanLockNote, usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
+import PlanPageLock from "@/app/components/dashboard/billing/PlanPageLock";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
 import { holdsPriorityIntro } from "@/app/lib/dashboard/gifts";
 import { BackendError } from "@/app/lib/api/core";
@@ -47,7 +48,7 @@ const DetailSkeleton: FC = () => (
   </DashCard>
 );
 
-const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
+const RecDetailScreen: FC<RecDetailClientProps> = ({ entryId }) => {
   const lock = usePlanLock(ULTRA_GATES.recommendations);
   const { gifts } = useActivity();
   // A redeemed priority intro (a streak gift) opens the recommendation it was made with, on any plan.
@@ -117,6 +118,23 @@ const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
       </main>
     </div>
   );
+};
+
+/** Below Ultra, with no priority intro waiting, the page is the plan card (PlanPageLock), as the list is. */
+const RecDetailClient: FC<RecDetailClientProps> = ({ entryId }) => {
+  const lock = usePlanLock(ULTRA_GATES.recommendations);
+  const { gifts } = useActivity();
+  if (lock.locked && !holdsPriorityIntro(gifts)) {
+    return (
+      <PlanPageLock
+        gate={ULTRA_GATES.recommendations}
+        title="Recommendations"
+        heading="Recommendations come with Ultra"
+        body="On Ultra, we recommend you directly to partner companies hiring on Remote Worldwide. Anything already made for you is kept."
+      />
+    );
+  }
+  return <RecDetailScreen entryId={entryId} />;
 };
 
 export default RecDetailClient;

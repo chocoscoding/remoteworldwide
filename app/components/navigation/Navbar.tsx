@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { signOut } from "@/app/lib/authClient";
 import Image from "next/image";
-import { ArrowRight, Bookmark, ChevronDown, LoaderCircle, LogOut, Menu, PenLine, Shield, UserRound, X } from "lucide-react";
+import { ArrowRight, Bookmark, ChevronDown, LayoutDashboard, LoaderCircle, LogOut, Menu, PenLine, Shield, UserRound, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
@@ -128,6 +128,10 @@ const AccountMenu = ({
                 </div>
               </div>
               <div className="mb-1.5 border-t border-primary/10" />
+              <Link href={DASHBOARD} onClick={close} className={MENU_ITEM}>
+                <LayoutDashboard className="h-4 w-4 text-primary/60" aria-hidden />
+                Dashboard
+              </Link>
               <Link href="/bookmarks" onClick={close} className={MENU_ITEM}>
                 <Bookmark className="h-4 w-4 text-primary/60" aria-hidden />
                 Bookmarks
@@ -469,6 +473,7 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
   const [group, setGroup] = useState<number | null>(null);
   const { isOpen2: accountOpen, closeNavbar2: closeAccount } = useNavbar();
   const button = useRef<HTMLButtonElement>(null);
+  const signedIn = useSession().status === "authenticated";
 
   const close = () => {
     setOpen(false);
@@ -560,16 +565,16 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
                 </div>
               );
             })}
-            {/* The bar's Waitlist button, which a phone's bar leaves out. */}
+            {/* The bar's Dashboard or Waitlist button, which a phone's bar leaves out. */}
             <Link
-              href={WAITLIST}
+              href={signedIn ? DASHBOARD : WAITLIST}
               onClick={close}
-              aria-current={pathname === WAITLIST ? "page" : undefined}
+              aria-current={(signedIn ? pathname?.startsWith(DASHBOARD) : pathname === WAITLIST) ? "page" : undefined}
               className={cn(
                 "mt-4 flex h-12 w-full items-center justify-center rounded-full bg-secondary text-base font-bold text-primary br-shadow-press",
                 FOCUS,
               )}>
-              Join the waitlist
+              {signedIn ? "Open your dashboard" : "Join the waitlist"}
             </Link>
           </div>
         </>
@@ -582,7 +587,6 @@ const Navbar = () => {
   const pathname = usePathname();
   const { status, data } = useSession();
   const signedIn = status === "authenticated";
-  const { openAuthModal } = useAuthModal();
 
   const colorToShow = (() => {
     const currentPathname = pathname;
@@ -608,20 +612,15 @@ const Navbar = () => {
           <div className="flex items-center gap-0.5 sm:gap-2">
             <NavMenu pathname={pathname} />
 
-            {/* <Link href={DASHBOARD} onClick={(event) => {
-              if (!signedIn) { event.preventDefault(); openAuthModal("login", DASHBOARD); }
-            }} aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined} className={cn(BAR_LINK, "hidden lg:inline-flex", FOCUS)}>
-              Dashboard
-            </Link> */}
-
-            {/* The 44px link is the touch target; the pill inside is what you see. From sm up only:
-                a phone has it in the hamburger (owner, 2026-10-15). */}
+            {/* The 44px link is the touch target; the pill inside is what you see. From lg up only: a
+                phone has it in the hamburger (owner, 2026-10-15). Signed in, it opens the dashboard,
+                which every signed-up account can use (owner, 2026-10-28); signed out, the waitlist. */}
             <Link
-              href={WAITLIST}
-              aria-current={pathname === WAITLIST ? "page" : undefined}
+              href={signedIn ? DASHBOARD : WAITLIST}
+              aria-current={(signedIn ? pathname?.startsWith(DASHBOARD) : pathname === WAITLIST) ? "page" : undefined}
               className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
               <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
-                Waitlist
+                {signedIn ? "Dashboard" : "Waitlist"}
               </span>
             </Link>
 
