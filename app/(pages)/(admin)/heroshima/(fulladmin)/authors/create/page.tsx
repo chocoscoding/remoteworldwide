@@ -74,7 +74,7 @@ export default function CreateBlog() {
   };
 
   return (
-    <div className="w-full h-screen overflow-y-scroll p-4">
+    <div className="w-full p-4">
       <h1 className="text-2xl font-bold mb-4">Create New Author</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

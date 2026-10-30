@@ -45,7 +45,7 @@ const FiltersClient: FC<{ initialData: FilterData }> = ({ initialData }) => {
   };
 
   return (
-    <div className="w-full h-screen overflow-y-scroll p-4">
+    <div className="w-full p-4">
       <h1 className="text-2xl font-bold mb-6">Manage Filters</h1>
       {Object.keys(categories).map((sectionKey) => {
         return (

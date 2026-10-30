@@ -145,7 +145,7 @@ const AutomationClient = () => {
   const isCooldown = cooldownUntil > now;
 
   return (
-    <div className="w-full h-screen overflow-y-scroll p-4">
+    <div className="w-full p-4">
       <h1 className="text-2xl font-bold mb-4">Automation Controls</h1>
 
       <section className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm max-w-screen-lg mb-6">

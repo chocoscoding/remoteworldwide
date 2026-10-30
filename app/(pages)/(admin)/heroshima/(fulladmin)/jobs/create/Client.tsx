@@ -212,7 +212,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
   };
 
   return (
-    <div className="w-full h-screen overflow-y-scroll">
+    <div className="w-full">
       <main className="p-4 mb-3">
         <h1 className="text-2xl font-bold mb-4">Create New Job</h1>
 

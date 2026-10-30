@@ -9,7 +9,7 @@ const AllAuthorsPage: FC<{ data: AuthorListChildType[] }> = ({ data }) => {
   const [authorList, setAuthorList] = useState(data);
 
   return (
-    <div className="w-full h-screen overflow-y-scroll">
+    <div className="w-full">
       <main className="p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold">Authors</h1>

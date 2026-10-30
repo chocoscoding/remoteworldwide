@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles, LifeBuoy, Hourglass, Users, Activity, Megaphone } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -145,9 +145,30 @@ const Sidebar = ({ hasAuthorProfile, sttLab }: { hasAuthorProfile: boolean; sttL
     return [];
   }, [userData, hasAuthorProfile, sttLab]);
 
+  // The links scroll with no scrollbar, so a fade at the top or bottom says there are more that way.
+  const scroller = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ up: false, down: false });
+  const measure = useCallback(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const up = el.scrollTop > 1;
+    const down = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    setMore((was) => (was.up === up && was.down === down ? was : { up, down }));
+  }, []);
+  useEffect(() => {
+    // The box (window resized) and what's in it (a section opening, the rail widening) both change it.
+    const observer = new ResizeObserver(measure);
+    if (scroller.current) observer.observe(scroller.current);
+    if (content.current) observer.observe(content.current);
+    measure();
+    return () => observer.disconnect();
+  }, [measure, status, menuItems]);
+
   return (
-    <div className={`flex flex-col h-screen bg-primary text-white ${isOpen ? "w-64" : "w-16"} transition-width duration-300 sticky top-0`}>
-      <div className={`flex items-center ${isOpen ? "justify-between" : "justify-center"} p-4 bg-primary border-b border-b-white/10`}>
+    // One screen tall, never more: the links scroll inside it, so the header and the bottom row stay put.
+    <div className={`flex shrink-0 flex-col h-screen bg-primary text-white ${isOpen ? "w-64" : "w-16"} transition-width duration-300 sticky top-0`}>
+      <div className={`flex shrink-0 items-center ${isOpen ? "justify-between" : "justify-center"} p-4 bg-primary border-b border-b-white/10`}>
         {isOpen && <div className="text-lg font-bold">WWR</div>}
         <button onClick={toggleSidebar} className="focus:outline-none">
           <Menu className="w-6 h-6" />
@@ -156,12 +177,14 @@ const Sidebar = ({ hasAuthorProfile, sttLab }: { hasAuthorProfile: boolean; sttL
 
       {status === "loading" ? (
         <>
-          <div className="h-full flex justify-center">
+          <div className="min-h-0 flex-1 flex justify-center">
             <LoaderCircle className=" animate-spin mt-3" />
           </div>
         </>
       ) : (
-        <div className={`flex-1 p-4 space-y-4 flex flex-col gap-4 ${isOpen ? "" : "items-center"}`}>
+        <div className="relative min-h-0 flex-1">
+          <div ref={scroller} onScroll={measure} className="h-full overflow-y-auto overscroll-contain scrollbar-none">
+            <div ref={content} className={`p-4 space-y-4 flex flex-col gap-4 ${isOpen ? "" : "items-center"}`}>
           {menuItems.map((item) => {
             if (!item.subItems) {
               return (
@@ -216,10 +239,14 @@ const Sidebar = ({ hasAuthorProfile, sttLab }: { hasAuthorProfile: boolean; sttL
               </div>
             );
           })}
+            </div>
+          </div>
+          <div aria-hidden className={`pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-primary to-transparent transition-opacity duration-200 ${more.up ? "opacity-100" : "opacity-0"}`} />
+          <div aria-hidden className={`pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-primary to-transparent transition-opacity duration-200 ${more.down ? "opacity-100" : "opacity-0"}`} />
         </div>
       )}
 
-      <div className="p-4 bg-primary">
+      <div className="shrink-0 border-t border-t-white/10 p-4 bg-primary">
         <Link href={"/"} className={`flex items-center space-x-4 ${isActive("/user") ? "text-secondary" : "text-gray-300"}`}>
           <Globe className="w-5 h-5" />
           {isOpen && <span>Main Website</span>}

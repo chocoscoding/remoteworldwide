@@ -74,7 +74,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
   }, [resource]);
 
   return (
-    <div className="w-full h-screen overflow-y-scroll p-4 lg:pr-[5%]">
+    <div className="w-full p-4 lg:pr-[5%]">
       <h1 className="text-2xl font-bold mb-4">Edit company information</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

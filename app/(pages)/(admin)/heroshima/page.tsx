@@ -20,7 +20,7 @@ export default async function AdminAnalytics() {
   //get admin dashboard info
   const ADMIN_DASHBOARD_INFO = await getAdminDashboardInfo();
   return (
-    <div className="w-full h-screen overflow-y-scroll">
+    <div className="w-full">
       <main className="p-4">
         <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
         <section className="mb-8">

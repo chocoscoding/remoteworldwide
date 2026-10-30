@@ -7,7 +7,7 @@ export default function CreateCompany() {
   const { push } = useRouter();
 
   return (
-    <div className="w-full h-screen overflow-y-scroll p-4 lg:pr-[5%]">
+    <div className="w-full p-4 lg:pr-[5%]">
       <h1 className="text-2xl font-bold mb-4">Create New Company</h1>
       <CompanyForm
         onCreated={(company) => push("/heroshima/companies/" + company.slug)}

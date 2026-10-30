@@ -22,9 +22,12 @@ export default async function RootLayout({
   const me = await myAuthor().catch(() => null);
 
   return (
-    <div className="w-full flex">
+    // The window itself never scrolls: the sidebar is one screen tall and the page scrolls in its own
+    // column, which takes what's left beside the sidebar (min-w-0, so wide content can't push it
+    // past the screen's right edge).
+    <div className="flex h-screen w-full overflow-hidden">
       <Sidebar hasAuthorProfile={me !== null} sttLab={sttLabAvailable((await headers()).get("host"))} />
-      <div className="h-screen w-full max-w-[1680px] overflow-x-clip overflow-y-auto m-auto">{children}</div>
+      <div className="h-screen min-w-0 flex-1 max-w-[1680px] overflow-x-clip overflow-y-auto m-auto">{children}</div>
     </div>
   );
 }

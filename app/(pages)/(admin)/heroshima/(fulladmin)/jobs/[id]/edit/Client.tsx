@@ -148,7 +148,7 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
   };
 
   return (
-    <div className="w-full h-screen overflow-y-scroll ">
+    <div className="w-full">
       {isLoading ? <OverlayLoader /> : null}
 
       <main className="p-4 mb-4">
