@@ -3,9 +3,19 @@
 import type { FC, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ArrowLeft, Home, RotateCcw } from "lucide-react";
-import { Lottie } from "lottie-react";
 import { cn } from "@/lib/utils";
+
+const ALERT_SIZE = "h-[7.5rem] w-[7.5rem] sm:h-[11rem] sm:w-[11rem] md:h-[14rem] md:w-[14rem]";
+
+// This screen is bundled with every route (the root error and not-found boundaries use it), so a
+// plain import put lottie-react, the biggest script on the site, on every page. Loaded here only
+// once an error screen renders; until then a box the animation's size holds its place.
+const Lottie = dynamic(() => import("lottie-react").then((mod) => mod.Lottie), {
+  ssr: false,
+  loading: () => <span className={cn("block", ALERT_SIZE)} />,
+});
 
 export interface ErrorScreenProps {
   digits: [string, string];
@@ -46,7 +56,7 @@ const ErrorScreen: FC<ErrorScreenProps> = ({ digits: [left, right], title, messa
           autoplay
           loop
           speed={0.6}
-          className="h-[7.5rem] w-[7.5rem] sm:h-[11rem] sm:w-[11rem] md:h-[14rem] md:w-[14rem]"
+          className={ALERT_SIZE}
         />
         <Digit>{right}</Digit>
       </div>
