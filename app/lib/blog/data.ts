@@ -1,4 +1,4 @@
-import { backend, backendOrNull } from "@/app/lib/backend";
+import { backend, backendCachedOrNull, backendOrNull } from "@/app/lib/backend";
 import { BLOG_CATEGORIES, categoryBySlug, type BlogCategory } from "./categories";
 import type { Author, BlogSettings, Cta, LeadMagnet, Offers, PostCard, PostFull } from "./types";
 
@@ -51,13 +51,30 @@ export interface PostPageData {
   settings: BlogSettings;
 }
 
+/** A post as its writer sees it, drafts included (the admin's view, /heroshima/blogs/[slug]). Sends the session. */
 export async function getPostPageData(slug: string): Promise<PostPageData | null> {
   const data = await backendOrNull<Omit<PostPageData, "category">>(`/blog/posts/${encodeURIComponent(slug)}`, { session: true });
   return data ? { ...data, category: categoryBySlug(data.post.category) ?? null } : null;
 }
 
+/**
+ * How long a cached blog page or read lasts before it is rebuilt. Publishing, editing or deleting a
+ * post (and the offer, pick and author changes) refresh every page under /blogs at once
+ * (revalidatePath in libs/query.ts and libs/blog-admin.ts); this only catches anything they miss.
+ */
+export const BLOG_REVALIDATE_S = 3600;
+
+/**
+ * A post as readers see it: published only, named to no visitor, so the public post page can be
+ * cached. A draft answers 404 here; writers preview drafts in the admin's view instead.
+ */
+export async function getPublishedPostPageData(slug: string): Promise<PostPageData | null> {
+  const data = await backendCachedOrNull<Omit<PostPageData, "category">>(`/blog/posts/${encodeURIComponent(slug)}`, { revalidate: BLOG_REVALIDATE_S, tags: [] });
+  return data ? { ...data, category: categoryBySlug(data.post.category) ?? null } : null;
+}
+
 export function getPostByPreviousSlug(slug: string): Promise<{ slug: string } | null> {
-  return backendOrNull<{ slug: string }>(`/blog/redirects/${encodeURIComponent(slug)}`);
+  return backendCachedOrNull<{ slug: string }>(`/blog/redirects/${encodeURIComponent(slug)}`, { revalidate: BLOG_REVALIDATE_S, tags: [] });
 }
 
 export function getSitemapEntries(): Promise<{ posts: { slug: string; updatedAt: Date }[]; authors: { slug: string }[] }> {

@@ -112,7 +112,8 @@ const AuthorDetailsPage: FC<{ data: AuthorWithBlog }> = ({ data }) => {
           <div key={index} className="p-4 border border-gray-300 rounded-md shadow-sm">
             <h3 className="text-lg font-bold">{blog.title}</h3>
             <p className="text-gray-600">{blog.description}</p>
-            <Link href={`/blogs/${blog.slug}`} className="text-green-500 underline">
+            {/* The admin's view, which shows drafts too; the public page shows published posts only. */}
+            <Link href={`/heroshima/blogs/${blog.slug}`} className="text-green-500 underline">
               Read More
             </Link>
           </div>

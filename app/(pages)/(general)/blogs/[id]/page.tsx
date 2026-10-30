@@ -1,15 +1,24 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { getPostByPreviousSlug, getPostPageData } from "@/app/lib/blog/data";
+import { getPostByPreviousSlug, getPublishedPostPageData } from "@/app/lib/blog/data";
 import { renderArticle } from "@/app/lib/blog/article";
 import Article from "@/app/components/blog/Article";
 import { absoluteUrl, blogOgImage, SITE_NAME } from "@/app/lib/seo";
 
 type Params = { params: Promise<{ id: string }> };
 
+// Cached: built on a post's first visit, then served from the cache until a blog change refreshes
+// it (libs/query.ts, libs/blog-admin.ts) or an hour passes (BLOG_REVALIDATE_S; this has to be a
+// literal). Published posts only, read without the visitor's session, so every reader gets the
+// same page. Writers preview drafts in the admin's view (/heroshima/blogs/[slug]).
+export const revalidate = 3600;
+export async function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const slug = decodeURIComponent((await params).id);
-  const data = await getPostPageData(slug);
+  const data = await getPublishedPostPageData(slug);
   if (!data) {
     return { title: "Post not found", description: "The post you are looking for does not exist.", robots: { index: false } };
   }
@@ -45,7 +54,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 const Page = async ({ params }: Params) => {
   const slug = decodeURIComponent((await params).id);
-  const data = await getPostPageData(slug);
+  const data = await getPublishedPostPageData(slug);
   if (!data) {
     const renamed = await getPostByPreviousSlug(slug);
     if (renamed) permanentRedirect(`/blogs/${renamed.slug}`);

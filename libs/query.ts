@@ -285,7 +285,9 @@ export const createAuthor = async (body: AuthorInput) => {
 export const updateAuthor = async (id: string, body: AuthorInput) => {
   await requireAdminAction();
   try {
-    return { data: await admin<Author>(`/authors/${idSegment(id)}`, { method: "PUT", body }) };
+    const author = await admin<Author>(`/authors/${idSegment(id)}`, { method: "PUT", body });
+    refreshBlogPages();
+    return { data: author };
   } catch (error) {
     return refused(error);
   }
@@ -295,6 +297,7 @@ export const deleteAuthor = async (id: string) => {
   await requireAdminAction();
   try {
     await admin(`/authors/${idSegment(id)}`, { method: "DELETE" });
+    refreshBlogPages();
     return { status: "deleted author successfully" };
   } catch (error) {
     return refused(error);
@@ -332,6 +335,11 @@ export interface BlogInput extends BlogConversionFields {
   coverImage: string;
   slug?: string;
 }
+
+// The public blog pages are cached (app/(pages)/(general)/blogs/[id]/page.tsx), and a post page
+// also shows other posts (featured, related) and its authors. So any change readers can see
+// refreshes every page under /blogs, not just the one post.
+const refreshBlogPages = () => revalidatePath("/blogs", "layout");
 
 export const createBlog = async (data: BlogInput) => {
   await requireWriterAction();
@@ -380,8 +388,7 @@ export const publishBlog = async (id: string) => {
   await requireWriterAction();
   try {
     const blog = await admin<EditableBlog>(`/posts/${idSegment(id)}/publish`, { method: "POST" });
-    revalidatePath("/blogs");
-    for (const slug of [blog.slug, ...blog.previousSlugs]) revalidatePath("/blogs/" + slug);
+    refreshBlogPages();
     return { data: blog };
   } catch (error) {
     return refused(error);
@@ -401,8 +408,7 @@ export const editBlog = async (id: string, data: Partial<BlogInput>) => {
   await requireWriterAction();
   try {
     const blog = await admin<Blog>(`/posts/${idSegment(id)}`, { method: "PUT", body: data });
-    revalidatePath("/blogs");
-    for (const slug of [blog.slug, ...blog.previousSlugs]) revalidatePath("/blogs/" + slug);
+    refreshBlogPages();
     return { data: blog };
   } catch (error) {
     return refused(error);
@@ -413,7 +419,7 @@ export const deleteBlog = async (id: string) => {
   await requireWriterAction();
   try {
     await admin(`/posts/${idSegment(id)}`, { method: "DELETE" });
-    revalidatePath("/blogs");
+    refreshBlogPages();
     return { status: "deleted blog successfully" };
   } catch (error) {
     return refused(error);
