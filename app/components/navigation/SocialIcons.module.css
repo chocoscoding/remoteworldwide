@@ -1,0 +1,62 @@
+/* The footer's social icons and their hover animations, in CSS. They were motion components
+   (components/ui/*-icon.tsx), which put the motion library on every page for three hovers.
+   The keyframes and timings are the same as theirs. Drawn strokes use pathLength="1" on the SVG
+   element, so a dash offset of 0.8 shows the first fifth of the line and 0 the whole of it. */
+
+.icon * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.draw {
+  stroke-dasharray: 1;
+}
+
+/* X / Twitter */
+@keyframes tw-y { 0% { translate: 0 0; } 25% { translate: 0 -4px; } 50% { translate: 0 0; } 75% { translate: 0 -2px; } 100% { translate: 0 0; } }
+@keyframes tw-scale { 0% { scale: 1; } 33.33% { scale: 1.08; } 66.67% { scale: 0.95; } 100% { scale: 1; } }
+@keyframes tw-rotate { 0% { rotate: 0deg; } 33.33% { rotate: -2deg; } 66.67% { rotate: 2deg; } 100% { rotate: 0deg; } }
+@keyframes tw-path { 0% { opacity: 0.9; scale: 1; } 50% { opacity: 1; scale: 1.12; } 100% { opacity: 1; scale: 1; } }
+
+/* Both icons below give their whole SVG the same small pop. */
+@keyframes pop { 0% { scale: 1; } 50% { scale: 1.06; } 100% { scale: 1; } }
+
+/* Instagram */
+@keyframes ig-frame { from { stroke-dashoffset: 0.8; opacity: 0.6; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes ig-lens { 0% { scale: 0.85; stroke-dashoffset: 1; } 50% { scale: 1.05; stroke-dashoffset: 0.5; } 100% { scale: 1; stroke-dashoffset: 0; } }
+@keyframes ig-dot { 0% { scale: 1; opacity: 1; } 50% { scale: 1.5; opacity: 0.4; } 100% { scale: 1; opacity: 1; } }
+
+/* LinkedIn */
+@keyframes li-main { from { stroke-dashoffset: 0.7; opacity: 0.6; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes li-rest { from { stroke-dashoffset: 1; opacity: 0; } to { stroke-dashoffset: 0; opacity: 1; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .link:hover .twitter {
+    animation: tw-y 1.2s ease-in-out, tw-scale 1.2s ease-in-out, tw-rotate 1.2s ease-in-out;
+  }
+  .link:hover .twitterPath {
+    animation: tw-path 0.8s ease-out 0.15s;
+  }
+
+  .link:hover .instagram {
+    animation: pop 0.4s ease-out;
+  }
+  .link:hover .igFrame {
+    animation: ig-frame 0.55s ease-in-out;
+  }
+  .link:hover .igLens {
+    animation: ig-lens 0.5s ease-out 0.1s;
+  }
+  .link:hover .igDot {
+    animation: ig-dot 0.35s ease-in-out 0.2s;
+  }
+
+  .link:hover .linkedin {
+    animation: pop 0.45s ease-out;
+  }
+  .link:hover .liMain {
+    animation: li-main 0.6s ease-in-out;
+  }
+  .link:hover .liRest {
+    animation: li-rest 0.45s ease-in-out 0.12s;
+  }
+}

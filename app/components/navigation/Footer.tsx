@@ -1,10 +1,8 @@
 import Link from "next/link";
 import React from "react";
 import LogoMini from "../svg/LogoMini";
-import { InstagramIcon } from "@/components/ui/instagram-icon";
 import { FaTelegram } from "react-icons/fa6";
-import { LinkedInIcon } from "@/components/ui/linkedin-icon";
-import { TwitterIcon } from "@/components/ui/twitter-icon";
+import { InstagramIcon, LinkedInIcon, TwitterIcon, socialLink } from "./SocialIcons";
 import CookieSettingsButton from "@/app/components/consent/CookieSettingsButton";
 import { SITE_NAV } from "@/app/lib/navigation/siteNav";
 import { FOOTER_LANDINGS } from "@/app/lib/landing/catalogue";
@@ -135,7 +133,7 @@ const Footer = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={social.label}
-                className={`grid size-10 place-content-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white ${FOCUS}`}>
+                className={`${socialLink} grid size-10 place-content-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white ${FOCUS}`}>
                 {social.icon}
               </a>
             ))}
