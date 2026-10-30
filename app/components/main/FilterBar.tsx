@@ -143,7 +143,14 @@ const FilterBar: FC<{ className?: string; compact?: boolean }> = ({ className, c
   const hasChips = dateLabel !== null || groups.some((group) => group.selected.length > 0);
 
   return (
-    <div role="group" aria-label="Filters" className={cn("flex flex-wrap items-center gap-2", className)}>
+    // Compact, up to 415px wide the four pills take two rows in Manrope, but the fallback font shown
+    // until Manrope arrives is narrower and fits them on one between 406 and 415px. The bar then grew
+    // a row when the font swapped and pushed the whole list down (CLS 0.26 on /jobs). So it holds
+    // two rows' height there from the first paint; from 416px they fit on one row in either font.
+    <div
+      role="group"
+      aria-label="Filters"
+      className={cn("flex flex-wrap items-center gap-2", compact && "max-[415px]:min-h-[72px] max-[415px]:content-start", className)}>
       <FilterPill
         label="Date range"
         active={dateLabel !== null}
