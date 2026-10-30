@@ -70,6 +70,16 @@ export async function backendCached<T>(path: string, cache: { revalidate: number
   return unwrapResponse<T>(res);
 }
 
+/** backendCached for a list that sends its total beside `data` (see backendWithCount). */
+export async function backendCachedWithCount<T>(path: string, cache: { revalidate: number; tags: string[] }): Promise<{ data: T; count: number }> {
+  const res = await fetch(`${BACKEND_URL}/api${path}`, {
+    headers: { accept: "application/json", ...clientIpHeaders(new Headers()) },
+    next: cache,
+  });
+  const count = res.ok ? Number((await res.clone().json().catch(() => null))?.count ?? 0) : 0;
+  return { data: await unwrapResponse<T>(res), count };
+}
+
 export async function backendCachedOrNull<T>(path: string, cache: { revalidate: number; tags: string[] }): Promise<T | null> {
   try {
     return await backendCached<T>(path, cache);

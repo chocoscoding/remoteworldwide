@@ -21,7 +21,7 @@ export default async function DashboardJobPage({ params }: { params: Promise<{ i
   let hasUserBookmarked: boolean | undefined = undefined;
   if (session?.user?.id && !session.user.deletionDueAt) {
     const bookmark = await checkBookmarkForUser(job.id);
-    if (bookmark.data?.id) hasUserBookmarked = true;
+    hasUserBookmarked = Boolean(bookmark.data?.id);
   }
 
   return (

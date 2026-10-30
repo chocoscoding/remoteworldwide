@@ -1,9 +1,11 @@
 import CompaniesList from "./Client";
 import { CompanyList } from "@/types/main";
 import { Metadata } from "next";
-import { backendWithCount } from "@/app/lib/backend";
+import { BOARD_TAGS, backendCachedWithCount } from "@/app/lib/backend";
 
-export const dynamic = "force-dynamic";
+// Cached like the board's other public reads: rebuilt every 10 minutes, or as soon as an admin
+// write expires the companies or jobs tag (the list shows each company's open jobs).
+export const revalidate = 600;
 
 export const metadata: Metadata = {
   // Already carries the site name, so it skips the root template rather than doubling it.
@@ -39,7 +41,7 @@ export const metadata: Metadata = {
 // The first page from the backend directly, not out through the site's own public URL and its CDN.
 const getCompanies = async (): Promise<{ data: CompanyList[]; count: number }> => {
   try {
-    return await backendWithCount<CompanyList[]>("/companies");
+    return await backendCachedWithCount<CompanyList[]>("/companies", { revalidate: 600, tags: [BOARD_TAGS.companies, BOARD_TAGS.jobs] });
   } catch (error) {
     console.error("Error fetching companies:", error);
     return { data: [], count: 0 };

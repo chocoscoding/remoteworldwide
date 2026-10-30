@@ -87,7 +87,9 @@ async function getJson(endpoint: string): Promise<unknown> {
 /**
  * Ashby has no single-posting endpoint: its board API lists every posting, descriptions and all,
  * which runs to megabytes for a big company (too big for the fetch cache). So each board is read
- * once and only the two facts per posting are kept, here, for ATS_REVALIDATE_S.
+ * once and only the two facts per posting are kept, here, for ATS_REVALIDATE_S. The fetch still
+ * names a revalidate time rather than no-store, because a no-store fetch makes the job page render
+ * on every request; a board over the cache's 2 MB limit just isn't stored (Next logs that).
  */
 const ashbyBoards = new Map<string, { at: number; facts: Promise<Map<string, AtsFacts> | null> }>();
 
@@ -109,7 +111,7 @@ async function readAshbyBoard(org: string): Promise<Map<string, AtsFacts> | null
     const res = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(org)}?includeCompensation=true`, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(TIMEOUT_MS * 2),
-      cache: "no-store",
+      next: { revalidate: ATS_REVALIDATE_S },
     });
     if (!res.ok) return null;
     const data: unknown = await res.json();

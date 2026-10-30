@@ -1,14 +1,31 @@
 "use client";
 import { Bookmark } from "lucide-react";
-import React, { FC, useState, useEffect } from "react";
+import React, { FC, useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { createBookmarkForUser, deleteBookmarkForUser } from "@/libs/query";
+import { checkBookmarkForUser, createBookmarkForUser, deleteBookmarkForUser } from "@/libs/query";
 import { toast } from "react-toastify";
 
 const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean; onLogin?: () => void }> = ({ jobId, hasUserBookmarked, onLogin }) => {
   const [isBookmarked, setIsBookmarked] = useState(hasUserBookmarked ?? false);
   const [pendingAction, setPendingAction] = useState<boolean | null>(null); // To track the intended action
-  const { status } = useSession();
+  const { status, data: session } = useSession();
+  const touched = useRef(false);
+
+  // No answer from the server (the public job page is cached, so it can't know who is looking):
+  // ask once the session says they're signed in. A press made meanwhile wins over the answer.
+  const signedInId = status === "authenticated" && !session?.user?.deletionDueAt ? session?.user?.id : undefined;
+  useEffect(() => {
+    if (hasUserBookmarked !== undefined || !signedInId) return;
+    let live = true;
+    checkBookmarkForUser(jobId)
+      .then((res) => {
+        if (live && !touched.current) setIsBookmarked(Boolean(res.data?.id));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [hasUserBookmarked, signedInId, jobId]);
 
   useEffect(() => {
     if (pendingAction === null) return;
@@ -47,6 +64,7 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean; onLogin?:
       return;
     }
     if (status === "authenticated") {
+      touched.current = true;
       const newBookmarkState = !isBookmarked;
       setIsBookmarked(newBookmarkState);
       setPendingAction(newBookmarkState); // Set the intended action

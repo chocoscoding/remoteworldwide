@@ -1,9 +1,6 @@
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
-import { checkBookmarkForUser } from "@/libs/query";
 import { cache } from "react";
 import { JobAndCompany } from "@/types/main";
-import type { Job } from "@/types/main";
 import OneJobClient from "./Client";
 import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 import { jobPostingJsonLd } from "@/app/lib/jobs/jobPostingJsonLd";
@@ -12,6 +9,14 @@ import { jobFacts } from "@/app/lib/jobs/jobFacts";
 import { BOARD_TAGS, backendCachedOrNull } from "@/app/lib/backend";
 
 export const revalidate = 43200; // 3600 * 12
+
+// Built on a job's first visit and then served from the cache, rebuilt every 12 hours or as soon
+// as an admin edit expires the jobs tag. An empty list is what lets that happen for paths not
+// built at deploy. Nothing here may read the visitor (cookies, auth()): that would build the page
+// per request again. Whether they saved the job is asked from the browser (BookmarkStatus).
+export async function generateStaticParams() {
+  return [];
+}
 
 // One listing and its whole company, from the backend (GET /api/jobs/:slug, description
 // sanitized). Held in the data cache under the board's jobs tag, so an admin's edit shows at
@@ -75,20 +80,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const JOB = await fetchJob(jobSlug);
 
   if (!JOB) notFound();
-  const userSession = await auth();
-
-  const { company: companyDetails, ..._jobDetails } = JOB!;
-  const jobDetails = _jobDetails as unknown as Job;
-
-  let hasUserBookmarked = undefined;
-  // The same tests requireUserAction makes, so a signed-in visitor never meets its 401, and
-  // an account locked for deletion (refused there with 423) still sees the public page.
-  if (userSession?.user?.id && !userSession.user.deletionDueAt) {
-    const _hasUserBookmarked = await checkBookmarkForUser(jobDetails.id);
-    if (_hasUserBookmarked.data?.id) {
-      hasUserBookmarked = true;
-    }
-  }
 
   // Employment type and salary for the markup, read from the posting's ATS (jobFacts.ts).
   const live = isJobLive(JOB);
@@ -103,7 +94,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     <>
       {live && facts ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(jobPostingJsonLd(JOB, facts)) }} /> : null}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbs) }} />
-      <OneJobClient Job={JOB} hasUserBookmarked={hasUserBookmarked} />
+      <OneJobClient Job={JOB} />
     </>
   );
 }
