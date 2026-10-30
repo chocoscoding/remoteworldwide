@@ -8,6 +8,7 @@ import type { Job } from "@/types/main";
 import { toast } from "react-toastify";
 import { LinkIcon, type LinkIconHandle } from "@/components/ui/link-icon";
 import { isJobExpired } from "@/app/lib/jobs/jobLifetime";
+import "react-quill-new/dist/quill.bubble.css";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => <JobDescriptionSkeleton /> });
 

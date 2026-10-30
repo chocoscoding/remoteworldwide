@@ -21,6 +21,8 @@ import { fromSavedJob } from "@/app/(pages)/(dashboard)/dashboard/apply/job";
 import { isJobLive } from "@/app/lib/jobs/jobLifetime";
 import { qk } from "@/app/lib/query/keys";
 import styles from "./JobPage.module.css";
+// The description is Quill HTML drawn with Quill's own classes (ql-editor, data-list bullets).
+import "react-quill-new/dist/quill.core.css";
 
 const actions = [
   { id: "apply", label: "Apply to job with AI", icon: Target, color: "#e1f073" },

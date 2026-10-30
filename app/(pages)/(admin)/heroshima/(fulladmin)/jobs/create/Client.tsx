@@ -11,6 +11,7 @@ import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
 import type { Company } from "@/types/main";
 import { createOneJob, type JobCreate } from "@/libs/query";
 import { actionErrorMessage } from "@/app/lib/auth/action-error";
+import "react-quill-new/dist/quill.snow.css";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
