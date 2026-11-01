@@ -37,7 +37,6 @@ export const SITE_NAV: SiteNavGroup[] = [
     links: [
       { title: "Pricing", href: "/pricing", blurb: "Free to start, upgrade any time" },
       { title: "Blog", href: "/blogs", blurb: "Guides for the remote job hunt" },
-      { title: "Join the waitlist", href: "/waitlist", blurb: "Get in early" },
     ],
   },
 ];

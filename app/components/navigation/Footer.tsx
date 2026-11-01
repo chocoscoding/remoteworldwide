@@ -83,9 +83,9 @@ const Footer = () => {
             </p>
           </div>
           <Link
-            href="/waitlist"
+            href="/dashboard"
             className={`inline-flex h-11 w-fit items-center rounded-full bg-secondary px-5 text-sm font-bold text-primary transition-colors hover:bg-white ${FOCUS}`}>
-            Join the waitlist
+            Go to dashboard
           </Link>
         </div>
 

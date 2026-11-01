@@ -9,12 +9,11 @@ import { TOOLS, toolBySlug, toolPath, type Tool } from "@/app/lib/tools/catalogu
 import ProblemStory from "@/app/components/waitlist/ProblemStory";
 import PinnedRail from "@/app/components/waitlist/PinnedRail";
 import SmoothScroll from "@/app/components/waitlist/SmoothScroll";
-import UnlessJoined from "@/app/components/waitlist/UnlessJoined";
 import FaqList from "@/app/components/pricing/FaqList";
 import CheckChip from "@/app/components/marketing/CheckChip";
 import Eyebrow from "@/app/components/marketing/Eyebrow";
 import ToolVisual from "@/app/components/tools/ToolVisual";
-import { SignedOutOnly, ToolCta, ToolHeroAction } from "@/app/components/tools/ToolCta";
+import { ToolCta, ToolHeroAction } from "@/app/components/tools/ToolCta";
 
 // One page per AI tool, each told as the site's landing story (promise, problem, how it works, what
 // you get, the old way against ours, what it costs, questions, the ask), with the ask after every
@@ -136,9 +135,7 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
             after={
               <div className="mt-10 flex flex-col gap-5 border-t border-primary/10 pt-8 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-lg font-bold md:text-xl">{tool.problemAfter}</p>
-                <ToolCta {...cta} look="lime">
-                  Get early access
-                </ToolCta>
+                <ToolCta {...cta} look="lime" />
               </div>
             }
             className={`${storyFont.className} mt-6 text-[1.2rem] leading-[1.2] tracking-tight text-primary sm:text-[2rem] lg:text-[2.42rem] lg:leading-[1.25]`}
@@ -316,15 +313,8 @@ export default async function ToolPage({ params }: { params: Promise<{ slug: str
             <Sparkle className="absolute left-8 top-8 hidden h-10 w-10 fill-secondary text-secondary md:block" aria-hidden />
             <Sparkle className="absolute bottom-10 right-10 hidden h-6 w-6 fill-secondary text-secondary md:block" aria-hidden />
             <div className="relative">
-              <UnlessJoined>
-                <h2 className="text-balance text-3xl font-extrabold tracking-tight md:text-5xl">{tool.finalHeading}</h2>
-                <SignedOutOnly>
-                  <p className="mx-auto mt-4 max-w-[480px] text-white/75">
-                    We&apos;re opening spots in batches. Leave your email and we&apos;ll write the moment yours is ready.
-                  </p>
-                </SignedOutOnly>
-              </UnlessJoined>
-              <ToolHeroAction {...cta} tone="dark" inputId="waitlist-email-final" className="mx-auto max-w-[560px] justify-center first:mt-0" />
+              <h2 className="text-balance text-3xl font-extrabold tracking-tight md:text-5xl">{tool.finalHeading}</h2>
+              <ToolHeroAction {...cta} tone="dark" className="mx-auto max-w-[560px] justify-center" />
               <Link
                 href="/pricing"
                 className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-bold text-white/80 underline decoration-white/30 decoration-2 underline-offset-4 hover:text-white hover:decoration-secondary">

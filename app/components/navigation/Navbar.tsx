@@ -15,7 +15,6 @@ import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
 import { SITE_NAV } from "@/app/lib/navigation/siteNav";
 
 const DASHBOARD = "/dashboard";
-const WAITLIST = "/waitlist";
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 // 36px rows: compact, as a menu's should be (owner, 2026-10-02: same text size, less height).
 const MENU_ITEM =
@@ -473,7 +472,6 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
   const [group, setGroup] = useState<number | null>(null);
   const { isOpen2: accountOpen, closeNavbar2: closeAccount } = useNavbar();
   const button = useRef<HTMLButtonElement>(null);
-  const signedIn = useSession().status === "authenticated";
 
   const close = () => {
     setOpen(false);
@@ -565,16 +563,16 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
                 </div>
               );
             })}
-            {/* The bar's Dashboard or Waitlist button, which a phone's bar leaves out. */}
+            {/* The bar's Dashboard button, which a phone's bar leaves out. */}
             <Link
-              href={signedIn ? DASHBOARD : WAITLIST}
+              href={DASHBOARD}
               onClick={close}
-              aria-current={(signedIn ? pathname?.startsWith(DASHBOARD) : pathname === WAITLIST) ? "page" : undefined}
+              aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined}
               className={cn(
                 "mt-4 flex h-12 w-full items-center justify-center rounded-full bg-secondary text-base font-bold text-primary br-shadow-press",
                 FOCUS,
               )}>
-              {signedIn ? "Open your dashboard" : "Join the waitlist"}
+              Open your dashboard
             </Link>
           </div>
         </>
@@ -613,14 +611,14 @@ const Navbar = () => {
             <NavMenu pathname={pathname} />
 
             {/* The 44px link is the touch target; the pill inside is what you see. From lg up only: a
-                phone has it in the hamburger (owner, 2026-10-15). Signed in, it opens the dashboard,
-                which every signed-up account can use (owner, 2026-10-28); signed out, the waitlist. */}
+                phone has it in the hamburger (owner, 2026-10-15). Signed out, the dashboard sends them
+                to login. */}
             <Link
-              href={signedIn ? DASHBOARD : WAITLIST}
-              aria-current={(signedIn ? pathname?.startsWith(DASHBOARD) : pathname === WAITLIST) ? "page" : undefined}
+              href={DASHBOARD}
+              aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined}
               className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
               <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
-                {signedIn ? "Dashboard" : "Waitlist"}
+                Dashboard
               </span>
             </Link>
 

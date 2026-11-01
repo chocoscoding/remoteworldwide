@@ -7,6 +7,7 @@ import Confetti from "react-confetti";
 import { ArrowRight, Check, LoaderCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PLAN_TIER_NAMES, isPlanTier, type PlanTier } from "@/app/lib/settings/types";
+import { SPOT_OFFSET } from "@/app/lib/waitlist/types";
 import {
   HERO_INPUT_ID,
   parseJoined,
@@ -22,11 +23,6 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const CONFETTI_COLORS = ["#e1f073", "#cddd54", "#f0c86a", "#222325"];
-/**
- * Added to the place in line where it is shown here (owner, 2026-10-01). Display only: the backend's
- * position, what this browser remembers and the admin waitlist all keep the real number.
- */
-const SPOT_OFFSET = 729;
 const noopSubscribe = () => () => {};
 
 const prefersReducedMotion = () => {

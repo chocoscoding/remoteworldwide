@@ -103,11 +103,9 @@ export default function ToolsPage() {
       <section className="mx-auto max-w-[1200px] px-4 py-24 md:py-28" aria-label="Get started">
         <div className="flex flex-col items-center gap-5 rounded-[28px] border border-primary/10 bg-white px-6 py-12 text-center">
           <h2 className="text-balance text-3xl font-extrabold tracking-tight md:text-4xl">One profile. Every tool. One login.</h2>
-          <p className="max-w-[480px] text-primary/70">We&apos;re opening spots in batches, and the job board is open to everyone today.</p>
+          <p className="max-w-[480px] text-primary/70">Start free. The job board is open to everyone.</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <ToolCta href="/dashboard" openLabel="Open your dashboard" waitlistHref="/waitlist">
-              Get early access
-            </ToolCta>
+            <ToolCta href="/dashboard" openLabel="Open your dashboard" />
             <Link
               href="/jobs"
               className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-primary/20 bg-white px-6 text-sm font-bold text-primary transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">

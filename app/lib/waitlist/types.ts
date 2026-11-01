@@ -30,6 +30,12 @@ export const WAITLIST_ADMIN_FILTER_LABELS: Record<WaitlistAdminFilter, string> =
   skipped: "Skipped",
 };
 
+/**
+ * Added to the waitlist's numbers where visitors see them (owner, 2026-10-01). Display only: the
+ * backend's position, what a browser remembers and the admin waitlist all keep the real number.
+ */
+export const SPOT_OFFSET = 729;
+
 /** What one grant gives, for copy only: the backend decides. */
 export const WAITLIST_GRANT_PLAN = "Pro";
 export const WAITLIST_GRANT_CREDITS = 100;
