@@ -1,0 +1,564 @@
+/* Blog posts, the legal pages and the blog editor. Imported only where they render, so the
+   rest of the site does not download it (was in globals.css until 2026-11-02). */
+
+/* Blog post body (also the legal pages). One 28px rhythm between blocks, gray
+   body text under dark headings, after the Cloudflare blog. Manrope is loaded
+   at 400/500/700 only, so no 600/800 here. */
+.post-prose {
+  color: #5f6063;
+  font-size: 1rem;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+.post-prose > :first-child,
+.post-prose > :first-child > :first-child {
+  margin-top: 0;
+}
+.post-prose > :last-child {
+  margin-bottom: 0;
+}
+/* The quote badge sits above the box, so a quote opening a segment still needs the room. */
+.post-prose > blockquote:first-child {
+  margin-top: 1.75rem;
+}
+/* Two segments touch when a marker's offer is missing (PostBody renders nothing). */
+.post-prose + .post-prose {
+  margin-top: 1.75em;
+}
+.post-prose p {
+  margin: 0 0 1.75em;
+}
+.post-prose h2,
+.post-prose h3,
+.post-prose h4,
+.post-prose h5,
+.post-prose h6 {
+  color: #222325;
+  font-weight: 700;
+  scroll-margin-top: 96px;
+}
+.post-prose h2 {
+  font-size: 1.625rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  margin: 2em 0 0.55em;
+}
+.post-prose h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  margin: 1.6em 0 0.45em;
+}
+.post-prose h4,
+.post-prose h5,
+.post-prose h6 {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  margin: 1.5em 0 0.4em;
+}
+.post-prose a {
+  color: #222325;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: #cddd54;
+}
+.post-prose a:hover {
+  text-decoration-color: #222325;
+}
+/* Quill nests links innermost, so bold links and linked headings keep their weight. */
+.post-prose :is(h2, h3, h4, h5, h6, strong, b, th) a {
+  font-weight: inherit;
+}
+.post-prose strong,
+.post-prose b {
+  color: #222325;
+  font-weight: 700;
+}
+.post-prose ul,
+.post-prose ol {
+  margin: 0 0 1.75em;
+  padding-left: 1.5em;
+}
+.post-prose ul {
+  list-style: disc;
+}
+.post-prose ol {
+  list-style: decimal;
+}
+.post-prose ol > li[data-list="bullet"] {
+  list-style: disc;
+}
+.post-prose li {
+  margin: 0 0 0.5em;
+  padding-left: 0.15em;
+}
+.post-prose ul > li::marker {
+  color: #9a9b9e;
+}
+.post-prose li > ul,
+.post-prose li > ol {
+  margin: 0.5em 0 0;
+}
+/* Quill's wrapper around an indented list (see sanitizePostHtml): not a list
+   item, so it draws no bullet and doesn't count in an <ol>. */
+.post-prose li.list-wrap {
+  display: block;
+  margin: 0;
+  padding-left: 0;
+}
+.post-prose li.list-wrap > ul,
+.post-prose li.list-wrap > ol {
+  margin: 0;
+}
+.post-prose li[data-list="checked"],
+.post-prose li[data-list="unchecked"] {
+  list-style: none;
+  margin-left: -1.5em;
+  padding-left: 1.75em;
+  position: relative;
+}
+.post-prose li[data-list="checked"]::before,
+.post-prose li[data-list="unchecked"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.375em;
+  width: 1em;
+  height: 1em;
+  border: 1.5px solid #8e8f92;
+  border-radius: 4px;
+  background: #fff;
+}
+.post-prose li[data-list="checked"]::before {
+  background: #e1f073;
+  border-color: #222325;
+}
+/* Pull quote: ink frame on a lime block shadow, with a quote-mark badge sitting
+   on the top border. Lines come in as <p>s (see joinQuotes); an optional source line
+   (the writer ends the quote with "--- Name") gets a rule and mono caps. The top margin
+   leaves room for the badge, the bottom one for the shadow. */
+.post-prose blockquote {
+  position: relative;
+  margin: 2.25rem 0 1.75rem;
+  padding: 1.8rem 1.62rem 0.81rem 1.8rem;
+  border: 1.5px solid #222325;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 4px 4px 0 0 #e1f073;
+  color: #525356;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.65;
+}
+.post-prose blockquote::before {
+  content: "\201C";
+  position: absolute;
+  top: -1.125rem;
+  left: 1.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 4px;
+  background: #222325;
+  color: #e1f073;
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  padding-top: 0.16rem;
+}
+.post-prose blockquote p {
+  margin: 0;
+}
+.post-prose blockquote .quote-source {
+  margin-top: 1rem;
+  color: #222325;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.post-prose blockquote .quote-source a {
+  text-decoration-line: none;
+}
+.post-prose blockquote .quote-source a:hover {
+  text-decoration-line: underline;
+  text-decoration-color: #cddd54;
+}
+.post-prose blockquote .quote-source::before {
+  content: "";
+  display: inline-block;
+  width: 1.5rem;
+  height: 2px;
+  margin-right: 0.75rem;
+  background: currentColor;
+  vertical-align: middle;
+}
+.post-prose pre,
+.post-prose .ql-syntax {
+  margin: 1.75em 0;
+  padding: 1rem 1.25rem;
+  background: #222325;
+  color: #f6f6f6;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.post-prose code {
+  font-size: 0.875em;
+  color: #222325;
+  background: #f0f0ea;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.post-prose pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+.post-prose img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.75em 0;
+  border-radius: 14px;
+  border: 2px solid #222325;
+}
+.post-prose iframe.ql-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin: 1.75em 0;
+  border-radius: 14px;
+  border: 2px solid #222325;
+}
+.post-prose hr {
+  border: 0;
+  border-top: 1px solid rgba(34, 35, 37, 0.15);
+  margin: 2em 0;
+}
+/* Tables (see shapeTables): hairline rows, no vertical rules, bold first column.
+   Full tables and Rows-only tables with column labels have a mono-caps heading on an
+   ink rule; plain Rows only gets a hairline on top instead. Wide ones scroll on phones. */
+.post-prose .post-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 1.75em;
+}
+.post-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+.post-prose th,
+.post-prose td {
+  padding: 0.9em 1.25em 0.9em 0;
+  border-bottom: 1px solid rgba(34, 35, 37, 0.12);
+  text-align: left;
+  vertical-align: top;
+}
+.post-prose :is(th, td):last-child {
+  padding-right: 0;
+}
+.post-prose td:first-child {
+  color: #222325;
+  font-weight: 700;
+}
+.post-prose thead th {
+  padding-top: 0;
+  padding-bottom: 0.75em;
+  border-bottom-color: #222325;
+  color: #8e8f92;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.post-prose .post-table--rows > tbody:first-child > tr:first-child > td {
+  border-top: 1px solid rgba(34, 35, 37, 0.12);
+}
+.post-prose .post-table--rows td:first-child {
+  width: 28%;
+  min-width: 9rem;
+}
+.post-prose .ql-align-center {
+  text-align: center;
+}
+.post-prose .ql-align-right {
+  text-align: right;
+}
+.post-prose .ql-indent-1 {
+  padding-left: 2em;
+}
+.post-prose .ql-indent-2 {
+  padding-left: 4em;
+}
+.post-prose .ql-indent-3 {
+  padding-left: 6em;
+}
+@media (max-width: 767px) {
+  .post-prose {
+    line-height: 1.7;
+  }
+  .post-prose h2 {
+    font-size: 1.375rem;
+  }
+  .post-prose h3 {
+    font-size: 1.1875rem;
+  }
+  .post-prose blockquote {
+    padding: 1.575rem 1.0125rem 0.675rem 1.125rem;
+    box-shadow: 3px 3px 0 0 #e1f073;
+    font-size: 0.875rem;
+  }
+  .post-prose blockquote::before {
+    top: -1rem;
+    left: 1rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 3rem;
+    padding-top: 0.18rem;
+  }
+}
+
+/* Posts written with blank lines (see RenderedPost.spacing): the editor's spacing
+   exactly, so blank lines are the only gaps and a line with none sits on the next.
+   Boxed blocks keep a small gap so their borders don't touch text. Top/bottom only,
+   so checklist items keep their margin-left. */
+.post-prose--as-written p,
+.post-prose--as-written ul,
+.post-prose--as-written ol,
+.post-prose--as-written li,
+.post-prose--as-written li > ul,
+.post-prose--as-written li > ol,
+.post-prose--as-written img,
+.post-prose--as-written h2,
+.post-prose--as-written h3,
+.post-prose--as-written h4,
+.post-prose--as-written h5,
+.post-prose--as-written h6 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.post-prose--as-written :is(pre, .ql-syntax),
+.post-prose--as-written iframe.ql-video {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+.post-prose--as-written .post-table-wrap {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+/* Room for the quote badge above and the block shadow below. */
+.post-prose--as-written blockquote {
+  margin-top: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+/* Line spacing, picked per paragraph in the editor's toolbar like a word processor's.
+   The old 1.75 body line is "1.5"; the rest scale from it (1.75 / 1.5 per step), and
+   1.15 is the default, so a line with no class gets it. Blog posts only: the legal
+   pages keep .post-prose's 1.75. */
+.post-prose--blog {
+  line-height: 1.465; /* 23.4px at 16px: the 1.15 step (21.4px) plus 2px */
+}
+:is(.post-editor .ql-editor, .post-prose) .ql-line-height-1 {
+  line-height: 1.17;
+}
+:is(.post-editor .ql-editor, .post-prose) .ql-line-height-1-5 {
+  line-height: 1.75;
+}
+:is(.post-editor .ql-editor, .post-prose) .ql-line-height-2 {
+  line-height: 2.33;
+}
+/* The toolbar's spacing picker, labelled like a word processor's. */
+.post-editor .ql-snow .ql-picker.ql-lineheight {
+  width: 78px;
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight .ql-picker-label::before,
+.post-editor .ql-snow .ql-picker.ql-lineheight .ql-picker-item::before {
+  content: "1.15";
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight [data-value="1"]::before {
+  content: "Single";
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight [data-value="1-5"]::before {
+  content: "1.5";
+}
+.post-editor .ql-snow .ql-picker.ql-lineheight [data-value="2"]::before {
+  content: "Double";
+}
+
+/* The blog editor (BlogForm): the same type as .post-prose, so writers see
+   roughly what readers get. Block margins stay 0 because blank lines are the
+   spacing here, and one 28px blank line equals the 28px paragraph gap on the
+   page. Selectors carry an extra class to beat quill.snow.css, which loads
+   after this file. */
+/* Pinned to the top of the admin scroll area while the editor is on screen, under the undo pill. */
+.post-editor .ql-toolbar.ql-snow {
+  position: sticky;
+  top: 3.5rem;
+  z-index: 20;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px 12px 0 0;
+  background: #fff;
+}
+/* Once the toolbar is pinned, the strip above it (behind the undo pill) frosts over, so
+   the text scrolling past doesn't show through. BlogForm sets data-stuck. */
+.post-editor .ql-toolbar.ql-snow::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: 100%;
+  height: 3.5rem;
+  background: rgb(255 255 255 / 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+[data-stuck] .post-editor .ql-toolbar.ql-snow::before {
+  opacity: 1;
+}
+.post-editor .ql-container.ql-snow {
+  border: 1px solid #e5e5e5;
+  border-radius: 0 0 12px 12px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+}
+.post-editor .ql-container .ql-editor {
+  min-height: 480px;
+  padding: 2rem max(1.5rem, calc((100% - 720px) / 2 - 3%)) 4rem;
+  color: #5f6063;
+  line-height: 1.465; /* 23.4px at 16px: the 1.15 step (21.4px) plus 2px */
+}
+.post-editor .ql-container .ql-editor.ql-blank::before {
+  left: max(1.5rem, calc((100% - 720px) / 2 - 3%));
+  right: max(1.5rem, calc((100% - 720px) / 2 - 3%));
+  color: #737373;
+  font-style: normal;
+}
+/* Tables: a light grid so every cell is clickable, and the heading row (Full, or Rows
+   only with column labels) drawn in the page's mono caps so writers see which they have. */
+.post-editor .ql-container .ql-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  table-layout: auto;
+}
+.post-editor .ql-container .ql-editor td {
+  border: 1px dashed #d9d9d2;
+  padding: 0.6em 0.75em;
+  vertical-align: top;
+}
+.post-editor .ql-container .ql-editor td:first-child {
+  color: #222325;
+  font-weight: 700;
+}
+.post-editor .ql-container .ql-editor table:not(:has(td.ql-table-rows)) tr:first-child td {
+  border-bottom: 1px solid #222325;
+  color: #8e8f92;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.post-editor .ql-container .ql-editor h2,
+.post-editor .ql-container .ql-editor h3,
+.post-editor .ql-container .ql-editor h4 {
+  color: #222325;
+  font-weight: 700;
+}
+.post-editor .ql-container .ql-editor h2 {
+  font-size: 1.625rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+.post-editor .ql-container .ql-editor h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+.post-editor .ql-container .ql-editor h4 {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+.post-editor .ql-container .ql-editor a {
+  color: #222325;
+  font-weight: 500;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: #cddd54;
+}
+.post-editor .ql-container .ql-editor :is(h2, h3, h4, strong) a {
+  font-weight: inherit;
+}
+.post-editor .ql-container .ql-editor strong {
+  color: #222325;
+  font-weight: 700;
+}
+/* Quotes, drawn like the page's pull quote. Quill keeps each quote line as its own
+   <blockquote>, so a run of them forms one box: sides and shadow on every line (each
+   line's background covers the shadow of the one above), top border and badge on the
+   first, bottom border on the last. A last line starting with "---" is the page's source. */
+.post-editor .ql-container .ql-editor blockquote {
+  position: relative;
+  margin: 0;
+  padding: 0 1.62rem 0 1.8rem;
+  border: 1.5px solid #222325;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  background: #fff;
+  box-shadow: 4px 4px 0 0 #e1f073;
+  color: #525356;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.65;
+}
+.post-editor .ql-container .ql-editor :not(blockquote) + blockquote,
+.post-editor .ql-container .ql-editor blockquote:first-child {
+  margin-top: 1.75rem;
+  padding-top: 1.8rem;
+  border-top-width: 1.5px;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+}
+.post-editor .ql-container .ql-editor blockquote:not(:has(+ blockquote)) {
+  margin-bottom: 1rem;
+  padding-bottom: 0.81rem;
+  border-bottom-width: 1.5px;
+  border-bottom-left-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+.post-editor .ql-container .ql-editor :not(blockquote) + blockquote::before,
+.post-editor .ql-container .ql-editor blockquote:first-child::before {
+  content: "\201C";
+  position: absolute;
+  top: -1.125rem;
+  left: 1.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 4px;
+  background: #222325;
+  color: #e1f073;
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  padding-top: 0.16rem;
+}
+/* Posts render justified text left-aligned; show it the same way here. */
+.post-editor .ql-container .ql-editor .ql-align-justify {
+  text-align: left;
+}

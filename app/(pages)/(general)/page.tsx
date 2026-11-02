@@ -39,7 +39,7 @@ export default async function Home() {
   const latestJobs = await getLatestJobs();
 
   return (
-    <div>
+    <main>
       {/* the header of the page */}
       <Header count={jobsCount} />
       <br />
@@ -63,6 +63,6 @@ export default async function Home() {
         <StaggerTestimonials />
       </div> */}
       <br />
-    </div>
+    </main>
   );
 }

@@ -30,6 +30,7 @@ import TableBar from "./TableBar";
 import { insertTable } from "./tableStyle";
 import { softBreakMatcher, tableEnterBinding } from "./softBreak";
 import { ADMIN_HINT, ADMIN_INPUT, ADMIN_LABEL } from "./OfferTargeting";
+import "@/app/components/blog/post.css";
 
 export interface BlogFormProps {
   authors: Author[];

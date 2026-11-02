@@ -5,6 +5,7 @@ import Link from "@/app/components/navigation/HoverPrefetchLink";
 import React, { FC, useId, useState } from "react";
 import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
+import { cloudinaryThumb } from "@/app/lib/cloudinary";
 
 // The /jobs board's "sticker" job tile (owner's design, trialled at /jobs_v2 and adopted 2026-10-16).
 // The whole tile opens the job: the title link stretches over it, and the company link and the "+N"
@@ -71,7 +72,7 @@ const JobTileV2: FC<JobTileV2Props> = (props) => {
         {company.logo && !logoBroken ? (
           <Image
             loading="lazy"
-            src={company.logo}
+            src={cloudinaryThumb(company.logo, 44)}
             alt=""
             width={44}
             height={44}

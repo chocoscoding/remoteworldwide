@@ -50,7 +50,8 @@ const CSP_REPORT_ONLY = [
   "frame-src 'self' https://upload-widget.cloudinary.com https://vars.hotjar.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  "upgrade-insecure-requests",
+  // Add "upgrade-insecure-requests" back when this becomes the enforced Content-Security-Policy.
+  // Browsers ignore it in a report-only policy and log a console error saying so.
 ].join("; ");
 
 /** @type {import('next').NextConfig} */

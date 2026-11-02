@@ -74,7 +74,7 @@ const Footer = () => {
         {/* Brand row: who we are in a line, and the way in. */}
         <div className="flex flex-col gap-6 border-b border-white/15 pb-10 md:flex-row md:items-end md:justify-between">
           <div className="max-w-[420px]">
-            <Link href="/" aria-label="Remote Worldwide home" className={`inline-flex items-center gap-2.5 rounded-md ${FOCUS}`}>
+            <Link href="/" aria-label="Remote Worldwide, home page" className={`inline-flex items-center gap-2.5 rounded-md ${FOCUS}`}>
               <LogoMini width={30} height={30} className="h-[30px] w-[30px]" />
               <span className="text-lg font-extrabold tracking-tight">Remote Worldwide</span>
             </Link>

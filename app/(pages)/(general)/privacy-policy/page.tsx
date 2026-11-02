@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "@/app/lib/seo";
+import "@/app/components/blog/post.css";
 
 const COMPANY = "Remote Worldwide";
 const CONTACT_EMAIL = "contact@remoteworldwide.net";

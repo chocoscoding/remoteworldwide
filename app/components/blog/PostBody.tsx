@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { PostSegment, RenderedPost } from "@/app/lib/blog/render";
 import LeadMagnetCard, { type LeadMagnetSummary } from "./LeadMagnetCard";
 import CtaCard, { type CtaSummary } from "./CtaCard";
+import "./post.css";
 
 export interface PostBodyProps {
   segments: PostSegment[];

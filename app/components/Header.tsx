@@ -13,10 +13,12 @@ const Header = ({ count }: { count: number | null }) => {
         <div className="w-full h-full relative overflow-hidden">
           <Globe />
           <Image
-            src={"/globe.png"}
+            src={"/globe.webp"}
             width={720}
             height={720}
             alt="globe fallback"
+            loading="eager"
+            fetchPriority="high"
             className="h-auto w-full md:w-auto md:h-full md:aspect-auto -bottom-14 md:bottom-0 absolute -right-4 md:scale-90"
             id="fallbackglobe"
           />

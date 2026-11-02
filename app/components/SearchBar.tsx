@@ -102,7 +102,8 @@ const InnerContent: React.FC = () => (
   <>
     <span className="hidden md:block">Search</span>
     <span className="md:hidden block">
-      <Search className="md:w-auto w-4" />
+      <Search className="md:w-auto w-4" aria-hidden="true" />
+      <span className="sr-only">Search</span>
     </span>
   </>
 );
