@@ -1,7 +1,8 @@
 "use client";
 
 import { FC, useSyncExternalStore } from "react";
-import { Chrome, X } from "lucide-react";
+import { X } from "lucide-react";
+import ChromeLogo from "@/app/components/svg/ChromeLogo";
 import { useAnswers } from "./answers/AnswersProvider";
 import { EXTENSION_URL } from "@/app/lib/extension/presence";
 
@@ -66,7 +67,7 @@ const ExtensionCard: FC = () => {
   return (
     <div className="mx-2 mb-2 flex flex-none items-center gap-2 rounded-xl border border-black/8 bg-[#f6f6f2] py-1.5 pl-2 pr-1 animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
       <span className="grid h-6 w-6 flex-none place-content-center rounded-md bg-[#222325]">
-        <Chrome className="h-3.5 w-3.5 text-[#e1f073]" />
+        <ChromeLogo className="h-3.5 w-3.5" aria-hidden />
       </span>
       <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-primary">Autofill in Chrome</p>
       <a

@@ -27,11 +27,12 @@
 import { useEffect, useId, useReducer, useRef, useState, type FC, type FormEvent, type ReactNode, type RefObject } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronDown, Chrome, CircleAlert, ClipboardPaste, Loader2, Search, Sparkles, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, CircleAlert, ClipboardPaste, Loader2, Search, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AutoGrowTextarea from "@/app/components/dashboard/ui/AutoGrowTextarea";
 import SlidingTabs from "@/app/components/dashboard/ui/SlidingTabs";
 import LogoMini from "@/app/components/svg/LogoMini";
+import ChromeLogo from "@/app/components/svg/ChromeLogo";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { EXTENSION_URL, useExtensionPresence } from "@/app/lib/extension/presence";
 import {
@@ -190,7 +191,7 @@ const ExtensionPromo: FC = () => {
   return (
     <div className="mt-3 flex flex-none items-center gap-4 rounded-2xl bg-[#222325] p-4 br-bold br-lime">
       <span className="grid h-11 w-11 flex-none place-content-center rounded-xl bg-[#e1f073]">
-        <Chrome className="h-5 w-5 text-[#222325]" />
+        <ChromeLogo className="h-5 w-5" aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-white">Skip the pasting next time</p>

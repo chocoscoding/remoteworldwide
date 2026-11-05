@@ -1,8 +1,9 @@
 "use client";
 
 import { FC } from "react";
-import { Check, Chrome, ExternalLink, Loader2, PlugZap } from "lucide-react";
+import { Check, ExternalLink, Loader2, PlugZap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ChromeLogo from "@/app/components/svg/ChromeLogo";
 import { useAnswers } from "@/app/components/dashboard/answers/AnswersProvider";
 import { EXTENSION_TOGGLES } from "@/app/components/dashboard/questions/ExtensionDialog";
 import { EXTENSION_URL } from "@/app/lib/extension/presence";
@@ -55,7 +56,7 @@ const ExtensionClient: FC = () => {
           </div>
           {extension.status === "absent" && (
             <a href={EXTENSION_URL} target="_blank" rel="noopener noreferrer" className={BUTTON_SOLID}>
-              <Chrome className="h-3.5 w-3.5" />
+              <ChromeLogo className="h-3.5 w-3.5" aria-hidden />
               Add to Chrome
               <span className="sr-only"> (opens the Chrome Web Store in a new tab)</span>
             </a>
