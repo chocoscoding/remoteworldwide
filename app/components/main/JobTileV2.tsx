@@ -78,7 +78,9 @@ const JobTileV2: FC<JobTileV2Props> = (props) => {
             alt=""
             width={44}
             height={44}
-            className="h-full w-full bg-white object-cover"
+            // Whole, as on the job page: a wide wordmark shrinks to fit instead of losing its sides,
+            // with a little room inside the ring so its ends don't touch it.
+            className="h-full w-full bg-white object-contain p-[3px]"
             onError={() => setLogoBroken(true)}
           />
         ) : (
