@@ -4,19 +4,20 @@ import LogoMini from "../svg/LogoMini";
 import { FaTelegram } from "react-icons/fa6";
 import { InstagramIcon, LinkedInIcon, TwitterIcon, socialLink } from "./SocialIcons";
 import CookieSettingsButton from "@/app/components/consent/CookieSettingsButton";
-import { SITE_NAV } from "@/app/lib/navigation/siteNav";
+import { JOB_BROWSE, SITE_NAV } from "@/app/lib/navigation/siteNav";
 import { FOOTER_LANDINGS } from "@/app/lib/landing/catalogue";
 
-// The site's crawlable links, in three columns (owner, 2026-10-15): the navbar's three groups
-// (SITE_NAV, so the words stay the same in both, as Google wants for sitelinks), Features first, plus
-// the links only the footer carries. `external` opens in a new tab; a mailto: is a plain link.
-// The Jobs column also lists the job landing pages, with the company ones under their own
-// Companies heading (owner's screenshot, 2026-10-28; app/lib/landing/catalogue.ts, live pages only).
+// The site's crawlable links in columns (owner, 2026-10-15): the navbar's three groups (SITE_NAV, so
+// the words stay the same in both, as Google wants for sitelinks), Features first, plus the links only
+// the footer carries. `external` opens in a new tab; a mailto: is a plain link. The job landing pages
+// are two columns of their own, region and role (JOB_BROWSE, the navbar's Jobs menu list; owner,
+// 2026-11-05), and the company ones sit under their own Companies heading in the Jobs column (owner's
+// screenshot, 2026-10-28; app/lib/landing/catalogue.ts, live pages only).
 type FooterLink = { title: string; href: string; external?: boolean };
 type FooterSection = { heading: string; links: FooterLink[] };
 
 const FOOTER_ONLY: Record<string, FooterLink[]> = {
-  Jobs: [...FOOTER_LANDINGS.Jobs, { title: "Daily jobs on Telegram", href: "https://t.me/worldwideremote", external: true }],
+  Jobs: [{ title: "Daily jobs on Telegram", href: "https://t.me/worldwideremote", external: true }],
   Company: [
     { title: "Contact", href: "mailto:contact@remoteworldwide.net" },
     { title: "Privacy Policy", href: "/privacy-policy" },
@@ -24,13 +25,14 @@ const FOOTER_ONLY: Record<string, FooterLink[]> = {
   ],
 };
 
-const COLUMN_ORDER = ["Features", "Jobs", "Company"];
+const BROWSE_COLUMNS = JOB_BROWSE.map((section) => section.label);
+const COLUMN_ORDER = ["Features", "Jobs", ...BROWSE_COLUMNS, "Company"];
 /** A second heading inside a column, under its first list. */
 const SUB_SECTIONS: Record<string, FooterSection> = {
   Jobs: { heading: "Companies", links: FOOTER_LANDINGS.Companies },
 };
 const COLUMNS: (FooterSection & { more?: FooterSection })[] = COLUMN_ORDER.map((label) => {
-  const group = SITE_NAV.find((g) => g.label === label);
+  const group = SITE_NAV.find((g) => g.label === label) ?? JOB_BROWSE.find((s) => s.label === label);
   const more = SUB_SECTIONS[label];
   return { heading: label, links: [...(group?.links ?? []), ...(FOOTER_ONLY[label] ?? [])], ...(more?.links.length ? { more } : {}) };
 });
@@ -89,8 +91,9 @@ const Footer = () => {
           </Link>
         </div>
 
-        {/* The three columns. Two across on a phone, Features taking the full first row. */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-10 py-10 sm:grid-cols-3">
+        {/* The five columns. Two across on a phone (Features taking the full first row), three on a
+            tablet, all five from lg up. */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 py-10 sm:grid-cols-3 lg:grid-cols-5">
           {COLUMNS.map((column, i) => (
             <nav key={column.heading} aria-label={column.heading} className={i === 0 ? "col-span-2 sm:col-span-1" : undefined}>
               <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-secondary">{column.heading}</h2>

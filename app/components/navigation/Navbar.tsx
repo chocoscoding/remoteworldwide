@@ -14,7 +14,7 @@ import ChromeLogo from "../svg/ChromeLogo";
 import { cn } from "@/app/lib/utils";
 import { loginWithNext, returnTo, signupWithNext } from "@/app/lib/next-url";
 import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
-import { SITE_NAV } from "@/app/lib/navigation/siteNav";
+import { JOB_BROWSE, SITE_NAV } from "@/app/lib/navigation/siteNav";
 
 const DASHBOARD = "/dashboard";
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
@@ -24,8 +24,13 @@ const MENU_ITEM =
 // Both menus: a white card with the ink hairline and the 2px hard shadow, nothing softer.
 const MENU_CARD = "rounded-xl bg-white br-shadow";
 
-/** Each list's width, fixed so the panel never measures (and clips) a half-laid-out list. Features is two columns. */
-const LIST_WIDTH: Record<string, string> = { Jobs: "w-[300px]", Features: "w-[560px]", Company: "w-[300px]" };
+/**
+ * Each list's width, fixed so the panel never measures (and clips) a half-laid-out list. Features is
+ * two columns; Jobs is its two pages side by side over the region and role pages (BROWSE).
+ */
+const LIST_WIDTH: Record<string, string> = { Jobs: "w-[560px]", Features: "w-[560px]", Company: "w-[300px]" };
+/** The extra landing links a group's list shows under its rows (only Jobs has them). */
+const BROWSE: Record<string, typeof JOB_BROWSE> = { Jobs: JOB_BROWSE };
 /** A group's overview page: a footer link under its rows instead of a row of its own. */
 const OVERVIEW: Record<string, { title: string; href: string }> = { Features: { title: "See all features", href: "/tools" } };
 
@@ -406,6 +411,7 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
             // its word is on.
             const offset = showing || open === null ? 0 : i < open ? -24 : 24;
             const overview = OVERVIEW[group.label];
+            const browse = BROWSE[group.label];
             const rows = group.links.filter((link) => link.href !== overview?.href);
             return (
               <div
@@ -421,7 +427,7 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
                   transform: `translateX(${offset}px)`,
                   transition: `opacity 200ms, transform 300ms ${EASE}, visibility 200ms`,
                 }}>
-                <ul className={cn("grid gap-0.5", rows.length > 4 && "grid-cols-2")}>
+                <ul className={cn("grid gap-0.5", (rows.length > 4 || browse) && "grid-cols-2")}>
                   {rows.map((link) => {
                     const current = pathname === link.href;
                     return (
@@ -444,6 +450,36 @@ const NavMenu = ({ pathname }: { pathname: string | null }) => {
                     );
                   })}
                 </ul>
+                {browse ? (
+                  // Plain rows in three columns under a hairline: the menu's own row style, smaller.
+                  <div className="mx-1 mt-1.5 grid gap-2.5 border-t border-primary/10 pb-1 pt-2.5">
+                    {browse.map((section) => (
+                      <div key={section.label}>
+                        <p className="px-1.5 pb-1 text-xs font-semibold text-primary">{section.label}</p>
+                        <ul className="grid grid-cols-3 gap-x-1">
+                          {section.links.map((link) => {
+                            const current = pathname === link.href;
+                            return (
+                              <li key={link.href}>
+                                <Link
+                                  href={link.href}
+                                  onClick={close}
+                                  tabIndex={showing ? undefined : -1}
+                                  aria-current={current ? "page" : undefined}
+                                  className={cn(
+                                    "flex min-h-8 items-center rounded-md px-1.5 text-[13px] text-primary/80 hover:bg-primary2 hover:text-primary focus-visible:bg-primary2 focus-visible:outline-none",
+                                    current && "bg-primary2 font-bold text-primary",
+                                  )}>
+                                  {link.title}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {overview ? (
                   <Link
                     href={overview.href}
@@ -557,6 +593,33 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
                             )}>
                             {link.title}
                           </Link>
+                        </li>
+                      ))}
+                      {/* Jobs' region and role pages: chips, so twenty links stay a short scroll. */}
+                      {(BROWSE[navGroup.label] ?? []).map((section) => (
+                        <li key={section.label} className="pb-3 pt-1">
+                          <p className="pb-2 text-xs font-semibold text-primary">{section.label}</p>
+                          <ul className="flex flex-wrap gap-2">
+                            {section.links.map((link) => {
+                              const current = pathname === link.href;
+                              return (
+                                <li key={link.href}>
+                                  <Link
+                                    href={link.href}
+                                    onClick={close}
+                                    tabIndex={expanded ? undefined : -1}
+                                    aria-current={current ? "page" : undefined}
+                                    className={cn(
+                                      "inline-flex min-h-9 items-center rounded-full border border-primary/15 px-3 text-sm text-primary/80 hover:border-primary hover:text-primary",
+                                      current && "border-primary font-bold text-primary",
+                                      FOCUS,
+                                    )}>
+                                    {link.title}
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </li>
                       ))}
                       <li aria-hidden className="h-2" />

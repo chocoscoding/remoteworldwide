@@ -40,3 +40,43 @@ export const SITE_NAV: SiteNavGroup[] = [
     ],
   },
 ];
+
+/**
+ * Landing pages under Jobs (REGIONS and ROLES in app/lib/landing/catalogue.ts): the Jobs dropdown
+ * and the phone menu list them under the group's own links (owner, 2026-11-05: moved there from the
+ * home and /jobs pages). Not in SITE_NAV, so the footer's Jobs column stays two links. Spelled out
+ * for the same reason as the feature pages; tests/site-nav.test.mjs checks each one is a real
+ * landing page.
+ */
+export const JOB_BROWSE: { label: string; links: SiteNavLink[] }[] = [
+  {
+    label: "Browse by region",
+    links: [
+      { title: "US", href: "/jobs/usa" },
+      { title: "UK", href: "/jobs/uk" },
+      { title: "Europe", href: "/jobs/europe" },
+      { title: "EMEA", href: "/jobs/emea" },
+      { title: "Canada", href: "/jobs/canada" },
+      { title: "Worldwide", href: "/jobs/worldwide" },
+      { title: "Latin America", href: "/jobs/latin-america" },
+      { title: "Asia Pacific", href: "/jobs/apac" },
+      { title: "Africa", href: "/jobs/africa" },
+    ],
+  },
+  {
+    label: "Browse by role",
+    links: [
+      { title: "Software engineering", href: "/jobs/software-engineer" },
+      { title: "Frontend development", href: "/jobs/frontend" },
+      { title: "Backend development", href: "/jobs/backend" },
+      { title: "DevOps", href: "/jobs/devops" },
+      { title: "Data", href: "/jobs/data" },
+      { title: "Product", href: "/jobs/product" },
+      { title: "Design", href: "/jobs/design" },
+      { title: "Marketing", href: "/jobs/marketing" },
+      { title: "Sales", href: "/jobs/sales" },
+      { title: "Customer support", href: "/jobs/customer-support" },
+      { title: "H1B sponsorship", href: "/jobs/h1b" },
+    ],
+  },
+];
