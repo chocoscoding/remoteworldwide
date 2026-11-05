@@ -5,6 +5,9 @@ import {
 } from "@/app/lib/sitemapData";
 import { sitemapChunks, sitemapXml } from "@/app/lib/sitemapXml";
 export const dynamic = "force-dynamic";
+// Same limits as the index (app/sitemap.xml/route.ts): a minute for a cold read, an hour at the
+// CDN, then the last copy for up to a day while it rebuilds in the background.
+export const maxDuration = 60;
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ file: string }> },
@@ -21,7 +24,7 @@ export async function GET(
     return new Response(sitemapXml(rows), {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": "public, max-age=0, s-maxage=300",
+        "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
       },
     });
   } catch {
