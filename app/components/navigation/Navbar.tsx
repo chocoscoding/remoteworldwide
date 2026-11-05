@@ -6,9 +6,11 @@ import { useSession } from "next-auth/react";
 import { signOut } from "@/app/lib/authClient";
 import Image from "next/image";
 import { ArrowRight, Bookmark, ChevronDown, LayoutDashboard, LoaderCircle, LogOut, Menu, PenLine, Shield, UserRound, X } from "lucide-react";
+import { EXTENSION_URL } from "@/app/lib/extension/url";
 import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
+import ChromeLogo from "../svg/ChromeLogo";
 import { cn } from "@/app/lib/utils";
 import { loginWithNext, returnTo, signupWithNext } from "@/app/lib/next-url";
 import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
@@ -611,16 +613,33 @@ const Navbar = () => {
             <NavMenu pathname={pathname} />
 
             {/* The 44px link is the touch target; the pill inside is what you see. From lg up only: a
-                phone has it in the hamburger (owner, 2026-10-15). Signed out, the dashboard sends them
-                to login. */}
-            <Link
-              href={DASHBOARD}
-              aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined}
-              className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
-              <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
-                Dashboard
-              </span>
-            </Link>
+                phone has its own in the hamburger (owner, 2026-10-15). Signed in, it opens the
+                dashboard. Signed out (and while the session loads, which is how most visitors arrive
+                on these cached pages, so they see no swap), it is the Chrome extension (owner,
+                2026-11-05): the dashboard would only send them to login, and this pill only shows on
+                the desktops that can install it. */}
+            {signedIn ? (
+              <Link
+                href={DASHBOARD}
+                aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined}
+                className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
+                <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
+                  Dashboard
+                </span>
+              </Link>
+            ) : (
+              <a
+                href={EXTENSION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
+                <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
+                  <ChromeLogo className="h-4 w-4" aria-hidden />
+                  Extension
+                  <span className="sr-only"> for Chrome, opens the Chrome Web Store in a new tab</span>
+                </span>
+              </a>
+            )}
 
             {/* The user icon on every screen size; a phone also gets the hamburger after it. */}
             {status === "loading" ? (
