@@ -677,11 +677,17 @@ const Navbar = () => {
 
             {/* The 44px link is the touch target; the pill inside is what you see. From lg up only: a
                 phone has its own in the hamburger (owner, 2026-10-15). Signed in, it opens the
-                dashboard. Signed out (and while the session loads, which is how most visitors arrive
-                on these cached pages, so they see no swap), it is the Chrome extension (owner,
-                2026-11-05): the dashboard would only send them to login, and this pill only shows on
-                the desktops that can install it. */}
-            {signedIn ? (
+                dashboard. Signed out, it is the Chrome extension (owner, 2026-11-05): the dashboard
+                would only send them to login, and this pill only shows on the desktops that can
+                install it. While the session is still loading it is NEITHER (owner, 2026-11-05: a
+                signed-in visitor saw Extension, then a flicker to Dashboard): a blank pill of the same
+                size holds the spot, so nothing wrong shows and nothing moves. These pages are cached
+                for everyone, so the server cannot know who is looking; the session decides it. */}
+            {status === "loading" ? (
+              <span aria-hidden className="hidden h-10 items-center lg:inline-flex">
+                <span className="mr-2 inline-block h-8 w-[104px] rounded-full bg-primary/[0.06]" />
+              </span>
+            ) : signedIn ? (
               <Link
                 href={DASHBOARD}
                 aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined}
