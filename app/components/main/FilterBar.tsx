@@ -4,10 +4,47 @@ import { format, subMonths } from "date-fns";
 import { CalendarIcon, Check, ChevronDown, X } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useFilter } from "@/provider/FilterProvider";
+import { useFilter, type DetailFilterKey } from "@/provider/FilterProvider";
 import { isDefaultRange, normalizeDateRange } from "@/lib/dateFilterUtils";
 import { FilterType } from "@/types/main";
 import { cn } from "@/lib/utils";
+
+// The region and role chips that sat under this bar on /jobs, folded into its pills (owner,
+// 2026-11-05). What the backend's Region and Roles lists already cover was dropped (EMEA, LATAM,
+// APAC, anywhere in the world; engineering, data, product, design, marketing, sales, customer
+// success). The rest is here, on the URL keys the landing pages filter by (app/lib/landing/catalogue.ts):
+// Europe and Africa are more `regions` values, the role ones set one-value detail keys.
+const EXTRA_REGIONS = ["Europe", "Africa"];
+/** `chip`: the removable chip's words after the pills, when the row's own label is too short alone. */
+type Extra = { label: string; chip?: string; values: Partial<Record<DetailFilterKey, string>> };
+const EXTRAS: Record<string, { heading: string; items: Extra[] }[]> = {
+  Roles: [
+    {
+      heading: "Specialism",
+      items: [
+        { label: "Frontend development", values: { roleCategory: "frontend" } },
+        { label: "Backend development", values: { roleCategory: "backend" } },
+        { label: "DevOps", values: { roleCategory: "devops" } },
+      ],
+    },
+  ],
+  // No country section under Region (owner, 2026-11-05): US, UK and Canada stay landing pages only
+  // (the navbar's Jobs menu and the footer).
+};
+/**
+ * Visa sponsorship, its own pill (owner, 2026-11-05; it began as H1B under Roles). One choice at a
+ * time, since the backend takes one visa type: "Any" asks only that sponsorship is offered, a type
+ * asks for that visa too. The types are JobDetailsFilters' list, the same keys as /jobs/h1b,
+ * /jobs/uk-visa-sponsorship and /jobs/eu-blue-card.
+ */
+const VISA_OPTIONS: Extra[] = [
+  { label: "Any sponsorship", chip: "Visa sponsorship", values: { visaSponsorship: "yes", visaType: "" } },
+  ...["H1B", "UK Skilled Worker", "EU Blue Card", "Canada LMIA", "TN", "O1", "L1"].map((type) => ({
+    label: type,
+    chip: `${type} sponsorship`,
+    values: { visaSponsorship: "yes", visaType: type },
+  })),
+];
 
 // Horizontal replacement for the old sidebar: each filter is a compact pill that
 // opens its options in a popover, and every picked value shows as its own
@@ -78,18 +115,7 @@ const OptionList: FC<{ name: string; options: FilterType[]; selected: string[]; 
       <ul className="max-h-72 overflow-y-auto p-1.5">
         {shown.map((option) => (
           <li key={option.value || option.label}>
-            <label className="flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 text-sm hover:bg-primary/[0.04]">
-              <input
-                type="checkbox"
-                className="peer sr-only"
-                checked={selected.includes(option.label)}
-                onChange={() => onToggle(option.label)}
-              />
-              <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[3px] border-[1.5px] border-primary bg-white text-primary peer-checked:bg-secondary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100">
-                <Check className="h-3 w-3 stroke-[3.5]" />
-              </span>
-              <span className="flex-1 font-medium">{option.label}</span>
-            </label>
+            <OptionRow label={option.label} checked={selected.includes(option.label)} onToggle={() => onToggle(option.label)} />
           </li>
         ))}
         {shown.length === 0 ? <li className="px-2 py-3 text-sm text-primary/50">No matches</li> : null}
@@ -97,6 +123,16 @@ const OptionList: FC<{ name: string; options: FilterType[]; selected: string[]; 
     </div>
   );
 };
+
+const OptionRow: FC<{ label: string; checked: boolean; onToggle: () => void }> = ({ label, checked, onToggle }) => (
+  <label className="flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 text-sm hover:bg-primary/[0.04]">
+    <input type="checkbox" className="peer sr-only" checked={checked} onChange={onToggle} />
+    <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[3px] border-[1.5px] border-primary bg-white text-primary peer-checked:bg-secondary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100">
+      <Check className="h-3 w-3 stroke-[3.5]" />
+    </span>
+    <span className="flex-1 font-medium">{label}</span>
+  </label>
+);
 
 const Chip: FC<{ label: string; onRemove: () => void }> = ({ label, onRemove }) => (
   <span className="inline-flex h-7 shrink-0 items-center gap-0.5 rounded-full bg-secondary pl-2.5 pr-1 text-xs font-semibold text-primary">
@@ -127,7 +163,22 @@ const FilterBar: FC<{ className?: string; compact?: boolean }> = ({ className, c
     dateRange,
     setDateRange,
     clearFilters,
+    detailFilters,
+    setDetailFilters,
   } = useFilter();
+  const extraOn = (item: Extra) =>
+    Object.entries(item.values).every(([key, value]) => detailFilters[key as DetailFilterKey] === value);
+  // On sets its keys (replacing another country or specialism); off clears them.
+  const toggleExtra = (item: Extra) => {
+    const on = extraOn(item);
+    setDetailFilters(Object.fromEntries(Object.entries(item.values).map(([key, value]) => [key, on ? "" : value])));
+  };
+  const extrasOn = (name: string) => (EXTRAS[name] ?? []).flatMap((section) => section.items).filter(extraOn);
+  const visaOn = VISA_OPTIONS.filter(extraOn);
+  const regions = [
+    ...regionOptions,
+    ...EXTRA_REGIONS.filter((name) => !regionOptions.some((option) => option.label === name)).map((name) => ({ value: name, label: name })),
+  ];
   // Two months side by side only where they fit; read when the popover opens.
   const [months, setMonths] = useState(2);
 
@@ -138,9 +189,10 @@ const FilterBar: FC<{ className?: string; compact?: boolean }> = ({ className, c
   const groups = [
     { name: "Roles", options: rolesOptions, selected: selectedRoles, set: setSelectedRoles },
     { name: "Seniority", options: seniorityOptions, selected: selectedSeniority, set: setSelectedSeniority },
-    { name: "Region", options: regionOptions, selected: selectedRegions, set: setSelectedRegions },
+    { name: "Region", options: regions, selected: selectedRegions, set: setSelectedRegions },
   ];
-  const hasChips = dateLabel !== null || groups.some((group) => group.selected.length > 0);
+  const hasChips =
+    dateLabel !== null || visaOn.length > 0 || groups.some((group) => group.selected.length + extrasOn(group.name).length > 0);
 
   return (
     // Compact, up to 415px wide the four pills take two rows in Manrope, but the fallback font shown
@@ -170,16 +222,41 @@ const FilterBar: FC<{ className?: string; compact?: boolean }> = ({ className, c
         />
       </FilterPill>
 
-      {groups.map((group) => (
-        <FilterPill key={group.name} label={group.name} active={group.selected.length > 0} count={group.selected.length} compact={compact}>
-          <OptionList
-            name={group.name}
-            options={group.options}
-            selected={group.selected}
-            onToggle={(label) => handleSelectOption(group.set, label)}
-          />
-        </FilterPill>
-      ))}
+      {groups.map((group) => {
+        const count = group.selected.length + extrasOn(group.name).length;
+        return (
+          <FilterPill key={group.name} label={group.name} active={count > 0} count={count} compact={compact}>
+            <OptionList
+              name={group.name}
+              options={group.options}
+              selected={group.selected}
+              onToggle={(label) => handleSelectOption(group.set, label)}
+            />
+            {(EXTRAS[group.name] ?? []).map((section) => (
+              <div key={section.heading} className="border-t border-primary/10 p-1.5">
+                <p className="px-2 pb-1 pt-1.5 text-xs font-semibold text-primary">{section.heading}</p>
+                <ul>
+                  {section.items.map((item) => (
+                    <li key={item.label}>
+                      <OptionRow label={item.label} checked={extraOn(item)} onToggle={() => toggleExtra(item)} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </FilterPill>
+        );
+      })}
+
+      <FilterPill label="Visa sponsorship" active={visaOn.length > 0} count={visaOn.length} compact={compact}>
+        <ul className="p-1.5">
+          {VISA_OPTIONS.map((item) => (
+            <li key={item.label}>
+              <OptionRow label={item.label} checked={extraOn(item)} onToggle={() => toggleExtra(item)} />
+            </li>
+          ))}
+        </ul>
+      </FilterPill>
 
       {hasChips ? (
         <>
@@ -190,6 +267,14 @@ const FilterBar: FC<{ className?: string; compact?: boolean }> = ({ className, c
               <Chip key={`${group.name}-${label}`} label={label} onRemove={() => handleSelectOption(group.set, label)} />
             )),
           )}
+          {groups.map((group) =>
+            extrasOn(group.name).map((item) => (
+              <Chip key={`${group.name}-extra-${item.label}`} label={item.chip ?? item.label} onRemove={() => toggleExtra(item)} />
+            )),
+          )}
+          {visaOn.map((item) => (
+            <Chip key={`visa-${item.label}`} label={item.chip ?? item.label} onRemove={() => toggleExtra(item)} />
+          ))}
           <button
             type="button"
             onClick={clearFilters}
