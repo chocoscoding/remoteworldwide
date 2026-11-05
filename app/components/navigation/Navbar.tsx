@@ -667,7 +667,7 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" aria-label="Remote Worldwide, home page" className={cn("block rounded-md py-2.5", FOCUS)}>
-              <LogoFull className="hidden h-[21px] w-auto lg:block" />
+              <LogoFull className="hidden h-[20px] w-auto lg:block" />
               <LogoMini width={35} height={35} className="w-full !h-auto block lg:hidden" />
             </Link>
           </div>
