@@ -30,7 +30,7 @@ const Header = ({ count }: { count: number | null }) => {
             {count} open positions 🔥
           </span>
         )}
-        <h1 className="font-bold max-w-[550px] mt-4 mb-3 text-clamp1">Find your next remote job</h1>
+        <h1 className="font-bold max-w-[550px] mt-4 mb-3 text-clamp1">Remote jobs worldwide, vetted daily</h1>
         <h2 className="text-gray-700 max-w-[500px] mb-5 text-sm xs:text-base">
           Discover verified worldwide remote roles. Confidently apply to roles that fit your location, skills, and ambition. No surprises,
           just opportunities that want you.

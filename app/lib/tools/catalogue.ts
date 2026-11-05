@@ -63,7 +63,7 @@ export const TOOLS: Tool[] = [
       "Build your resume in six ATS-friendly templates, then tailor it to each posting with AI: missing keywords, sharper bullets, one page. Export to PDF or Word.",
     keywords: ["ai resume builder", "tailor resume to job description", "ats friendly resume", "resume builder", "remote job resume"],
     eyebrow: "Resume builder · six templates",
-    h1: { before: "A resume tailored to", mark: "every posting", after: "in minutes." },
+    h1: { before: "AI resume builder", mark: "tailored to every job" },
     intro:
       "Start from scratch, from the resume you already have, or let AI build one from your profile. Then aim it at a job: AI finds the keywords you're missing and sharpens your bullets, in your words, and you approve every change.",
     heroChecks: ["One resume free", "PDF, Word or Markdown", "Your original stays untouched"],
@@ -126,7 +126,7 @@ export const TOOLS: Tool[] = [
       "Check your resume against any job posting: a 0 to 100 match score, the keywords you're missing, the requirements you only partly cover, and rewrites to fix them.",
     keywords: ["ats resume checker", "resume score", "ats score", "resume keyword checker", "check resume against job description"],
     eyebrow: "ATS scorer · on every plan",
-    h1: { before: "Know your", mark: "match score", after: "before you apply." },
+    h1: { before: "ATS resume checker", mark: "for your next job" },
     intro:
       "Paste a posting or pick one from the board, add your resume, and get a 0 to 100 score with every requirement checked: found, partly covered or missing, and the closest line in your resume for each.",
     heroChecks: ["1 credit per scan", "Works on the Free plan", "Paste a link or the whole posting"],
@@ -189,7 +189,7 @@ export const TOOLS: Tool[] = [
       "Write a cover letter from the job posting and your real resume, in four tones from warm to formal. Edit it, revise it to your own note, and download a PDF or Word file.",
     keywords: ["ai cover letter generator", "cover letter generator", "cover letter from resume", "write a cover letter", "remote job cover letter"],
     eyebrow: "Cover letters · four tones",
-    h1: { before: "A cover letter that sounds like", mark: "you", after: "on your best day." },
+    h1: { before: "AI cover letter generator", mark: "in your own voice" },
     intro:
       "Pick the job and your resume, choose a tone, and get a first draft built from what you've actually done. Then make it yours: edit it, ask for a revision in your own words, and download it.",
     heroChecks: ["One letter free", "Built from your resume", "PDF or Word download"],
@@ -250,7 +250,7 @@ export const TOOLS: Tool[] = [
       "Fill job applications on Greenhouse, Lever and Ashby from your profile and saved answers, on your click. Draft open answers with AI and track every application.",
     keywords: ["job application autofill", "autofill job applications", "job application chrome extension", "greenhouse autofill", "lever autofill"],
     eyebrow: "Chrome extension · on the Web Store",
-    h1: { before: "Fill the form", mark: "on your click,", after: "not before." },
+    h1: { before: "Job application autofill", mark: "you control" },
     intro:
       "The Remote Worldwide extension fills application forms from your profile and the answers you've saved. Nothing is typed until you press the button, and it never submits for you.",
     heroChecks: ["Autofill is free", "Never fills without a click", "Never submits a form"],
@@ -314,7 +314,7 @@ export const TOOLS: Tool[] = [
       "Never lose a half-finished job application again. The Remote Worldwide Chrome extension saves your answers as you type and picks up where you stopped, on your click.",
     keywords: ["job application chrome extension", "save job application progress", "resume job application later", "job search extension", "remote worldwide extension"],
     eyebrow: "Chrome extension · on the Web Store",
-    h1: { before: "Pick up every application", mark: "where you stopped." },
+    h1: { before: "Job application browser extension", mark: "with your details ready" },
     intro:
       "Half the applications you start get interrupted: a meeting, a closed tab, a question you need to think about. The Remote Worldwide extension saves what you've answered as you type, and when you open that posting again, it offers to put it all back.",
     heroChecks: ["Drafts are free", "Survives a refresh or a closed tab", "Fills back only when you press it"],
@@ -425,7 +425,7 @@ export const TOOLS: Tool[] = [
       "Practise interviews out loud with an AI voice interviewer. Questions come from the posting and your resume, then a report scores your answers, pace and filler words.",
     keywords: ["ai mock interview", "mock interview practice", "interview practice with feedback", "voice interview practice", "behavioral interview practice"],
     eyebrow: "Voice mock interviews · Pro and up",
-    h1: { before: "Rehearse the interview", mark: "out loud", after: "before it counts." },
+    h1: { before: "AI mock interviews", mark: "practise out loud" },
     intro:
       "A voice interviewer asks the questions this role is likely to bring up, from the posting and your resume, and follows up when an answer is vague. Afterwards, a report shows what landed and how you sounded saying it.",
     heroChecks: ["Questions from the posting and your resume", "Recorded, with a synced transcript", "A better answer for every question"],
@@ -488,7 +488,7 @@ export const TOOLS: Tool[] = [
       "Track every job application on one board, from saved to offer. Follow-up reminders with drafted messages, a calendar and table view, and a weekly goal. Free.",
     keywords: ["job application tracker", "job search tracker", "track job applications", "job application organizer", "follow up after applying"],
     eyebrow: "Application tracker · free",
-    h1: { before: "Every application,", mark: "one board.", after: undefined },
+    h1: { before: "Job application tracker", mark: "all your progress in one place" },
     intro:
       "Save a job, apply, and watch it move: Saved, Applied, In conversation, Interviewing, Offer. Follow-ups come due on their own, with the message drafted, so nothing goes quiet because you forgot.",
     heroChecks: ["Free on every plan", "Board, table and calendar", "Follow-ups that remind you"],
