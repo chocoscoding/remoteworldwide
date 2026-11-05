@@ -63,6 +63,9 @@ const MoreLocations = ({ rest }: { rest: string[] }) => {
 const JobTileV2: FC<JobTileV2Props> = (props) => {
   const { title, slug, company, region, createdAt, seniority, jobBasePath = "/jobs" } = props;
   const [logoBroken, setLogoBroken] = useState(false);
+  // Most logos are square and should fill the ring; a wordmark that is much wider (or taller) than
+  // it is high stays whole instead (owner, 2026-11-05: square ones shrank inside a white margin).
+  const [logoWide, setLogoWide] = useState(false);
   const locations = jobLocations(props.facts, region);
   const chips = jobFactChips(props.facts);
   const shown = locations.length > SHOWN_LOCATIONS + 1 ? locations.slice(0, SHOWN_LOCATIONS) : locations;
@@ -78,9 +81,14 @@ const JobTileV2: FC<JobTileV2Props> = (props) => {
             alt=""
             width={44}
             height={44}
-            // Whole, as on the job page: a wide wordmark shrinks to fit instead of losing its sides,
-            // with a little room inside the ring so its ends don't touch it.
-            className="h-full w-full bg-white object-contain p-[3px]"
+            // A square logo fills the ring edge to edge. A wordmark more than about 4:3 either way
+            // shrinks to fit whole, with a little room so its ends don't touch the ring, rather than
+            // losing its sides ("process.st" read "oce"). cloudinaryThumb keeps the logo's shape (c_fit).
+            className={cn("h-full w-full bg-white", logoWide ? "object-contain p-[3px]" : "object-cover")}
+            onLoad={(event) => {
+              const { naturalWidth: w, naturalHeight: h } = event.currentTarget;
+              setLogoWide(h > 0 && (w / h > 1.3 || w / h < 0.77));
+            }}
             onError={() => setLogoBroken(true)}
           />
         ) : (
