@@ -33,6 +33,14 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "meta-externalagent",
         disallow: "/",
       },
+      // Crawlers that rebuilt the job pages and sent nobody back (Vercel logs, 2026-11-05): 42% of
+      // /jobs/[id] renders in a week and about 30% of all function time, with zero visits from
+      // meta.ai, Petal Search or Widesyker in 30 days. meta-webindexer feeds Meta AI search, not
+      // link previews (facebookexternalhit), so shared links keep their cards.
+      {
+        userAgent: ["meta-webindexer", "PetalBot", "WidesykerBot"],
+        disallow: "/",
+      },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,
