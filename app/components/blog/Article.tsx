@@ -12,6 +12,7 @@ import AuthorStack from "./AuthorStack";
 import CtaCard, { ctaHref } from "./CtaCard";
 import LeadMagnetCard from "./LeadMagnetCard";
 import PostBody from "./PostBody";
+import ArticleDiscovery from "./ArticleDiscovery";
 import PostCard, { formatPostDate } from "./PostCard";
 import ShareRow from "./ShareRow";
 import TableOfContents from "./TableOfContents";
@@ -193,6 +194,8 @@ const Article: FC<ArticleProps> = ({ data, rendered, toolbar, jsonLd }) => {
               ctasByKey={ctasByKey}
               nextStep={nextStep}
             />
+
+            {jsonLd && post.status === "PUBLISHED" && <ArticleDiscovery post={post} />}
 
             {cta && (
               <CtaCard
