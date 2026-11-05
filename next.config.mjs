@@ -91,6 +91,9 @@ const nextConfig = {
       { source: "/jobs/frontend-developer", destination: "/jobs/frontend", permanent: true },
       { source: "/jobs/h1b-visa-sponsor", destination: "/jobs/h1b", permanent: true },
       { source: "/jobs/skilled-worker-visa-sponsor", destination: "/jobs/uk-visa-sponsorship", permanent: true },
+      // The per-request route behind /jobs/<slug> (see the last rewrite) is never a public address.
+      // Redirects only see the address that was asked for, so the rewrite itself still reaches it.
+      { source: "/jobs/landing/:slug", destination: "/jobs/:slug", permanent: false },
     ];
   },
   // Authentication is hosted by the Express backend (@auth/express).
@@ -315,6 +318,17 @@ const nextConfig = {
       {
         source: "/api/subscribers/export",
         destination: `${backend}/api/blog/admin/subscribers.csv`,
+      },
+      // /jobs/<slug> is a listing or a landing page (app/lib/landing/catalogue.ts). Listings are
+      // cached (app/(pages)/(general)/jobs/[id]); landing pages read ?page= and the request, which
+      // a cached route may not. Listing slugs end in a long number (title-<hex><13-digit time>), so
+      // a one-segment slug without a 10-digit run goes to the per-request route, which shows the
+      // landing page, or the listing when an admin wrote its slug by hand. An array of rewrites is
+      // checked after the filesystem, so the static landing folders (/jobs/latest, ...) and
+      // two-segment landings (jobs/[id]/[segment]) never reach this.
+      {
+        source: "/jobs/:slug((?![^/]*\\d{10})[^/]+)",
+        destination: "/jobs/landing/:slug",
       },
     ];
   },

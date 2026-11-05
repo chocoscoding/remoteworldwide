@@ -18,7 +18,7 @@
 //     return only active listings and public fields.
 
 import { revalidatePath, updateTag } from "next/cache";
-import { backend, BackendError, backendCached, backendOrNull, BOARD_TAGS, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
+import { backend, BackendError, backendCached, backendOrNull, BOARD_TAGS, idSegment, isObjectId, jobPageTag, type BackendInit } from "@/app/lib/backend";
 import type { Company, CompanyWithJobsCount, FilterData, Job, OneBookmarkType } from "@/types/main";
 import type { PublicJobFacts, CompanyHiringProfile } from "@/types/main";
 import type { Author, Blog, BlogStatus, EditableBlog } from "@/app/lib/blog/types";
@@ -34,15 +34,22 @@ const boardError = (error: unknown): never => {
   throw new Error(error instanceof BackendError ? error.message : "something went wrong");
 };
 
-/** After a listing write: the cached board reads, the home page, and the listing's own page. */
+/** After a listing write: the cached board reads, the home page, and that listing's own page. */
 const listingsChanged = (...slugs: (string | undefined)[]) => {
   updateTag(BOARD_TAGS.jobs);
   updateTag(BOARD_TAGS.companies);
   revalidatePath("/");
-  revalidatePath("/jobs", "layout");
+  // The /jobs page, not "/jobs" as a layout: that also expired every cached listing under it, so
+  // each post made the next crawler rebuild ~2,000 pages. The other pages under /jobs (the list,
+  // the landing pages) render per request, so only the listings were ever cached there.
+  revalidatePath("/jobs");
   revalidatePath("/companies", "layout");
   revalidatePath("/sitemap.xml");
-  for (const slug of slugs) if (slug) revalidatePath(`/jobs/${slug}`);
+  for (const slug of slugs) {
+    if (!slug) continue;
+    updateTag(jobPageTag(slug));
+    revalidatePath(`/jobs/${slug}`);
+  }
 };
 
 const jobAdmin = <T,>(path: string, init: BackendInit = {}) => backend<T>(`/jobs/admin${path}`, { ...init, session: true });
@@ -185,8 +192,11 @@ export const updateCompany = async (id: string, input: CompanyInput): Promise<{ 
   try {
     const data = await backend<Company>(`/companies/${idSegment(id)}`, { method: "PUT", body: input, session: true });
     companiesChanged(data.slug);
-    // A listing's page shows its company's panel.
+    // Job tiles show the company's name and logo, and every listing's page shows its panel. The
+    // listing pages are not on `jobs` (see BOARD_TAGS), so this is the one write that expires
+    // them all; company edits are rare next to job posts.
     updateTag(BOARD_TAGS.jobs);
+    updateTag(BOARD_TAGS.jobPages);
     return { data };
   } catch (error) {
     return boardRefused(error);

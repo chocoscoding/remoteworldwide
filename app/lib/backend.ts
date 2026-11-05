@@ -54,7 +54,31 @@ export async function backendWithCount<T>(path: string, init: BackendInit = {}):
 }
 
 /** The job board's cache tags. An admin write expires its tag (libs/query.ts), so the next render reads fresh. */
-export const BOARD_TAGS = { jobs: "board:jobs", companies: "board:companies", filters: "board:filters" } as const;
+// `jobs` is the board's LISTS (counts, latest, filters' numbers). One listing's own page is not
+// on it: it carries its own tag plus `jobPages`. Every page or data entry a render touches
+// collects that fetch's tags, so when listings carried `jobs`, posting one job expired all
+// ~2,000 cached job pages and the crawlers rebuilt them (Vercel logs, 2026-11-05).
+export const BOARD_TAGS = { jobs: "board:jobs", jobPages: "board:job-pages", companies: "board:companies", filters: "board:filters" } as const;
+
+/** How long a listing's cached page and read live, unless it expires sooner (see the job page). */
+export const JOB_PAGE_REVALIDATE_S = 86_400;
+
+/** One listing's own tag. The slug may arrive URL-encoded from params or raw from the backend. */
+export function jobPageTag(slug: string): string {
+  let plain = slug;
+  try { plain = decodeURIComponent(slug); } catch { /* A stray % stays as it is. */ }
+  return `board:job:${plain}`;
+}
+
+/**
+ * The cache settings for one listing's read (GET /api/jobs/:slug). Both pages that read it (the
+ * public /jobs/[id] and the dashboard copy) share one data-cache entry, because tags and
+ * revalidate are not part of its key, so they must name the same tags: a listing write expires
+ * its own tag, a company edit (its panel is on every listing) expires `jobPages`.
+ */
+export function jobReadCache(slug: string, revalidate = JOB_PAGE_REVALIDATE_S): { revalidate: number; tags: string[] } {
+  return { revalidate, tags: [jobPageTag(slug), BOARD_TAGS.jobPages] };
+}
 
 /**
  * A public read that stays in Next's data cache, for pages that are cached themselves (the home

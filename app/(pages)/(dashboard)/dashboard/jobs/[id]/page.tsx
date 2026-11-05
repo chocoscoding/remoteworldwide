@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { checkBookmarkForUser } from "@/libs/query";
-import { BOARD_TAGS, backendCachedOrNull } from "@/app/lib/backend";
+import { backendCachedOrNull, jobReadCache } from "@/app/lib/backend";
 import type { JobAndCompany } from "@/types/main";
 import NotificationBell from "@/app/components/dashboard/notifications/NotificationBell";
 import OneJobClient from "./Client";
@@ -14,7 +14,8 @@ export const metadata = { title: "Jobs", robots: { index: false, follow: false }
 // The redesigned job page is currently dashboard-only.
 export default async function DashboardJobPage({ params }: { params: Promise<{ id: string }> }) {
   const slug = decodeURIComponent((await params).id);
-  const job = await backendCachedOrNull<JobAndCompany>(`/jobs/${encodeURIComponent(slug)}`, { revalidate: 43200, tags: [BOARD_TAGS.jobs] });
+  // Same read, same cache entry and tags as the public listing page (see jobReadCache).
+  const job = await backendCachedOrNull<JobAndCompany>(`/jobs/${encodeURIComponent(slug)}`, jobReadCache(slug));
   if (!job) notFound();
 
   const session = await auth();
