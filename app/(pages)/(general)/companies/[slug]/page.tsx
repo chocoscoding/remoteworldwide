@@ -1,4 +1,4 @@
-import CompanySection from "@/app/components/main/job/CompanySection";
+import CompanyCard from "./CompanyCard";
 import JobTile from "@/app/components/main/JobTileV2";
 import { notFound } from "next/navigation";
 import type { CompanyWithJobsCount, JobTileType } from "@/types/main";
@@ -49,14 +49,19 @@ export default async function Page({params,searchParams}:Props) {
   const data=[breadcrumbJsonLd([{name:"Companies",path:"/companies"},{name:company.name,path:companyPath(company.slug,page)}]),
     {"@context":"https://schema.org","@type":"Organization",name:company.name,url:company.website || absoluteUrl(companyPath(company.slug,1)),...(company.logo?{logo:company.logo}:{}),sameAs:[company.linkedin,company.twitter,company.facebook].filter(Boolean)},
     {"@context":"https://schema.org","@type":"ItemList",itemListElement:result.data.map((job,index)=>({"@type":"ListItem",position:(page-1)*50+index+1,name:job.title,url:absoluteUrl(`/jobs/${job.slug}`)}))}];
-  return <main className="mx-auto min-h-screen max-w-[1350px] px-4 py-8">
+  // The navbar's width and side padding, so the page lines up with it and wide screens are used
+  // (owner, 2026-11-05: it sat in 1350px under a 1680px bar).
+  return <main className="mx-auto min-h-screen max-w-[1680px] px-4 py-8 sm:px-6 lg:px-8">
     {data.map((node,index)=><script key={index} type="application/ld+json" dangerouslySetInnerHTML={{__html:jsonLd(node)}} />)}
     <Link href="/companies" className="mb-5 inline-block underline">All companies</Link>
     <h1 className="mb-2 text-3xl font-bold">{company.name} careers and remote jobs{page>1 ? ` — page ${page}` : ""}</h1>
     <p className="mb-6 text-gray-600">{result.count} open {result.count===1 ? "role" : "roles"} on Remote Worldwide</p>
-    <div className="grid gap-8 md:grid-cols-[280px_minmax(0,1fr)]">
-      <aside><CompanySection companyDetails={{...company,_count:{jobs:result.count}}} showFullDetails />
-        {profile && <dl className="mt-5 space-y-3 text-sm">{[["Industry",profile.industry],["Company size",profile.size],["Headquarters",profile.hqCountry],["Remote policy",profile.remotePolicy]].map(([label,value])=>value?<div key={label}><dt className="font-semibold">{label}</dt><dd>{value}</dd></div>:null)}</dl>}
+    {/* A phone stacks the card over the list; a tablet shows it as a banner over a full-width list
+        (CompanyCard); from lg it is a card beside the list that stays in view (the list runs to 50
+        jobs a page). The facts under it sit in a row on a tablet, a column beside the list. */}
+    <div className="grid gap-8 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <aside className="lg:sticky lg:top-24 lg:self-start"><CompanyCard company={company} jobCount={result.count} />
+        {profile && <dl className="mt-5 space-y-3 text-sm md:grid md:grid-cols-4 md:gap-4 md:space-y-0 lg:block lg:space-y-3">{[["Industry",profile.industry],["Company size",profile.size],["Headquarters",profile.hqCountry],["Remote policy",profile.remotePolicy]].map(([label,value])=>value?<div key={label}><dt className="font-semibold">{label}</dt><dd>{value}</dd></div>:null)}</dl>}
         {profile?.careersUrl && <a href={profile.careersUrl} target="_blank" rel="noopener noreferrer" className="mt-5 inline-block font-semibold underline">Company careers website</a>}
       </aside>
       <section aria-label="Open jobs">
@@ -79,7 +84,7 @@ export default async function Page({params,searchParams}:Props) {
     </div>
     <section className="mt-10" aria-labelledby="similar-companies"><h2 id="similar-companies" className="mb-4 text-2xl font-bold">Similar companies hiring</h2>
       {company.similarCompanies?.length ? (
-        <ul className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {company.similarCompanies.map(item => (
             <li key={item.slug}>
               <Link href={`/companies/${item.slug}`} className="flex items-center gap-3 rounded-lg border p-4 hover:underline">
