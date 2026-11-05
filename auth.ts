@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { headers } from "next/headers";
 import type { Session } from "next-auth";
 import { clientIpHeaders } from "@/app/lib/api/clientIp";
@@ -11,7 +12,12 @@ import { clientIpHeaders } from "@/app/lib/api/clientIp";
  */
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
 
-export const auth = async (): Promise<Session | null> => {
+// cache(): one backend lookup per server request. The admin and dashboard layouts, the page,
+// generateMetadata and the action guards each call auth(), so one render used to ask the
+// backend up to five times for the same cookie (production logs, 2026-11-05). React's cache is
+// request-scoped, so a sign-out still shows on the very next request; outside a render (route
+// handlers) it simply calls through.
+export const auth = cache(async (): Promise<Session | null> => {
   // Outside the try/catch on purpose: during prerendering headers() throws a
   // DynamicServerError that Next.js uses to mark the route dynamic (the same
   // behavior the previous NextAuth auth() had) — it must not be swallowed.
@@ -45,4 +51,4 @@ export const auth = async (): Promise<Session | null> => {
     console.warn(`[auth] backend unreachable at ${BACKEND_URL} — treating as signed out:`, error);
     return null;
   }
-};
+});
