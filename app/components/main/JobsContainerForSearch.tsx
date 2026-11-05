@@ -12,7 +12,13 @@ import PaginationControlNew from "./PaginationControlNew";
 export type InitialJobs = { query: string; data: JobTileType[]; count: number };
 
 /** `jobBasePath`: where a tile opens its job (see JobTileV2). */
-const JobsContainerForSearch = ({ initial, jobBasePath }: { initial?: InitialJobs; jobBasePath?: string }) => {
+const JobsContainerForSearch = ({
+  initial,
+  jobBasePath,
+}: {
+  initial?: InitialJobs;
+  jobBasePath?: string;
+}) => {
   const jobsPerPage = 50;
   const [totalJobs, setTotalJobs] = useState<number>(initial?.count ?? 0);
   const totalPages = Math.ceil(totalJobs / jobsPerPage);
@@ -26,8 +32,8 @@ const JobsContainerForSearch = ({ initial, jobBasePath }: { initial?: InitialJob
 
   // Pagination state
   const currentPage = useMemo(() => {
-    const page = searchParams.get("page");
-    return page ? ~~page : 1;
+    const page = Number(searchParams.get("page") ?? 1);
+    return Number.isInteger(page) && page > 0 ? page : 1;
   }, [searchParams]);
 
   // Loading and error state
@@ -67,32 +73,46 @@ const JobsContainerForSearch = ({ initial, jobBasePath }: { initial?: InitialJob
     // setCurrentPage(page);
   };
 
-  // Simulate fetching data
-  const getJobs = async (): Promise<void> => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/jobs?${searchParams.toString()}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch jobs");
-      }
-      const jobs = await response.json();
-      setTotalJobs(jobs.count);
-      setJobs(jobs.data);
-    } catch (error: any) {
-      setError("Error fetching jobs:" + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
   useEffect(() => {
-    if (served.current !== undefined && served.current === searchParams.toString()) return;
+    if (
+      served.current !== undefined &&
+      served.current === searchParams.toString()
+    )
+      return;
     served.current = undefined;
-    const timeout = setTimeout(() => {
-      getJobs();
-    }, 500);
-    return () => clearTimeout(timeout);
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/jobs?${searchParams.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok)
+          throw new Error(
+            "The job list could not load. Check your filters and try again.",
+          );
+        const result = await response.json();
+        if (!controller.signal.aborted) {
+          setTotalJobs(result.count);
+          setJobs(result.data);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted)
+          setError(
+            error instanceof Error
+              ? error.message
+              : "The job list could not load.",
+          );
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, [searchParams]);
-
   // Display range for jobs on the current page
   const startJobIndex = (currentPage - 1) * jobsPerPage;
   const endJobIndex = startJobIndex + jobsPerPage;
@@ -121,16 +141,18 @@ const JobsContainerForSearch = ({ initial, jobBasePath }: { initial?: InitialJob
   if (totalJobs < 1) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] text-center md:h-[90%]">
-        <p className="font-bold text-xl mb-2">No opening found for now 😟</p>
-        <p className="">Clear filters or search queries to see more oppotunities 😇</p>
+        <p className="font-bold text-xl mb-2">No matching listings right now</p>
+        <p className="">
+          Clear a filter or try another search to see more opportunities.
+        </p>
       </div>
     );
   }
 
   return (
     <div>
-      {jobs.map((job, index) => (
-        <JobTile {...job} jobBasePath={jobBasePath} key={index} />
+      {jobs.map((job) => (
+        <JobTile {...job} jobBasePath={jobBasePath} key={job.id} />
       ))}
 
       {/* pagination */}

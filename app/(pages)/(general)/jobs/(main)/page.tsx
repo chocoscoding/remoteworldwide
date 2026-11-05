@@ -1,62 +1,78 @@
 import { FilterProvider } from "@/provider/FilterProvider";
 import Client from "../Client";
-
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import { getFilters } from "@/libs/query";
 import { showsAds } from "@/app/lib/ads";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { absoluteUrl } from "@/app/lib/seo";
 import { searchJobs } from "@/app/lib/jobs/searchJobs";
+import { pageParam } from "@/app/lib/landing/catalogue";
 import type { InitialJobs } from "@/app/components/main/JobsContainerForSearch";
-
 export const dynamic = "force-dynamic";
-
-// "Jobs" leads the title so Google's sitelink for this page reads "Jobs". The canonical
-// folds every filtered or paged variant (?roles=…, ?page=…) back into /jobs.
-const TITLE = "Jobs – Remote jobs open worldwide | Remote Worldwide";
-const DESCRIPTION =
-  "Browse vetted remote jobs you can do from anywhere: engineering, design, marketing, sales and more. Filter by role, seniority and region, and apply in minutes.";
-
-// A plain page of the board (?page=3 and nothing else) is its own page, so its canonical is
-// itself and Google follows the job links on it: folding every page into /jobs hid all but the
-// first 50 jobs. Filtered and searched views still fold into /jobs.
-export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }): Promise<Metadata> {
-  const params = await searchParams;
-  const keys = Object.keys(params);
-  const page = typeof params.page === "string" ? Number(params.page) : 1;
-  const ownPage = keys.length === 1 && keys[0] === "page" && Number.isInteger(page) && page > 1;
-  const path = ownPage ? `/jobs?page=${page}` : "/jobs";
-  const title = ownPage ? `Jobs, page ${page} – Remote jobs open worldwide | Remote Worldwide` : TITLE;
-  return {
-    // Already carries the site name, so it skips the root template rather than doubling it.
-    title: { absolute: title },
-    description: DESCRIPTION,
-    alternates: { canonical: path },
-    openGraph: { type: "website", url: absoluteUrl(path), title, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
-    twitter: { card: "summary_large_image", title, description: DESCRIPTION, images: [absoluteUrl("/api/og/job")] },
-  };
-}
-
-/** The first page of results for this URL, queried here so the HTML carries the job links. Undefined on a failure: the list then fetches as before. */
-async function firstJobs(params: Record<string, string | string[] | undefined>): Promise<InitialJobs | undefined> {
+type Params = Record<string, string | string[] | undefined>;
+const queryOf = (params: Params) => {
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(params))
     for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, v);
-  }
+  return query.toString();
+};
+const firstJobs = cache(async (query: string): Promise<InitialJobs | undefined> => {
   try {
-    const { data, count } = await searchJobs(query);
-    return { query: query.toString(), data, count };
+    const { data, count } = await searchJobs(new URLSearchParams(query));
+    return { query, data, count };
   } catch {
     return undefined;
   }
+});
+const DESCRIPTION =
+  "Browse current remote jobs worldwide. Filter by role, eligible country, salary, employment type and supported visa sponsorship.";
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Params> }): Promise<Metadata> {
+  const params = await searchParams;
+  const page = pageParam(params.page);
+  if (page === null) notFound();
+  const filtered = Object.keys(params).some((key) => key !== "page");
+  const result = await firstJobs(queryOf(params));
+  if (result && page > Math.max(1, Math.ceil(result.count / 50))) notFound();
+  const path = page > 1 ? `/jobs?page=${page}` : "/jobs";
+  const title =
+    params.status === "archived"
+      ? "Archived remote jobs | Remote Worldwide"
+      : page > 1
+        ? `Remote Jobs Worldwide, Page ${page} | Remote Worldwide`
+        : `Remote Jobs Worldwide${result ? `: ${result.count.toLocaleString("en-US")} Open Roles` : ""} | Remote Worldwide`;
+  return {
+    title: { absolute: title },
+    description: DESCRIPTION,
+    alternates: { canonical: path },
+    ...(filtered || !result ? { robots: { index: false, follow: true } } : {}),
+    openGraph: {
+      type: "website",
+      url: absoluteUrl(path),
+      title,
+      description: DESCRIPTION,
+      images: [absoluteUrl("/api/og/job")],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: DESCRIPTION,
+      images: [absoluteUrl("/api/og/job")],
+    },
+  };
 }
-
-export default async function CategoriesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [{ data: filters }, ads, initialJobs] = await Promise.all([getFilters(), showsAds(), searchParams.then(firstJobs)]);
-
+export default async function JobsPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const params = await searchParams,
+    page = pageParam(params.page);
+  if (page === null) notFound();
+  const [{ data: filters }, ads, initialJobs] = await Promise.all([getFilters(), showsAds(), firstJobs(queryOf(params))]);
+  if (initialJobs && page > Math.max(1, Math.ceil(initialJobs.count / 50))) notFound();
   return (
     <main className="p-3 md:p-6 w-full max-w-[1300px] m-auto min-h-screen">
-      <h1 className="text-2xl md:text-3xl font-bold text-center">Remote jobs you can do from anywhere</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-center">
+        {params.status === "archived" ? "Archived remote jobs" : "Remote jobs worldwide"}
+        {page > 1 ? `, page ${page}` : ""}
+      </h1>
       <br />
       <Suspense>
         <FilterProvider filterData={filters}>

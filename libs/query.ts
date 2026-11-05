@@ -20,6 +20,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { backend, BackendError, backendCached, backendOrNull, BOARD_TAGS, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
 import type { Company, CompanyWithJobsCount, FilterData, Job, OneBookmarkType } from "@/types/main";
+import type { PublicJobFacts, CompanyHiringProfile } from "@/types/main";
 import type { Author, Blog, BlogStatus, EditableBlog } from "@/app/lib/blog/types";
 import { requireAdminAction, requireRoleAction, requireUserAction } from "@/app/lib/auth/action-guards";
 
@@ -36,7 +37,11 @@ const boardError = (error: unknown): never => {
 /** After a listing write: the cached board reads, the home page, and the listing's own page. */
 const listingsChanged = (...slugs: (string | undefined)[]) => {
   updateTag(BOARD_TAGS.jobs);
+  updateTag(BOARD_TAGS.companies);
   revalidatePath("/");
+  revalidatePath("/jobs", "layout");
+  revalidatePath("/companies", "layout");
+  revalidatePath("/sitemap.xml");
   for (const slug of slugs) if (slug) revalidatePath(`/jobs/${slug}`);
 };
 
@@ -64,14 +69,15 @@ export const toggleJobActiveState = async (id: string, state: boolean) => {
   }
 };
 
-export type JobCreate = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "seniority"> & { region: string[] | string };
+type JobMetadataEdit = {facts?:PublicJobFacts|null;postedAt?:string|null;employerExpiresAt?:string|null;closedAt?:string|null;closureReason?:string|null;archiveIndexable?:boolean|null;approveEnrichment?:boolean};
+export type JobCreate = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "seniority"> & { region: string[] | string } & JobMetadataEdit;
 
 // The admin's "Create job". Every field is required; the backend names the first one missing.
 export const createOneJob = async (jobDetails: JobCreate) => {
   await requireAdminAction();
-  const { title, description, companyId, applicationUrl, category, region, seniority } = jobDetails;
+  const { title, description, companyId, applicationUrl, category, region, seniority, facts, postedAt, employerExpiresAt, closedAt, closureReason, archiveIndexable } = jobDetails;
   try {
-    const data = await jobAdmin<Job>("", { method: "POST", body: { title, description, companyId, applicationUrl, category, region, seniority } });
+    const data = await jobAdmin<Job>("", { method: "POST", body: { title, description, companyId, applicationUrl, category, region, seniority, facts, postedAt, employerExpiresAt, closedAt, closureReason, archiveIndexable } });
     listingsChanged();
     return { data };
   } catch (error) {
@@ -81,15 +87,15 @@ export const createOneJob = async (jobDetails: JobCreate) => {
 
 // The fields the edit form owns, named one by one so a direct call cannot set `isActive`
 // (publishing is toggleJobActiveState's job) or `createdAt` (which orders the board).
-type JobEdit = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "region" | "seniority" | "slug">;
+type JobEdit = Pick<Job, "title" | "description" | "companyId" | "applicationUrl" | "category" | "region" | "seniority" | "slug"> & JobMetadataEdit;
 
 export const updateOneJob = async (id: string, jobDetails: JobEdit) => {
   await requireAdminAction();
   try {
-    const { title, description, companyId, applicationUrl, category, region, seniority, slug } = jobDetails;
+    const { title, description, companyId, applicationUrl, category, region, seniority, slug, facts, postedAt, employerExpiresAt, closedAt, closureReason, archiveIndexable, approveEnrichment } = jobDetails;
     const { previousSlug, ...data } = await jobAdmin<Job & { previousSlug: string }>(`/${idSegment(id)}`, {
       method: "PUT",
-      body: { title, description, companyId, applicationUrl, category, region, seniority, slug },
+      body: { title, description, companyId, applicationUrl, category, region, seniority, slug, facts, postedAt, employerExpiresAt, closedAt, closureReason, archiveIndexable, approveEnrichment },
     });
     listingsChanged(previousSlug, data.slug);
     return { data };
@@ -150,6 +156,7 @@ const boardRefused = (error: unknown): { error: string } => {
 };
 
 export type CompanyInput = Pick<Company, "name" | "about" | "website"> & {
+  hiringProfile?:CompanyHiringProfile|null;
   logo: string | null;
   linkedin?: string | null;
   twitter?: string | null;

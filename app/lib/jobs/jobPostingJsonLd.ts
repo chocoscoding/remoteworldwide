@@ -13,20 +13,23 @@
 import type { JobAndCompany } from "@/types/main";
 import { absoluteUrl, SITE_NAME } from "@/app/lib/seo";
 import { applicantCountries } from "./regionCountries";
-import { jobExpiresAt } from "./jobLifetime";
+import { effectiveExpiry } from "./jobLifetime";
 import type { JobFacts } from "./jobFacts";
 
 export function jobPostingJsonLd(job: JobAndCompany, facts: JobFacts) {
   const { company } = job;
+  const regions = job.facts?.regions.length ? job.facts.regions : job.region;
+  const countries = job.facts?.countries.length ? job.facts.countries : regions.length ? applicantCountries(regions) : [];
+  const remote = !["hybrid", "onsite"].includes(job.facts?.remotePolicy ?? "");
   return {
     "@context": "https://schema.org",
     "@type": "JobPosting",
     title: job.title,
     // Stored as Quill HTML, which is the format Google asks for.
     description: job.description,
-    datePosted: new Date(job.createdAt).toISOString(),
-    validThrough: jobExpiresAt(job.createdAt).toISOString(),
-    employmentType: facts.employmentType,
+    datePosted: new Date(job.lifecycle?.postedAt ?? job.createdAt).toISOString(),
+    validThrough: effectiveExpiry(job).toISOString(),
+    ...(facts.employmentType ? {employmentType: facts.employmentType} : {}),
     identifier: { "@type": "PropertyValue", name: SITE_NAME, value: job.id },
     url: absoluteUrl(`/jobs/${job.slug}`),
     hiringOrganization: {
@@ -50,8 +53,8 @@ export function jobPostingJsonLd(job: JobAndCompany, facts: JobFacts) {
           },
         }
       : {}),
-    jobLocationType: "TELECOMMUTE",
-    applicantLocationRequirements: applicantCountries(job.region).map((name) => ({ "@type": "Country", name })),
+    ...(remote ? {jobLocationType: "TELECOMMUTE"} : {}),
+    ...(countries.length ? {applicantLocationRequirements: countries.map((name) => ({ "@type": "Country", name }))} : {}),
     // Applying happens on the employer's own site.
     directApply: false,
   };

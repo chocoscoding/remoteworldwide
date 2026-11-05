@@ -1,5 +1,6 @@
 import { JobTileType } from "@/types/main";
-import { Calendar, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
+import { ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
+import { jobFactChips, jobLocations } from "@/app/lib/jobs/publicJobFacts";
 import Image from "next/image";
 import Link from "@/app/components/navigation/HoverPrefetchLink";
 import React, { FC } from "react";
@@ -7,7 +8,7 @@ import TimeAgo from "timeago-react";
 
 const JobTile: FC<JobTileType> = (props) => {
   const { title, slug, company, region, createdAt, seniority } = props;
-  const regionLabel = region.length > 0 ? region.join(", ") : "Anywhere in the world";
+  const regionLabel = jobLocations(props.facts, region).join(", ");
   return (
     <div className="flex p-4 mb-5 rounded-md gap-2 md:gap-3 bg-white br-plain-press">
       {/* logo
@@ -36,10 +37,7 @@ const JobTile: FC<JobTileType> = (props) => {
               <MapPinned className="w-4 text-gray-400" />
               <span>{regionLabel}</span>
             </p>
-            <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
-              <Calendar className="w-4 text-gray-400" />
-              <span>Full-time</span>
-            </p>
+            {jobFactChips(props.facts).map(chip => <span key={chip.kind} title={chip.detail} className="rounded-full bg-secondary px-2 py-1 text-xs font-semibold">{chip.label}</span>)}
             <p className="text-gray-500 text-base flex flex-shrink-0 items-center gap-1.5">
               <ChartNoAxesColumnIncreasing className="w-4 text-gray-400" />
               <span>{seniority}</span>

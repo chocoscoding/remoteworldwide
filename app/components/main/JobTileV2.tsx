@@ -6,6 +6,7 @@ import React, { FC, useId, useState } from "react";
 import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
 import { cloudinaryThumb } from "@/app/lib/cloudinary";
+import { jobFactChips, jobLocations } from "@/app/lib/jobs/publicJobFacts";
 
 // The /jobs board's "sticker" job tile (owner's design, trialled at /jobs_v2 and adopted 2026-10-16).
 // The whole tile opens the job: the title link stretches over it, and the company link and the "+N"
@@ -60,9 +61,10 @@ const MoreLocations = ({ rest }: { rest: string[] }) => {
 };
 
 const JobTileV2: FC<JobTileV2Props> = (props) => {
-  const { title, slug, company, region, createdAt, seniority, pay, visa, jobBasePath = "/jobs" } = props;
+  const { title, slug, company, region, createdAt, seniority, jobBasePath = "/jobs" } = props;
   const [logoBroken, setLogoBroken] = useState(false);
-  const locations = region.length > 0 ? region : ["Anywhere in the world"];
+  const locations = jobLocations(props.facts, region);
+  const chips = jobFactChips(props.facts);
   const shown = locations.length > SHOWN_LOCATIONS + 1 ? locations.slice(0, SHOWN_LOCATIONS) : locations;
   const rest = locations.slice(shown.length);
 
@@ -109,10 +111,8 @@ const JobTileV2: FC<JobTileV2Props> = (props) => {
           </Pill>
         ))}
         {rest.length > 0 ? <MoreLocations rest={rest} /> : null}
-        <Pill>Full-time</Pill>
         {seniority ? <Pill>{seniority}</Pill> : null}
-        {pay ? <Pill className="bg-primary text-secondary">{pay}</Pill> : null}
-        {visa ? <Pill className="border-[1.5px] border-primary bg-secondary px-2 py-px">{visa}</Pill> : null}
+        {chips.map(chip => <span key={chip.kind} title={chip.detail}><Pill className={chip.kind === "salary" ? "bg-primary text-secondary" : chip.kind === "visa" ? "border-[1.5px] border-primary bg-secondary px-2 py-px" : undefined}>{chip.label}</Pill></span>)}
       </div>
     </div>
   );

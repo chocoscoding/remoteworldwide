@@ -8,6 +8,8 @@ import { toast } from "react-toastify";
 import type { Company } from "@/types/main";
 import { createCompany } from "@/libs/query";
 import { cn } from "@/lib/utils";
+import CompanyHiringEditor from "./CompanyHiringEditor";
+import type { CompanyHiringProfile } from "@/types/main";
 
 /**
  * The "create a company" fields + POST, shared by the standalone
@@ -44,6 +46,7 @@ const CompanyForm: FC<CompanyFormProps> = ({ onCreated, renderActions, className
   const [facebook, setFacebook] = useState("");
   const [error, setError] = useState<{ logo?: boolean }>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [hiringProfile,setHiringProfile] = useState<CompanyHiringProfile|null>(null);
 
   const handleLogoUpload = (result: CloudinaryUploadWidgetResults) => {
     const info = result?.info;
@@ -55,7 +58,7 @@ const CompanyForm: FC<CompanyFormProps> = ({ onCreated, renderActions, className
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const formValues = { name: name.trim(), about: about.trim(), logo, website, linkedin, twitter, facebook };
+    const formValues = { name: name.trim(), about: about.trim(), logo, website, linkedin, twitter, facebook, hiringProfile };
     if (isLoading) return;
     if (!logo) {
       // The API rejects a logo-less company anyway — stop here so the admin
@@ -93,6 +96,7 @@ const CompanyForm: FC<CompanyFormProps> = ({ onCreated, renderActions, className
 
   return (
     <form onSubmit={handleSubmit} className={className}>
+      <CompanyHiringEditor value={hiringProfile} onChange={setHiringProfile}/>
       <div className={cn("space-y-4", fieldsClassName)}>
         <div>
           <label className={LABEL_CLASS}>Company Name</label>

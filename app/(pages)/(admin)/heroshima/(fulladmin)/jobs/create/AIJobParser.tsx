@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa6";
 import { FilterData, FilterType } from "@/types/main";
+import type { PublicJobFacts } from "@/types/main";
 
 interface SelectRef {
   inputRef?: HTMLInputElement;
@@ -20,6 +21,8 @@ interface AIJobParserProps {
     category: string;
     regions: string[];
     seniorityLevel: string;
+    factsDraft?: PublicJobFacts|null;
+    factsEvidence?: unknown;
   }) => void;
 }
 
@@ -67,6 +70,8 @@ const AIJobParser: FC<AIJobParserProps> = ({ filters, allCompanies, onParseCompl
         category: category || "",
         regions: normalizedRegions,
         seniorityLevel: seniorityLevel || "",
+        factsDraft: data.data.factsDraft ?? null,
+        factsEvidence: data.data.factsEvidence,
       });
 
       toast.success("Job parsed successfully! Review and submit.", {

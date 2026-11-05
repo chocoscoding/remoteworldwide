@@ -7,7 +7,8 @@ import BookmarkStatus from "../BookmarkStatus";
 import type { Job } from "@/types/main";
 import { toast } from "react-toastify";
 import { LinkIcon, type LinkIconHandle } from "@/components/ui/link-icon";
-import { isJobExpired } from "@/app/lib/jobs/jobLifetime";
+import { isJobLive, expiredJobMessage } from "@/app/lib/jobs/jobLifetime";
+import { jobFactChips } from "@/app/lib/jobs/publicJobFacts";
 import "react-quill-new/dist/quill.bubble.css";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => <JobDescriptionSkeleton /> });
@@ -100,9 +101,9 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
       {/* expired job */}
 
       {/* The same rule that drops the page's JobPosting markup and noindexes it. A <p>: the job title is the page's one h1. */}
-      {isJobExpired(data.createdAt) && (
+      {!isJobLive(data) && (
         <div className="w-full rounded-b-xl bg-red-500 text-white text-center py-2">
-          <p className="font-semibold text-sm">This job has expired</p>
+          <p className="font-semibold text-sm">{expiredJobMessage(data)}</p>
         </div>
       )}
 
@@ -134,6 +135,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
                 <span>{seniority}</span>
               </h2>
             </div>
+            <div className="flex flex-wrap gap-2">{jobFactChips(data.facts).map(chip => <span key={chip.kind} title={chip.detail} className="rounded-full bg-secondary px-3 py-1 text-sm">{chip.label}</span>)}</div>
           </div>
           <div className="flex justify-end gap-3 flex-shrink-0 w-fit">
             <button
@@ -151,14 +153,14 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
             <ReactQuill  value={description} readOnly={true} theme={"bubble"} />
           </Suspense>
         </section>
-        <Link
+        {isJobLive(data) ? <Link
           href={applicationUrl}
           target="_blank"
           onClick={trackApply ? () => countJobEvent(data.id, "apply-click") : undefined}
           className="bg-primary text-white w-full h-12 text-lg flex justify-center gap-3 items-center hover:rounded-lg transition-all mt-5 rounded-md">
           <Zap />
           <span className="font-bold">Apply Now</span>
-        </Link>
+        </Link> : <Link href="/jobs" className="mt-5 block font-semibold underline">Browse current openings</Link>}
       </div>
     </div>
   );

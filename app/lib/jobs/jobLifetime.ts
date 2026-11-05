@@ -1,27 +1,34 @@
-// How long a posting counts as open: a month and a half from the day it was posted (owner,
-// 2026-10-07). The job page's "This job has expired" banner, its JobPosting markup
-// (validThrough), its robots tag and the sitemap all read this one rule, so Google never sees a
-// page that says "expired" while the markup says "open" (Google's job guidelines treat that as a
-// violation). Counted from createdAt, not updatedAt: an edit doesn't make a posting new again.
+import type { JobLifecycle } from "@/types/jobMetadata";
 
-export const JOB_LIFETIME_DAYS = 45;
+export const JOB_LIFETIME_DAYS = 56;
 const LIFETIME_MS = JOB_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
+type LifetimeJob = { isActive?: boolean; createdAt: Date | string; lifecycle?: JobLifecycle };
 
-/** When a posting stops counting as open: the day it was posted plus the lifetime. */
-export function jobExpiresAt(createdAt: Date | string): Date {
-  return new Date(new Date(createdAt).getTime() + LIFETIME_MS);
+/** A legacy listing's fallback. A known employer deadline can only shorten its life. */
+export function jobExpiresAt(postedAt: Date | string, employerExpiresAt?: Date | string | null): Date {
+  const maximum = new Date(postedAt).getTime() + LIFETIME_MS;
+  const employer = employerExpiresAt ? new Date(employerExpiresAt).getTime() : NaN;
+  return new Date(Number.isFinite(employer) ? Math.min(maximum, employer) : maximum);
 }
-
 export function isJobExpired(createdAt: Date | string, now = Date.now()): boolean {
-  return jobExpiresAt(createdAt).getTime() < now;
+  return !(jobExpiresAt(createdAt).getTime() > now);
 }
-
-/** Published and not past its lifetime: the only jobs search engines should index. */
-export function isJobLive(job: { isActive: boolean; createdAt: Date | string }, now = Date.now()): boolean {
-  return job.isActive && !isJobExpired(job.createdAt, now);
+export function effectiveExpiry(job: Pick<LifetimeJob, "createdAt" | "lifecycle">): Date {
+  return job.lifecycle ? new Date(job.lifecycle.expiresAt) : jobExpiresAt(job.createdAt);
 }
-
-/** The oldest `createdAt` a live job can have right now, for database filters. */
-export function liveJobsSince(now = Date.now()): Date {
-  return new Date(now - LIFETIME_MS);
+export function isJobLive(job: LifetimeJob, now = Date.now()): boolean {
+  if (job.isActive === false) return false;
+  if (job.lifecycle && job.lifecycle.status !== "open") return false;
+  return effectiveExpiry(job).getTime() > now;
 }
+export function isJobIndexable(job: LifetimeJob, now = Date.now()): boolean {
+  return isJobLive(job, now) || (job.isActive !== false && job.lifecycle?.status !== "unpublished" && job.lifecycle?.archiveIndexable === true);
+}
+export function expiredJobMessage(job: LifetimeJob): string {
+  if (job.lifecycle?.status === "closed") return "The employer has closed this role. This page is kept as an archive.";
+  if (job.lifecycle?.status === "unpublished" || job.isActive === false) return "This listing is no longer published on Remote Worldwide.";
+  const expires = effectiveExpiry(job);
+  const date = Number.isNaN(expires.getTime()) ? "" : ` on ${expires.toLocaleDateString("en-GB", {day:"numeric",month:"short",year:"numeric",timeZone:"UTC"})}`;
+  return `This listing expired on Remote Worldwide${date}. The employer's current hiring status has not been confirmed.`;
+}
+export function liveJobsSince(now = Date.now()): Date { return new Date(now - LIFETIME_MS); }

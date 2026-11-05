@@ -6,17 +6,18 @@ import { useRouter } from "next/navigation";
 import { SelectField, TextField } from "@/app/components/inputs";
 import { FilterData, FilterType, FormValues, Option } from "@/types/main";
 import { toast } from "react-toastify";
-import type { Job } from "@/types/main";
 import { updateOneJob } from "@/libs/query";
 import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import OverlayLoader from "@/app/components/OverlayLoader";
 import CreateCompanyModal from "@/app/components/ADMIN/CreateCompanyModal";
 import type { Company } from "@/types/main";
 import "react-quill-new/dist/quill.snow.css";
+import JobFactsEditor, { JobLifecycleEditor, type LifecycleEdit } from "@/app/components/ADMIN/JobFactsEditor";
+import type { AdminJobPage, PublicJobFacts } from "@/types/main";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
-type UpdateJobType = { job: Job & { company: { name: string } }; allCompanies: FilterType[]; filters: FilterData };
+type UpdateJobType = { job: AdminJobPage; allCompanies: FilterType[]; filters: FilterData };
 
 const GenerateNewOption = (title: string, href: string) => ({
   value: "add new",
@@ -44,6 +45,11 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
     body: job.description,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [facts, setFacts] = useState<PublicJobFacts|null>(job.facts ?? job.factsDraft ?? null);
+  const [factsReviewed, setFactsReviewed] = useState(false);
+  const [approveEnrichment, setApproveEnrichment] = useState(false);
+  const iso = (value:Date|string|null|undefined) => value ? new Date(value).toISOString() : null;
+  const [lifecycle, setLifecycle] = useState<LifecycleEdit>({postedAt:iso(job.postedAt),employerExpiresAt:iso(job.employerExpiresAt),closedAt:iso(job.closedAt),closureReason:job.closureReason,archiveIndexable:job.archiveIndexable});
   // Seeded from the server, then kept in sync client-side so a company created
   // from the popup shows up in the select without a reload.
   const [companies, setCompanies] = useState<FilterType[]>(allCompanies);
@@ -94,6 +100,8 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const finalValue = {
+      ...lifecycle,
+      ...(factsReviewed && facts ? {facts} : {approveEnrichment}),
       title: formValues.title,
       description: formValues.body,
       companyId: formValues.company!.value,
@@ -112,7 +120,6 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
       !finalValue.companyId && "companyId",
       !finalValue.applicationUrl && "applicationUrl",
       !finalValue.category && "category",
-      finalValue.region.length === 0 && "region",
       !finalValue.seniority && "seniority",
       hasDuplicateRegions && "duplicate regions",
     ].filter(Boolean) as string[];
@@ -154,6 +161,9 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
       <main className="p-4 mb-4">
         <h1 className="text-2xl font-bold mb-4">Update Job</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <JobFactsEditor value={facts} onChange={value=>{setFacts(value);setApproveEnrichment(false);}} reviewed={factsReviewed} onReviewedChange={setFactsReviewed} evidence={job.enrichment}/>
+          {!!job.enrichment && !factsReviewed && <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={approveEnrichment} onChange={e=>setApproveEnrichment(e.target.checked)}/>I reviewed the extracted source evidence above. Publish its supported, non-conflicting details.</label>}
+          <JobLifecycleEditor value={lifecycle} onChange={setLifecycle}/>
           <TextField
             label="Job Title"
             value={formValues.title}
@@ -194,8 +204,7 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
             value={formValues.region}
             options={getRegionOptions(filters.region, formValues.region)}
             onChange={(value) => handleRegionChange(value as Option[] | null)}
-            placeholder="Select region(s)"
-            required
+            placeholder="Select region(s), or leave unknown"
             isMulti
           />
 

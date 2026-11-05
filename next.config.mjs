@@ -83,7 +83,15 @@ const nextConfig = {
   // A permanent redirect gives both addresses one document rather than a second
   // copy that could drift out of date.
   async redirects() {
-    return [{ source: "/privacy", destination: "/privacy-policy", permanent: true }];
+    return [
+      { source: "/privacy", destination: "/privacy-policy", permanent: true },
+      ...["us", "united-states", "america"].map(slug => ({ source: `/jobs/${slug}`, destination: "/jobs/usa", permanent: true })),
+      { source: "/jobs/united-kingdom", destination: "/jobs/uk", permanent: true },
+      { source: "/jobs/latam", destination: "/jobs/latin-america", permanent: true },
+      { source: "/jobs/frontend-developer", destination: "/jobs/frontend", permanent: true },
+      { source: "/jobs/h1b-visa-sponsor", destination: "/jobs/h1b", permanent: true },
+      { source: "/jobs/skilled-worker-visa-sponsor", destination: "/jobs/uk-visa-sponsorship", permanent: true },
+    ];
   },
   // Authentication is hosted by the Express backend (@auth/express).
   // Proxying /api/auth/* keeps the Auth.js cookies first-party and the

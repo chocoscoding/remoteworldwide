@@ -11,10 +11,10 @@ const CompanySection: FC<{
   forAdmin?: boolean;
 }> = ({ showFullDetails = false, forAdmin = false, companyDetails }) => {
   const socialMediaLinks = [
-    { href: companyDetails.twitter ?? "#", Icon: FaXTwitter },
-    { href: companyDetails.facebook ?? "#", Icon: FaFacebookF },
-    { href: companyDetails.linkedin ?? "#", Icon: FaLinkedin },
-    { href: companyDetails.website ?? "#", Icon: FaLink },
+    { href: companyDetails.twitter, Icon: FaXTwitter },
+    { href: companyDetails.facebook, Icon: FaFacebookF },
+    { href: companyDetails.linkedin, Icon: FaLinkedin },
+    { href: companyDetails.website, Icon: FaLink },
   ];
   return (
     <div
@@ -54,7 +54,7 @@ const CompanySection: FC<{
           )}
         </div>
       ) : null}
-      <p className="text-base md:text-sm text-gray-700 line-clamp-3 text-center">{companyDetails.about}</p>
+      <p className={`text-base md:text-sm text-gray-700 text-center whitespace-pre-line break-words ${showFullDetails ? "" : "line-clamp-3"}`}>{companyDetails.hiringProfile?.hiringAbout ?? companyDetails.about}</p>
 
       {showFullDetails ? (
         <div className=" bg-secondary h-6 w-fit p-2.5 rounded-full flex items-center justify-center mt-2 mb-1">

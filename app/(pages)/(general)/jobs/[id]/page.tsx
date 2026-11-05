@@ -1,100 +1,57 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { JobAndCompany } from "@/types/main";
+import type { JobAndCompany } from "@/types/main";
 import OneJobClient from "./Client";
 import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 import { jobPostingJsonLd } from "@/app/lib/jobs/jobPostingJsonLd";
-import { isJobLive } from "@/app/lib/jobs/jobLifetime";
+import { isJobLive, isJobIndexable } from "@/app/lib/jobs/jobLifetime";
 import { jobFacts } from "@/app/lib/jobs/jobFacts";
-import { BOARD_TAGS, backendCachedOrNull } from "@/app/lib/backend";
+import { jobLocations } from "@/app/lib/jobs/publicJobFacts";
+import { backendOrNull } from "@/app/lib/backend";
+import Link from "next/link";
+import LandingPage, { landingMetadata } from "@/app/components/landing/LandingPage";
+import { landingBySlug } from "@/app/lib/landing/catalogue";
 
-export const revalidate = 43200; // 3600 * 12
+// Expiry is evaluated on each request; cached HTML must never advertise an already expired job.
+export const dynamic = "force-dynamic";
+type Props = {params:Promise<{id:string}>;searchParams:Promise<{page?:string|string[]}>};
+const fetchJob = cache((slug: string) => backendOrNull<JobAndCompany>(`/jobs/${encodeURIComponent(slug)}`));
 
-// Built on a job's first visit and then served from the cache, rebuilt every 12 hours or as soon
-// as an admin edit expires the jobs tag. An empty list is what lets that happen for paths not
-// built at deploy. Nothing here may read the visitor (cookies, auth()): that would build the page
-// per request again. Whether they saved the job is asked from the browser (BookmarkStatus).
-export async function generateStaticParams() {
-  return [];
-}
-
-// One listing and its whole company, from the backend (GET /api/jobs/:slug, description
-// sanitized). Held in the data cache under the board's jobs tag, so an admin's edit shows at
-// once; cache() lets generateMetadata and the page share one read per request.
-const fetchJob = cache(async (slug: string): Promise<JobAndCompany | null> => {
-  try {
-    return await backendCachedOrNull<JobAndCompany>(`/jobs/${encodeURIComponent(slug)}`, { revalidate: 43200, tags: [BOARD_TAGS.jobs] });
-  } catch (error) {
-    throw new Error("Something went wrong");
-  }
-});
-
-const fetchJobMetaData = fetchJob;
-
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const jobSlug = decodeURIComponent((await params).id);
-  const JOB = await fetchJobMetaData(jobSlug);
-
-  // The page answers 404 (./not-found.tsx); this only names the tab.
-  if (!JOB) return { title: "Job Not Found", robots: { index: false, follow: true } };
-
-  // fetch data
-  const regionLabel = JOB.region?.length ? JOB.region.join(", ") : "Anywhere in the world";
-  const imageUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/og/job?title=${encodeURIComponent(JOB.title)}&type=${encodeURIComponent(
-    regionLabel,
-  )}&company=${encodeURIComponent(JOB.company.name)}${JOB.company.logo ? `&logo=${encodeURIComponent(JOB.company.logo)}` : ""}`;
-
-  const keywordText = JOB.slug.split("-").slice(0, -1);
-  const title = `${JOB.title} at ${JOB.company.name} (Remote) | Remote Worldwide`;
-  const description = `${JOB.company.name} is hiring a remote ${JOB.title}.${JOB.seniority ? ` Seniority: ${JOB.seniority}.` : ""} Location: ${regionLabel}. Read the full job description and apply on Remote Worldwide.`;
+export async function generateMetadata({params,searchParams}:Props) {
+  const slug = (await params).id;
+  if (landingBySlug("jobs",slug)) return landingMetadata("jobs",slug,{searchParams});
+  const job = await fetchJob(slug);
+  if (!job) return {title:"Job Not Found",robots:{index:false,follow:true}};
+  const live = isJobLive(job);
+  const region = jobLocations(job.facts,job.region).join(", ");
+  const title = `${job.title} at ${job.company.name} (Remote${region !== "Location not specified" ? `, ${region}` : ""})${live ? "" : " — Archived"} | Remote Worldwide`;
+  const description = live
+    ? `${job.company.name} is hiring a ${job.title}. ${region !== "Location not specified" ? `Location: ${region}. ` : ""}Read the job details and apply.`
+    : `Archived ${job.title} listing at ${job.company.name}. Read the original role details and explore current remote opportunities.`;
+  const image = absoluteUrl(`/api/og/job?${new URLSearchParams({title:job.title,type:region,company:job.company.name,...(job.company.logo ? {logo:job.company.logo} : {})})}`);
   return {
-    // Already carries the site name, so it skips the root template rather than doubling it.
-    title: { absolute: title },
-    description,
-    alternates: {
-      canonical: absoluteUrl(`/jobs/${JOB.slug}`),
-    },
-    // An unpublished or expired posting stays up for people who follow an old link, but
-    // leaves the index (and Google's job results) the same day its markup goes.
-    ...(isJobLive(JOB) ? {} : { robots: { index: false, follow: true } }),
-    openGraph: {
-      images: imageUrl,
-      title,
-      description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
-      url: absoluteUrl(`/jobs/${JOB.slug}`),
-    },
-    // Without a twitter block here, the root layout's is inherited whole, image included,
-    // so X, Slack and Discord (they read twitter:image) showed the bare /api/og/job logo card.
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description: `Find out more about the ${JOB.title} position at ${JOB.company.name}.`,
-      images: [imageUrl],
-    },
-    keywords: ["Remoteworldwide", ...keywordText],
+    title:{absolute:title},description,alternates:{canonical:absoluteUrl(`/jobs/${job.slug}`)},
+    robots:{index:isJobIndexable(job),follow:true},
+    openGraph:{images:image,title,description,url:absoluteUrl(`/jobs/${job.slug}`)},
+    twitter:{card:"summary_large_image" as const,title,description,images:[image]},
   };
 }
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const jobSlug = decodeURIComponent((await params).id);
-  const JOB = await fetchJob(jobSlug);
-
-  if (!JOB) notFound();
-
-  // Employment type and salary for the markup, read from the posting's ATS (jobFacts.ts).
-  const live = isJobLive(JOB);
-  const facts = live ? await jobFacts(JOB) : null;
-
-  const breadcrumbs = breadcrumbJsonLd([
-    { name: "Jobs", path: "/jobs" },
-    { name: JOB.title, path: `/jobs/${JOB.slug}` },
-  ]);
-
-  return (
-    <>
-      {live && facts ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(jobPostingJsonLd(JOB, facts)) }} /> : null}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbs) }} />
-      <OneJobClient Job={JOB} />
-    </>
-  );
+export default async function Page({params,searchParams}:Props) {
+  const slug = (await params).id;
+  if (landingBySlug("jobs",slug)) return <LandingPage kind="jobs" slug={slug} searchParams={searchParams} />;
+  const job = await fetchJob(slug);
+  if (!job) notFound();
+  const live = isJobLive(job);
+  const facts = live ? await jobFacts(job) : null;
+  const breadcrumbs = breadcrumbJsonLd([{name:"Jobs",path:"/jobs"},{name:job.title,path:`/jobs/${job.slug}`}]);
+  return <>
+    {live && facts ? <script type="application/ld+json" dangerouslySetInnerHTML={{__html:jsonLd(jobPostingJsonLd(job,facts))}} /> : null}
+    <script type="application/ld+json" dangerouslySetInnerHTML={{__html:jsonLd(breadcrumbs)}} />
+    <OneJobClient Job={job} />
+    <nav className="mx-auto flex max-w-[1200px] flex-wrap gap-4 px-4 py-8" aria-label="Browse more jobs">
+      <Link href="/jobs" className="inline-flex items-center justify-center rounded-full border-2 border-black bg-secondary px-5 py-3 text-sm font-bold text-black shadow-[3px_3px_0_0_#000] transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black active:translate-y-0.5 motion-reduce:transition-none">Browse all open jobs</Link>
+      <Link href={`/companies/${job.company.slug}`} className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-5 py-3 text-sm font-bold text-black shadow-[3px_3px_0_0_#000] transition-transform hover:-translate-y-0.5 hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black active:translate-y-0.5 motion-reduce:transition-none">More jobs at {job.company.name}</Link>
+    </nav>
+  </>;
 }

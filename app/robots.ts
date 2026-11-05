@@ -22,8 +22,8 @@ export default function robots(): MetadataRoute.Robots {
           "/forgot-password",
           "/reset-password",
           "/bookmarks",
-          "/*?*category=",
-          "/*?*utm_",
+          // Public filters must remain crawlable so their noindex metadata can be read.
+
         ],
       },
       // Meta's AI training crawler: 269,000 requests in five days (Oct 2-6, 2026) and no visitors

@@ -7,6 +7,8 @@ import Image from "next/image";
 import { toast } from "react-toastify";
 import type { Company } from "@/types/main";
 import { updateCompany } from "@/libs/query";
+import CompanyHiringEditor from "@/app/components/ADMIN/CompanyHiringEditor";
+import type { CompanyHiringProfile } from "@/types/main";
 
 const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
   const [name, setName] = useState(companyData.name);
@@ -18,6 +20,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
   const [facebook, setFacebook] = useState(companyData.facebook ?? "");
   const [error, setError] = useState<{ logo?: boolean }>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [hiringProfile,setHiringProfile] = useState<CompanyHiringProfile|null>(companyData.hiringProfile??null);
 
   const pathname = useParams();
 
@@ -35,7 +38,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
     if (!logo) {
       setError((prev) => ({ ...prev, logo: true }));
     }
-    const formValues = { name: name.trim(), about: about.trim(), logo, website, linkedin, twitter, facebook };
+    const formValues = { name: name.trim(), about: about.trim(), logo, website, linkedin, twitter, facebook, hiringProfile };
 
     setIsLoading(true);
     toast.info("Adding new company...", { autoClose: 300 });
@@ -77,6 +80,7 @@ const EditCompanyClient: FC<{ companyData: Company }> = ({ companyData }) => {
     <div className="w-full p-4 lg:pr-[5%]">
       <h1 className="text-2xl font-bold mb-4">Edit company information</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <CompanyHiringEditor value={hiringProfile} onChange={setHiringProfile}/>
         <div>
           <label className=" text-sm font-medium text-primary/95 flex items-center">Company Name</label>
           <input

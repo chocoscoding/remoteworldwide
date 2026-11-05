@@ -12,6 +12,8 @@ import type { Company } from "@/types/main";
 import { createOneJob, type JobCreate } from "@/libs/query";
 import { actionErrorMessage } from "@/app/lib/auth/action-error";
 import "react-quill-new/dist/quill.snow.css";
+import JobFactsEditor, { JobLifecycleEditor, type LifecycleEdit } from "@/app/components/ADMIN/JobFactsEditor";
+import type { PublicJobFacts } from "@/types/main";
 
 const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false });
 
@@ -45,6 +47,10 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     body: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [facts, setFacts] = useState<PublicJobFacts|null>(null);
+  const [factsReviewed, setFactsReviewed] = useState(false);
+  const [factsEvidence, setFactsEvidence] = useState<unknown>(null);
+  const [lifecycle, setLifecycle] = useState<LifecycleEdit>({});
   // Seeded from the server, then kept in sync client-side so a company created
   // from the popup shows up in the select without a reload.
   const [companies, setCompanies] = useState<FilterType[]>(allCompanies);
@@ -121,8 +127,13 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
     category: string;
     regions: string[];
     seniorityLevel: string;
+    factsDraft?: PublicJobFacts|null;
+    factsEvidence?: unknown;
   }) => {
     const { jobTitle, companyName, jobDescription, seniorityLevel, category, regions, jobLink } = parsedData;
+    setFacts(parsedData.factsDraft ?? null);
+    setFactsEvidence(parsedData.factsEvidence);
+    setFactsReviewed(false);
 
     setFormValues((prev) => ({
       ...prev,
@@ -160,6 +171,8 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const finalValue = {
+      ...lifecycle,
+      ...(factsReviewed && facts ? {facts} : {}),
       title: formValues.title,
       description: formValues.body,
       companyId: formValues.company?.value,
@@ -177,7 +190,6 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
       !finalValue.companyId && "companyId",
       !finalValue.applicationUrl && "applicationUrl",
       !finalValue.category && "category",
-      finalValue.region.length === 0 && "region",
       !finalValue.seniority && "seniority",
       hasDuplicateRegions && "duplicate regions",
     ].filter(Boolean) as string[];
@@ -276,8 +288,7 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             value={formValues.region}
             options={getRegionOptions(filters.region, formValues.region)}
             onChange={(value) => handleRegionChange(value as Option[] | null)}
-            placeholder="Select region(s)"
-            required
+            placeholder="Select region(s), or leave unknown"
             isMulti
           />
 
@@ -301,6 +312,8 @@ const CreateJob: FC<{ allCompanies: FilterType[]; filters: FilterData }> = ({ al
             />
           </div>
 
+          <JobFactsEditor value={facts} onChange={setFacts} reviewed={factsReviewed} onReviewedChange={setFactsReviewed} evidence={factsEvidence}/>
+          <JobLifecycleEditor value={lifecycle} onChange={setLifecycle}/>
           <div className="flex justify-center">
             <button
               type="submit"

@@ -1,9 +1,13 @@
 import type { Author } from "@/app/lib/blog/types";
+import type { PublicJobFacts, JobLifecycle, CompanyHiringProfile } from "./jobMetadata";
+export type { PublicJobFacts, JobLifecycle, CompanyHiringProfile, SalaryBand } from "./jobMetadata";
 
 // The job board's listing and company, as the backend sends them (remoteworldwidebackend
 // src/types/board.ts, BoardJob and BoardCompany): change one, change the other. The dates arrive
 // as ISO strings and app/lib/api/core.ts revives them into Dates.
 export interface Job {
+  facts?: PublicJobFacts | null;
+  lifecycle?: JobLifecycle;
   id: string;
   slug: string;
   title: string;
@@ -19,6 +23,11 @@ export interface Job {
 }
 
 export interface Company {
+  sponsorshipHistory?: {periodStart:string;periodEnd:string;certifiedCases:number;medianWage:number|null;topTitles:string[];lastFilingDate:string|null;sourceUrl:string;sourceUrls?:string[];matchStatus:"reviewed"|"unreviewed";updatedAt:string;wageCurrency:"USD";wagePeriod:"year";wageSampleCount?:number;wageBasis?:string} | null;
+  hiringProfile?: CompanyHiringProfile | null;
+  hiringRegions?: string[];
+  openJobsCount?: number;
+  similarCompanies?: CompanyList[];
   id: string;
   name: string;
   slug: string;
@@ -41,6 +50,13 @@ export interface JobStats {
 }
 
 export interface AdminJobPage extends JobAndCompany {
+  factsDraft?: PublicJobFacts | null;
+  enrichment?: unknown;
+  postedAt?: Date | string | null;
+  employerExpiresAt?: Date | string | null;
+  closedAt?: Date | string | null;
+  closureReason?: string | null;
+  archiveIndexable?: boolean | null;
   stats: JobStats;
 }
 
@@ -88,7 +104,7 @@ export interface JobAndCompanyWithCount extends Job {
   company: CompanyWithJobsCount;
 }
 
-interface FormValues {
+export interface FormValues {
   title: string;
   company: Option | null;
   link: string;
@@ -98,7 +114,7 @@ interface FormValues {
   body: string;
 }
 
-interface WithPaginationProps {
+export interface WithPaginationProps {
   jobs: Job[];
   currentPage: number;
   totalJobs: number;
@@ -110,11 +126,13 @@ interface WithPaginationProps {
   loading: boolean; // Added loading state
 }
 
-interface FetchDataFunction<T> {
+export interface FetchDataFunction<T> {
   (currentPage: number, jobsPerPage: number): Promise<{ jobs: T[]; total: number }>;
 }
 
 export interface JobTileType {
+  facts?: PublicJobFacts | null;
+  lifecycle?: JobLifecycle;
   title: string;
   id: string;
   company: {
@@ -128,7 +146,7 @@ export interface JobTileType {
   seniority: string;
   createdAt: Date;
 }
-interface OneJobListType {
+export interface OneJobListType {
   title: string;
   id: string;
   company: {
