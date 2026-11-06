@@ -4,11 +4,14 @@ import { BackendError } from "@/app/lib/backend";
 import { listUsers } from "@/libs/analytics-admin";
 import { USER_SORTS, USER_SORT_LABELS, ago, type AdminUserList, type UserSort } from "@/app/lib/tracking/types";
 import { TierBadge } from "@/app/components/ADMIN/analytics/Charts";
+import UsersTable from "@/app/components/ADMIN/analytics/UsersTable";
 
 // Every account, last active first by default: their plan, when they were last here and where,
 // and how much they have done. A row opens the person's own page (/heroshima/users/[id]) with
 // everything they did. Server-rendered through session-forwarding server actions
 // (libs/analytics-admin.ts); the (fulladmin) layout and the backend both require an ADMIN.
+// Tick some people, or all of them, to export chosen fields as CSV or TXT: UsersTable adds the
+// checkboxes and Export around the cells rendered here.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Users", robots: { index: false, follow: false } };
 
@@ -84,69 +87,75 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-md border border-gray-300 bg-white">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="border-b border-gray-300 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-3 py-2 font-semibold">Person</th>
-                  <th className="px-3 py-2 font-semibold">Plan</th>
-                  <th className="px-3 py-2 font-semibold">Last active</th>
-                  <th className="px-3 py-2 font-semibold">Last on</th>
-                  <th className="px-3 py-2 text-right font-semibold">30 d</th>
-                  <th className="px-3 py-2 text-right font-semibold">All time</th>
-                  <th className="px-3 py-2 font-semibold">Device</th>
-                  <th className="px-3 py-2 font-semibold">Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.items.map((u) => (
-                  <tr key={u.id} className="border-b border-gray-100 last:border-0 hover:bg-[#fbfbf7]">
-                    <td className="px-3 py-2">
-                      <Link href={`/heroshima/users/${u.id}`} className="flex items-center gap-2.5">
-                        <Image
-                          src={u.image || "/images/noimage.png"}
-                          alt=""
-                          width={28}
-                          height={28}
-                          referrerPolicy="no-referrer"
-                          unoptimized
-                          className="h-7 w-7 flex-none rounded-full border border-gray-200 object-cover"
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate font-semibold hover:underline">{u.name || "No name"}</span>
-                          <span className="block truncate text-xs text-gray-500">
-                            {u.email}
-                            {u.role !== "USER" ? ` · ${u.role.toLowerCase()}` : ""}
-                            {!u.verified ? " · unverified" : ""}
-                          </span>
+          <UsersTable
+            q={q}
+            sort={sort}
+            total={list.total}
+            columns={8}
+            empty={q ? "Nobody matches that search." : "No accounts yet."}
+            head={
+              <>
+                <th className="px-3 py-2 font-semibold">Person</th>
+                <th className="px-3 py-2 font-semibold">Plan</th>
+                <th className="px-3 py-2 font-semibold">Last active</th>
+                <th className="px-3 py-2 font-semibold">Last on</th>
+                <th className="px-3 py-2 text-right font-semibold">30 d</th>
+                <th className="px-3 py-2 text-right font-semibold">All time</th>
+                <th className="px-3 py-2 font-semibold">Device</th>
+                <th className="px-3 py-2 font-semibold">Joined</th>
+              </>
+            }
+            rows={list.items.map((u) => ({
+              id: u.id,
+              label: u.email || u.name || u.id,
+              cells: (
+                <>
+                  <td className="px-3 py-2">
+                    <Link href={`/heroshima/users/${u.id}`} className="flex items-center gap-2.5">
+                      <Image
+                        src={u.image || "/images/noimage.png"}
+                        alt=""
+                        width={28}
+                        height={28}
+                        referrerPolicy="no-referrer"
+                        unoptimized
+                        className="h-7 w-7 flex-none rounded-full border border-gray-200 object-cover"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold hover:underline">{u.name || "No name"}</span>
+                        <span className="block truncate text-xs text-gray-500">
+                          {u.email}
+                          {u.role !== "USER" ? ` · ${u.role.toLowerCase()}` : ""}
+                          {!u.verified ? " · unverified" : ""}
                         </span>
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2">
-                      <TierBadge tier={u.tier} />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap" title={u.lastSeenAt ?? undefined}>
-                      {ago(u.lastSeenAt)}
-                    </td>
-                    <td className="max-w-[200px] truncate px-3 py-2 text-gray-600" title={u.lastPath ?? undefined}>
-                      {u.lastFeature ?? "Not seen yet"}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">{u.events30d.toLocaleString("en-GB")}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-gray-600">{u.eventCount.toLocaleString("en-GB")}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-600">{u.device ? `${u.device.browser}, ${u.device.os}` : "Unknown"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-600">{u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Unknown"}</td>
-                  </tr>
-                ))}
-                {!list.items.length && (
-                  <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-gray-500">
-                      {q ? "Nobody matches that search." : "No accounts yet."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2">
+                    <TierBadge tier={u.tier} />
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap" title={u.lastSeenAt ?? undefined}>
+                    {ago(u.lastSeenAt)}
+                  </td>
+                  <td className="max-w-[200px] truncate px-3 py-2 text-gray-600" title={u.lastPath ?? undefined}>
+                    {u.lastFeature ?? "Not seen yet"}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{u.events30d.toLocaleString("en-GB")}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-gray-600">{u.eventCount.toLocaleString("en-GB")}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">{u.device ? `${u.device.browser}, ${u.device.os}` : "Unknown"}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">
+                    {u.createdAt
+                      ? new Date(u.createdAt).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "Unknown"}
+                  </td>
+                </>
+              ),
+            }))}
+          />
 
           <nav aria-label="Pages" className="mt-4 flex items-center gap-3 text-sm">
             {page > 1 && (

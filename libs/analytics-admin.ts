@@ -6,7 +6,8 @@
 // requireAdminAction refuses a non-admin here first. Server to backend, so no rewrite exists.
 
 import { requireAdminAction } from "@/app/lib/auth/action-guards";
-import { backend, idSegment } from "@/app/lib/backend";
+import { BackendError, backend, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
+import { isExportField, type ExportField, type UserExport, type UserSelection } from "@/app/lib/tracking/export";
 import {
   TRACK_KINDS,
   USER_SORTS,
@@ -17,7 +18,7 @@ import {
   type UserSort,
 } from "@/app/lib/tracking/types";
 
-const analytics = <T>(path: string) => backend<T>(`/admin/analytics${path}`, { session: true });
+const analytics = <T>(path: string, init: Omit<BackendInit, "session"> = {}) => backend<T>(`/admin/analytics${path}`, { ...init, session: true });
 
 const int = (value: unknown, fallback: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(Number(value)) || fallback));
 
@@ -32,6 +33,42 @@ export const listUsers = async ({ q = "", page = 1, sort = "last_seen" }: { q?: 
   const search = typeof q === "string" ? q.trim().slice(0, 100) : "";
   if (search) params.set("q", search);
   return analytics<AdminUserList>(`/users?${params.toString()}`);
+};
+
+/**
+ * The chosen fields for the chosen people, for the users screen's Export. The browser builds the
+ * file from these rows (app/lib/tracking/export.ts). Ids and fields are checked here as well as on
+ * the backend, because an action's arguments are whatever its caller sends. A backend refusal comes
+ * back as `error` rather than thrown, since a production build hides a thrown action's message.
+ */
+export const exportUsers = async ({
+  selection,
+  fields,
+  sort = "last_seen",
+}: {
+  selection: UserSelection;
+  fields: ExportField[];
+  sort?: UserSort;
+}): Promise<{ data: UserExport; error?: never } | { error: string; data?: never }> => {
+  await requireAdminAction();
+  const ids = (list: unknown) => (Array.isArray(list) ? list.filter(isObjectId).slice(0, 10_000) : []);
+  const body: Record<string, unknown> = {
+    fields: Array.isArray(fields) ? fields.filter(isExportField) : [],
+    sort: (USER_SORTS as readonly string[]).includes(sort) ? sort : "last_seen",
+  };
+  if (selection?.mode === "all") {
+    body.all = true;
+    body.q = typeof selection.q === "string" ? selection.q.trim().slice(0, 100) : "";
+    body.exclude = ids(selection.except);
+  } else {
+    body.ids = ids(selection?.ids);
+  }
+  try {
+    return { data: await analytics<UserExport>("/users/export", { method: "POST", body }) };
+  } catch (error) {
+    if (error instanceof BackendError) return { error: error.message || `The backend answered ${error.status}.` };
+    throw error;
+  }
 };
 
 export const getUserDetail = async (id: string) => {
