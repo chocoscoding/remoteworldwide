@@ -100,7 +100,36 @@ export interface AdminUserDetail {
   devices: (DeviceInfo & { count: number; lastAt: string })[];
   spends: { at: string; delta: number; reason: string; feature: string | null; balanceAfter: number }[];
   streakActions: { at: string; kind: string; day: string }[];
+  /** Every payment they started, newest first (the last 50). Absent from an older backend. */
+  checkouts?: CheckoutBrief[];
 }
+
+/**
+ * A payment someone started and how it ended: `pending` opened Stripe's page and has not paid,
+ * `completed` paid, `canceled` let Stripe's page expire unpaid, `failed` never reached Stripe.
+ * A null `provider` is a reservation made while card payments were off.
+ */
+export interface CheckoutBrief {
+  id: string;
+  kind: "subscription" | "credits";
+  planKey: string | null;
+  interval: string | null;
+  packKey: string | null;
+  credits: number;
+  amountCents: number;
+  currency: string;
+  status: "pending" | "completed" | "canceled" | "failed";
+  provider: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export const CHECKOUT_STATUS_LABELS: Record<CheckoutBrief["status"], { label: string; hint: string }> = {
+  completed: { label: "Paid", hint: "Paid on Stripe" },
+  pending: { label: "Not finished", hint: "Opened Stripe's payment page and has not paid" },
+  canceled: { label: "Closed unpaid", hint: "Stripe's payment page expired without a payment" },
+  failed: { label: "Didn't open", hint: "Stripe's payment page could not be opened" },
+};
 
 export interface EventPage {
   items: TrackEventView[];
@@ -122,7 +151,8 @@ export interface CardEventPage {
   visitors: number;
   page: number;
   pages: number;
-  items: (TrackEventView & { user: UserBrief | null })[];
+  /** `checkout` is on a call that started a payment: the checkout it made and how that ended, null when none matches. */
+  items: (TrackEventView & { user: UserBrief | null; checkout?: CheckoutBrief | null })[];
 }
 
 /** The address of one card row's page, keeping the overview's range. */

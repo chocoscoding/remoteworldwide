@@ -6,10 +6,12 @@ import { BackendError } from "@/app/lib/backend";
 import { getUserDetail, getUserEvents } from "@/libs/analytics-admin";
 import { TRACK_KIND_LABELS, TRACK_KINDS, ago, dateTime, type AdminUserDetail, type EventPage } from "@/app/lib/tracking/types";
 import { BarList, DayColumns, Panel, StatTile, TierBadge } from "@/app/components/ADMIN/analytics/Charts";
+import { CheckoutBadge, checkoutWhat } from "@/app/components/ADMIN/analytics/Checkout";
 import Timeline from "./Timeline";
 
 // One person: their plan and credits, what they use and how much, where and on what, what they
-// spent credits on, their streak actions, and below it all, everything they did, newest first
+// spent credits on, the payments they started and how each ended, their streak actions, and below
+// it all, everything they did, newest first
 // (Timeline.tsx pages through it). Admin only: the (fulladmin) layout, the server actions'
 // requireAdminAction and the backend's isAdmin.
 export const dynamic = "force-dynamic";
@@ -162,6 +164,26 @@ const Page = async ({ params, searchParams }: { params: Promise<{ id: string }>;
           )}
         </Panel>
       </div>
+
+      <Panel title="Payments they started" className="mb-4" aside={<span className="text-xs text-gray-500">newest first</span>}>
+        {detail.checkouts?.length ? (
+          <ol className="text-sm">
+            {detail.checkouts.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-gray-100 py-2 last:border-0">
+                <time className="w-[128px] flex-none text-xs tabular-nums text-gray-500" dateTime={c.createdAt}>
+                  {dateTime(c.createdAt)}
+                </time>
+                <CheckoutBadge checkout={c} />
+                <span className="font-medium">{checkoutWhat(c)}</span>
+                {c.completedAt ? <span className="text-xs text-gray-500">paid {dateTime(c.completedAt)}</span> : null}
+                {!c.provider ? <span className="text-xs text-gray-500">reserved while card payments were off</span> : null}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-gray-500">No payments started.</p>
+        )}
+      </Panel>
 
       {detail.streakActions.length ? (
         <Panel title="Streak actions" className="mb-4">

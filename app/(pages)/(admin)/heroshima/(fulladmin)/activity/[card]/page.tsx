@@ -7,9 +7,11 @@ import { getCardEvents } from "@/libs/analytics-admin";
 import { ACTIVITY_CARDS, ACTIVITY_CARD_LABELS, TRACK_KIND_LABELS, cardRowHref, dateTime, type ActivityCard, type CardEventPage } from "@/app/lib/tracking/types";
 import { StatTile } from "@/app/components/ADMIN/analytics/Charts";
 import { KIND_STYLE, details } from "@/app/components/ADMIN/analytics/EventRow";
+import { CheckoutBadge, checkoutWhat } from "@/app/components/ADMIN/analytics/Checkout";
 
 // One row of the Activity page's cards, opened: every event that row counted in the same range,
-// newest first, 50 a page, with who did it, when and where. The address keeps the card, the row
+// newest first, 50 a page, with who did it, when and where; a call that started a payment also
+// says how that payment ended. The address keeps the card, the row
 // (?key=), the range (?days=) and the page (?page=), so it can be shared or reloaded. Admin only:
 // the (fulladmin) layout, the server action's requireAdminAction and the backend's isAdmin.
 export const dynamic = "force-dynamic";
@@ -126,6 +128,19 @@ const Page = async ({ params, searchParams }: { params: Promise<{ card: string }
                         <td className="px-3 py-2.5">
                           <span className={cn("mr-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide", KIND_STYLE[e.kind])}>{TRACK_KIND_LABELS[e.kind]}</span>
                           <span className="break-words font-medium">{e.name}</span>
+                          {e.checkout !== undefined ? (
+                            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-600">
+                              {e.checkout ? (
+                                <>
+                                  <CheckoutBadge checkout={e.checkout} />
+                                  {checkoutWhat(e.checkout)}
+                                  {e.checkout.completedAt ? <span className="text-gray-500">paid {dateTime(e.checkout.completedAt)}</span> : null}
+                                </>
+                              ) : (
+                                <span className="text-gray-500">No matching payment found</span>
+                              )}
+                            </span>
+                          ) : null}
                         </td>
                         <td className="max-w-[240px] break-words px-3 py-2.5 text-gray-600">{e.path ?? ""}</td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-gray-600">{e.feature}</td>
