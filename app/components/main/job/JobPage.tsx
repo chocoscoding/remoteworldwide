@@ -354,10 +354,13 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
                 timeZone: "UTC",
               })}
             </span>
-            <span>
-              <MapPin size={14} />
-              {jobLocations(job.facts, job.region).join(", ")}
-            </span>
+            {/* One chip per place (owner, 2026-11-10: "EMEA and LATAM should be independent chips"). */}
+            {jobLocations(job.facts, job.region).map((place) => (
+              <span key={place}>
+                <MapPin size={14} />
+                {place}
+              </span>
+            ))}
             <span>
               <House size={14} />
               {job.facts?.remotePolicy?.replace(/-/g, " ") ?? "Remote"}
