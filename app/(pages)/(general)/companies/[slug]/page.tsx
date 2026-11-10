@@ -1,7 +1,7 @@
 import CompanyCard from "./CompanyCard";
 import JobTile from "@/app/components/main/JobTileV2";
-import { notFound } from "next/navigation";
-import type { CompanyWithJobsCount, JobTileType } from "@/types/main";
+import { notFound, permanentRedirect } from "next/navigation";
+import type { CompanyList, CompanyWithJobsCount, JobTileType } from "@/types/main";
 import Link from "next/link";
 import Image from "next/image";
 import { cache } from "react";
@@ -15,6 +15,37 @@ export const dynamic = "force-dynamic";
 type Props = {params:Promise<{slug:string}>;searchParams:Promise<{page?:string|string[]}>};
 const fetchCompany = cache((slug:string) => backendOrNull<CompanyWithJobsCount>(`/companies/${encodeURIComponent(slug)}`));
 const companyPath = (slug:string,page:number) => `/companies/${encodeURIComponent(slug)}${page > 1 ? `?page=${page}` : ""}`;
+
+// Until 2026-02-05 a company's page was /companies/<its name> (/companies/Xapo%20Bank), and Google
+// and old LinkedIn, X and Telegram posts still link there. The site has no database, so the backend
+// is asked: first the slug that name was given (slugify lower+strict, as the backend's companySlug),
+// then its name search, keeping only an exact name (case, `+` for a space and extra spaces aside).
+const nameKey = (name:string) => name.replace(/\s+/g," ").trim().toLowerCase();
+const nameSlug = (name:string) => name.normalize("NFKD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9\s-]/g,"").trim().replace(/[\s-]+/g,"-").toLowerCase();
+const legacySlug = cache(async (param:string):Promise<string|null> => {
+  let name=param;
+  try { name=decodeURIComponent(param); } catch { /* A stray % stays as it is. */ }
+  // Already slug-shaped: a slug no company has (a deleted one), not an old name. No more lookups.
+  if(nameSlug(name)===name) return null;
+  for(const candidate of new Set([name,name.replace(/\+/g," ")])) {
+    const key=nameKey(candidate), slug=nameSlug(candidate);
+    if(!key || !slug) continue;
+    const derived=await fetchCompany(slug);
+    if(derived && nameKey(derived.name)===key) return derived.slug;
+    const match=(await backendOrNull<CompanyList[]>(`/companies?find=${encodeURIComponent(key)}`))?.find(item=>nameKey(item.name)===key);
+    if(match?.slug) return match.slug;
+    // Renamed since: an edit keeps the slug, so the old name's slug is still that company.
+    if(derived) return derived.slug;
+  }
+  return null;
+});
+
+/** No company has this slug: an old name address moves to its company for good (308), anything else is a real 404. */
+async function missingCompany(slug:string):Promise<never> {
+  const target=await legacySlug(slug);
+  if(target) permanentRedirect(companyPath(target,1));
+  notFound();
+}
 
 export async function generateMetadata({params,searchParams}:Props):Promise<Metadata> {
   const slug=(await params).slug;
@@ -38,7 +69,7 @@ export default async function Page({params,searchParams}:Props) {
   const page=pageParam((await searchParams).page);
   if(page===null) notFound();
   const company=await fetchCompany(slug);
-  if(!company) notFound();
+  if(!company) return missingCompany(slug);
   // All displayed jobs and pagination links are in the server HTML, including without JavaScript.
   const result=await backendWithCount<JobTileType[]>(`/jobs/company/${company.id}?page=${page}`);
   const totalPages=Math.max(1,Math.ceil(result.count/50));
