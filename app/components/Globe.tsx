@@ -129,8 +129,7 @@ export default function Globe() {
       if (!stylesBefore.has(node)) node.remove();
     });
 
-    // The first frame is drawn: swap the static picture for the live globe.
-    document.querySelector("#fallbackglobe")?.remove();
+    // The first frame is drawn: fade the globe in.
     canvas.style.opacity = "1";
 
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
