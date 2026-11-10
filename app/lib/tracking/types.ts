@@ -107,6 +107,31 @@ export interface EventPage {
   next: string | null;
 }
 
+/** The activity overview's ranked cards a row of which opens its own page (/heroshima/activity/[card]). */
+export const ACTIVITY_CARDS = ["features", "pages", "clicks", "api"] as const;
+export type ActivityCard = (typeof ACTIVITY_CARDS)[number];
+export const ACTIVITY_CARD_LABELS: Record<ActivityCard, string> = { features: "What people use", pages: "Pages", clicks: "Presses", api: "Changes made (API)" };
+
+/** The page of one card row: the row's numbers, then its events newest first. `user` is null for a visitor or a deleted account. */
+export interface CardEventPage {
+  card: ActivityCard;
+  key: string;
+  days: number;
+  total: number;
+  people: number;
+  visitors: number;
+  page: number;
+  pages: number;
+  items: (TrackEventView & { user: UserBrief | null })[];
+}
+
+/** The address of one card row's page, keeping the overview's range. */
+export const cardRowHref = (card: ActivityCard, key: string, days: number, page = 1): string => {
+  const search = new URLSearchParams({ key, days: String(days) });
+  if (page > 1) search.set("page", String(page));
+  return `/heroshima/activity/${card}?${search.toString()}`;
+};
+
 /** "3 min ago", "2 h ago", "5 d ago", or the date past a month. */
 export function ago(iso: string | null, now = Date.now()): string {
   if (!iso) return "Never";

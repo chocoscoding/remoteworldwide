@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { TRACK_KIND_LABELS, dateTime, type TrackEventView, type UserBrief } from "@/app/lib/tracking/types";
 
-const KIND_STYLE: Record<string, string> = {
+export const KIND_STYLE: Record<string, string> = {
   page_view: "bg-gray-100 text-gray-700",
   click: "bg-[#e1f073] text-black",
   submit: "bg-[#e2ebf8] text-[#1c3d6e]",
@@ -13,7 +13,7 @@ const KIND_STYLE: Record<string, string> = {
 };
 
 /** The facts beside a row, in words: "→ /dashboard/tracker", "201 in 84 ms", "Chrome on Windows". */
-const details = (e: TrackEventView): string[] => {
+export const details = (e: TrackEventView): string[] => {
   const out: string[] = [];
   const p = e.props;
   if (typeof p.href === "string") out.push(`→ ${p.href}`);

@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { BackendError } from "@/app/lib/backend";
 import { getActivityOverview } from "@/libs/analytics-admin";
-import type { ActivityOverview } from "@/app/lib/tracking/types";
+import { cardRowHref, type ActivityOverview } from "@/app/lib/tracking/types";
 import { BarList, DayColumns, Panel, StatTile } from "@/app/components/ADMIN/analytics/Charts";
 import EventRow from "@/app/components/ADMIN/analytics/EventRow";
 
 // Everything happening on the platform: who is active, what they use, which pages and presses, and
-// the latest things people did. Read from the backend's tracking (libs/analytics-admin.ts); the
-// (fulladmin) layout hides it from anyone who isn't an ADMIN and the backend refuses them too.
+// the latest things people did. A row of the use, pages, presses and changes cards opens its own
+// page with every event it counted (activity/[card]). Read from the backend's tracking
+// (libs/analytics-admin.ts); the (fulladmin) layout hides it from anyone who isn't an ADMIN and
+// the backend refuses them too.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Activity", robots: { index: false, follow: false } };
 
@@ -74,16 +76,16 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ days?: string }>
 
           <div className="grid gap-4 lg:grid-cols-3">
             <Panel title="What people use" aside={<span className="text-xs text-gray-500">events · people</span>}>
-              <BarList rows={data.features.map((f) => ({ label: f.feature, value: f.count, sub: `${f.users} ppl` }))} />
+              <BarList rows={data.features.map((f) => ({ label: f.feature, value: f.count, sub: `${f.users} ppl`, href: cardRowHref("features", f.feature, days) }))} />
             </Panel>
             <Panel title="Pages">
-              <BarList rows={data.pages.map((p) => ({ label: p.path, value: p.count, sub: `${p.users} ppl` }))} />
+              <BarList rows={data.pages.map((p) => ({ label: p.path, value: p.count, sub: `${p.users} ppl`, href: cardRowHref("pages", p.path, days) }))} />
             </Panel>
             <Panel title="Presses">
-              <BarList rows={data.clicks.map((c) => ({ label: c.name, value: c.count, sub: `${c.users} ppl` }))} />
+              <BarList rows={data.clicks.map((c) => ({ label: c.name, value: c.count, sub: `${c.users} ppl`, href: cardRowHref("clicks", c.name, days) }))} />
             </Panel>
             <Panel title="Changes made (API)">
-              <BarList rows={data.api.map((a) => ({ label: a.name, value: a.count, sub: `${a.users} ppl` }))} />
+              <BarList rows={data.api.map((a) => ({ label: a.name, value: a.count, sub: `${a.users} ppl`, href: cardRowHref("api", a.name, days) }))} />
             </Panel>
             <Panel title="Devices">
               <BarList rows={data.devices.map((d) => ({ label: `${d.os}${d.mobile ? " (phone)" : ""}`, value: d.count }))} />

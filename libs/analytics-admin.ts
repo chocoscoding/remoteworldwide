@@ -9,11 +9,14 @@ import { requireAdminAction } from "@/app/lib/auth/action-guards";
 import { BackendError, backend, idSegment, isObjectId, type BackendInit } from "@/app/lib/backend";
 import { isExportField, type ExportField, type UserExport, type UserSelection } from "@/app/lib/tracking/export";
 import {
+  ACTIVITY_CARDS,
   TRACK_KINDS,
   USER_SORTS,
+  type ActivityCard,
   type ActivityOverview,
   type AdminUserDetail,
   type AdminUserList,
+  type CardEventPage,
   type EventPage,
   type UserSort,
 } from "@/app/lib/tracking/types";
@@ -25,6 +28,14 @@ const int = (value: unknown, fallback: number, min: number, max: number) => Math
 export const getActivityOverview = async (days = 30) => {
   await requireAdminAction();
   return analytics<ActivityOverview>(`/overview?days=${int(days, 30, 1, 90)}`);
+};
+
+/** One row of an overview card, opened: its events newest first, a page at a time, in the overview's range. */
+export const getCardEvents = async ({ card, key, days = 30, page = 1 }: { card: ActivityCard; key: string; days?: number; page?: number }) => {
+  await requireAdminAction();
+  if (!(ACTIVITY_CARDS as readonly string[]).includes(card)) throw new BackendError(400, "Unknown card");
+  const params = new URLSearchParams({ key: typeof key === "string" ? key.slice(0, 500) : "", days: String(int(days, 30, 1, 90)), page: String(int(page, 1, 1, 100_000)) });
+  return analytics<CardEventPage>(`/cards/${card}/events?${params.toString()}`);
 };
 
 export const listUsers = async ({ q = "", page = 1, sort = "last_seen" }: { q?: string; page?: number; sort?: UserSort } = {}) => {

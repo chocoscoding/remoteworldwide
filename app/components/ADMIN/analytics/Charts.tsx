@@ -25,35 +25,38 @@ export const Panel: FC<{ title: string; children: ReactNode; className?: string;
   </section>
 );
 
-/** A ranked list with a bar per row, its width the row's share of the biggest. */
+/** A ranked list with a bar per row, its width the row's share of the biggest. A row with `href` is a link from end to end. */
 export const BarList: FC<{
   rows: { label: string; value: number; sub?: string; href?: string }[];
   empty?: string;
 }> = ({ rows, empty = "Nothing yet." }) => {
   if (!rows.length) return <p className="text-sm text-gray-500">{empty}</p>;
   const max = Math.max(...rows.map((r) => r.value), 1);
+  const rowClass = "relative flex items-center justify-between gap-3 overflow-hidden rounded px-2 py-1 text-sm";
   return (
     <ol className="flex flex-col gap-1.5">
       {rows.map((row, i) => {
-        const label = (
-          <span className="relative z-10 min-w-0 truncate" title={row.label}>
-            {row.label || "(none)"}
-          </span>
-        );
-        return (
-          <li key={`${row.label}-${i}`} className="relative flex items-center justify-between gap-3 overflow-hidden rounded px-2 py-1 text-sm">
+        const inner = (
+          <>
             <span aria-hidden className="absolute inset-y-0 left-0 rounded bg-[#e1f073]/60" style={{ width: `${(row.value / max) * 100}%` }} />
-            {row.href ? (
-              <Link href={row.href} className="relative z-10 min-w-0 truncate hover:underline">
-                {row.label}
-              </Link>
-            ) : (
-              label
-            )}
+            <span className={cn("relative z-10 min-w-0 truncate", row.href && "group-hover:underline")} title={row.label}>
+              {row.label || "(none)"}
+            </span>
             <span className="relative z-10 flex-none tabular-nums text-gray-700">
               {n(row.value)}
               {row.sub ? <span className="ml-1.5 text-xs text-gray-500">{row.sub}</span> : null}
             </span>
+          </>
+        );
+        return (
+          <li key={`${row.label}-${i}`} className={row.href ? undefined : rowClass}>
+            {row.href ? (
+              <Link href={row.href} className={cn(rowClass, "group outline-1 -outline-offset-1 outline-black hover:outline focus-visible:outline")}>
+                {inner}
+              </Link>
+            ) : (
+              inner
+            )}
           </li>
         );
       })}
