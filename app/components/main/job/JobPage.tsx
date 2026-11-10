@@ -40,6 +40,7 @@ import { fromSavedJob } from "@/app/(pages)/(dashboard)/dashboard/apply/job";
 import { isJobLive, canStillApply, expiredJobMessage } from "@/app/lib/jobs/jobLifetime";
 import { jobFactChips, jobLocations } from "@/app/lib/jobs/publicJobFacts";
 import { qk } from "@/app/lib/query/keys";
+import { useApplyWithExtension } from "./ApplyWithExtension";
 import styles from "./JobPage.module.css";
 // The description is Quill HTML drawn with Quill's own classes (ql-editor, data-list bullets).
 import "react-quill-new/dist/quill.core.css";
@@ -50,7 +51,7 @@ const actions = [
   { id: "cover", label: "Cover letter", icon: Mail, color: "#fde3d8" },
   { id: "referrals", label: "Find referrals", icon: Users, color: "#e2ebf8" },
   { id: "resume", label: "Build a resume", icon: FilePlus2, color: "#fcf0c7" },
-  { id: "tracker", label: "Add to tracker", icon: ListPlus, color: "#ffffff" },
+  { id: "tracker", label: "Add to application tracker", icon: ListPlus, color: "#ffffff" },
 ] as const;
 type Action = (typeof actions)[number]["id"];
 
@@ -84,6 +85,13 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
   const applyOpen = canStillApply(job);
   const company = job.company;
   const chips = jobFactChips(job.facts);
+  const { onApplyClick, dialog: applyDialog } = useApplyWithExtension(
+    { id: job.id, applicationUrl: job.applicationUrl },
+    {
+      account: status === "loading" ? "loading" : status === "authenticated" ? "signed-in" : "signed-out",
+      onSignIn: () => openAuthModal("login"),
+    },
+  );
 
   useEffect(() => {
     const row = pills.current;
@@ -218,8 +226,9 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
           target="_blank"
           rel="noopener noreferrer"
           className={styles.apply}
-          onClick={() => {
+          onClick={(event) => {
             countEvent(job.id, "apply-click");
+            onApplyClick(event);
           }}>
           Apply now
           <ArrowUpRight size={17} />
@@ -228,7 +237,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
           <button
             type="button"
             className={styles.trackButton}
-            aria-label="Add to tracker"
+            aria-label="Add to application tracker"
             disabled={pending !== null || status === "loading"}
             onClick={() => void runAction("tracker")}>
             <Columns3 size={18} />
@@ -241,10 +250,10 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
 
   const tools = (mobile = false) => (
     <section
-      aria-label="Application Tools"
+      aria-label="Tools for this Job"
       className={`${styles.tools} ${!mobile && compact ? styles.compact : ""} ${mobile && expanded ? styles.expanded : ""}`}>
       <div className={styles.toolsHeading}>
-        <h2>Application Tools</h2>
+        <h2>Tools for this Job</h2>
         <button
           className={styles.desktopToggle}
           type="button"
@@ -428,6 +437,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
       <div ref={barAnchor} className={styles.barAnchor} />
       {apply(true)}
       <AdSlot slot="job-bottom" shape="banner" only="mobile" className="px-4 pb-5" />
+      {applyDialog}
     </main>
   );
 }

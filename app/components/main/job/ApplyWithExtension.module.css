@@ -1,0 +1,104 @@
+/* The title, "Apply in 10 minutes" → "Apply in 1 minute" (owner, 2026-11-09): the time is in
+   the title's own type. A thin line strikes "10 minutes"; it is pushed up above the line and
+   tilted 5 degrees (owner: -5deg), where it stays, faded, as "1 minute" rises into its place and a lime
+   highlighter sweeps behind it. Plays each time the dialog opens. */
+
+.slot {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+/* "1 minute": in the line, hidden until "10 minutes" makes way. */
+.after {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  padding: 0 0.18em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(60%);
+  animation: rise 460ms cubic-bezier(0.22, 1, 0.36, 1) 1.05s forwards;
+}
+
+/* The highlighter behind "1 minute". */
+.after::before {
+  content: "";
+  position: absolute;
+  inset: 14% 0 10%;
+  z-index: -1;
+  border-radius: 5px;
+  background: #e1f073;
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: draw 380ms cubic-bezier(0.22, 1, 0.36, 1) 1.55s forwards;
+}
+
+/* "10 minutes": over the same spot at first, then pushed up and tilted. */
+.before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0 0.18em;
+  white-space: nowrap;
+  color: #222325;
+  transform-origin: center;
+  animation: push 560ms cubic-bezier(0.65, 0, 0.35, 1) 0.95s forwards;
+}
+
+/* The strike through "10 minutes". */
+.before::after {
+  content: "";
+  position: absolute;
+  left: 0.18em;
+  right: 0.18em;
+  top: 54%;
+  height: 2.5px;
+  border-radius: 999px;
+  background: #e5484d;
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: draw 300ms ease-out 0.45s forwards;
+}
+
+@keyframes push {
+  to {
+    transform: translate(18%, -78%) rotate(-5deg) scale(0.62);
+    color: rgb(34 35 37 / 0.5);
+  }
+}
+
+@keyframes rise {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes draw {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Reduced motion: the end state, still. */
+@media (prefers-reduced-motion: reduce) {
+  .after,
+  .after::before,
+  .before,
+  .before::after {
+    animation: none;
+  }
+  .after {
+    opacity: 1;
+    transform: none;
+  }
+  .after::before,
+  .before::after {
+    transform: scaleX(1);
+  }
+  .before {
+    transform: translate(18%, -78%) rotate(-5deg) scale(0.62);
+    color: rgb(34 35 37 / 0.5);
+  }
+}
