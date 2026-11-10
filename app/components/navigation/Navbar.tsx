@@ -667,48 +667,30 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" aria-label="Remote Worldwide, home page" className={cn("block rounded-md py-2.5", FOCUS)}>
-              <LogoFull className="hidden h-[20px] w-auto lg:block" />
-              <LogoMini width={35} height={35} className="w-full !h-auto block lg:hidden" />
+              {/* 10% smaller than before (owner, 2026-11-09): 20px → 18px, 35px → 31.5px. */}
+              <LogoFull className="hidden h-[18px] w-auto lg:block" />
+              <LogoMini width={31.5} height={31.5} className="block h-auto w-[31.5px] lg:hidden" />
             </Link>
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-2">
             <NavMenu pathname={pathname} />
 
-            {/* The 44px link is the touch target; the pill inside is what you see. From lg up only: a
-                phone has its own in the hamburger (owner, 2026-10-15). Signed in, it opens the
-                dashboard. Signed out, it is the Chrome extension (owner, 2026-11-05): the dashboard
-                would only send them to login, and this pill only shows on the desktops that can
-                install it. While the session is still loading it is NEITHER (owner, 2026-11-05: a
-                signed-in visitor saw Extension, then a flicker to Dashboard): a blank pill of the same
-                size holds the spot, so nothing wrong shows and nothing moves. These pages are cached
-                for everyone, so the server cannot know who is looking; the session decides it. */}
-            {status === "loading" ? (
-              <span aria-hidden className="hidden h-10 items-center lg:inline-flex">
-                <span className="mr-2 inline-block h-8 w-[104px] rounded-full bg-primary/[0.06]" />
+            {/* The 44px link is the touch target; the pill inside is what you see. From lg up only, the
+                desktops that can install it. Always the Chrome extension (owner, 2026-11-09), for
+                everyone, so nothing waits on the session and nothing flickers: the dashboard is in
+                the account menu, and a phone has its own button in the hamburger. */}
+            <a
+              href={EXTENSION_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
+                <ChromeLogo className="h-4 w-4" aria-hidden />
+                Extension
+                <span className="sr-only"> for Chrome, opens the Chrome Web Store in a new tab</span>
               </span>
-            ) : signedIn ? (
-              <Link
-                href={DASHBOARD}
-                aria-current={pathname?.startsWith(DASHBOARD) ? "page" : undefined}
-                className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
-                <span className="inline-flex h-8 items-center rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
-                  Dashboard
-                </span>
-              </Link>
-            ) : (
-              <a
-                href={EXTENSION_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
-                <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
-                  <ChromeLogo className="h-4 w-4" aria-hidden />
-                  Extension
-                  <span className="sr-only"> for Chrome, opens the Chrome Web Store in a new tab</span>
-                </span>
-              </a>
-            )}
+            </a>
 
             {/* The user icon on every screen size; a phone also gets the hamburger after it. */}
             {status === "loading" ? (
