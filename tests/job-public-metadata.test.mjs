@@ -75,14 +75,20 @@ it("does not invent chips, salary or worldwide eligibility, and shows an unknown
 });
 it("salary chips preserve currency, period and conditional bands",()=>{
   const salary={min:100000,max:140000,currency:"USD",period:"year",kind:"base",conditions:"US applicants"};
-  assert.equal(salaryLabel(salary),"USD 100,000–140,000/year (US applicants)");
+  assert.equal(salaryLabel(salary),"$100,000 - 140,000/yr (US applicants)");
   assert.equal(salaryLabel({...salary,currency:null}),null);
+  assert.equal(salaryLabel({...salary,min:100,max:110,period:"hour",conditions:null}),"$100 - 110/hr");
+  assert.equal(salaryLabel({...salary,currency:"NGN",conditions:null}),"NGN 100,000 - 140,000/yr");
   const single=jobFactChips({...facts,salaryBands:[salary]})[0];
-  assert.equal(single.label,"USD 100,000–140,000/year");
+  assert.equal(single.label,"$100,000 - 140,000/yr");
   assert.match(single.detail,/US applicants/);
   const chips=jobFactChips({...facts,salaryBands:[salary,{...salary,currency:"GBP",conditions:"UK applicants"}]});
-  assert.equal(chips[0].label,"Multiple salary bands");
+  assert.equal(chips[0].label,"$100,000 - 140,000/yr");
   assert.match(chips[0].detail,/UK applicants/);
+  // Several bands: the chip shows the highest, the hover text keeps them all.
+  const cities=jobFactChips({...facts,salaryBands:[{...salary,min:174000,max:223000,conditions:"Austin"},{...salary,min:200000,max:257000,conditions:"San Francisco"},{...salary,min:148000,max:190000,kind:"unspecified",conditions:"Other"}]});
+  assert.equal(cities[0].label,"$200,000 - 257,000/yr");
+  assert.match(cities[0].detail,/Austin.*San Francisco.*Other/);
 });
 it("does not claim sponsorship merely because a visa type is mentioned",()=>{
   assert.deepEqual(jobFactChips({...facts,visaTypes:["H1B"]}).map(chip=>chip.kind),["employment"]);

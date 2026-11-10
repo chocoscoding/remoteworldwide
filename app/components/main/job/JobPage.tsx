@@ -38,7 +38,7 @@ import { createApplication, findDuplicateApplication, newClientId } from "@/app/
 import { createApplySession, matchApplySession } from "@/app/lib/apply/sessions";
 import { fromSavedJob } from "@/app/(pages)/(dashboard)/dashboard/apply/job";
 import { isJobLive, canStillApply, expiredJobMessage } from "@/app/lib/jobs/jobLifetime";
-import { jobFactChips, jobLocations, salaryLabel } from "@/app/lib/jobs/publicJobFacts";
+import { jobFactChips, jobLocations } from "@/app/lib/jobs/publicJobFacts";
 import { qk } from "@/app/lib/query/keys";
 import styles from "./JobPage.module.css";
 // The description is Quill HTML drawn with Quill's own classes (ql-editor, data-list bullets).
@@ -368,15 +368,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
           {apply()}
           {applyOpen && <div className={styles.mobileTools}>{tools(true)}</div>}
           {job.facts && (
-            <dl className="my-6 grid gap-3 text-sm">
-              {job.facts.salaryBands.map((band, index) =>
-                salaryLabel(band) ? (
-                  <div key={index}>
-                    <dt className="font-bold">{band.kind === "base" ? "Base salary" : "Compensation"}</dt>
-                    <dd>{salaryLabel(band)}</dd>
-                  </div>
-                ) : null,
-              )}
+            <dl className="my-6 grid gap-3 text-sm empty:hidden">
               {job.facts.timezoneOverlap && (
                 <div>
                   <dt className="font-bold">Working hours</dt>
