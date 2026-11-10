@@ -14,7 +14,7 @@ import {
   RotateCw,
   Sparkle,
 } from "lucide-react";
-import { SCAN_CREDITS, scanCoverage } from "@/app/lib/ats/api";
+import { scanCoverage } from "@/app/lib/ats/api";
 import AiAssistRail from "./AiAssistRail";
 import {
   EmptyRing,
@@ -191,8 +191,8 @@ const AtsDockedRail: FC<
           <button
             type="button"
             onClick={onRecheck}
-            aria-label={`Check again · ${SCAN_CREDITS} credit`}
-            title={`Check again · ${SCAN_CREDITS} credit`}
+            aria-label="Check again"
+            title="Check again"
             className="grid h-9 w-9 cursor-pointer place-content-center rounded-[9px] border-[1.5px] border-[#222325] bg-[#e1f073]"
           >
             <RotateCw className="h-3.5 w-3.5" strokeWidth={2.4} />

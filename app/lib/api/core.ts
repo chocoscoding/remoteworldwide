@@ -28,6 +28,13 @@ const DATE_KEYS = new Set([
   "subscribedAt",
 ]);
 
+/**
+ * Any refusal for want of credits (a 402), whatever it cost. The services' own sentences name the
+ * price ("You need 2 credits to write a cover letter"), and the site names none (owner, 2026-11-10:
+ * "remove all instance or places where you are telling the user how much credits they would spend").
+ */
+export const NOT_ENOUGH_CREDITS = "You don't have enough credits for this.";
+
 export class BackendError extends Error {
   constructor(
     public status: number,
@@ -37,7 +44,7 @@ export class BackendError extends Error {
     /** The plan tier a "plan_required" refusal asks for. */
     public requiredPlan: string | null = null,
   ) {
-    super(message);
+    super(status === 402 ? NOT_ENOUGH_CREDITS : message);
     this.name = "BackendError";
   }
 }

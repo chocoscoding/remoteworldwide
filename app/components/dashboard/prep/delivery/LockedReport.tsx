@@ -30,12 +30,7 @@ export interface LockedReportProps {
   className?: string;
 }
 
-const credit = (n: number) => `${n} ${n === 1 ? "credit" : "credits"}`;
-
-const LockedReport: FC<LockedReportProps> = ({ credits, balance = null, onUnlock, unlocking = false, error = null, topUpHref = PREP_BILLING_HREF, className }) => {
-  const shortBy = credits !== null && balance !== null && balance < credits ? credits - balance : null;
-  const cost = credits === null ? "this session" : credit(credits);
-
+const LockedReport: FC<LockedReportProps> = ({ onUnlock, unlocking = false, error = null, topUpHref = PREP_BILLING_HREF, className }) => {
   return (
     <section aria-label="Report locked" className={cn("relative overflow-hidden rounded-2xl border-2 border-dashed border-black/20 bg-white", className)}>
       {/* A glimpse of what's waiting: shapes only, no data. */}
@@ -58,11 +53,9 @@ const LockedReport: FC<LockedReportProps> = ({ credits, balance = null, onUnlock
           <div className="min-w-0">
             <h3 className="text-[15px] font-bold text-primary">Your report is ready, and locked for now</h3>
             <p className="mt-1.5 max-w-[520px] text-sm leading-relaxed text-black/60">
-              We tried to charge {cost} for this session and your balance didn&apos;t cover it
-              {balance !== null && <> (you have {credit(balance)})</>}. Your recording and transcript stay above. Get more credits, then unlock: you&apos;re
-              charged once{credits !== null && <>, {credit(credits)}</>}, and the scores, findings and rewrites appear here.
+              Your balance didn&apos;t cover this session. Your recording and transcript stay above. Get more credits, then unlock, and the
+              scores, findings and rewrites appear here.
             </p>
-            {shortBy !== null && <p className="mt-1.5 text-xs font-semibold text-black/50">You need {credit(shortBy)} more.</p>}
           </div>
         </div>
 

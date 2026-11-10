@@ -110,7 +110,6 @@ export function questionPresetFor(capMinutes: number): SessionLength {
   return chosen;
 }
 
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 export interface PrepSetupProps {
   track: PrepTrack;
@@ -226,7 +225,7 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
   } else if (!likelySet) {
     questionsNote = hasPosting ? (
       <>
-        {generalLead}, not ones written for this job. Write likely questions on the track ({plural(likely.data?.cost ?? 1, "credit")}) and
+        {generalLead}, not ones written for this job. Write likely questions on the track and
         the interview asks those instead: questions from this posting&apos;s requirements and your resume. {toTrack}
       </>
     ) : (
@@ -547,9 +546,9 @@ const PrepSetup: FC<PrepSetupProps> = ({ track, initialFormats, onBack, onOpenQu
                     !voiceOffered
                       ? ""
                       : offerMinutes !== null
-                        ? // The recording stops at what the balance covers, so there are no extra minutes to price.
-                          ` At most ${plural(creditsFor(offerMinutes * MINUTE_MS, rule), "credit")}: recording stops at ${offerMinutes}:00.`
-                        : ` ${plural(voiceCost, "credit")} for ${lengthMinutes} minutes, +${rule.perExtraMinute} per extra minute.`
+                        ? // The recording stops at what the balance covers. No price either way (owner, 2026-11-10).
+                          ` Recording stops at ${offerMinutes}:00.`
+                        : ""
                   }`}
           </p>
         </div>

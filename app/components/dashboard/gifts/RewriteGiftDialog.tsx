@@ -157,7 +157,7 @@ const RewriteGiftDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => vo
           <DialogDescription className="mt-2 text-xs leading-relaxed text-black/50">
             {built
               ? "A new resume, saved next to your others. The one you picked is untouched."
-              : "Your gift pays for one full AI rewrite: no credits, any plan. If it doesn't build, you keep the gift."}
+              : "Your gift pays for one full AI rewrite, on any plan. If it doesn't build, you keep the gift."}
           </DialogDescription>
           {!source && !built && (
             <div className="relative mt-4">
@@ -233,7 +233,7 @@ const RewriteGiftDialog: FC<{ open: boolean; onOpenChange: (open: boolean) => vo
               />
             </label>
             <div className="mt-5 flex items-center justify-between gap-3">
-              <p className="text-xs text-black/50">{building ? "Writing your resume. This can take up to half a minute." : "Free with your gift."}</p>
+              <p className="text-xs text-black/50">{building ? "Writing your resume. This can take up to half a minute." : "Paid for by your gift."}</p>
               <StickerButton variant="primary" size="md" disabled={building || !role.trim()} onClick={() => void rewrite()}>
                 {building ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {building ? "Rewriting…" : "Rewrite it"}

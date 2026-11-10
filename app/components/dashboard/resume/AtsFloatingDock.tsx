@@ -22,11 +22,10 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SCAN_CREDITS, scanCoverage } from "@/app/lib/ats/api";
+import { scanCoverage } from "@/app/lib/ats/api";
 import { scoreColor, scoreTrackColor } from "@/app/lib/apply/score";
 import {
   MAX_ASK_INSTRUCTION_CHARS,
-  SUGGESTION_CREDITS,
 } from "@/app/lib/resume/ai";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
 import AiAssistRail, { AskLongerNote, type AiAssistRailProps } from "./AiAssistRail";
@@ -233,9 +232,6 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
               How it reads to applicant tracking systems
             </span>
           </button>
-          <span className="px-2.5 pb-1 pt-1.5 text-[11px] text-[#8a8b85]">
-            {SCAN_CREDITS} credit per check
-          </span>
         </div>
       )}
 
@@ -340,8 +336,8 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
               type="button"
               onClick={submitAsk}
               disabled={!props.askInput.trim() || aiRunning !== null}
-              aria-label={`Send · ${SUGGESTION_CREDITS} credit`}
-              title={`Send · ${SUGGESTION_CREDITS} credit`}
+              aria-label="Send"
+              title="Send"
               className="grid h-8 w-8 flex-none cursor-pointer place-content-center rounded-lg bg-[#222325] transition-opacity disabled:cursor-default disabled:opacity-30"
             >
               {asking ? (
@@ -410,7 +406,7 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
                 <button
                   type="button"
                   onClick={onRecheck}
-                  title={`Check again · ${SCAN_CREDITS} credit`}
+                  title="Check again"
                   className="flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[7px] border-[1.5px] border-[#222325] bg-[#e1f073] px-2.5 text-xs font-extrabold text-primary"
                 >
                   <RotateCw className="h-3 w-3" strokeWidth={2.6} />

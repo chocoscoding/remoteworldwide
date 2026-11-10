@@ -3,7 +3,8 @@
 // remoteworldwideai planService; credits: CREDIT_COSTS in app/lib/pricing/catalogue.ts; the
 // extension's sites: rwwextension's adapters). Change a feature, change its line here.
 //
-// House rules for the words: no em dashes, no rival product names, no invented numbers or users.
+// House rules for the words: no em dashes, no rival product names, no invented numbers or users,
+// and no per-action credit prices (owner, 2026-11-10): say which plan has a tool, not what it spends.
 // Slugs are the searches each page answers, so keep them once Google has them.
 
 import type { StoryLine } from "@/app/components/waitlist/ProblemStory";
@@ -100,7 +101,7 @@ export const TOOLS: Tool[] = [
     ],
     cost: {
       heading: "The builder is free. AI help starts on Basic.",
-      body: "Free keeps one resume you can edit and tailor by hand, with every template and export. Basic adds AI help (1 credit per suggestion, 3 to build a full resume with AI) and unlimited resumes.",
+      body: "Free keeps one resume you can edit and tailor by hand, with every template and export. Basic adds AI help, from tailoring to a job to building a full resume with AI, and unlimited resumes.",
     },
     priceNote: "Free plan includes one resume; AI help from the Basic plan, paid in credits.",
     faq: [
@@ -108,7 +109,6 @@ export const TOOLS: Tool[] = [
       { q: "Will AI make things up on my resume?", a: "No. It writes from your own resume or profile, and won't invent a career if you've given it nothing to work from. You see every suggestion before it's applied." },
       { q: "Is the resume ATS-friendly?", a: "PDF exports keep real, selectable text, and the Word export is always a single column, which applicant tracking systems read most reliably. You can check any version with the ATS resume checker." },
       { q: "Can I import my existing resume?", a: "Yes. Upload a PDF, Word or text file and it's turned into an editable resume you can restyle and tailor." },
-      { q: "How much does AI help cost?", a: "Each AI suggestion (tailor to a job, add keywords, rewrite, quantify, shorten, fix grammar) is 1 credit. Building a whole resume with AI is 3 credits, charged only when it comes back." },
       { q: "What page size are resumes?", a: "Every resume is A4." },
     ],
     related: ["ats", "cover", "autofill"],
@@ -120,7 +120,7 @@ export const TOOLS: Tool[] = [
     name: "ATS resume checker",
     step: "Score",
     card: "Score your resume against any posting, keyword by keyword, and see exactly which requirements it misses before an applicant tracking system does.",
-    planBadge: "Every plan · 1 credit",
+    planBadge: "On every plan",
     metaTitle: "ATS Resume Checker: Free Resume Score Against Any Job | Remote Worldwide",
     metaDescription:
       "Check your resume against any job posting: a 0 to 100 match score, the keywords you're missing, the requirements you only partly cover, and rewrites to fix them.",
@@ -129,7 +129,7 @@ export const TOOLS: Tool[] = [
     h1: { before: "ATS resume checker", mark: "for your next job" },
     intro:
       "Paste a posting or pick one from the board, add your resume, and get a 0 to 100 score with every requirement checked: found, partly covered or missing, and the closest line in your resume for each.",
-    heroChecks: ["1 credit per scan", "Works on the Free plan", "Paste a link or the whole posting"],
+    heroChecks: ["A 0 to 100 match score", "Works on the Free plan", "Paste a link or the whole posting"],
     dashboardHref: "/dashboard/ats",
     openLabel: "Open the ATS checker",
     problem: [
@@ -162,12 +162,12 @@ export const TOOLS: Tool[] = [
       { old: "Rewriting from scratch", now: "Rewrites of the bullets you already have" },
     ],
     cost: {
-      heading: "1 credit a scan, on every plan.",
-      body: "The checker isn't behind a plan. Free comes with 45 credits a month, so you can score dozens of applications before paying anything.",
+      heading: "On every plan, including Free.",
+      body: "The checker isn't behind a plan. Free comes with 45 AI credits a month, so you can start scoring your applications before paying anything.",
     },
-    priceNote: "1 credit per scan on every plan, including Free (45 credits a month).",
+    priceNote: "On every plan, including Free (45 AI credits a month).",
     faq: [
-      { q: "Is the ATS resume checker free?", a: "It's on every plan, including Free. Each scan costs 1 credit, and Free comes with 45 credits every month." },
+      { q: "Is the ATS resume checker free?", a: "It's on every plan, including Free. Scans use AI credits, and Free comes with 45 every month." },
       { q: "What is an ATS?", a: "An applicant tracking system: the software employers use to collect applications and, often, to filter and rank them by how well a resume matches the posting." },
       { q: "Do I need a job posting to get a score?", a: "No. You can get a general score with no job. Scoring against a posting tells you much more: which of its requirements and keywords you cover." },
       { q: "Can I check against a job from another site?", a: "Yes. Paste the link or the whole posting text and we fill in the fields for you." },
@@ -211,7 +211,7 @@ export const TOOLS: Tool[] = [
     featuresHeading: "A draft worth editing, not rewriting.",
     features: [
       { title: "Grounded in your resume", body: "It writes from your real experience and the posting's actual asks, so the letter connects the two instead of repeating your resume." },
-      { title: "Four tones", body: "Warm and direct, Formal, Story-led or Short. Switch back to a tone you've already written for free." },
+      { title: "Four tones", body: "Warm and direct, Formal, Story-led or Short. Every tone you've written stays one click away." },
       { title: "Revise to your own note", body: "Tell it what to change in plain words, like \"lead with the design system\" or \"less formal\", and get a reworked draft." },
       { title: "A real editor", body: "Rich text with theme, font, spacing and letterhead controls, so it looks as considered as it reads." },
       { title: "Ready to send", body: "Copy it, print it, or download it as a PDF or Word file. In the browser extension, you can write one and insert it straight into the form." },
@@ -224,12 +224,12 @@ export const TOOLS: Tool[] = [
       { old: "Rewriting it all to change one thing", now: "Revisions to your own note" },
     ],
     cost: {
-      heading: "One letter free. 2 credits a draft.",
-      body: "Free keeps one cover letter you can edit, revise and download. Each new draft is 2 credits and a revision is 1. Basic and up keep as many letters as you write.",
+      heading: "One letter free. Unlimited from Basic.",
+      body: "Free keeps one cover letter you can edit, revise and download. Basic and up keep as many letters as you write.",
     },
-    priceNote: "Free plan keeps one cover letter; drafts cost 2 credits and revisions 1.",
+    priceNote: "Free plan keeps one cover letter; Basic and up keep as many as you write.",
     faq: [
-      { q: "Is the cover letter generator free?", a: "Free keeps one cover letter, and drafting it uses 2 of your 50 monthly credits. Editing, revising and downloading it stay open. Basic and up keep as many letters as you like." },
+      { q: "Is the cover letter generator free?", a: "Free keeps one cover letter, and editing, revising and downloading it stay open. Basic and up keep as many letters as you like." },
       { q: "Does it make up experience?", a: "No. It writes from the resume you choose and the posting, and you approve and edit every word before you send it." },
       { q: "Can I write my own instead?", a: "Yes. \"Write your own\" opens a blank letter in the same editor, with the same themes and downloads." },
       { q: "How long is each letter?", a: "Short is two paragraphs, Warm and direct is three, and Formal and Story-led are four." },
@@ -244,7 +244,7 @@ export const TOOLS: Tool[] = [
     name: "Job application autofill",
     step: "Apply",
     card: "A Chrome extension that fills application forms from your profile and saved answers on Greenhouse, Lever and Ashby, only when you press the button.",
-    planBadge: "Free · Chrome",
+    planBadge: "Every plan · Chrome",
     metaTitle: "Job Application Autofill Extension for Chrome | Remote Worldwide",
     metaDescription:
       "Fill job applications on Greenhouse, Lever and Ashby from your profile and saved answers, on your click. Draft open answers with AI and track every application.",
@@ -253,7 +253,7 @@ export const TOOLS: Tool[] = [
     h1: { before: "Job application autofill", mark: "you control" },
     intro:
       "The Remote Worldwide extension fills application forms from your profile and the answers you've saved. Nothing is typed until you press the button, and it never submits for you.",
-    heroChecks: ["Autofill is free", "Never fills without a click", "Never submits a form"],
+    heroChecks: ["Autofill on every plan", "Never fills without a click", "Never submits a form"],
     dashboardHref: EXTENSION_URL,
     openLabel: "Add it to Chrome",
     secondary: { label: "See it on the Chrome Web Store", href: EXTENSION_URL, external: true },
@@ -273,28 +273,28 @@ export const TOOLS: Tool[] = [
     featuresHeading: "Faster forms, with you in control.",
     features: [
       { title: "Consent first", body: "Nothing is typed until you press a button. Filling as the form loads is a setting, off unless you turn it on." },
-      { title: "Your saved answers", body: "Save an answer once and reuse it on the next form. Saving to your profile is free." },
-      { title: "AI for open questions", body: "\"Answer with AI\" drafts a reply from your resume and the posting; writing several at once is 1 credit for up to eight." },
-      { title: "Drafts that remember", body: "Close the tab halfway through and your answers are kept as a draft, free, with a small badge on the page when one is waiting." },
+      { title: "Your saved answers", body: "Save an answer once to your profile and reuse it on the next form." },
+      { title: "AI for open questions", body: "\"Answer with AI\" drafts a reply from your resume and the posting, and can write up to eight at once." },
+      { title: "Drafts that remember", body: "Close the tab halfway through and your answers are kept as a draft, with a small badge on the page when one is waiting." },
       { title: "Score and tailor in the panel", body: "Score your match for the job on screen, ask questions about it, write a cover letter and pick which resume to upload." },
       { title: "Safe by design", body: "It never fills identity, bank or card numbers, passwords or dates of birth, and demographic questions only from answers you saved yourself." },
     ],
     whyHeading: "Stop retyping yourself.",
     why: [
       { old: "Typing the same details on every form", now: "Filled from your profile, on your click" },
-      { old: "Losing answers when the tab closes", now: "Drafts kept, free, until you're back" },
+      { old: "Losing answers when the tab closes", now: "Drafts kept until you're back" },
       { old: "Starting every open question from zero", now: "AI drafts from your resume and the posting" },
       { old: "Forgetting where you applied", now: "Tracked automatically after you submit" },
     ],
     cost: {
-      heading: "Autofill is free. AI answers use credits.",
-      body: "Filling from your profile and saved answers, saving answers and keeping drafts cost nothing. Drafting open answers with AI is 1 credit for up to eight, and a match score is 1 credit.",
+      heading: "Autofill on every plan, including Free.",
+      body: "Filling from your profile and saved answers, saving answers and keeping drafts come with every plan. AI-drafted answers and match scores use your monthly AI credits.",
     },
-    priceNote: "Free to install and autofill; AI-drafted answers and match scores use credits.",
+    priceNote: "Free to install, with autofill on every plan; AI-drafted answers and match scores use credits.",
     faq: [
       { q: "Which sites does it work on?", a: "It recognises application forms on Greenhouse, Lever and Ashby out of the box. You can add any other careers site from the panel, with one Chrome permission for that site." },
       { q: "Does it submit applications for me?", a: "Never. It fills fields when you press the button, and you review and submit the form yourself." },
-      { q: "Is the extension free?", a: "Installing it, autofilling from your profile and saved answers, and keeping drafts are free. AI-drafted answers are 1 credit for a batch of up to eight, and a match score is 1 credit." },
+      { q: "Is the extension free?", a: "It's free to install. Autofill from your profile and saved answers, and drafts, come with every plan, including Free. AI-drafted answers and match scores use your monthly AI credits." },
       { q: "Do I need a separate account?", a: "No. It uses your Remote Worldwide sign-in." },
       { q: "What will it never fill?", a: "Identity, bank or card numbers, passwords and dates of birth. Demographic questions are only filled from answers you saved yourself, with that setting turned on." },
       { q: "Which browsers are supported?", a: "Chrome, from the Chrome Web Store." },
@@ -308,7 +308,7 @@ export const TOOLS: Tool[] = [
     name: "Chrome extension",
     step: "Continue",
     card: "Every application you start is saved as you type. Close the tab, come back days later, and pick up exactly where you stopped, on your click.",
-    planBadge: "Free · Chrome",
+    planBadge: "Every plan · Chrome",
     metaTitle: "Chrome Extension: Save and Resume Job Applications | Remote Worldwide",
     metaDescription:
       "Never lose a half-finished job application again. The Remote Worldwide Chrome extension saves your answers as you type and picks up where you stopped, on your click.",
@@ -317,7 +317,7 @@ export const TOOLS: Tool[] = [
     h1: { before: "Job application browser extension", mark: "with your details ready" },
     intro:
       "Half the applications you start get interrupted: a meeting, a closed tab, a question you need to think about. The Remote Worldwide extension saves what you've answered as you type, and when you open that posting again, it offers to put it all back.",
-    heroChecks: ["Drafts are free", "Survives a refresh or a closed tab", "Fills back only when you press it"],
+    heroChecks: ["Drafts on every plan", "Survives a refresh or a closed tab", "Fills back only when you press it"],
     dashboardHref: EXTENSION_URL,
     openLabel: "Add it to Chrome",
     secondary: { label: "See it on the Chrome Web Store", href: EXTENSION_URL, external: true },
@@ -382,10 +382,10 @@ export const TOOLS: Tool[] = [
       { old: "Good answers lost after you apply", now: "Kept with the application, ready to reuse" },
     ],
     cost: {
-      heading: "Drafts are free. So is installing it.",
-      body: "Saving and continuing drafts, autofill from your profile and saved answers, and tracking cost nothing. Only AI features use credits: 1 credit drafts up to eight open answers, and a match score is 1 credit.",
+      heading: "Free to install. Drafts on every plan.",
+      body: "Saving and continuing drafts, autofill from your profile and saved answers, and tracking come with every plan, including Free. AI features, like drafted answers and match scores, use your monthly AI credits.",
     },
-    priceNote: "Free to install; drafts and autofill are free, AI features use credits.",
+    priceNote: "Free to install; drafts and autofill on every plan, AI features use credits.",
     faq: [
       {
         q: "What happens if I close the tab halfway through an application?",
@@ -399,7 +399,7 @@ export const TOOLS: Tool[] = [
         q: "Will it fill the form on its own?",
         a: "No. Nothing is typed into a page until you press a button. Filling as a form loads is a setting, off unless you turn it on.",
       },
-      { q: "Do drafts cost credits?", a: "No. Saving and continuing drafts is free on every plan." },
+      { q: "Do I need a paid plan for drafts?", a: "No. Saving and continuing drafts works on every plan, including Free." },
       {
         q: "What happens to a draft after I apply?",
         a: "Its answers join that application's record and it moves to the Applied tab of Application drafts, where it stays for 30 days.",
@@ -461,13 +461,12 @@ export const TOOLS: Tool[] = [
       { old: "Remembering your best answer too late", now: "A better answer written for each question" },
     ],
     cost: {
-      heading: "On Pro and Ultra. 5 credits a session.",
-      body: "A session of up to 10 minutes is 5 credits; past that, each extra started minute is 1. You're billed on the recording, not on how many questions you get through.",
+      heading: "On Pro and Ultra.",
+      body: "Interview prep and voice mock interviews come with Pro and Ultra, in sessions of 6, 15 or 25 minutes that use your monthly AI credits.",
     },
-    priceNote: "Included with the Pro and Ultra plans; 5 credits covers a session of up to 10 minutes.",
+    priceNote: "Included with the Pro and Ultra plans.",
     faq: [
       { q: "Which plan includes mock interviews?", a: "Interview prep and voice mock interviews come with Pro and Ultra." },
-      { q: "How are sessions billed?", a: "5 credits covers up to 10 minutes of recording. Past that, each extra started minute is 1 credit. Likely interview questions for a role are 1 credit per set." },
       { q: "What kinds of interview can I practise?", a: "Behavioural questions, a portfolio walkthrough and a salary conversation, on their own or combined, at three difficulties." },
       { q: "What does the report cover?", a: "Four tabs: Overall (scores, feedback per question and action items), Transcript, Delivery (pace, pauses, filler words, pitch and energy) and Positioning (how you come across, rated in words)." },
       { q: "Is the interview recorded?", a: "Yes, so the report can play back the moments it talks about, alongside a synced transcript." },
@@ -503,7 +502,7 @@ export const TOOLS: Tool[] = [
     problemAfter: "So we put the whole search on one board.",
     stepsHeading: "Save it, apply, follow it to an answer.",
     steps: [
-      { title: "Add a job", body: "From a listing on the board, or by pasting any link or posting. Importing a job is free." },
+      { title: "Add a job", body: "From a listing on the board, or by pasting any link or posting." },
       { title: "Move it along", body: "Drag cards from Saved to Applied, In conversation, Interviewing and Offer, or close them out as rejected, ghosted, withdrawn or declined." },
       { title: "Follow up on time", body: "Reminders come due after a week of silence, with a message drafted. You send it, then mark it sent." },
     ],
@@ -525,11 +524,11 @@ export const TOOLS: Tool[] = [
     ],
     cost: {
       heading: "Free, on every plan.",
-      body: "The tracker, follow-ups, drafts and streaks cost nothing and need no plan. Importing a job from a link or posting is free too.",
+      body: "The tracker, follow-ups, drafts and streaks are all on the Free plan, so you never need to upgrade to keep your search in order.",
     },
     priceNote: "Free on every plan.",
     faq: [
-      { q: "Is the job application tracker free?", a: "Yes. The board, follow-up reminders, drafts and streaks are free on every plan, and importing a job costs nothing." },
+      { q: "Is the job application tracker free?", a: "Yes. The board, follow-up reminders, drafts and streaks are free on every plan." },
       { q: "What stages does it track?", a: "Saved, Applied, In conversation, Interviewing and Offer on the board, plus four ways to close an application: rejected, ghosted, withdrawn or declined." },
       { q: "When are follow-ups due?", a: "Seven days after you apply, after five days of silence mid-conversation, and a last nudge at fourteen days. After thirty days you're offered to close it as ghosted." },
       { q: "Does it send follow-up emails for me?", a: "No. It drafts the message for you to copy and send yourself, then you mark it sent." },

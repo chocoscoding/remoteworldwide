@@ -43,7 +43,6 @@ import TimeAgo from "timeago-react";
 import { cn } from "@/lib/utils";
 import {
   ATS_BILLING_HREF,
-  SCAN_CREDITS,
   partialLine,
   scanCoverage,
   type ScanFailure,
@@ -51,8 +50,6 @@ import {
 import { scoreColor, scoreTrackColor } from "@/app/lib/apply/score";
 import {
   MAX_ASK_INSTRUCTION_CHARS,
-  SUGGESTION_CREDITS,
-  costsCredit,
   type SuggestionTool,
 } from "@/app/lib/resume/ai";
 import ScoreRing from "@/app/components/dashboard/ui/ScoreRing";
@@ -403,7 +400,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
                       type="button"
                       onClick={onCheckAgainstJob}
                       disabled={checking}
-                      title={`Check against another job · ${SCAN_CREDITS} credit`}
+                      title="Check against another job"
                       className="cursor-pointer font-bold text-[#e1f073] underline underline-offset-2 hover:text-white"
                     >
                       Change
@@ -430,7 +427,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
             <button
               type="button"
               onClick={onRecheck}
-              title={`Check again · ${SCAN_CREDITS} credit`}
+              title="Check again"
               className="h-7 flex-none cursor-pointer rounded-[7px] border-[1.5px] border-[#222325] bg-[#e1f073] px-2.5 text-xs font-extrabold text-primary"
             >
               Check again
@@ -445,7 +442,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
             <button
               type="button"
               onClick={onRecheck}
-              title={`Check again · ${SCAN_CREDITS} credit`}
+              title="Check again"
               className="h-7 flex-none cursor-pointer rounded-[7px] border-[1.5px] border-[#222325] bg-[#e1f073] px-2.5 text-xs font-extrabold text-primary"
             >
               Check again
@@ -459,7 +456,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
             <button
               type="button"
               onClick={check.job ? onCheckGeneral : onCheckAgainstJob}
-              title={`${SCAN_CREDITS} credit`}
               className="h-[26px] cursor-pointer px-1 text-xs font-bold text-[#e1f073] underline underline-offset-2 hover:text-white"
             >
               {check.job ? "General score instead" : "Against a job instead"}
@@ -515,7 +511,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
         <button
           type="button"
           onClick={pick === "job" ? onCheckAgainstJob : onCheckGeneral}
-          title={`${SCAN_CREDITS} credit`}
           className="h-10 cursor-pointer rounded-[10px] border-[1.5px] border-[#222325] bg-[#e1f073] text-sm font-extrabold text-primary"
         >
           Score resume
@@ -729,11 +724,6 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
                             >
                               Dismiss
                             </button>
-                            {tool !== null && (
-                              <span className="ml-auto text-[11px] font-semibold text-[#8a8b85]">
-                                {costsCredit(tool) ? `${SUGGESTION_CREDITS} credit` : "Included"}
-                              </span>
-                            )}
                           </div>
                         )}
                       </div>
@@ -828,8 +818,8 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
           type="button"
           onClick={onAskSubmit}
           disabled={!askInput.trim() || aiRunning !== null}
-          aria-label={`Send · ${SUGGESTION_CREDITS} credit`}
-          title={`Send · ${SUGGESTION_CREDITS} credit`}
+          aria-label="Send"
+          title="Send"
           className={cn(
             "grid h-8 w-8 flex-none cursor-pointer place-content-center rounded-lg transition-colors disabled:cursor-default",
             askInput.trim()

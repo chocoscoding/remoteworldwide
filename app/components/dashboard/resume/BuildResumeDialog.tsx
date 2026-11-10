@@ -23,7 +23,7 @@ import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { ATS_BILLING_HREF } from "@/app/lib/ats/api";
 import type { PickedJob } from "@/app/lib/jobs/fields";
 import { TEMPLATE_OPTIONS } from "@/app/lib/dashboard/resume/templates";
-import { BUILD_CREDITS, buildResume, type StoredResumeDocument } from "@/app/lib/resume/api";
+import { buildResume, type StoredResumeDocument } from "@/app/lib/resume/api";
 import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
 
 const SENIORITIES = ["Entry level", "Mid level", "Senior", "Lead", "Principal"] as const;
@@ -216,7 +216,7 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
 
         <div className="flex items-center justify-between gap-2.5 border-t border-black/8 px-6 py-4">
           <div className="flex flex-col gap-0.5">
-            <p className="text-xs text-black/50">{building ? "Writing your resume. This can take up to half a minute." : `${BUILD_CREDITS} credits, only if it builds.`}</p>
+            {building && <p className="text-xs text-black/50">Writing your resume. This can take up to half a minute.</p>}
             {!building && <FreeUsesNote feature="resumeBuild" noun="AI resume build" />}
           </div>
           <div className="flex flex-none items-center gap-2.5">

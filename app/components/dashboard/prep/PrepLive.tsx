@@ -45,7 +45,7 @@ import { formatClock as formatRecordingClock } from "@/app/lib/voice/format";
 import { engineTurnId, hasEngineAnswer, type EngineProblem, type EngineProblemKind } from "@/app/lib/voice/capture/engineInterview";
 import { problemCopy } from "@/app/lib/voice/talkState";
 import { contentWords, echoesQuestion, endsOpen, quietForVoice, quietForWords } from "@/app/lib/voice/turnEnd";
-import { PREP_LIMITS, type CreatePrepSessionInput, type CreatePrepSessionResult, type EndReason, type PrepInsufficientCredits, type PrepSnapshot, type PrepVoiceConfig, type TurnSource } from "@/app/lib/voice/types";
+import { PREP_LIMITS, type CreatePrepSessionInput, type CreatePrepSessionResult, type EndReason, type PrepSnapshot, type TurnSource } from "@/app/lib/voice/types";
 import type { InterviewOpening } from "@/app/lib/voice/conversation";
 import { questionPresetFor, type SessionConfig } from "./PrepSetup";
 import { useVoiceSession } from "@/app/components/dashboard/voice/useVoiceSession";
@@ -290,8 +290,6 @@ function eyebrowFor(stage: Stage): string {
   return stage === "asking" ? "Asking" : stage === "thinking" || stage === "finished" ? "Answered" : "Your turn";
 }
 
-const creditCount = (n: number) => `${n} credit${n === 1 ? "" : "s"}`;
-
 /**
  * Seconds a finished engine interview waits, once the interviewer has said its
  * closing line, before it ends itself (owner, 2026-10-04): there is nothing
@@ -301,10 +299,8 @@ const AUTO_FINISH_SECONDS = 10;
 /** The voice bars across the full answer bar: enough of them to stay a dense line at 1100px. */
 const ANSWER_BAR_COUNT = 96;
 
-/** A 402 on start, with the price: the setup screen no longer shows the balance beside it. */
-function creditsRefusal(credits: PrepInsufficientCredits, rule: PrepVoiceConfig["credits"]): string {
-  return `You have ${creditCount(credits.balance)}, and a voice session needs at least ${credits.required}. ${creditCount(rule.base)} cover up to ${rule.includedMinutes} minutes, then +${rule.perExtraMinute} for each extra minute started, charged once your report is ready.`;
-}
+/** A 402 on start. No price and no balance (owner, 2026-11-10: no credit amounts anywhere). */
+const CREDITS_REFUSAL = "You don't have enough credits for a voice session. Get more credits, then start again.";
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -812,7 +808,7 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
         const plan = planRequiredOf(error);
         refuse({
           problem: open ? "open" : credits ? "credits" : plan ? "plan" : limited ? "limited" : "other",
-          message: credits ? creditsRefusal(credits, settings.credits) : apiMessage(error),
+          message: credits ? CREDITS_REFUSAL : apiMessage(error),
           ...(open ? { openSessionId: open.sessionId } : {}),
         });
         return;
@@ -1565,10 +1561,6 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
       ? "Answer when you're ready. Talk over them if you want, they'll stop."
       : "Answer out loud. The interviewer moves on when you finish.";
 
-  const rule = voiceConfig.data?.credits;
-  const includedMs = (rule?.includedMinutes ?? 10) * 60_000;
-  const perExtra = rule?.perExtraMinute ?? 1;
-  const pastIncluded = recording && capture.elapsedMs >= includedMs;
   const pendingParts = capture.upload.pending;
   const failedParts = capture.upload.failed;
   // A part is cut every few seconds, so one on its way is the normal state;
@@ -1814,11 +1806,6 @@ const PrepLive: FC<PrepLiveProps> = ({ track, config, likelyQuestions, fixedQues
         <div className="flex-1 min-w-[100px] h-1 rounded-full bg-white/15 overflow-hidden">
           <div className="h-full bg-[#e1f073] transition-[width] duration-300" style={{ width: `${progressShare * 100}%` }} />
         </div>
-        {pastIncluded && (
-          <span className="text-[11px] font-bold text-[#e1f073] border border-[#e1f073]/40 rounded-md px-2 py-0.5 flex-none">
-            +{perExtra} credit{perExtra === 1 ? "" : "s"} per extra minute
-          </span>
-        )}
         {/* Time so far only: the session's limit isn't a countdown to watch, and the minute-left warning still says when it's close. */}
         <span className="text-xs font-bold tabular-nums flex-none">
           {recording ? formatRecordingClock(capture.elapsedMs) : formatClock(elapsedSeconds)}

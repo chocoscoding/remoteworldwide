@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import FreeUsesNote from "@/app/components/dashboard/billing/FreeUsesNote";
 import { cn } from "@/lib/utils";
-import { SUGGESTION_CREDITS, costsCredit, type SuggestionTool } from "@/app/lib/resume/ai";
+import { type SuggestionTool } from "@/app/lib/resume/ai";
 import type {
   QuantifySuggestion,
   RewriteVariant,
@@ -482,7 +482,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
     <button
       type="button"
       aria-label={label}
-      title={`${label} · ${costsCredit(id) ? `${SUGGESTION_CREDITS} credit` : "Included"}`}
+      title={label}
       onClick={() => onRun(id)}
       disabled={busy}
       className={ICON_ACTION}
@@ -1145,9 +1145,6 @@ const AiToolsList: FC<AiToolsListProps> = ({
         <h2 className="flex-1 text-lg font-extrabold tracking-[-0.01em] text-primary">
           AI tools
         </h2>
-        <span className="text-xs text-[#8a8b85]">
-          Editing included · tailoring {SUGGESTION_CREDITS} credit
-        </span>
       </div>
       <FreeUsesNote
         feature="resumeHelp"

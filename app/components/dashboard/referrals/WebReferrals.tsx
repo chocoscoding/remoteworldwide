@@ -148,7 +148,6 @@ const StartCard: FC<{ company: string; role: string; onStart: () => void }> = ({
           We search LinkedIn and the web for whoever is likely hiring for {role || "this role"}, the recruiters, and the team doing the
           work, with profile links and likely work emails.
         </p>
-        <p className="mt-2 text-xs text-black/50">1 credit per search, and only when it finds someone. Coming back to it later is free.</p>
       </div>
       <StickerButton variant="primary" size="md" onClick={onStart}>
         <Search className="h-4 w-4" />

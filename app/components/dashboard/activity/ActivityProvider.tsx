@@ -752,16 +752,16 @@ export const ActivityProvider: FC<{ children: ReactNode }> = ({ children }) => {
     },
     repairWithCredits: () => {
       if (!repair) return;
-      const { brokenStreak: days, priceCredits } = repair;
+      const { brokenStreak: days } = repair;
       repairMutation.mutate("credits", {
-        onSuccess: () => toast.success(`${days}-day streak restored.`, { description: `${priceCredits} credits spent.` }),
+        onSuccess: () => toast.success(`${days}-day streak restored.`),
       });
     },
     halfRestoreStreak: () => {
       if (!repair) return;
       const half = repair.halfDays;
       repairMutation.mutate("half", {
-        onSuccess: () => toast(`${half} ${half === 1 ? "day" : "days"} restored, free.`, { description: "One free restore every 30 days." }),
+        onSuccess: () => toast(`${half} ${half === 1 ? "day" : "days"} restored.`, { description: "One of these every 30 days." }),
       });
     },
 

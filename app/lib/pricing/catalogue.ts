@@ -286,7 +286,10 @@ export const ESTIMATOR_ITEMS: EstimatorItem[] = [
 
 export interface FeatureRow {
   label: string;
-  /** What it is, and its price or limit, shown in grey under the label, e.g. "Score against a posting · 1 credit". */
+  /**
+   * What it is, shown in grey under the label, e.g. "Score against a posting". No per-action credit
+   * prices or "· free" tags (owner, 2026-11-10); plan limits go in `values`.
+   */
   note?: string;
   /** Plan keys that include it, or every plan. A plan key missing from both reads as "—". */
   plans: "all" | string[];
@@ -318,7 +321,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     rows: [
       { label: "Remote job board", note: "Search, save and apply to vetted remote roles", plans: "all" },
       { label: "No ads", note: "Browse the job board without them", plans: PAID_PLANS },
-      { label: "Import jobs", note: "From a link or a pasted posting · free", plans: "all" },
+      { label: "Import jobs", note: "From a link or a pasted posting", plans: "all" },
       { label: "Saved jobs", note: "A shortlist to come back to", plans: "all" },
       { label: "Unlimited application tracking", note: "Every application, stage by stage", plans: "all" },
     ],
@@ -327,22 +330,22 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     title: "Resumes & cover letters",
     rows: [
       { label: "Resume builder", plans: "all", values: { free: "1 resume", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" } },
-      { label: "Import your resume", note: "Upload a PDF, Word or text file · free", plans: "all" },
-      { label: "Build a resume with AI", note: "A full resume around a target role · 3 credits", plans: "all", values: freeMonthly("1") },
-      { label: "AI help in the resume builder", note: "Tailor, add keywords, quantify, shorten · 1 credit", plans: "all", values: freeMonthly("3") },
-      { label: "ATS scans", note: "Keyword-by-keyword score against a posting · 1 credit", plans: "all" },
-      { label: "Cover letters", note: "2 credits a draft, 1 per revision", plans: "all", values: { free: "1 letter", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" } },
+      { label: "Import your resume", note: "Upload a PDF, Word or text file", plans: "all" },
+      { label: "Build a resume with AI", note: "A full resume around a target role", plans: "all", values: freeMonthly("1") },
+      { label: "AI help in the resume builder", note: "Tailor, add keywords, quantify, shorten", plans: "all", values: freeMonthly("3") },
+      { label: "ATS scans", note: "Keyword-by-keyword score against a posting", plans: "all" },
+      { label: "Cover letters", note: "From the posting and your resume, revised to your note", plans: "all", values: { free: "1 letter", basic: "Unlimited", pro: "Unlimited", ultra: "Unlimited" } },
       { label: "Document vault", note: "Your files in one place, with a master resume", plans: "all" },
     ],
   },
   {
     title: "Applying",
     rows: [
-      { label: "Ask about a job", note: "Answers from the posting and your profile · 1 credit", plans: "all" },
-      { label: "Saved application answers", note: "Write an answer once, reuse it anywhere · free", plans: "all" },
+      { label: "Ask about a job", note: "Answers from the posting and your profile", plans: "all" },
+      { label: "Saved application answers", note: "Write an answer once, reuse it anywhere", plans: "all" },
       { label: "Chrome extension", note: "Save and track jobs from the application page", plans: "all", href: EXTENSION_URL },
-      { label: "Autofill from your profile", note: "Your details and saved answers · free", plans: "all" },
-      { label: "AI answers in the extension", note: "New questions answered from your resume · 1 credit", plans: "all" },
+      { label: "Autofill from your profile", note: "Your details and saved answers", plans: "all" },
+      { label: "AI answers in the extension", note: "New questions answered from your resume", plans: "all" },
       { label: "Application drafts", note: "Pick an application back up later", plans: "all" },
       { label: "Recommended to partner companies", note: "We recommend you directly to partner companies hiring on Remote Worldwide", plans: ["ultra"] },
     ],
@@ -351,8 +354,8 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     title: "Interview prep",
     rows: [
       { label: "Prep tracks for each role", note: "Built on the real posting, synced with your tracker", plans: "all" },
-      { label: "Likely interview questions", note: "A tailored set for the role · 1 credit", plans: "all", values: freeMonthly("1 set", ["free", "basic"]) },
-      { label: "Voice mock interviews", note: "5 credits for up to 10 minutes, then 1 a minute", plans: "all", values: freeMonthly("1", ["free", "basic"]) },
+      { label: "Likely interview questions", note: "A tailored set for the role", plans: "all", values: freeMonthly("1 set", ["free", "basic"]) },
+      { label: "Voice mock interviews", note: "Practise out loud with your likely interviewer", plans: "all", values: freeMonthly("1", ["free", "basic"]) },
       { label: "Interview reports", note: "Scores, transcript and recording playback", plans: "all" },
       { label: "Delivery analysis", note: "Long pauses, filler words and pitch", plans: "all" },
       { label: "Positioning, diction and grammar", note: "Every point backed by a quote from your answers", plans: "all" },
@@ -362,7 +365,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
     title: "Coaching & momentum",
     rows: [
-      { label: "AI career coach", note: "15 free replies a day, then 1 credit each", plans: "all", values: freeMonthly("5 replies") },
+      { label: "AI career coach", note: "Ask anything about your job search", plans: "all", values: freeMonthly("5 replies") },
       { label: "Talk it through by voice", note: "With the coach and Ask about a job", plans: "all", values: freeMonthly("1 talk") },
       { label: "Daily plan", note: "Today's tasks, picked for your search", plans: "all" },
       { label: "Coach plans on your daily plan", note: "The coach's suggested tasks, added in one go", plans: "all", values: freeMonthly("1") },

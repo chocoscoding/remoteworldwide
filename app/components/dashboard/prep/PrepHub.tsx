@@ -15,7 +15,7 @@ import type { PrepRound, PrepRoundInput, PrepRoundOutcome, UpdatePrepTrackInput 
 import { TASK_LIMITS, type AddTasksResult } from "@/app/lib/tasks/types";
 import { formatDuration } from "@/app/lib/voice/format";
 import { scoreDisplayOf, sessionBelongsTo } from "@/app/lib/voice/mapSession";
-import type { BillingState, PrepSessionMode, PrepSessionStatus, PrepSessionSummary } from "@/app/lib/voice/types";
+import type { PrepSessionMode, PrepSessionStatus, PrepSessionSummary } from "@/app/lib/voice/types";
 import { useLikelyQuestions } from "@/hooks/queries/usePrepTrackQueries";
 import { usePrepSessions } from "@/hooks/queries/usePrepSessionQueries";
 import type { ChipTone } from "./Chip";
@@ -85,14 +85,6 @@ interface HistoryRow {
   provisional: boolean;
   status: PrepSessionStatus | null;
   locked: boolean;
-  cost: string | null;
-}
-
-/** What the session cost, once that is settled; nothing while it isn't. */
-function costLabel(credits: number | null, state: BillingState | null): string | null {
-  if (state === "not-charged") return "No charge";
-  if ((state === "charged" || state === "unbilled") && credits !== null) return `${credits} ${credits === 1 ? "credit" : "credits"}`;
-  return null;
 }
 
 /** `scoreDisplayOf`, for a row: the score it shows, and whether it is provisional. The report reads the same. */
@@ -112,7 +104,6 @@ function savedRow(summary: PrepSessionSummary): HistoryRow {
     ...rowScore(summary),
     status: summary.status,
     locked: summary.locked,
-    cost: costLabel(summary.billing.credits, summary.billing.state),
   };
 }
 
@@ -126,7 +117,6 @@ function mergedRow(session: PrepSession): HistoryRow {
     ...rowScore(session),
     status: session.status ?? null,
     locked: session.locked ?? false,
-    cost: session.billing ? costLabel(session.billing.credits, session.billing.state) : null,
   };
 }
 
@@ -569,7 +559,6 @@ const PrepHub: FC<PrepHubProps> = ({
                     <span className="block text-sm font-bold text-primary">{s.title}</span>
                     <span className="block text-xs text-black/45">
                       {formatDate(new Date(s.at), "EEE d MMM")} · {s.length}
-                      {s.cost && ` · ${s.cost}`}
                       {s.provisional && " · short session"}
                     </span>
                   </button>

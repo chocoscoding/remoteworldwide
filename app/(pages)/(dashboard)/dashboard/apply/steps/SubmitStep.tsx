@@ -40,7 +40,6 @@ import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { APPLICATION_LIMITS, type ApplicationAnswer, type ApplicationItem } from "@/app/lib/applications/types";
 import { ATS_BILLING_HREF } from "@/app/lib/ats/api";
 import {
-  AUTOFILL_CREDITS,
   AUTOFILL_MAX_QUESTIONS,
   AUTOFILL_QUESTION_MAX,
   FORM_QUESTIONS_MAX,
@@ -86,8 +85,8 @@ const norm = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
 /** As many questions as the form reader returns: "Answer all" drafts them in batches. */
 const MAX_ROWS = FORM_QUESTIONS_MAX;
 
-/** What a drafted answer costs, said on the buttons that spend it. */
-const COST_HINT = `Saved answers are free. The rest are drafted from your profile and resume, ${AUTOFILL_CREDITS} credit for up to ${AUTOFILL_MAX_QUESTIONS}.`;
+/** On the buttons that draft answers. No price (owner, 2026-11-10: no credit amounts anywhere). */
+const DRAFT_HINT = "Your saved answers go in as they are. The rest are drafted from your profile and resume.";
 
 const LEFT_OUT_WORDS: Record<FormLeftOut, string> = {
   name: "name",
@@ -418,7 +417,7 @@ const SubmitStep: FC<SubmitStepProps> = ({
               Paste again
             </button>
             {toDraft.length > 0 || busy ? (
-              <button type="button" className={FEATURED} disabled={busy} title={COST_HINT} onClick={() => void draft(toDraft)}>
+              <button type="button" className={FEATURED} disabled={busy} title={DRAFT_HINT} onClick={() => void draft(toDraft)}>
                 {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 {busy ? "Answering" : answered.length > 0 ? `Answer ${toDraft.length} more` : "Answer all"}
               </button>
@@ -651,7 +650,7 @@ const FoundRow: FC<{
         </button>
         <button
           type="button"
-          title={COST_HINT}
+          title={DRAFT_HINT}
           disabled={busy || !row.question.trim()}
           onClick={onAnswer}
           className="h-7 flex-none cursor-pointer rounded-md border border-black/20 bg-white px-2.5 text-xs font-medium text-primary transition-colors hover:border-[#222325] hover:bg-[#e1f073] disabled:cursor-default disabled:opacity-40 disabled:hover:border-black/20 disabled:hover:bg-white">
@@ -718,7 +717,7 @@ const AnswerRow: FC<{
           <button
             type="button"
             aria-label="Write this answer again"
-            title={`Write this answer again. ${COST_HINT}`}
+            title={`Write this answer again. ${DRAFT_HINT}`}
             disabled={busy}
             onClick={onWriteAgain}
             className={ICON_BUTTON}>

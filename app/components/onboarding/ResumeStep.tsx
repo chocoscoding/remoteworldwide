@@ -220,7 +220,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ used, skipped, onSkip, onUnskip, onCo
                       <WandSparkles className="h-4 w-4" aria-hidden />
                       Fill my profile from it
                     </button>
-                    <span className={HINT}>Free. Only empty fields are filled.</span>
+                    <span className={HINT}>Only empty fields are filled.</span>
                   </div>
                 </>
               ))}

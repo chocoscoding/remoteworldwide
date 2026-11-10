@@ -112,7 +112,6 @@ import { importResumeContent, listResumeDocuments, resumeContentToText } from "@
 import { mimeForFileName } from "@/app/lib/resume/mime";
 import {
   COVER_BILLING_HREF,
-  COVER_REVISE_CREDITS,
   MAX_REVISE_INSTRUCTION_CHARS,
   RECENT_LETTERS,
   TONE_PARAGRAPHS,
@@ -1260,7 +1259,6 @@ const CoverScreen: FC = () => {
                       className="flex-1 min-w-0 bg-transparent text-sm text-primary placeholder:text-black/35 outline-none"
                     />
                   </div>
-                  <span className="hidden flex-none text-[11px] font-semibold text-black/45 sm:inline">{COVER_REVISE_CREDITS} credit</span>
                   <StickerButton
                     variant="primary"
                     size="md"

@@ -41,8 +41,6 @@ import { APPLICATION_LIMITS } from "@/app/lib/applications/types";
 import type { ApplyCoverState, CoverShown } from "@/app/lib/apply/state";
 import {
   COVER_BILLING_HREF,
-  COVER_CREDITS,
-  COVER_REVISE_CREDITS,
   MAX_REVISE_INSTRUCTION_CHARS,
   TONE_PARAGRAPHS,
   describeCoverFailure,
@@ -332,7 +330,7 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
                 // An ink shadow on hover: a lime one would vanish into the lime button.
                 className="[--br-c:#222325]"
                 disabled={busy}
-                title={`Writes ${nextIsRewrite ? "a new" : "a"} ${TONE_LABELS[tone].toLowerCase()} letter from your resume and this posting. ${COVER_CREDITS} credits.`}
+                title={`Writes ${nextIsRewrite ? "a new" : "a"} ${TONE_LABELS[tone].toLowerCase()} letter from your resume and this posting.`}
                 onClick={() => void write(tone)}>
                 <Sparkles className="h-4 w-4" />
                 Generate
@@ -435,7 +433,6 @@ const CoverStep: FC<CoverStepProps> = ({ job, resumeId, resumeName, cover: saved
                     className="min-w-0 flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-black/35"
                   />
                 </div>
-                <span className="hidden flex-none text-[11px] font-semibold text-black/45 sm:inline">{COVER_REVISE_CREDITS} credit</span>
                 <StickerButton
                   variant="primary"
                   size="md"

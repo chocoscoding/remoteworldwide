@@ -33,7 +33,7 @@ import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import Pill from "@/app/components/dashboard/ui/Pill";
 import StreakFlame from "@/app/components/dashboard/streak/StreakFlame";
 import { useActivity, type LogApplicationResult } from "@/app/components/dashboard/activity/ActivityProvider";
-import { SCAN_CREDITS, isUnchecked, scanTier } from "@/app/lib/ats/api";
+import { isUnchecked, scanTier } from "@/app/lib/ats/api";
 import type { StoredScan } from "@/app/lib/ats/types";
 import { shortDateLabel, tierFor } from "@/app/lib/dashboard/streak";
 import { useStoredScanQuery } from "@/hooks/queries/useAtsQueries";
@@ -64,14 +64,14 @@ const keywordMatchOf = (scan: StoredScan): number | null => {
   return scan.degraded && metric.value === 0 ? null : metric.value;
 };
 
-/** The one link out when there is no score to show — to the scorer, with the price on it. */
+/** The one link out when there is no score to show: to the scorer. No price on it (owner, 2026-11-10). */
 const ScanLink: FC<{ onClose: () => void; children: string }> = ({ onClose, children }) => (
   <Link
     href={ATS_HREF}
     onClick={onClose}
     className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-bold text-primary underline decoration-2 underline-offset-2 hover:decoration-[#6c7a1e]">
     <ScanSearch className="h-3.5 w-3.5" />
-    {children} · {SCAN_CREDITS} credit
+    {children}
   </Link>
 );
 

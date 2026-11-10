@@ -73,8 +73,8 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     a: "The job board, autofill from your profile and saved answers, application tracking and drafts, one resume and one cover letter, and 45 AI credits a month, topped back up to 45 at the start of each month. Credits pay for ATS scans, questions about a job and new AI answers. Free also includes a little AI resume help, coaching, planning and interview practice each month. Basic expands resume help, coaching and planning; Pro expands interview practice.",
   },
   {
-    q: "Is autofill free, or does it use credits?",
-    a: "Filling a form from your profile and your approved saved answers is free on every plan, as often as you like. Credits are only used when you ask the AI to draft a new answer to a question you haven't answered before.",
+    q: "Is autofill on every plan?",
+    a: "Yes. Filling a form from your profile and your approved saved answers works on every plan, including Free, as often as you like. AI only steps in when you ask it to draft a new answer to a question you haven't answered before.",
   },
   {
     q: "How does quarterly billing work?",
@@ -94,15 +94,15 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "What happens if I run out of credits?",
-    a: "Top up with a credit pack, or wait for your allowance to refill. The free parts keep working either way: the job board, importing jobs, drafts, tracking, and autofill from your profile and approved saved answers. New AI answers use credits, and so do coach replies past your first 15 each day on a paid plan.",
+    a: "Top up with a credit pack, or wait for your allowance to refill. Everything that isn't AI keeps working either way: the job board, importing jobs, drafts, tracking, and autofill from your profile and approved saved answers.",
   },
   {
     q: "Why not just use ChatGPT?",
     a: "You can, and plenty of people do. Remote Worldwide does the job-search work around the writing: it tailors your resume and cover letter to the real posting and scores them against it, fills the application form for you, keeps every application in a tracker, and runs a voice mock interview with the kind of interviewer you're likely to meet, then reports on your answers and your delivery. No copying and pasting between tabs, and nothing lost between applications.",
   },
   {
-    q: "How are voice mock interviews billed?",
-    a: "Free and Basic include one session a month; Pro and Ultra support more practice. 5 credits covers up to 10 minutes of recording; past that, each extra started minute is 1 credit. You're billed on the recording, not on how many questions you get through.",
+    q: "Which plans include voice mock interviews?",
+    a: "Free and Basic include one session a month, so you can try it. Pro and Ultra support more practice, in sessions of 6, 15 or 25 minutes.",
   },
   {
     q: "What does Ultra add?",
@@ -231,10 +231,10 @@ export default async function PricingPage() {
         <section className="mx-auto max-w-[1180px] px-4" aria-label="Plans">
           <div className="mb-6 flex flex-col items-center gap-4">
             <BillingToggle savings={savingLabels(plans)} />
-            {/* Free autofill is said once here rather than on every card (owner, 2026-10-26). */}
+            {/* Autofill on every plan is said once here rather than on every card (owner, 2026-10-26). */}
             <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-primary/70">
               <li className="flex items-center gap-2">
-                <Check className="h-4 w-4 flex-none" aria-hidden /> Free autofill, saved answers, drafts and tracker on every plan
+                <Check className="h-4 w-4 flex-none" aria-hidden /> Autofill, saved answers, drafts and tracker on every plan
               </li>
               <li className="flex items-center gap-2">
                 <RefreshCcw className="h-4 w-4 flex-none" aria-hidden /> Cancel anytime
@@ -315,7 +315,7 @@ export default async function PricingPage() {
           <CreditEstimator plans={plans} />
         </section>
 
-        {/* What a credit buys — hidden for now; its prices live in the comparison table above.
+        {/* What a credit buys: hidden. Per-action credit prices stay off the public pages (owner, 2026-11-10).
         <section className="mx-auto max-w-[1140px] px-4 pt-24" aria-labelledby="costs-heading">
           <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div className="max-w-[640px]">

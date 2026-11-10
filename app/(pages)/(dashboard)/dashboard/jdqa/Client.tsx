@@ -963,7 +963,7 @@ const JdqaScreen: FC = () => {
             ) : ask.state.status === "answered" ? (
               <AnswerBubble
                 answer={ask.state.entry.answer}
-                note={ask.state.repeat ? "Asked before · no credit used" : ask.state.charged ? "1 credit used" : null}
+                note={ask.state.repeat ? "Asked before" : null}
                 job={answerJob}
               />
             ) : (

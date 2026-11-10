@@ -17,7 +17,7 @@
 import { apiGet, apiPost } from "@/app/lib/api/client";
 import { PLANS_HREF } from "@/app/lib/settings/types";
 import { createSseParser, type SseFrame } from "@/app/lib/api/sse";
-import { BackendError, apiMessage, revive, signalPlanLimit } from "@/app/lib/api/core";
+import { BackendError, NOT_ENOUGH_CREDITS, apiMessage, revive, signalPlanLimit } from "@/app/lib/api/core";
 import type {
   AcceptProposalInput,
   AcceptProposalResult,
@@ -122,7 +122,8 @@ export class CoachStreamError extends Error {
     message: string,
     public readonly retryAfterMs: number | null,
   ) {
-    super(message);
+    // Out of credits mid-stream says it without the price, as a 402 does (BackendError).
+    super(code === "insufficient-credits" ? NOT_ENOUGH_CREDITS : message);
     this.name = "CoachStreamError";
   }
 }
@@ -403,25 +404,19 @@ export function fresherUsage(a: CoachUsage | undefined, b: CoachUsage | undefine
 }
 
 /**
- * What a screen reader hears when a reply has finished: that it arrived, what
- * it cost if it cost anything, and the allowance now. The reply itself is in
- * the transcript.
+ * What a screen reader hears when a reply has finished: that it arrived, and
+ * the free replies left today. Never what it cost (owner, 2026-11-10: no credit
+ * amounts anywhere). The reply itself is in the transcript.
  */
 export function describeReplyDone({ charged, usage }: { charged: boolean; usage: CoachUsage | null }): string {
-  if (charged) {
-    const credits = usage?.creditsPerReply ?? 1;
-    return `Coach replied. ${credits} ${credits === 1 ? "credit" : "credits"} used.`;
-  }
-  // Uncharged: the free replies left, or, once they are gone, what the next reply costs.
+  if (charged) return "Coach replied.";
   const left = describeUsage(usage ?? undefined);
   return left ? `Coach replied. ${left.charAt(0).toUpperCase()}${left.slice(1)}.` : "Coach replied.";
 }
 
-/** "12 free replies left today", then "1 credit per reply" once they are used. */
+/** "12 free replies left today", then nothing once they are used (no price per reply). */
 export function describeUsage(usage: CoachUsage | undefined): string {
   if (!usage) return "";
   const left = usage.freeRepliesLeft;
-  if (left > 0) return `${left} free ${left === 1 ? "reply" : "replies"} left today`;
-  const credits = usage.creditsPerReply;
-  return credits > 0 ? `${credits} ${credits === 1 ? "credit" : "credits"} per reply` : "";
+  return left > 0 ? `${left} free ${left === 1 ? "reply" : "replies"} left today` : "";
 }

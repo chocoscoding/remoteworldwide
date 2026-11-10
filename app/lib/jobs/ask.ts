@@ -129,8 +129,7 @@ export function askAnnouncement(latest: AskProgress | null): string {
   if (latest.status === "pending") return "Thinking…";
   const verdict = latest.verdict.trim();
   const firstSentence = verdict.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? verdict;
-  const cost = latest.repeat ? " Asked before, no credit used." : latest.charged ? " 1 credit used." : "";
-  return `Answered: ${firstSentence}${cost}`;
+  return `Answered: ${firstSentence}${latest.repeat ? " Asked before." : ""}`;
 }
 
 // ---------------------------------------------------------------------------

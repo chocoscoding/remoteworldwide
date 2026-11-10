@@ -44,7 +44,7 @@ const RepairStreakPanel: FC = () => {
 
   if (!repair || !repairOpen) return null;
 
-  const { brokenStreak, hoursSinceBreak, priceCredits, restoreHeld: hasRestore, freeHalfAvailable, halfDays: half } = repair;
+  const { brokenStreak, hoursSinceBreak, restoreHeld: hasRestore, freeHalfAvailable, halfDays: half } = repair;
   const inWindow = hoursSinceBreak <= REPAIR_WINDOW_HOURS;
   const hoursLeft = Math.max(0, repair.hoursLeft);
 
@@ -97,13 +97,13 @@ const RepairStreakPanel: FC = () => {
                 ) : (
                   <StickerButton variant="primary" size="lg" className="w-full" disabled={repairing} onClick={repairWithCredits}>
                     <RotateCcw className="h-4 w-4" />
-                    {`Repair all ${brokenStreak} days for ${priceCredits} credits`}
+                    {`Repair all ${brokenStreak} days with credits`}
                   </StickerButton>
                 )}
 
                 <p className="mt-2 text-center text-xs text-black/50">
                   {hasRestore ? (
-                    "A gift you earned. No charge, ever."
+                    "A gift you earned."
                   ) : (
                     <>
                       Or use a restore gift. They come from the big milestones and real wins.{" "}
@@ -117,11 +117,11 @@ const RepairStreakPanel: FC = () => {
                 {/* The fallback, so the offer is never only for people who can pay. */}
                 {!hasRestore && freeHalfAvailable && (
                   <StickerButton variant="outline" size="md" className="w-full" disabled={repairing} onClick={halfRestoreStreak}>
-                    Take {half} {half === 1 ? "day" : "days"} back, free
+                    Take {half} {half === 1 ? "day" : "days"} back
                   </StickerButton>
                 )}
                 {!hasRestore && freeRestoreUsed && (
-                  <p className="text-center text-[11px] text-black/40">Free restore already used this month.</p>
+                  <p className="text-center text-[11px] text-black/40">Monthly restore already used.</p>
                 )}
 
                 <button

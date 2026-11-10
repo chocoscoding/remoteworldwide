@@ -33,7 +33,6 @@ export interface LikelyQuestionsProps {
 
 const PREVIEW_COUNT = 3;
 
-const credits = (n: number) => `${n} ${n === 1 ? "credit" : "credits"}`;
 
 /**
  * Tracks whose first set this page has started writing by itself: once each per visit, however
@@ -183,8 +182,7 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
         <div>
           <p className="text-sm font-bold text-primary mb-1">No questions yet</p>
           <p className="text-sm text-black/50 max-w-sm mx-auto leading-relaxed">
-            Written from the posting&apos;s requirements and your resume: where you&apos;re strong, and where they&apos;ll probe.{" "}
-            {credits(cost)}; reopening them is free.
+            Written from the posting&apos;s requirements and your resume: where you&apos;re strong, and where they&apos;ll probe.
           </p>
         </div>
         <button
@@ -254,7 +252,7 @@ const LikelyQuestions: FC<LikelyQuestionsProps> = ({ track, variant, onPractise,
               disabled={busy}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-black/50 hover:text-primary cursor-pointer whitespace-nowrap disabled:opacity-50">
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              {state?.stale ? "Write them again for the changes" : "Write a new set"} · {credits(cost)}
+              {state?.stale ? "Write them again for the changes" : "Write a new set"}
             </button>
           )}
         </div>
