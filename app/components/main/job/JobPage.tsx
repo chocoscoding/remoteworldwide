@@ -37,7 +37,7 @@ import { atsScoreHref, coverLetterHref, findReferralHref, tailorResumeHref } fro
 import { createApplication, findDuplicateApplication, newClientId } from "@/app/lib/applications/api";
 import { createApplySession, matchApplySession } from "@/app/lib/apply/sessions";
 import { fromSavedJob } from "@/app/(pages)/(dashboard)/dashboard/apply/job";
-import { isJobLive, expiredJobMessage } from "@/app/lib/jobs/jobLifetime";
+import { isJobLive, canStillApply, expiredJobMessage } from "@/app/lib/jobs/jobLifetime";
 import { jobFactChips, jobLocations, salaryLabel } from "@/app/lib/jobs/publicJobFacts";
 import { qk } from "@/app/lib/query/keys";
 import styles from "./JobPage.module.css";
@@ -81,6 +81,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
   const [fadeRight, setFadeRight] = useState(true);
   const [docked, setDocked] = useState(false);
   const live = isJobLive(job);
+  const applyOpen = canStillApply(job);
   const company = job.company;
   const chips = jobFactChips(job.facts);
 
@@ -135,7 +136,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
   }, [job.id]);
 
   async function runAction(action: Action) {
-    if (!live && action === "apply") return;
+    if (!applyOpen) return;
     if (status === "loading" || busy.current) return;
     if (status !== "authenticated") {
       openAuthModal("login");
@@ -201,7 +202,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
   }
 
   const apply = (mobile = false) =>
-    !live ? (
+    !applyOpen ? (
       mobile ? null : (
         <div className={styles.applyRow}>
           <Link href="/jobs" className={styles.apply}>
@@ -213,15 +214,14 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
     ) : (
       <div ref={mobile ? bar : undefined} className={mobile ? `${styles.mobileApply} ${docked ? styles.docked : ""}` : styles.applyRow}>
         <a
-          href={live ? job.applicationUrl : undefined}
-          aria-disabled={!live}
+          href={job.applicationUrl}
           target="_blank"
           rel="noopener noreferrer"
           className={styles.apply}
           onClick={() => {
-            if (live) countEvent(job.id, "apply-click");
+            countEvent(job.id, "apply-click");
           }}>
-          {live ? "Apply now" : "Job closed"}
+          Apply now
           <ArrowUpRight size={17} />
         </a>
         {mobile ? (
@@ -366,7 +366,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
             ))}
           </div>
           {apply()}
-          {live && <div className={styles.mobileTools}>{tools(true)}</div>}
+          {applyOpen && <div className={styles.mobileTools}>{tools(true)}</div>}
           {job.facts && (
             <dl className="my-6 grid gap-3 text-sm">
               {job.facts.salaryBands.map((band, index) =>
@@ -428,7 +428,7 @@ export default function JobPage({ job, hasUserBookmarked }: { job: JobAndCompany
               <p>{company.about}</p>
             </div>
           </Link>
-          {live && <div className={styles.desktopTools}>{tools()}</div>}
+          {applyOpen && <div className={styles.desktopTools}>{tools()}</div>}
           {/* The backend sends ads only to signed-out visitors and Free accounts. */}
           <AdSlot slot="job-sidebar" only="desktop" />
         </aside>

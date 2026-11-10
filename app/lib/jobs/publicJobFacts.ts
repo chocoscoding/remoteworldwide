@@ -9,14 +9,16 @@ export function salaryLabel(band: SalaryBand): string | null {
   return `${band.currency} ${amount}/${band.period}${kind}${band.conditions ? ` (${band.conditions})` : ""}`;
 }
 export function jobFactChips(facts: PublicJobFacts | null | undefined): {label:string; kind:"salary"|"visa"|"employment"; detail?:string}[] {
-  if (!facts) return [];
+  // An employment type we could not work out is shown as full-time (owner, 2026-11-09).
+  if (!facts) return [{kind:"employment",label:"Full-time"}];
   const chips: ReturnType<typeof jobFactChips> = [];
   const salaries = facts.salaryBands.flatMap(band => {const label=salaryLabel({...band,conditions:null});return label ? [{label,detail:salaryLabel(band) ?? undefined}] : [];});
   if (salaries.length === 1) chips.push({kind:"salary",...salaries[0]});
   else if (salaries.length > 1) chips.push({kind:"salary",label:"Multiple salary bands",detail:salaries.map(band=>band.detail).join("; ")});
   if (facts.visaSponsorship === "yes") chips.push({kind:"visa",label:"Visa sponsorship",detail:facts.sponsorshipConditions ?? undefined});
   else if (facts.visaSponsorship === "no") chips.push({kind:"visa",label:"No visa sponsorship",detail:facts.sponsorshipConditions ?? undefined});
-  if (facts.employmentType) chips.push({kind:"employment",label:facts.employmentType.charAt(0).toUpperCase()+facts.employmentType.slice(1)});
+  const employment = facts.employmentType ?? "full-time";
+  chips.push({kind:"employment",label:employment.charAt(0).toUpperCase()+employment.slice(1)});
   return chips;
 }
 export function jobLocations(facts: PublicJobFacts | null | undefined, legacy: string[] = []): string[] {

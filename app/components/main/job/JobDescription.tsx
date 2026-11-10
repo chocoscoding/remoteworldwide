@@ -7,7 +7,7 @@ import BookmarkStatus from "../BookmarkStatus";
 import type { Job } from "@/types/main";
 import { toast } from "react-toastify";
 import { LinkIcon, type LinkIconHandle } from "@/components/ui/link-icon";
-import { isJobLive, expiredJobMessage } from "@/app/lib/jobs/jobLifetime";
+import { isJobLive, canStillApply, expiredJobMessage } from "@/app/lib/jobs/jobLifetime";
 import { jobFactChips } from "@/app/lib/jobs/publicJobFacts";
 import "react-quill-new/dist/quill.bubble.css";
 
@@ -153,7 +153,7 @@ const JobDescription: FC<{ data: Job; hasUserBookmarked?: boolean; showBookmark?
             <ReactQuill  value={description} readOnly={true} theme={"bubble"} />
           </Suspense>
         </section>
-        {isJobLive(data) ? <Link
+        {canStillApply(data) ? <Link
           href={applicationUrl}
           target="_blank"
           onClick={trackApply ? () => countJobEvent(data.id, "apply-click") : undefined}
