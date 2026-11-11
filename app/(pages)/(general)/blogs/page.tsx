@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { BLOG_CATEGORIES, categoryBySlug } from "@/app/lib/blog/categories";
-import { getCategoriesWithCounts, getFeaturedPosts, getOffers, getPublishedPosts } from "@/app/lib/blog/data";
+import { getCategoriesWithCounts, getFeaturedPosts, getPublishedPosts } from "@/app/lib/blog/data";
 import { absoluteUrl, jsonLd as serializeJsonLd, SITE_NAME, SITE_URL, publisherNode } from "@/app/lib/seo";
 import CategoryNav from "@/app/components/blog/CategoryNav";
-import CtaCard from "@/app/components/blog/CtaCard";
 import PostCard from "@/app/components/blog/PostCard";
 import PostGrid, { BlogPagination } from "@/app/components/blog/PostGrid";
 
@@ -51,17 +49,15 @@ const BlogIndex = async ({ searchParams }: Search) => {
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
   const landing = page === 1;
 
-  const [offers, categories, list, featured] = await Promise.all([
-    getOffers(),
+  const [categories, list, featured] = await Promise.all([
     getCategoriesWithCounts(),
     getPublishedPosts({ page }),
-    landing ? getFeaturedPosts(4) : Promise.resolve([]),
+    landing ? getFeaturedPosts(1) : Promise.resolve([]),
   ]);
 
-  const bandCta = offers.cta;
   const featuredSlugs = new Set(featured.map((p) => p.slug));
   const latest = landing ? list.posts.filter((p) => !featuredSlugs.has(p.slug)) : list.posts;
-  const [lead, ...picks] = featured;
+  const lead = featured[0];
   const hrefFor = (n: number) => (n > 1 ? `/blogs?page=${n}` : "/blogs");
 
   const jsonLd = [
@@ -140,25 +136,13 @@ const BlogIndex = async ({ searchParams }: Search) => {
         </div>
       </header>
 
-      <div
-        id="latest"
-        className={cn(
-          "mx-auto max-w-[1440px] px-4 py-10 md:py-14 scroll-mt-4",
-          bandCta && "lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-16",
-        )}>
+      <div id="latest" className="mx-auto max-w-[1440px] scroll-mt-4 px-4 py-10 md:py-14">
         <main className="min-w-0">
           <CategoryNav categories={categories} active={null} />
 
           {landing && lead && (
             <section className="mt-10" aria-label="Start here">
               <PostCard post={lead} variant="feature" />
-              {picks.length > 0 && (
-                <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                  {picks.map((p) => (
-                    <PostCard key={p.slug} post={p} />
-                  ))}
-                </div>
-              )}
             </section>
           )}
 
@@ -176,7 +160,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
                   <p className="mt-1 text-sm text-primary/60">The first guides are being written.</p>
                 </div>
               ) : (
-                <PostGrid posts={latest} />
+                <PostGrid posts={latest} wide />
               )}
             </section>
           )}
@@ -204,14 +188,6 @@ const BlogIndex = async ({ searchParams }: Search) => {
             </section>
           )}
         </main>
-
-        {bandCta && (
-          <aside className="mt-12 lg:mt-0">
-            <div className="lg:sticky lg:top-24">
-              <CtaCard cta={bandCta} variant="side" placement="index-band" />
-            </div>
-          </aside>
-        )}
       </div>
     </div>
   );

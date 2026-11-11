@@ -46,18 +46,26 @@ const PostCard: FC<{ post: PostCardData; variant?: "default" | "compact" | "feat
 
   if (variant === "feature") {
     return (
-      <article className={cn("group overflow-hidden rounded-[24px] border-2 bg-white br-bold md:grid md:grid-cols-2", className)}>
-        <Link href={href} className="relative block aspect-[3/2] md:aspect-auto md:min-h-[320px]">
-          <Image src={post.coverImage} alt={post.title} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" priority />
+      <article className={cn("group overflow-hidden rounded-[24px] border-2 bg-white br-bold md:grid md:grid-cols-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]", className)}>
+        {/* lg+: image takes 60% at its full 3:2 shape, so the card grows taller with the page. */}
+        <Link href={href} className="relative block aspect-[3/2] md:aspect-auto md:min-h-[320px] lg:aspect-[3/2] lg:min-h-0">
+          <Image
+            src={post.coverImage}
+            alt={post.title}
+            fill
+            sizes="(min-width: 1024px) 60vw, (min-width: 768px) 50vw, 100vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            priority
+          />
         </Link>
-        <div className="flex flex-col justify-center p-6 md:p-9">
+        <div className="flex flex-col justify-center p-6 md:p-9 xl:p-12">
           <span className="w-fit rounded-full bg-secondary px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.1em] text-primary">{category?.name ?? "Blog"}</span>
-          <h3 className="mt-3 text-2xl font-extrabold leading-tight text-primary md:text-3xl">
+          <h3 className="mt-3 text-2xl font-extrabold leading-tight text-primary md:text-3xl xl:text-4xl">
             <Link href={href} className="hover:underline">
               {post.title}
             </Link>
           </h3>
-          <p className="mt-3 line-clamp-3 text-base text-primary/70">{post.description}</p>
+          <p className="mt-3 line-clamp-3 text-base text-primary/70 xl:line-clamp-4 xl:text-lg">{post.description}</p>
           <AuthorStack authors={authors} size="sm" meta={date} link={false} className="mt-5" />
         </div>
       </article>
