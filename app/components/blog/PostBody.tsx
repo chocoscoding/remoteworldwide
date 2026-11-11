@@ -1,13 +1,11 @@
 import type { FC } from "react";
-import { cn } from "@/lib/utils";
-import type { PostSegment, RenderedPost } from "@/app/lib/blog/render";
+import type { PostSegment } from "@/app/lib/blog/render";
 import LeadMagnetCard, { type LeadMagnetSummary } from "./LeadMagnetCard";
 import CtaCard, { type CtaSummary } from "./CtaCard";
 import "./post.css";
 
 export interface PostBodyProps {
   segments: PostSegment[];
-  spacing: RenderedPost["spacing"];
   blogSlug: string;
   leadMagnet: LeadMagnetSummary | null;
   magnetsBySlug: Record<string, LeadMagnetSummary>;
@@ -16,11 +14,13 @@ export interface PostBodyProps {
   nextStep?: { label: string; href: string };
 }
 
-const PostBody: FC<PostBodyProps> = ({ segments, spacing, blogSlug, leadMagnet, magnetsBySlug, cta, ctasByKey, nextStep }) => (
+const PostBody: FC<PostBodyProps> = ({ segments, blogSlug, leadMagnet, magnetsBySlug, cta, ctasByKey, nextStep }) => (
   <div>
     {segments.map((seg, i) => {
       if (seg.type === "html") {
-        return <div key={i} className={cn("post-prose post-prose--blog", spacing === "as-written" && "post-prose--as-written")} dangerouslySetInnerHTML={{ __html: seg.html }} />;
+        // renderPost normalizes empty editor blocks to this exact markup. The reading
+        // layout supplies their spacing; keep the stored article and inline breaks intact.
+        return <div key={i} className="post-prose post-prose--blog" dangerouslySetInnerHTML={{ __html: seg.html.replaceAll("<p><br /></p>", "") }} />;
       }
       if (seg.kind === "cta") {
         const chosen = seg.ref ? (ctasByKey[seg.ref] ?? null) : cta;

@@ -60,12 +60,12 @@ const PostCard: FC<{ post: PostCardData; variant?: "default" | "compact" | "feat
         </Link>
         <div className="flex flex-col justify-center p-6 md:p-9 xl:p-12">
           <span className="w-fit rounded-full bg-secondary px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.1em] text-primary">{category?.name ?? "Blog"}</span>
-          <h3 className="mt-3 text-2xl font-extrabold leading-tight text-primary md:text-3xl xl:text-4xl">
+          <h3 className="mt-4 text-2xl font-extrabold leading-snug text-primary md:text-3xl xl:text-4xl xl:leading-tight">
             <Link href={href} className="hover:underline">
               {post.title}
             </Link>
           </h3>
-          <p className="mt-3 line-clamp-3 text-base text-primary/70 xl:line-clamp-4 xl:text-lg">{post.description}</p>
+          <p className="mt-4 line-clamp-3 text-base leading-relaxed text-primary/70 xl:line-clamp-4 xl:text-lg">{post.description}</p>
           <AuthorStack authors={authors} size="sm" meta={date} link={false} className="mt-5" />
         </div>
       </article>
@@ -77,15 +77,15 @@ const PostCard: FC<{ post: PostCardData; variant?: "default" | "compact" | "feat
       <Link href={href} className="relative block aspect-[3/2] overflow-hidden rounded-[20px] border-2 border-primary bg-white">
         <Image src={post.coverImage} alt={post.title} fill sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
       </Link>
-      <div className="mt-4 flex flex-1 flex-col">
+      <div className="mt-5 flex flex-1 flex-col">
         <span className="w-fit rounded-full bg-secondary px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-primary">{category?.name ?? "Blog"}</span>
-        <h3 className="mt-2.5 text-xl font-extrabold leading-snug text-primary">
+        <h3 className="mt-3 text-xl font-extrabold leading-[1.4] text-primary">
           <Link href={href} className="group-hover:underline">
             {post.title}
           </Link>
         </h3>
-        <p className="mt-2 line-clamp-2 text-sm text-primary/65">{post.description}</p>
-        <p className="mt-auto flex items-center gap-2 pt-4 text-xs text-primary/55">
+        <p className="mt-3 line-clamp-2 text-[15px] leading-relaxed text-primary/65">{post.description}</p>
+        <p className="mt-auto flex items-center gap-2 pt-5 text-xs text-primary/55">
           <span className="flex items-center" aria-hidden>
             {authors.slice(0, 3).map((a, i) => (
               <span key={a.slug} className={cn("relative h-5 w-5 overflow-hidden rounded-full border border-primary/30 bg-white", i > 0 && "-ml-1.5")} style={{ zIndex: 3 - i }}>

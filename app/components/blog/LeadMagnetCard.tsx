@@ -90,7 +90,9 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
   const horizontal = variant === "inline" || variant === "category";
   const inputId = `lm-${variant}-${placement}-${magnet.slug}`;
   // The hero sits on a page of bigger shadows; in articles everything stays at 2px.
-  const buttonShadow = isHero
+  const buttonShadow = isSidebar
+    ? "border border-primary/25 bg-white text-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+    : isHero
     ? "br-bold-press br-lime"
     : "br-shadow-press br-lime";
 
@@ -100,7 +102,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
       className={cn(
         "relative rounded-[20px] border-2 border-primary",
         isHero && "bg-white p-6 md:p-8 br-bold br-lime",
-        isSidebar && "bg-secondary p-5 br-shadow",
+        isSidebar && "border border-primary/15 bg-primary2 p-6",
         horizontal && "not-prose bg-secondary p-5 md:p-6",
         variant === "inline" && "my-8 br-shadow",
         variant === "category" && "my-10 br-bold",
@@ -114,8 +116,8 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
         )}
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary/70">Free download</p>
-          <h3 className={cn("mt-1.5 font-extrabold leading-tight text-primary", isHero ? "text-2xl md:text-3xl" : "text-lg")}>{magnet.title}</h3>
-          <p className={cn("mt-2 text-primary/75", isHero ? "text-base" : "text-sm")}>{magnet.hook}</p>
+          <h3 className={cn("mt-1.5 font-extrabold leading-tight text-primary", isHero ? "text-2xl md:text-3xl" : "text-lg", isSidebar && "mt-3 font-bold leading-snug")}>{magnet.title}</h3>
+          <p className={cn("mt-2 text-primary/75", isHero ? "text-base" : "text-sm", isSidebar && "mt-3 leading-relaxed")}>{magnet.hook}</p>
           {magnet.bullets.length > 0 && !isSidebar && (
             <ul className="mt-3 space-y-1.5 text-sm text-primary/85">
               {magnet.bullets.slice(0, 3).map((b) => (
@@ -127,7 +129,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
             </ul>
           )}
 
-          <div aria-live="polite" className="mt-4">
+          <div aria-live="polite" className={cn("mt-4", isSidebar && "mt-5")}>
             {status === "success" && download ? (
               <div className="rounded-xl border-2 border-primary bg-white p-4">
                 <p className="flex items-center gap-2 text-base font-extrabold text-primary">
@@ -173,6 +175,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                   className={cn(
                     "h-11 w-full min-w-0 flex-none rounded-lg border-2 border-primary bg-white px-3.5 text-sm text-primary placeholder:text-primary/40 outline-none focus:ring-2 focus:ring-primary/30",
                     isHero && "sm:flex-1",
+                    isSidebar && "border border-primary/25",
                   )}
                 />
                 <input type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" className="absolute -left-[9999px] h-0 w-0 opacity-0" aria-hidden />

@@ -6,7 +6,7 @@ import PostCard, { type PostCardData } from "./PostCard";
 
 // `wide`: full-width pages (blog index) fit four a row on xl screens.
 const PostGrid: FC<{ posts: PostCardData[]; wide?: boolean }> = ({ posts, wide }) => (
-  <div className={cn("mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3", wide && "xl:grid-cols-4")}>
+  <div className={cn("mt-10 grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3", wide && "xl:grid-cols-4")}>
     {posts.map((p) => (
       <PostCard key={p.slug} post={p} />
     ))}

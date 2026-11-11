@@ -84,7 +84,7 @@ const TONE: Record<
 };
 
 const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, className }) => {
-  const t = TONE[cta.tone] ?? TONE.INK;
+  const t = variant === "side" ? TONE.PAPER : (TONE[cta.tone] ?? TONE.INK);
   const band = variant === "band";
   const inArticle = variant === "inline" || variant === "end";
   const hasImage = Boolean(cta.imageUrl);
@@ -103,14 +103,14 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
         )}>
         {cta.headline}
       </h3>
-      <p className={cn("mt-2 max-w-[60ch]", t.sub, variant === "inline" || variant === "side" ? "text-sm md:text-base" : "text-base")}>{cta.body}</p>
+      <p className={cn("mt-2 max-w-[60ch] leading-relaxed", t.sub, variant === "inline" || variant === "side" ? "text-sm md:text-base" : "text-base")}>{cta.body}</p>
       <a
         href={ctaHref(cta.key, placement, blogSlug)}
         className={cn(
           "mt-5 inline-flex flex-none items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold",
-          variant === "side" && "mt-4 px-4 py-2.5",
           t.button,
-          inArticle ? t.buttonShadowSm : t.buttonShadow,
+          variant !== "side" && (inArticle ? t.buttonShadowSm : t.buttonShadow),
+          variant === "side" && "mt-5 border border-primary/25 bg-white px-4 py-2.5 text-primary hover:bg-primary/5",
         )}>
         {cta.buttonLabel}
         <ArrowRight className="h-4 w-4" />
@@ -125,11 +125,11 @@ const CtaCard: FC<CtaCardProps> = ({ cta, variant, placement, blogSlug, classNam
       className={cn(
         "not-prose rounded-[20px] border-2 border-primary",
         t.card,
-        inArticle ? t.shadowSm : t.shadow,
+        variant !== "side" && (inArticle ? t.shadowSm : t.shadow),
         variant === "inline" && "my-8 p-5 md:p-6",
         variant === "end" && "mt-8 p-6 md:p-8",
         band && "p-7 md:p-10",
-        variant === "side" && "rounded-2xl p-5 br-shadow",
+        variant === "side" && "rounded-2xl border border-primary/15 p-6",
         className,
       )}>
       {hasImage ? (

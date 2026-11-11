@@ -327,47 +327,90 @@
   }
 }
 
-/* Posts written with blank lines (see RenderedPost.spacing): the editor's spacing
-   exactly, so blank lines are the only gaps and a line with none sits on the next.
-   Boxed blocks keep a small gap so their borders don't touch text. Top/bottom only,
-   so checklist items keep their margin-left. */
-.post-prose--as-written p,
-.post-prose--as-written ul,
-.post-prose--as-written ol,
-.post-prose--as-written li,
-.post-prose--as-written li > ul,
-.post-prose--as-written li > ol,
-.post-prose--as-written img,
-.post-prose--as-written h2,
-.post-prose--as-written h3,
-.post-prose--as-written h4,
-.post-prose--as-written h5,
-.post-prose--as-written h6 {
-  margin-top: 0;
+/* Reading rhythm shared by every blog. PostBody absorbs normalized blank editor
+   paragraphs, so these margins never stack with manually inserted empty lines.
+   Keep this scoped: legal pages and the writing surface have their own sizing. */
+.post-prose--blog {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+.post-prose--blog :is(p, ul, ol) {
+  margin-bottom: 1.25em;
+}
+.post-prose--blog h2 {
+  margin: 2.5rem 0 1rem;
+  font-size: 1.625rem;
+  line-height: 1.3;
+}
+.post-prose--blog h3 {
+  margin: 2rem 0 0.875rem;
+  font-size: 1.375rem;
+  line-height: 1.4;
+}
+.post-prose--blog :is(h4, h5, h6) {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1.125rem;
+}
+.post-prose--blog li {
+  margin-bottom: 0.65em;
+}
+.post-prose--blog li > :is(ul, ol) {
+  margin: 0.65em 0 0;
+}
+.post-prose--blog li > p:last-child {
   margin-bottom: 0;
 }
-.post-prose--as-written :is(pre, .ql-syntax),
-.post-prose--as-written iframe.ql-video {
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
+.post-prose--blog blockquote {
+  font-size: 1rem;
+  line-height: 1.75;
 }
-.post-prose--as-written .post-table-wrap {
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
+.post-prose--blog blockquote p {
+  margin-bottom: 0;
 }
-/* Room for the quote badge above and the block shadow below. */
-.post-prose--as-written blockquote {
+.post-prose--blog blockquote p + p:not(.quote-source) {
+  margin-top: 1em;
+}
+.post-prose--blog table {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+.post-prose--blog :is(th, td) {
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+.post-prose--blog :is(th, td) > :last-child {
+  margin-bottom: 0;
+}
+.post-prose--blog > :first-child {
+  margin-top: 0;
+}
+.post-prose--blog > blockquote:first-child {
   margin-top: 1.75rem;
-  margin-bottom: 1rem;
 }
-
-/* Line spacing, picked per paragraph in the editor's toolbar like a word processor's.
-   The old 1.75 body line is "1.5"; the rest scale from it (1.75 / 1.5 per step), and
-   1.15 is the default, so a line with no class gets it. Blog posts only: the legal
-   pages keep .post-prose's 1.75. */
-.post-prose--blog {
-  line-height: 1.465; /* 23.4px at 16px: the 1.15 step (21.4px) plus 2px */
+.post-prose--blog > :last-child {
+  margin-bottom: 0;
 }
+@media (min-width: 768px) {
+  .post-prose--blog {
+    font-size: 1.125rem;
+  }
+  .post-prose--blog h2 {
+    margin-top: 3rem;
+    font-size: 1.875rem;
+  }
+  .post-prose--blog h3 {
+    margin-top: 2.5rem;
+    font-size: 1.5rem;
+  }
+  .post-prose--blog > :first-child {
+    margin-top: 0;
+  }
+  .post-prose--blog > blockquote:first-child {
+    margin-top: 1.75rem;
+  }
+}
+/* Author-selected line heights remain available in the editor. Published single
+   spacing gets a readable minimum; the more generous choices remain intact. */
 :is(.post-editor .ql-editor, .post-prose) .ql-line-height-1 {
   line-height: 1.17;
 }
@@ -376,6 +419,9 @@
 }
 :is(.post-editor .ql-editor, .post-prose) .ql-line-height-2 {
   line-height: 2.33;
+}
+.post-prose.post-prose--blog .ql-line-height-1 {
+  line-height: 1.65;
 }
 /* The toolbar's spacing picker, labelled like a word processor's. */
 .post-editor .ql-snow .ql-picker.ql-lineheight {
