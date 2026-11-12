@@ -319,6 +319,28 @@ const nextConfig = {
         source: "/api/subscribers/export",
         destination: `${backend}/api/blog/admin/subscribers.csv`,
       },
+      // The mail system's browser-facing routes (MAIL-BUILD-SPEC.md section 7). A face or Yes / No
+      // tapped in a mail opens `${APP_URL}/api/mail/feedback?s=&a=&t=`, which records it and
+      // redirects to /mail/feedback, whose comment box posts to /api/mail/feedback/comment;
+      // /mail/unsubscribed posts the optional reason; the billing screen reads a personal offer
+      // (session cookie) from /api/mail/offers/current. Only these: the Resend webhook and the
+      // admin's mail routes are not reached through the site.
+      {
+        source: "/api/mail/feedback",
+        destination: `${backend}/api/mail/feedback`,
+      },
+      {
+        source: "/api/mail/feedback/comment",
+        destination: `${backend}/api/mail/feedback/comment`,
+      },
+      {
+        source: "/api/mail/unsubscribe-reason",
+        destination: `${backend}/api/mail/unsubscribe-reason`,
+      },
+      {
+        source: "/api/mail/offers/current",
+        destination: `${backend}/api/mail/offers/current`,
+      },
       // /jobs/<slug> is a listing or a landing page (app/lib/landing/catalogue.ts). Listings are
       // cached (app/(pages)/(general)/jobs/[id]); landing pages read ?page= and the request, which
       // a cached route may not. Listing slugs end in a long number (title-<hex><13-digit time>), so

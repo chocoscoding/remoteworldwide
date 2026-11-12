@@ -41,9 +41,14 @@ function useBillingMutation<TData, TVars>(run: (vars: TVars) => Promise<TData>, 
   });
 }
 
+/**
+ * `offerToken` is a personal offer from a mail (`/dashboard/settings/billing?offer=`), sent only when
+ * the billing screen confirmed it is theirs and covers this plan; the backend checks it again and
+ * puts the discount on Stripe's page.
+ */
 export function useBuyPlan(onCheckout: (checkout: Checkout) => void) {
-  return useBillingMutation<Checkout, { planKey: string; interval: BillingInterval }>(
-    ({ planKey, interval }) => apiPost<Checkout>("/api/billing/checkout/plan", { planKey, interval }),
+  return useBillingMutation<Checkout, { planKey: string; interval: BillingInterval; offerToken?: string }>(
+    ({ planKey, interval, offerToken }) => apiPost<Checkout>("/api/billing/checkout/plan", { planKey, interval, ...(offerToken ? { offerToken } : {}) }),
     (checkout) => {
       // An upgrade of a card subscription: the difference was charged and the plan has moved.
       // Quarterly back to monthly: booked for the quarter's end, or called off. Nothing is charged.

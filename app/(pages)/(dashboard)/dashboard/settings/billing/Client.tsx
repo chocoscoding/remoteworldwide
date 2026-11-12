@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { qk } from "@/app/lib/query/keys";
-import { apiPost } from "@/app/lib/api/client";
-import { Check, CreditCard, Zap } from "lucide-react";
+import { apiGet, apiPost } from "@/app/lib/api/client";
+import { Check, CreditCard, Tag, Zap } from "lucide-react";
+import { isOfferToken, offerCovers, offerHeadline, offerUntil, usableGrant, type CurrentOffer, type OfferGrantView } from "@/app/lib/mail/userMail";
 import { cn } from "@/lib/utils";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import { BillingSwitch, PERIOD_SUFFIX, PERIOD_WORDS } from "@/app/components/pricing/BillingInterval";
@@ -38,26 +39,56 @@ const billingRank = (billing: BillingInterval) => BILLING_ORDER.indexOf(billing)
 /** If the confirm call is slow or the webhook is what lands, look again a few times. */
 const RETURN_REFETCH_MS = [1500, 4000, 9000];
 
+const INTERVAL_WORDS: Record<string, string> = { month: "monthly", quarter: "quarterly", year: "yearly" };
+
+/** "Pro or Ultra", "Pro, Basic or Ultra". */
+const orList = (words: string[]) => (words.length > 1 ? `${words.slice(0, -1).join(", ")} or ${words[words.length - 1]}` : (words[0] ?? ""));
+
 /**
  * @param initialBilling The billing picked on /pricing, when the visitor came from there (`?billing=quarter|year`).
  * @param pickedPlan The plan picked on /pricing (`?plan=`), whose checkout opens on arrival.
  * @param returned Back from Stripe: Checkout paid ("success"), abandoned ("canceled"), or the portal ("portal").
  * @param sessionId The Checkout session Stripe sent back with "success", which the backend confirms.
+ * @param offerToken A personal offer from a mail (`?offer=`): shown as a banner when the backend says
+ *   it is this person's, unexpired and unused, and sent with a checkout it covers.
  */
 const BillingClient: FC<{
   initialBilling?: BillingInterval;
   pickedPlan?: string;
   returned?: "success" | "canceled" | "portal";
   sessionId?: string;
+  offerToken?: string;
 }> = ({
   initialBilling,
   pickedPlan,
   returned,
   sessionId,
+  offerToken: offerParam,
 }) => {
   const { subscription, plan, plans, creditPacks, invoices, busy, buyPlan, buyCredits, cancelPlan, openPortal, payments = false, manageBilling = false } = useBilling();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  // The personal offer. Read once: the address loses `?offer=` when this screen tidies it away.
+  const [offerToken] = useState(() => (isOfferToken(offerParam) ? offerParam : null));
+  const [offer, setOffer] = useState<{ loading: boolean; grant: OfferGrantView | null }>(() => ({ loading: offerToken !== null, grant: null }));
+  useEffect(() => {
+    if (!offerToken) return;
+    let live = true;
+    // No grant (not theirs, expired, used, or anything else the backend says) shows nothing.
+    apiGet<CurrentOffer>(`/api/mail/offers/current?token=${encodeURIComponent(offerToken)}`).then(
+      (answer) => live && setOffer({ loading: false, grant: usableGrant(answer?.grant) }),
+      () => live && setOffer({ loading: false, grant: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [offerToken]);
+  // A card subscriber's plan changes are charged in place, not on Stripe's checkout page, so an offer never rides on them.
+  const offerGrant = manageBilling ? null : offer.grant;
+  /** The token, for a checkout the offer covers; nothing otherwise, so the checkout goes ahead at the plain price. */
+  const offerFor = (planKey: string, billing: BillingInterval) => (offerToken && offerGrant && offerCovers(offerGrant, planKey, billing) ? offerToken : undefined);
+  const choosePlan = (planKey: string, billing: BillingInterval) => buyPlan(planKey, billing, offerFor(planKey, billing));
 
   // Coming back from Stripe: ask the backend to check with Stripe (so it works without the webhook),
   // say what happened, refetch, and drop the query so a reload doesn't say it again.
@@ -125,18 +156,19 @@ const BillingClient: FC<{
   // screen would not offer (a lower plan, or payments not on).
   const pickHandled = useRef(false);
   useEffect(() => {
-    if (!pickedPlan || returned || pickHandled.current) return;
+    // With a personal offer in the address too, wait for its answer so the checkout can carry it.
+    if (!pickedPlan || returned || pickHandled.current || offer.loading) return;
     pickHandled.current = true;
     // Dropped first, so Back from Stripe's page lands here without opening it again.
     router.replace("/dashboard/settings/billing", { scroll: false });
     const index = plans.findIndex((p) => p.key === pickedPlan);
     const picked = plans[index];
     const checkout = payments && !manageBilling && picked !== undefined && picked.priceCents > 0 && (onFree || index > currentIndex);
-    if (checkout) buyPlan(picked.key, billing);
+    if (checkout) choosePlan(picked.key, billing);
     else document.getElementById("plans")?.scrollIntoView({ behavior: "smooth", block: "start" });
     // Once per visit, with what the page opened on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [offer.loading]);
 
   return (
     <>
@@ -165,6 +197,17 @@ const BillingClient: FC<{
             </button>
           ) : undefined
         }>
+        {offerGrant ? (
+          <div className={cn(CARD, "mb-4 flex items-start gap-2.5 border-[#cddd54] bg-[#f6faea] px-4 py-3")} role="status">
+            <Tag className="mt-0.5 h-4 w-4 flex-none text-primary" aria-hidden />
+            <p className="text-xs leading-relaxed text-black/65">
+              {/* Local time: fetched in the browser, so the reader's own zone. */}
+              <span className="font-bold text-primary">{offerHeadline(offerGrant)}</span>, until {offerUntil(offerGrant.expiresAt)}. Applied when you choose{" "}
+              {offerGrant.plans.length ? orList(offerGrant.plans.map((k) => plans.find((p) => p.key === k)?.name ?? k)) : "a plan"}
+              {offerGrant.intervals.length ? `, billed ${orList(offerGrant.intervals.map((i) => INTERVAL_WORDS[i] ?? i))}` : ""}.
+            </p>
+          </div>
+        ) : null}
         {boostEnds ? (
           <div className={cn(CARD, "mb-4 flex items-center gap-2.5 border-[#cddd54] bg-[#f6faea] px-4 py-3")}>
             <Zap className="h-4 w-4 flex-none text-primary" aria-hidden />
@@ -301,7 +344,7 @@ const BillingClient: FC<{
                   <p className="mt-5 text-xs text-black/45">From {renews}, when your quarter ends</p>
                 ) : null}
                 {action ? (
-                  <button type="button" className={cn(BUTTON_SOLID, switchBack ? "mt-2" : "mt-5")} onClick={() => buyPlan(p.key, billing)} disabled={busy || pending}>
+                  <button type="button" className={cn(BUTTON_SOLID, switchBack ? "mt-2" : "mt-5")} onClick={() => choosePlan(p.key, billing)} disabled={busy || pending}>
                     {pending ? "Reserved" : action}
                   </button>
                 ) : null}

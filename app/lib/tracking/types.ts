@@ -2,6 +2,7 @@
 // backend's contract (remoteworldwidebackend src/types/tracking.ts, services/admin/analyticsService.ts).
 
 import type { PlanTier } from "@/app/lib/settings/types";
+import type { UserMailBrief } from "@/app/lib/mail/userMail";
 
 export const TRACK_KINDS = ["page_view", "click", "submit", "api", "session_start", "custom"] as const;
 export type TrackKind = (typeof TRACK_KINDS)[number];
@@ -71,6 +72,8 @@ export interface AdminUserRow extends UserBrief {
   device: DeviceInfo | null;
   eventCount: number;
   events30d: number;
+  /** Their mail engagement (the users list's Mail column, filtered by `mail=<level>`). Absent from an older backend. */
+  mail?: UserMailBrief;
 }
 
 export interface AdminUserList {

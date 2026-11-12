@@ -3,36 +3,50 @@ import Image from "next/image";
 import { BackendError } from "@/app/lib/backend";
 import { listUsers } from "@/libs/analytics-admin";
 import { USER_SORTS, USER_SORT_LABELS, ago, type AdminUserList, type UserSort } from "@/app/lib/tracking/types";
+import { MAIL_LEVELS, MAIL_LEVEL_HINTS, MAIL_LEVEL_LABELS, isMailLevel, type MailLevel } from "@/app/lib/mail/userMail";
 import { TierBadge } from "@/app/components/ADMIN/analytics/Charts";
 import UsersTable from "@/app/components/ADMIN/analytics/UsersTable";
+import MailLevelBadge from "./MailLevelBadge";
 
 // Every account, last active first by default: their plan, when they were last here and where,
-// and how much they have done. A row opens the person's own page (/heroshima/users/[id]) with
+// how much they have done, and how they take our mail (level and last click, filterable by level).
+// A row opens the person's own page (/heroshima/users/[id]) with
 // everything they did. Server-rendered through session-forwarding server actions
 // (libs/analytics-admin.ts); the (fulladmin) layout and the backend both require an ADMIN.
 // Tick some people, or all of them, to export chosen fields as CSV or TXT: UsersTable adds the
-// checkboxes and Export around the cells rendered here.
+// checkboxes and Export around the cells rendered here. With a mail level picked, "Select all"
+// means everyone at that level the search matches (the export is sent the level too).
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Users", robots: { index: false, follow: false } };
 
-const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; sort?: string }> }) => {
+const chip = (on: boolean) =>
+  `rounded-md border px-3 py-1.5 text-xs font-bold ${on ? "border-black bg-black text-[#e1f073]" : "border-gray-300 bg-white text-gray-700 hover:border-black"}`;
+
+/** "Clicked 3 d ago", "Clicked just now". */
+const clicked = (iso: string) => `Clicked ${ago(iso).replace(/^Just now$/, "just now")}`;
+
+const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; sort?: string; mail?: string }> }) => {
   const params = await searchParams;
   const q = (params.q ?? "").trim();
   const sort: UserSort = (USER_SORTS as readonly string[]).includes(params.sort ?? "") ? (params.sort as UserSort) : "last_seen";
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const mail: MailLevel | undefined = isMailLevel(params.mail) ? params.mail : undefined;
 
   let list: AdminUserList | null = null;
   let failure: string | null = null;
   try {
-    list = await listUsers({ q, page, sort });
+    list = await listUsers({ q, page, sort, mail });
   } catch (error) {
     if (!(error instanceof BackendError)) throw error;
     failure = error.message || `The backend answered ${error.status}.`;
   }
 
-  const href = (next: { sort?: UserSort; page?: number }) => {
+  /** `mail: null` clears the level; left out, it stays. */
+  const href = (next: { sort?: UserSort; page?: number; mail?: MailLevel | null }) => {
     const search = new URLSearchParams({ sort: next.sort ?? sort });
     if (q) search.set("q", q);
+    const level = next.mail === undefined ? mail : next.mail;
+    if (level) search.set("mail", level);
     if ((next.page ?? 1) > 1) search.set("page", String(next.page));
     return `/heroshima/users?${search.toString()}`;
   };
@@ -59,6 +73,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
         </nav>
         <form method="get" role="search" className="flex flex-1 gap-2">
           <input type="hidden" name="sort" value={sort} />
+          {mail ? <input type="hidden" name="mail" value={mail} /> : null}
           <label htmlFor="users-search" className="sr-only">
             Search by name, email or id
           </label>
@@ -74,12 +89,26 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
             Search
           </button>
           {q && (
-            <Link href={`/heroshima/users?sort=${sort}`} className="self-center text-xs font-semibold text-gray-500 hover:text-primary hover:underline">
+            <Link
+              href={`/heroshima/users?sort=${sort}${mail ? `&mail=${mail}` : ""}`}
+              className="self-center text-xs font-semibold text-gray-500 hover:text-primary hover:underline">
               Clear search
             </Link>
           )}
         </form>
       </div>
+
+      <nav aria-label="Filter by outreach engagement" className="mb-4 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-xs font-bold uppercase tracking-wide text-gray-500">Outreach</span>
+        <Link href={href({ mail: null })} aria-current={!mail ? "page" : undefined} className={chip(!mail)}>
+          Anyone
+        </Link>
+        {MAIL_LEVELS.map((level) => (
+          <Link key={level} href={href({ mail: level })} aria-current={level === mail ? "page" : undefined} title={MAIL_LEVEL_HINTS[level]} className={chip(level === mail)}>
+            {MAIL_LEVEL_LABELS[level]}
+          </Link>
+        ))}
+      </nav>
 
       {!list ? (
         <div role="alert" className="rounded-md border border-[#f3c4b8] bg-[#fdeae6] p-4 text-sm text-[#b23c26]">
@@ -91,8 +120,9 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
             q={q}
             sort={sort}
             total={list.total}
-            columns={8}
-            empty={q ? "Nobody matches that search." : "No accounts yet."}
+            columns={9}
+            mail={mail}
+            empty={mail ? "Nobody matches that filter." : q ? "Nobody matches that search." : "No accounts yet."}
             head={
               <>
                 <th className="px-3 py-2 font-semibold">Person</th>
@@ -101,6 +131,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
                 <th className="px-3 py-2 font-semibold">Last on</th>
                 <th className="px-3 py-2 text-right font-semibold">30 d</th>
                 <th className="px-3 py-2 text-right font-semibold">All time</th>
+                <th className="px-3 py-2 font-semibold">Outreach</th>
                 <th className="px-3 py-2 font-semibold">Device</th>
                 <th className="px-3 py-2 font-semibold">Joined</th>
               </>
@@ -142,6 +173,18 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{u.events30d.toLocaleString("en-GB")}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-gray-600">{u.eventCount.toLocaleString("en-GB")}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {u.mail ? (
+                      <span className="flex items-center gap-1.5">
+                        <MailLevelBadge level={u.mail.level} />
+                        <span className="text-xs text-gray-500" title={`${u.mail.sent30d.toLocaleString("en-GB")} mails in the last 30 days`}>
+                          {u.mail.lastClickAt ? clicked(u.mail.lastClickAt) : u.mail.sent30d ? `${u.mail.sent30d} in 30 d` : null}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">Not known</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap text-gray-600">{u.device ? `${u.device.browser}, ${u.device.os}` : "Unknown"}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-gray-600">
                     {u.createdAt

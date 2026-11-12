@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type FC, type ReactN
 import { Download } from "lucide-react";
 import { NO_PICK, nextPick, parsePick, pickView, type PickAction, type UsersPick } from "@/app/lib/tracking/export";
 import type { UserSort } from "@/app/lib/tracking/types";
+import { MAIL_LEVEL_LABELS, type MailLevel } from "@/app/lib/mail/userMail";
 import UserExportDialog from "./UserExportDialog";
 
 const STORAGE_KEY = "rww-admin-users-pick";
@@ -73,20 +74,23 @@ export interface UsersTableProps {
   sort: UserSort;
   /** Everyone the search matches, on every page: what "Select all" takes. */
   total: number;
+  /** The list's mail level, when one is picked: "Select all" then means everyone at it. */
+  mail?: MailLevel;
 }
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
 
-const UsersTable: FC<UsersTableProps> = ({ rows, head, columns, empty, q, sort, total }) => {
+const UsersTable: FC<UsersTableProps> = ({ rows, head, columns, empty, q, sort, total, mail }) => {
   const stored = useSyncExternalStore(subscribe, readPick, () => NO_PICK);
   const [exporting, setExporting] = useState(false);
   const pageBox = useRef<HTMLInputElement>(null);
   const exportButton = useRef<HTMLButtonElement>(null);
 
   const pageIds = rows.map((r) => r.id);
-  const view = pickView(stored, pageIds, q, total);
-  const dispatch = (action: PickAction) => writePick(nextPick(readPick(), action, pageIds, q, total));
-  const matching = q ? ` matching “${q}”` : "";
+  const level = mail ?? "";
+  const view = pickView(stored, pageIds, q, total, level);
+  const dispatch = (action: PickAction) => writePick(nextPick(readPick(), action, pageIds, q, total, level));
+  const matching = `${q ? ` matching “${q}”` : ""}${mail ? ` at outreach level “${MAIL_LEVEL_LABELS[mail]}”` : ""}`;
   const unticked = view.state.every?.except.length ?? 0;
 
   // `indeterminate` is a property, not an attribute: React can't set it from markup.

@@ -24,8 +24,8 @@ interface BillingContextValue extends BillingOverview {
   busy: boolean;
   /** The checkout this session just opened, so the screen can show what is pending. */
   lastCheckout: Checkout | null;
-  /** Monthly unless told otherwise. */
-  buyPlan: (planKey: string, interval?: BillingInterval) => void;
+  /** Monthly unless told otherwise. `offerToken`: a personal offer from a mail (the billing screen's `?offer=`). */
+  buyPlan: (planKey: string, interval?: BillingInterval, offerToken?: string) => void;
   buyCredits: (packKey: string) => void;
   cancelPlan: () => void;
   /** Stripe's billing portal, for an account that has paid by card. */
@@ -54,7 +54,7 @@ export const BillingProvider: FC<{ initial: BillingOverview; children: ReactNode
         ...overview,
         busy,
         lastCheckout,
-        buyPlan: (planKey, interval = "month") => buyPlan.mutate({ planKey, interval }),
+        buyPlan: (planKey, interval = "month", offerToken) => buyPlan.mutate({ planKey, interval, ...(offerToken ? { offerToken } : {}) }),
         buyCredits: (packKey) => buyCredits.mutate(packKey),
         cancelPlan: () => cancelPlan.mutate(),
         openPortal: () => openPortal.mutate(),

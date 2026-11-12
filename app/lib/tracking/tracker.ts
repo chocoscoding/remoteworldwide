@@ -4,7 +4,11 @@
 // src/types/tracking.ts). The backend adds every change made through its API on its own side.
 //
 // What is never sent: anything typed into a field, a field's value, or a query string. A press is
-// named by what the control says (its data-track, aria-label or visible text), cut short.
+// named by what the control says (its data-track, aria-label or visible text), cut short. The one
+// exception is a mail's own id: a page view whose address carries `m=` with exactly 24 hex
+// characters (the mail_sends id the events service adds to its links, MAIL-BUILD-SPEC.md section 2)
+// sends that id as `props.m`, so the backend can mark the visit as coming from that mail. Nothing
+// else from the query string is read.
 //
 // Browser-only: `ActivityTracker` starts and stops it.
 
@@ -97,10 +101,22 @@ export function flush(useBeacon = false): void {
   }
 }
 
+/** The mail a page was opened from: `m` in a query string when it is a mail_sends id (24 hex), else null. */
+export function mailSendIdFrom(search: string): string | null {
+  try {
+    const id = new URLSearchParams(search).get("m");
+    return id && /^[a-f\d]{24}$/i.test(id) ? id.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function track(kind: TrackKind, name: string, props?: QueuedEvent["props"]): void {
   const clean = name.replace(/\s+/g, " ").trim().slice(0, LABEL_MAX);
   if (!clean) return;
-  queue.push({ kind, name: clean, path: window.location.pathname, at: new Date().toISOString(), ...(props && Object.keys(props).length ? { props } : {}) });
+  const mail = kind === "page_view" ? mailSendIdFrom(window.location.search) : null;
+  const all = mail ? { ...props, m: mail } : props;
+  queue.push({ kind, name: clean, path: window.location.pathname, at: new Date().toISOString(), ...(all && Object.keys(all).length ? { props: all } : {}) });
   if (queue.length >= FLUSH_AT) flush();
   else if (timer === null) timer = window.setTimeout(() => flush(), FLUSH_MS);
 }

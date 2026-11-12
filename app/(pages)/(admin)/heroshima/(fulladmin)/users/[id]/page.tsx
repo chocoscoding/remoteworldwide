@@ -3,29 +3,58 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { BackendError } from "@/app/lib/backend";
-import { getUserDetail, getUserEvents } from "@/libs/analytics-admin";
+import { getUserDetail, getUserEvents, getUserMail, getUserMailEvents } from "@/libs/analytics-admin";
 import { TRACK_KIND_LABELS, TRACK_KINDS, ago, dateTime, type AdminUserDetail, type EventPage } from "@/app/lib/tracking/types";
+import { MAIL_FILTER, type MailTimelinePage, type UserMailDetail } from "@/app/lib/mail/userMail";
 import { BarList, DayColumns, Panel, StatTile, TierBadge } from "@/app/components/ADMIN/analytics/Charts";
 import { CheckoutBadge, checkoutWhat } from "@/app/components/ADMIN/analytics/Checkout";
+import MailPanel from "./MailPanel";
 import Timeline from "./Timeline";
 
 // One person: their plan and credits, what they use and how much, where and on what, what they
-// spent credits on, the payments they started and how each ended, their streak actions, and below
-// it all, everything they did, newest first
+// spent credits on, the payments they started and how each ended, their mail (MailPanel.tsx), their
+// streak actions, and below it all, everything they did, newest first, their mail rows woven in
 // (Timeline.tsx pages through it). Admin only: the (fulladmin) layout, the server actions'
 // requireAdminAction and the backend's isAdmin.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "User", robots: { index: false, follow: false } };
+
+type Soft<T> = { data: T; error: null } | { data: null; error: string };
+
+/** The mail parts are extra: a backend that refuses them (or doesn't have them yet) leaves the rest of the page standing. */
+const softly = <T,>(promise: Promise<T>): Promise<Soft<T>> =>
+  promise.then(
+    (data) => ({ data, error: null }),
+    (error: unknown) => {
+      if (!(error instanceof BackendError)) throw error;
+      return { data: null, error: error.message || `the backend answered ${error.status}` };
+    },
+  );
+
+const NO_EVENTS: EventPage = { items: [], next: null };
 
 const Page = async ({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ kind?: string; feature?: string }> }) => {
   const { id } = await params;
   const filters = await searchParams;
   if (!/^[a-f\d]{24}$/i.test(id)) notFound();
 
+  const mailOnly = filters.kind === MAIL_FILTER;
+  const kind = mailOnly ? MAIL_FILTER : (TRACK_KINDS as readonly string[]).includes(filters.kind ?? "") ? filters.kind : undefined;
+  const feature = mailOnly ? undefined : filters.feature?.trim() || undefined;
+  // Mail rows join the unfiltered timeline and make up the Mail filter; the other filters are about the site.
+  const withMailRows = mailOnly || (!kind && !feature);
+
   let detail: AdminUserDetail;
   let first: EventPage;
+  let mail: Soft<UserMailDetail>;
+  let mailRows: Soft<MailTimelinePage> | null;
   try {
-    [detail, first] = await Promise.all([getUserDetail(id), getUserEvents(id, { kind: filters.kind, feature: filters.feature })]);
+    [detail, first, mail, mailRows] = await Promise.all([
+      getUserDetail(id),
+      mailOnly ? Promise.resolve(NO_EVENTS) : getUserEvents(id, { kind, feature }),
+      softly(getUserMail(id)),
+      withMailRows ? softly(getUserMailEvents(id)) : Promise.resolve(null),
+    ]);
   } catch (error) {
     if (error instanceof BackendError && error.status === 404) notFound();
     if (!(error instanceof BackendError)) throw error;
@@ -39,8 +68,6 @@ const Page = async ({ params, searchParams }: { params: Promise<{ id: string }>;
   }
 
   const { user, plan, counts } = detail;
-  const kind = (TRACK_KINDS as readonly string[]).includes(filters.kind ?? "") ? filters.kind : undefined;
-  const feature = filters.feature?.trim() || undefined;
   const filterHref = (next: { kind?: string; feature?: string }) => {
     const search = new URLSearchParams();
     if (next.kind) search.set("kind", next.kind);
@@ -185,6 +212,8 @@ const Page = async ({ params, searchParams }: { params: Promise<{ id: string }>;
         )}
       </Panel>
 
+      <MailPanel mail={mail.data} error={mail.error} />
+
       {detail.streakActions.length ? (
         <Panel title="Streak actions" className="mb-4">
           <p className="flex flex-wrap gap-1.5 text-xs">
@@ -199,7 +228,7 @@ const Page = async ({ params, searchParams }: { params: Promise<{ id: string }>;
 
       <section id="timeline" className="rounded-md border border-gray-300 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold">Everything they did{feature ? ` in ${feature}` : ""}</h2>
+          <h2 className="text-sm font-bold">Everything they did{feature ? ` in ${feature}` : mailOnly ? " with our mail" : ""}</h2>
           <nav aria-label="Filter the timeline" className="flex flex-wrap gap-1.5">
             <Link
               href={filterHref({ feature })}
@@ -216,6 +245,13 @@ const Page = async ({ params, searchParams }: { params: Promise<{ id: string }>;
                 {TRACK_KIND_LABELS[k]}
               </Link>
             ))}
+            <Link
+              href={filterHref({ kind: MAIL_FILTER })}
+              aria-current={mailOnly ? "page" : undefined}
+              title="Mails they opened or clicked, visits from mail, and what was credited to a mail"
+              className={`rounded border px-2 py-1 text-xs font-bold ${mailOnly ? "border-black bg-black text-[#e1f073]" : "border-gray-300 hover:border-black"}`}>
+              Outreach
+            </Link>
             {feature ? (
               <Link href={filterHref({ kind })} className="self-center px-1 text-xs font-semibold text-gray-500 hover:underline">
                 Clear {feature}
@@ -223,7 +259,15 @@ const Page = async ({ params, searchParams }: { params: Promise<{ id: string }>;
             ) : null}
           </nav>
         </div>
-        <Timeline key={`${kind ?? ""}|${feature ?? ""}`} userId={user.id} initial={first} kind={kind} feature={feature} />
+        <Timeline
+          key={`${kind ?? ""}|${feature ?? ""}`}
+          userId={user.id}
+          initial={first}
+          mail={mailRows?.data ?? null}
+          mailFailed={Boolean(mailRows?.error)}
+          kind={kind}
+          feature={feature}
+        />
       </section>
     </div>
   );

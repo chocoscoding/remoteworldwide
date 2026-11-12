@@ -4,8 +4,9 @@ export const metadata = { title: "Plan and billing", robots: { index: false, fol
 
 // Auth is gated in app/(pages)/(dashboard)/dashboard/layout.tsx.
 // `?plan=` (and `?billing=quarter` or `?billing=year` unless Monthly is picked) arrives from a plan button on /pricing.
+// `?offer=<token>` arrives from a mail with a personal discount (MAIL-PLAN.md 5.7.2).
 export default async function SettingsBillingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const { billing, checkout, plan, portal, session_id } = await searchParams;
+  const { billing, checkout, offer, plan, portal, session_id } = await searchParams;
   // Back from Stripe: `?checkout=success|canceled` from Checkout, `?portal=back` from the billing portal.
   const returned = checkout === "success" || checkout === "canceled" ? checkout : portal ? "portal" : undefined;
   return (
@@ -14,6 +15,7 @@ export default async function SettingsBillingPage({ searchParams }: { searchPara
       pickedPlan={typeof plan === "string" ? plan : undefined}
       returned={returned}
       sessionId={typeof session_id === "string" ? session_id : undefined}
+      offerToken={typeof offer === "string" ? offer : undefined}
     />
   );
 }

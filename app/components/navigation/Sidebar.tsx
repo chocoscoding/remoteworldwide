@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles, LifeBuoy, Hourglass, Users, Activity, Megaphone } from "lucide-react";
+import { Menu, Home, Briefcase, Building, List, User, LogOut, ChevronDown, Book, Globe, LoaderCircle, BotIcon, AudioLines, Sparkles, LifeBuoy, Hourglass, Users, Activity, Megaphone, Mail } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -26,6 +26,8 @@ const menuItemsForAdmin: MenuItem[] = [
   { name: "Users", icon: Users, path: "/users", section: "users" },
   // What everyone is doing: active people, features, pages, presses, the live feed.
   { name: "Activity", icon: Activity, path: "/activity", section: "activity" },
+  // Outreach: campaigns, playbooks, offers, templates, audiences, the inbox and mail analytics.
+  { name: "Outreach", icon: Mail, path: "/outreach", section: "outreach" },
   {
     name: "Company",
     icon: Building,
@@ -122,6 +124,8 @@ const Sidebar = ({ hasAuthorProfile, sttLab }: { hasAuthorProfile: boolean; sttL
       setOpenAccordion("coverage");
     } else if (pathname.includes("/waitlist")) {
       setOpenAccordion("waitlist");
+    } else if (pathname.includes("/heroshima/outreach")) {
+      setOpenAccordion("outreach");
     } else if (pathname.includes("/heroshima/users")) {
       setOpenAccordion("users");
     } else if (pathname.includes("/heroshima/activity")) {

@@ -4,6 +4,7 @@
 // made here, in the browser, so nothing is written to disk on a server.
 
 import { PLAN_TIER_NAMES, isPlanTier } from "@/app/lib/settings/types";
+import { MAIL_LEVEL_LABELS, isMailLevel } from "@/app/lib/mail/userMail";
 
 /** Same keys, same order as the backend's EXPORT_FIELDS. */
 export const EXPORT_FIELDS = [
@@ -38,6 +39,9 @@ export const EXPORT_FIELDS = [
   "emailOffers",
   "emailProductNews",
   "emailWeeklyDigest",
+  "mailLevel",
+  "mailLastClickAt",
+  "mailSent30d",
 ] as const;
 export type ExportField = (typeof EXPORT_FIELDS)[number];
 export type ExportValue = string | number | boolean | null;
@@ -77,6 +81,9 @@ export const EXPORT_FIELD_LABELS: Record<ExportField, string> = {
   emailOffers: "Offer emails on",
   emailProductNews: "Product news on",
   emailWeeklyDigest: "Weekly digest on",
+  mailLevel: "Mail engagement",
+  mailLastClickAt: "Last mail click (UTC)",
+  mailSent30d: "Mails, 30 days",
 };
 
 export const EXPORT_FIELD_GROUPS: { title: string; fields: ExportField[] }[] = [
@@ -100,16 +107,20 @@ export const EXPORT_FIELD_GROUPS: { title: string; fields: ExportField[] }[] = [
     title: "Email choices",
     fields: ["emailOffers", "emailProductNews", "emailWeeklyDigest"],
   },
+  {
+    title: "Mail",
+    fields: ["mailLevel", "mailLastClickAt", "mailSent30d"],
+  },
 ];
 
 export const DEFAULT_EXPORT_FIELDS: ExportField[] = ["name", "email", "tier", "createdAt", "lastSeenAt"];
 
-const DATE_FIELDS = new Set<ExportField>(["createdAt", "periodEnd", "lastSeenAt", "firstSeenAt"]);
+const DATE_FIELDS = new Set<ExportField>(["createdAt", "periodEnd", "lastSeenAt", "firstSeenAt", "mailLastClickAt"]);
 
 export type ExportFormat = "csv" | "txt";
 
-/** Who goes in the file: people ticked one by one, or everyone the search matches less the unticked. */
-export type UserSelection = { mode: "ids"; ids: string[] } | { mode: "all"; q: string; except: string[] };
+/** Who goes in the file: people ticked one by one, or everyone the search (and mail level) matches less the unticked. */
+export type UserSelection = { mode: "ids"; ids: string[] } | { mode: "all"; q: string; mail?: string; except: string[] };
 
 export interface UserExport {
   fields: ExportField[];
@@ -126,6 +137,7 @@ export function exportCell(field: ExportField, value: ExportValue): string {
     return Number.isNaN(d.getTime()) ? value : d.toISOString().slice(0, 16).replace("T", " ");
   }
   if (field === "tier" && isPlanTier(value)) return PLAN_TIER_NAMES[value];
+  if (field === "mailLevel" && isMailLevel(value)) return MAIL_LEVEL_LABELS[value];
   return String(value);
 }
 
@@ -165,12 +177,13 @@ export function buildUserExport(data: Pick<UserExport, "fields" | "rows">, forma
 /**
  * Who is ticked. `picked` holds rows ticked by hand and stays as the admin pages and searches, so
  * "some" can be gathered from anywhere. `every` is the banner's "Select all N": everyone the search
- * `q` matches, on every page, less the rows unticked after (`except`). It belongs to its search, so
- * a different search shows it as nothing picked.
+ * `q` matches (within the mail level `mail`, when one is picked), on every page, less the rows
+ * unticked after (`except`). It belongs to its search and level, so a different one shows it as
+ * nothing picked.
  */
 export interface UsersPick {
   picked: string[];
-  every: { q: string; except: string[] } | null;
+  every: { q: string; mail?: string; except: string[] } | null;
 }
 
 export const NO_PICK: UsersPick = { picked: [], every: null };
@@ -202,17 +215,21 @@ export function parsePick(raw: string | null): UsersPick {
   try {
     const value = JSON.parse(raw) as {
       picked?: unknown;
-      every?: { q?: unknown; except?: unknown } | null;
+      every?: { q?: unknown; mail?: unknown; except?: unknown } | null;
     };
-    const every = value.every && typeof value.every.q === "string" ? { q: value.every.q, except: idsOf(value.every.except) } : null;
+    const every =
+      value.every && typeof value.every.q === "string"
+        ? { q: value.every.q, ...(isMailLevel(value.every.mail) ? { mail: value.every.mail } : {}), except: idsOf(value.every.except) }
+        : null;
     return { picked: every ? [] : idsOf(value.picked), every };
   } catch {
     return NO_PICK;
   }
 }
 
-export function pickView(stored: UsersPick, pageIds: readonly string[], q: string, total: number): PickView {
-  const state = stored.every && stored.every.q !== q ? NO_PICK : stored;
+/** `mail` is the list's mail level, "" for anyone. */
+export function pickView(stored: UsersPick, pageIds: readonly string[], q: string, total: number, mail = ""): PickView {
+  const state = stored.every && (stored.every.q !== q || (stored.every.mail ?? "") !== mail) ? NO_PICK : stored;
   const except = new Set(state.every?.except ?? []);
   const picked = new Set(state.picked);
   const checked = new Set(pageIds.filter((id) => (state.every ? !except.has(id) : picked.has(id))));
@@ -231,8 +248,8 @@ export function pickView(stored: UsersPick, pageIds: readonly string[], q: strin
 }
 
 /** The next pick, after a checkbox, the banner or Clear. */
-export function nextPick(stored: UsersPick, action: PickAction, pageIds: readonly string[], q: string, total: number): UsersPick {
-  const view = pickView(stored, pageIds, q, total);
+export function nextPick(stored: UsersPick, action: PickAction, pageIds: readonly string[], q: string, total: number, mail = ""): UsersPick {
+  const view = pickView(stored, pageIds, q, total, mail);
   const { state } = view;
   const toggle = (list: string[], ids: readonly string[], on: boolean) => {
     const set = new Set(list);
@@ -246,14 +263,14 @@ export function nextPick(stored: UsersPick, action: PickAction, pageIds: readonl
     case "clear":
       return NO_PICK;
     case "every":
-      return { picked: [], every: { q, except: [] } };
+      return { picked: [], every: { q, ...(mail ? { mail } : {}), except: [] } };
     case "page":
       // Ticked means "in the file": in every-mode that is NOT being in `except`.
       if (state.every)
         return {
           picked: [],
           every: {
-            q: state.every.q,
+            ...state.every,
             except: toggle(state.every.except, pageIds, view.allOnPage),
           },
         };
@@ -268,7 +285,7 @@ export function nextPick(stored: UsersPick, action: PickAction, pageIds: readonl
         return {
           picked: [],
           every: {
-            q: state.every.q,
+            ...state.every,
             except: toggle(state.every.except, [action.id], !on),
           },
         };
@@ -281,7 +298,9 @@ export function nextPick(stored: UsersPick, action: PickAction, pageIds: readonl
 
 /** What the export action is sent for a pick. */
 export const selectionOf = (state: UsersPick): UserSelection =>
-  state.every ? { mode: "all", q: state.every.q, except: state.every.except } : { mode: "ids", ids: state.picked };
+  state.every
+    ? { mode: "all", q: state.every.q, ...(state.every.mail ? { mail: state.every.mail } : {}), except: state.every.except }
+    : { mode: "ids", ids: state.picked };
 
 /** rww-users-2026-11-06.csv */
 export const exportFileName = (format: ExportFormat, now = new Date()): string => `rww-users-${now.toISOString().slice(0, 10)}.${format}`;
