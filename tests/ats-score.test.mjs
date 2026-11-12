@@ -31,6 +31,7 @@ registerHooks({
 
 const { displayedScore, expectedScore, isCurrentScore, projectedLifts, scoreMakeup } = await import("../app/lib/ats/score.ts");
 const { strictness } = await import("../app/lib/ats/strictness.ts");
+const { SCORING_VERSION } = await import("../app/lib/ats/scoring-version.ts");
 const { toReport } = await import("../app/lib/ats/report.ts");
 const { scanBaseline } = await import("../app/lib/apply/state.ts");
 
@@ -41,6 +42,14 @@ it('preserves serialized metric factors and scoring version; legacy reports and 
   assert.equal(scanBaseline({resumeId:'a',version:2,report},'b',3).previousScore,null);
   const legacy=toReport({...report,scoringVersion:undefined});
   assert.equal(scanBaseline({resumeId:'a',version:2,report:legacy},'a',3).previousScore,null);
+});
+
+it('keeps the saved score independent of the optional as-written score', () => {
+  const scan = {scanId:'best', score:54, metrics:[], gaps:[], verdicts:[]};
+  assert.equal(toReport(scan).asWrittenScore, undefined);
+  const best = toReport({...scan, asWrittenScore:90});
+  assert.equal(best.score, 54);
+  assert.equal(best.asWrittenScore, undefined);
 });
 
 const metrics = (keyword, impact, parse, length) => [
@@ -54,13 +63,13 @@ describe("the ATS score's recipe", () => {
   it("adds up 70/15/10/5 from the numbers shown, rounding a half up as by hand", () => {
     assert.equal(expectedScore({ metrics: metrics(86, 69, 100, 100) }), 86);
     assert.equal(expectedScore({ metrics: metrics(92, 94, 100, 100) }), 94);
-    assert.equal(expectedScore({ metrics: metrics(100, 100, 100, 100), stuffingPenalty: 2 }), 98);
+    assert.equal(expectedScore({ metrics: metrics(100, 100, 100, 100), stuffingPenalty: 2 }), 97);
     assert.equal(expectedScore({ metrics: metrics(100, 100, 100, 100) }), 99);
     assert.equal(expectedScore({ metrics: metrics(null, 60, 90, 90) }), 80);
   });
 
   it("tells a report scored by keyword match alone from one scored today", () => {
-    assert.equal(isCurrentScore({ scoringVersion: 22, score: 86, metrics: metrics(86, 69, 100, 100) }), true);
+    assert.equal(isCurrentScore({ scoringVersion: SCORING_VERSION, score: 86, metrics: metrics(86, 69, 100, 100) }), true);
     // Before 2026-10-19 the same numbers scored 75 when keyword match was 75.
     assert.equal(isCurrentScore({ score: 75, metrics: metrics(75, 69, 100, 100) }), false);
     // Too old to have every metric: nothing to tell by.
@@ -68,7 +77,7 @@ describe("the ATS score's recipe", () => {
   });
 
   it("never says the score's recipe on the page (owner, 2026-10-19: it read as a keyword matcher)", () => {
-    const made = scoreMakeup({ scoringVersion: 22, score: 86, metrics: metrics(86, 69, 100, 100) }, { keywordChecked: true });
+    const made = scoreMakeup({ scoringVersion: SCORING_VERSION, score: 86, metrics: metrics(86, 69, 100, 100) }, { keywordChecked: true });
     assert.equal(made.current, true);
     assert.doesNotMatch(JSON.stringify(made), /%|keyword match/i);
     assert.equal(scoreMakeup({ score: 75, metrics: metrics(75, 69, 100, 100) }, { keywordChecked: true }).current, false);
@@ -139,7 +148,7 @@ it("rejects arithmetically valid reports from a missing or old scoring version",
   const report = { score: 86, metrics: metrics(86, 69, 100, 100) };
   assert.equal(isCurrentScore(report), false);
   assert.equal(isCurrentScore({ ...report, scoringVersion: 15 }), false);
-  assert.equal(isCurrentScore({ ...report, scoringVersion: 22 }), true);
+  assert.equal(isCurrentScore({ ...report, scoringVersion: SCORING_VERSION }), true);
 });
 
 it('marks provider fallback verdicts as partial even when they have coverage states', async () => {

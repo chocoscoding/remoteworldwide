@@ -67,6 +67,8 @@ const toBase64 = (file: File): Promise<string> =>
   });
 
 export interface ImportedResume {
+  reviewOnly?: boolean;
+  followUpQuestions?: import("@/app/lib/ats/types").ScanReport["followUpQuestions"];
   resumeId: string;
   version: number;
   status: string;
@@ -254,6 +256,7 @@ const MAX_IMPORT_LABEL = 120;
 export function importResumeContent(content: ResumeContent, label: string): Promise<ImportedResume> {
   return apiPost<ImportedResume>("/api/ai/resume/imports/text", {
     text: resumeContentToText(content),
+    content,
     label: label.trim().slice(0, MAX_IMPORT_LABEL) || null,
   });
 }
@@ -275,12 +278,13 @@ const DRAFTS = "/api/ai/resume/drafts";
 const draftLabel = (label: string) => label.trim().slice(0, MAX_IMPORT_LABEL) || "Tailored resume";
 
 /** The application's draft, made from the first version it uses. */
-export const createDraftResume = (content: ResumeContent, label: string): Promise<ImportedResume> =>
-  apiPost<ImportedResume>(DRAFTS, { content, label: draftLabel(label) });
+export interface DraftScoreGuard { checkedTailor?: string; applicantFact?: boolean; tailor?: boolean; scanId: string; jdText: string; best?: { pending: string[]; excluded: string[]; company?: string | null; confirmed?: Array<{ term: string; detail?: string; entryId?: string }> } }
+export const createDraftResume = (content: ResumeContent, label: string, scoreGuard?: DraftScoreGuard): Promise<ImportedResume> =>
+  apiPost<ImportedResume>(DRAFTS, { content, scoreGuard, label: draftLabel(label) });
 
 /** A later version, into the same draft. Unchanged words keep its version. */
-export const updateDraftResume = (id: string, content: ResumeContent, label?: string): Promise<ImportedResume> =>
-  apiPatch<ImportedResume>(`${DRAFTS}/${encodeURIComponent(id)}`, { content, ...(label ? { label: draftLabel(label) } : {}) });
+export const updateDraftResume = (id: string, content: ResumeContent, label?: string, scoreGuard?: DraftScoreGuard): Promise<ImportedResume> =>
+  apiPatch<ImportedResume>(`${DRAFTS}/${encodeURIComponent(id)}`, { content, scoreGuard, ...(label ? { label: draftLabel(label) } : {}) });
 
 /** The application was tracked with this draft: kept, under the name it was sent with, in the resume lists from now on. */
 export const keepDraftResume = (id: string, label?: string): Promise<ImportedResume> =>
@@ -322,6 +326,7 @@ export interface SavedResumeDocument {
 
 /** The slices an autosave may send. It sends the ones that changed, whole. */
 export interface ResumeDocumentPatch {
+  expectedUpdatedAt?:string;
   label?: string;
   content?: ResumeContent;
   design?: ResumeDesign;

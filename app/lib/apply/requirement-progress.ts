@@ -16,3 +16,15 @@ export function requirementProgress(before: ScanReport | null | undefined, after
     return was && was.state !== 'undetermined' && v.state !== 'undetermined' && credit(v) > credit(was);
   }).map(v => v.requirement.label || v.requirement.text);
 }
+
+/** The same verified source material goes to both the whole-resume and selected-keyword writers. */
+export function suggestionEvidence(verdict: RequirementVerdict | undefined, label: string) {
+  return {
+    means: verdict?.requirement.text ?? label,
+    proof: verdict?.requirement.proof ?? [],
+    missing: verdict?.criteria?.filter(part => part.match === "absent").map(part => part.criterion),
+    evidenced: verdict?.criteria?.filter(part => part.match !== "absent")
+      .map(part => part.criterion + " (" + part.match + "): " + part.quote),
+    citations: verdict?.evidence.filter(item => item.section === "experience").map(item => item.text),
+  };
+}

@@ -57,6 +57,7 @@ export interface ResumeCheck {
   posting: CheckPosting | null;
   /** Exactly the text that was scored (`resumeContentToText`). Compared against the document to tell a stale check. */
   text: string;
+  contentKey?: string;
 }
 
 /**
@@ -95,8 +96,12 @@ export interface ResumeDocument {
  * text is what was scored: a change the text does not show (an entry id, a
  * link label) cannot have moved the score and does not make the check stale.
  */
+export const scoreContentKey = (content: ResumeContent): string =>
+  JSON.stringify([resumeContentToText(content), content.hiddenParts ?? [], content.draftProposals ?? [],
+    content.aiFigures ?? [], content.aiFiguresCleared === true]);
+
 export const isStaleCheck = (doc: Pick<ResumeDocument, "check" | "content">): boolean =>
-  doc.check !== null && doc.check.text !== resumeContentToText(doc.content);
+  doc.check !== null && (doc.check.contentKey ? doc.check.contentKey !== scoreContentKey(doc.content) : doc.check.text !== resumeContentToText(doc.content));
 
 /**
  * Whether a resume has nothing on it yet for a check or a suggestion to read.

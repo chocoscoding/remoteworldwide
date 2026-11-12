@@ -7,6 +7,8 @@ import type { ChunkSection, CoverageState, RequirementVerdict, ScanReport } from
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import type { ResumePlace } from "@/app/lib/resume/ai";
 import type { FitAsk } from "./state";
+import { opensWithStrongVerb } from "./impact";
+import { actionableSkillLabel } from "../resume/skill-labels";
 
 export type ScoreHue = "low" | "mid" | "high";
 
@@ -21,13 +23,6 @@ export const METRIC_GROUPS: Array<{ title: string; ids: string[] }> = [
   { title: "Pass the AI", ids: ["keyword-match", "parseability"] },
   { title: "Pass the human", ids: ["impact-language", "length-format"] },
 ];
-
-/**
- * Keyword match from which nothing more is asked for (owner, 2026-10-19: "there should be a point
- * where it's like, nothing left to add, move on"). A senior already this close is not shown
- * "Personalized communication" to add.
- */
-export const ENOUGH_KEYWORD_MATCH = 90;
 
 /** Impact language under which its row shows; above it, three bullets without a number are no reason to nag. */
 export const IMPACT_WORTH_FIXING_BELOW = 80;
@@ -124,12 +119,6 @@ export function provedIn(worked: ReadonlyArray<{ label: string; lines: string[] 
   return workedIn(inLines, content, ["bullets"]);
 }
 
-/** Whether the resume already matches enough of the posting that nothing more is suggested for it. */
-export const matchesEnough = (report: Pick<ScanReport, "metrics">): boolean => {
-  const keyword = report.metrics.find((metric) => metric.id === "keyword-match");
-  return typeof keyword?.value === "number" && keyword.checked !== false && keyword.value >= ENOUGH_KEYWORD_MATCH;
-};
-
 /** The checks the scan could measure, with their numbers: one it could not ("not checked") is never 0. */
 const measured = (report: Pick<ScanReport, "metrics">): Array<{ id: string; value: number }> =>
   report.metrics.flatMap((metric) => (metric.checked === false || metric.value === null ? [] : [{ id: metric.id, value: metric.value }]));
@@ -202,6 +191,18 @@ const TRAIT_LABEL = /\b(?:comfort\w*|confiden\w*|willing\w*|eager\w*|energy|init
  */
 export const fitGap = (verdict: RequirementVerdict | undefined): boolean => !verdict || worthAdding(verdict);
 
+/** Tailor can rewrite work for a partly met duty even when the keyword card is finished. */
+export function tailorTargets(report: Pick<ScanReport, "score" | "verdicts">) {
+  const remaining = (v: RequirementVerdict) => v.requirement.weight *
+    (v.requirement.type === "preferred" ? 0.4 : 1) *
+    (v.state === "partial" ? 1 - (v.criterionCredit ?? v.score ?? 0.5) : 1);
+  return report.verdicts.filter(v => (v.state === "partial" || v.state === "missing") &&
+    ["skill", "experience", "responsibility"].includes(v.requirement.category) && !v.requirement.id.startsWith("role:") &&
+    !TRAIT_LABEL.test(v.requirement.label || v.requirement.text))
+    .sort((a,b) => remaining(b) - remaining(a))
+    .map(v => ({ id:v.requirement.id, label:v.requirement.label || v.requirement.text }));
+}
+
 /** Example asks shown at once, at most. */
 const MAX_EXAMPLE_ASKS = 4;
 
@@ -225,7 +226,7 @@ export function exampleAsks(
     if (verdict.requirement.id.startsWith("role:")) continue;
     for (const term of verdict.unnamed ?? []) {
       const key = fold(term);
-      if (!key || seen.has(key) || listed.has(key) || declined.has(key)) continue;
+      if (!key || !actionableSkillLabel(term) || seen.has(key) || listed.has(key) || declined.has(key)) continue;
       seen.add(key);
       const near = (verdict.requirement.proof ?? []).filter((word) => fold(word) !== key);
       out.push({ term, ifTrue: `${term}, if you have used it`, place: "skills", fromStep: null, no: false, addedIn: null, near });
@@ -240,7 +241,11 @@ const foldName = (text: string): string =>
     .toLowerCase()
     .replace(/[^\p{L}\p{N}+#]+/gu, " ")
     .trim();
-const coreName = (label: string): string => foldName(label).replace(LABEL_FILLER, " ").replace(/\s+/g, " ").trim() || foldName(label);
+const coreName = (label: string): string => {
+  const name = foldName(label).replace(/\banswer engine optimi[sz]ation\b/g, "aeo");
+  const core = name.replace(LABEL_FILLER, " ").replace(/\b(?:tools?|mastery|queries|query|dashboards?|visuali[sz]ation)\b/g, " ").replace(/\s+/g, " ").trim();
+  return /^(?:analytics|marketing|design|data|management|research|product)$/.test(core) ? name : core || name;
+};
 /** Up to this many characters, a name matches only a name that is exactly it. */
 const SHORT_NAME_CHARS = 2;
 
@@ -429,6 +434,41 @@ export interface KeptProof {
   kept: string[];
 }
 
+/** On stretch matches, bring one buried achievement to the top of its role
+ * when the scan actually cites it and the writer left the experience alone. */
+export function leadWithEvidence(before: ResumeContent, proposal: ResumeContent, report: Pick<ScanReport,"score"|"verdicts">): ResumeContent {
+  if (report.score >= 85) return proposal;
+  const weights = new Map<string,number>();
+  for (const verdict of report.verdicts) {
+    if (verdict.mention || !["satisfied", "partial"].includes(verdict.state) || verdict.requirement.id?.startsWith("role:")) continue;
+    const weight = (verdict.requirement.weight ?? 1) * (verdict.state === "satisfied" ? 1 : 0.75);
+    for (const item of verdict.evidence) {
+      if (item.section === "experience") weights.set(item.text, (weights.get(item.text) ?? 0) + weight);
+    }
+  }
+  const action = (line:string) => opensWithStrongVerb(line.trim().replace(/^successfully\s+/i, ""));
+  const experience = proposal.experience.map((entry, index) => {
+    const original = before.experience[index];
+    if (!original || entry.id !== original.id || entry.hidden || proposal.hiddenParts?.some(part =>
+      part === "experience" || part === "exp:"+entry.id || part.startsWith("exp:"+entry.id+":"))) return entry;
+    if (original.bullets.length !== entry.bullets.length) return entry;
+    const first = entry.bullets.findIndex(action);
+    if (first < 0) return entry;
+    let best = first;
+    for (let b = first + 1; b < entry.bullets.length; b++) {
+      // Do not move achievements across a subheading, employer description or list boundary.
+      if (/:\s*$/.test(entry.bullets[b-1]) || (!action(entry.bullets[b]) && !/[.!?]$/.test(entry.bullets[b]))) break;
+      if (!action(entry.bullets[b])) continue;
+      if ((weights.get(original.bullets[b]) ?? 0) > (weights.get(original.bullets[best]) ?? 0)) best = b;
+    }
+    if (best === first || (weights.get(original.bullets[best]) ?? 0) - (weights.get(original.bullets[first]) ?? 0) < 3) return entry;
+    const bullets = [...entry.bullets];
+    bullets.splice(first, 0, ...bullets.splice(best, 1));
+    return {...entry, bullets};
+  });
+  return experience.some((role,e) => role !== proposal.experience[e]) ? {...proposal, experience} : proposal;
+}
+
 /**
  * No AI change may remove what proves a requirement (owner, 2026-10-19: a rewrite took "copywriting"
  * and "English" off the resume, and the score went from 61 to 45). Every line the scan quotes as
@@ -436,7 +476,25 @@ export interface KeptProof {
  * least half of the words that showed it, goes back to how it was. Everything else in the change stays.
  */
 export function keepProof(before: ResumeContent, after: ResumeContent, report: Pick<ScanReport, "verdicts">, reviewedCompressions: readonly string[] = []): KeptProof {
+  // Automated follow-up edits must leave a reviewable line attached to its
+  // evidence. Only an explicit user edit or confirmation accepts a proposal.
   let content = after;
+  const pending = before.draftProposals ?? [];
+  if (pending.length) {
+    const experience = after.experience.map(role => {
+      const original = before.experience.find(r => r.id === role.id);
+      if (!original || original.bullets.length !== role.bullets.length) return role;
+      const bullets = role.bullets.map((line,i) => {
+        const old = pending.find(p => p.entryId === role.id && p.after === original.bullets[i]);
+        if (!old || role.bullets.includes(old.after) || after.draftProposals?.some(p => p.entryId === role.id && p.after === line)) return line;
+        return old.after;
+      });
+      return {...role, bullets};
+    });
+    const proposals = [...new Map([...pending, ...(after.draftProposals ?? [])].map(p => [p.signature,p])).values()]
+      .filter(p => experience.some(r => r.id === p.entryId && r.bullets.includes(p.after)));
+    content = {...after, experience, draftProposals: proposals};
+  }
   const kept = new Set<string>();
   const lost = (was: string, now: string, verdict: RequirementVerdict): boolean => {
     if (sameLine(now, was)) return false;
@@ -476,6 +534,12 @@ export function keepProof(before: ResumeContent, after: ResumeContent, report: P
             if (!sameLine(bullet, evidence.text)) return;
             const now = content.experience.find((e) => e.id === entry.id);
             if (!now || index >= now.bullets.length || !lost(bullet, now.bullets[index], verdict)) return;
+            // The writer can split a long final paragraph into its independent
+            // accomplishments. No evidence is lost when every visible word survives.
+            if (index === entry.bullets.length - 1 && now.bullets.length > entry.bullets.length &&
+                !content.hiddenParts?.some(key => key.startsWith("exp:"+now.id+":")) &&
+                sameLine(now.bullets.slice(index).join(" "),bullet)) return;
+            if (now.bullets.some((line,i) => sameLine(line,bullet) && !content.hiddenParts?.includes(`exp:${now.id}:${i}`))) return;
             content = {
               ...content,
               experience: content.experience.map((e) =>
@@ -496,6 +560,10 @@ export function keepProof(before: ResumeContent, after: ResumeContent, report: P
         });
       }
     }
+  }
+  if (content.draftProposals?.length) {
+    const active = content.draftProposals.filter(p => content.experience.some(role => role.id === p.entryId && role.bullets.includes(p.after)));
+    if (active.length !== content.draftProposals.length) content = {...content, draftProposals:active};
   }
   return { content, kept: [...kept] };
 }

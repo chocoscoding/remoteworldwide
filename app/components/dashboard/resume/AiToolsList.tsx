@@ -21,6 +21,9 @@ import {
   type FocusEvent,
   type ReactNode,
 } from "react";
+import FigurePlacement, { experienceOnly, skillProof } from "./FigurePlacement";
+import ReviewedWording from "./ReviewedWording";
+import { withYourNumber } from "@/app/lib/apply/impact-asks";
 import type { LucideIcon } from "lucide-react";
 import {
   Briefcase,
@@ -146,16 +149,17 @@ export interface AiToolsListProps {
   /** Quantify's per-bullet upgrades and which have been applied. */
   quantify: QuantifySuggestion[] | null;
   quantifyApplied: Set<number>;
-  onApplyQuantify: (index: number, confirmed?: string) => void;
+  onApplyQuantify: (index: number, confirmed?: string, experience?: boolean, skill?: string) => void;
   onApplyAllQuantify: () => void;
   /** Missing keywords the standing job check found, when there is one — said on the keywords row. */
   keywordsFound?: number | null;
   /** Bullets on the resume that carry no number — said on the Quantify row. */
   linesWithoutNumber?: number;
   keywordProposals?: KeywordProposalRow[] | null;
+  keywordPlacement?: (term:string)=>ReactNode;
   onAcceptKeyword?: (term: string) => void;
   onRejectKeyword?: (term: string) => void;
-  onAcceptAllKeywords?: () => void;
+  onAcceptAllKeywords?: (terms:string[]) => void;
   /** Rewrite, Quantify or Tone waiting for a pick on the page: its row says so and offers Cancel. */
   picking?: "rewrite" | "quantify" | "tone" | null;
   onCancelPick?: () => void;
@@ -359,6 +363,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
   linesWithoutNumber = 0,
   keywordProposals = null,
   onAcceptKeyword,
+  keywordPlacement,
   onRejectKeyword,
   onAcceptAllKeywords,
   picking = null,
@@ -384,9 +389,10 @@ const AiToolsList: FC<AiToolsListProps> = ({
   // Per-card navigation.
   const [take, setTake] = useState(0);
   const [qAt, setQAt] = useState(0);
+  const [destination,setDestination]=useState(experienceOnly);
   const [ownWording, setOwnWording] = useState("");
   const [wordingPreview, setWordingPreview] = useState(false);
-  useEffect(() => { setOwnWording(""); setWordingPreview(false); }, [qAt, quantify]);
+  useEffect(() => { setOwnWording(""); setWordingPreview(false); setDestination(experienceOnly); }, [qAt, quantify]);
   const [leftOut, setLeftOut] = useState<ReadonlySet<string>>(() => new Set());
   useEffect(() => setTake(0), [rewriteVariants]);
   useEffect(() => setQAt(0), [quantify]);
@@ -514,7 +520,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
           .filter((row) => leftOut.has(row.term))
           .forEach((row) => onRejectKeyword?.(row.term));
         if (chosen.length === 1) onAcceptKeyword?.(chosen[0].term);
-        else if (chosen.length > 1) onAcceptAllKeywords?.();
+        else if (chosen.length > 1) onAcceptAllKeywords?.(chosen.map(row=>row.term));
         setLeftOut(new Set());
       };
       return (
@@ -605,6 +611,7 @@ const AiToolsList: FC<AiToolsListProps> = ({
               );
             })}
           </div>
+          {chosen.length===1 && keywordPlacement?.(chosen[0].term)}
         </ResultCard>
       );
     }
@@ -704,6 +711,9 @@ const AiToolsList: FC<AiToolsListProps> = ({
     if (id === "quantify" && quantify && quantify.length > 0) {
       const at = Math.min(qAt, quantify.length - 1);
       const q = quantify[at];
+      const typed = ownWording.trim();
+      const wording = !typed ? q.after : withYourNumber(q.before,q.after,typed) ?? (typed.split(/\s+/).length >= 5 ? typed : "");
+      const proof=skillProof(q.before,wording,destination);
       const applied = quantifyApplied.has(at);
       const left = quantify.filter((_, i) => !quantifyApplied.has(i)).length;
       const nextOpen = () => {
@@ -730,10 +740,10 @@ const AiToolsList: FC<AiToolsListProps> = ({
                   type="button"
                   onClick={() => {
                     if (q.estimate && !wordingPreview) { setWordingPreview(true); return; }
-                    onApplyQuantify(at, q.estimate ? ownWording.trim() : undefined);
+                    onApplyQuantify(at, q.estimate ? wording : undefined, !q.estimate || destination.experience, q.estimate ? proof : undefined);
                     nextOpen();
                   }}
-                  disabled={q.estimate && ownWording.trim().split(/\s+/).length < 5}
+                  disabled={q.estimate && (!wording || (!destination.experience && !destination.skills) || (destination.skills && (!proof || proof.length>50)))}
                   className={MAIN_ACTION}
                 >
                   {q.estimate ? wordingPreview ? "Confirm wording" : "Preview wording" : "Apply"}
@@ -810,14 +820,15 @@ const AiToolsList: FC<AiToolsListProps> = ({
               {q.before}
             </span>
             <span className="text-[12.5px] font-bold leading-relaxed text-primary">
-              {q.after}
+              <ReviewedWording before={q.before} after={q.after} />
             </span>
             {q.estimate && <div className="space-y-2 text-xs">
               <p>This proposed number is unconfirmed. {q.question || "What changed after this work?"} You can skip and keep the original.</p>
-              <label className="block">Your complete sentence, including the actual value, unit and period
+              <label className="block">Confirm the proposed wording or enter your figure with its unit
                 <textarea value={ownWording} onChange={event => { setOwnWording(event.target.value); setWordingPreview(false); }} className="mt-1 w-full rounded border p-2" />
               </label>
-              {wordingPreview && <p role="status"><strong>Preview: </strong>{ownWording.trim()}</p>}
+              <FigurePlacement before={q.before} after={wording} choice={destination} onChange={next=>{setDestination(next);setWordingPreview(false);}} />
+              {wordingPreview && <p role="status"><strong>Preview: </strong>{wording}</p>}
             </div>}
           </div>
         </ResultCard>

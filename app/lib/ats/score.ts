@@ -51,7 +51,7 @@ export function expectedScore(report: Pick<ScanReport, "metrics" | "stuffingPena
             length * HEADLINE_SHARES["length-format"]) /
             100,
         );
-  return Math.max(0, Math.min(MAX_SCAN_SCORE, made - (report.stuffingPenalty ?? 0)));
+  return Math.max(0, Math.min(MAX_SCAN_SCORE, made) - (report.stuffingPenalty ?? 0));
 }
 
 /** A report is comparable only when both its metric rules and arithmetic are current.
@@ -126,9 +126,9 @@ export function projectedLifts(report: Pick<ScanReport, "verdicts" | "metrics">)
     // Skills, or without some of its examples: the rest of its credit.
     const examples = verdict.state === "satisfied" && typeof verdict.examples === "number" ? verdict.examples : 1;
     if (verdict.state === "undetermined" || (verdict.state === "satisfied" && (verdict.coverage ?? 1) >= 1 && !verdict.mention && examples >= 1)) continue;
+    // Match the scorer: use the lower credit once, without stacking discounts.
     const earned =
-      (verdict.coverage ?? REQUIREMENT_WEIGHTS.coverage[verdict.state]) *
-      (verdict.mention ? REQUIREMENT_WEIGHTS.mention : 1) *
+      Math.min(verdict.coverage ?? REQUIREMENT_WEIGHTS.coverage[verdict.state], verdict.mention ? REQUIREMENT_WEIGHTS.mention : 1) *
       (1 - REQUIREMENT_WEIGHTS.examples * (1 - examples)) *
       (REQUIREMENT_WEIGHTS.confidence[verdict.confidence] ?? 1);
     lifts.set(verdict.requirement.id, (HEADLINE_SHARES["keyword-match"] * weightOf(verdict) * (1 - earned)) / possible);

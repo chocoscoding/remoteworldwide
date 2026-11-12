@@ -1,0 +1,10 @@
+@media (prefers-reduced-motion: no-preference) {
+  .nudge {
+    animation: employer-question 450ms ease-in-out 2;
+  }
+}
+
+@keyframes employer-question {
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}

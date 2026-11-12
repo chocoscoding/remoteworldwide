@@ -2,17 +2,11 @@ export interface DraftRole { id: string; label: string; company?: string; role?:
 
 /** A starting point to confirm, never evidence that the candidate did this work. */
 export function experienceDraft(skill: string, role: DraftRole): string {
-  const company = role.company?.trim() || "[company]";
-  if (/recruit|hiring|candidate screening|talent acquisition/i.test(skill)) {
-    return `Supported [${skill} / candidate screening] for [X] roles at ${company}, helping reduce time-to-hire by [X]%.`;
-  }
-  if (/sales|revenue|account management/i.test(skill)) {
-    return `Used [${skill}] at ${company} to support [X] accounts, contributing to [X]% growth in [revenue / retention].`;
-  }
-  if (/test|quality|automation|engineering|programming|react|python|typescript/i.test(skill)) {
-    return `Used [${skill}] at ${company} to improve [system / workflow], reducing [errors / processing time] by [X]%.`;
-  }
-  return `Applied [${skill}] in my ${role.role?.trim() || "[role]"} work at ${company} to improve [process / deliverable], achieving [measurable outcome].`;
+  // Reuse a relevant line the candidate already supplied before offering a new draft.
+  const terms = skill.toLowerCase().match(/[a-z]{3,}/g) ?? [];
+  const existing = role.context?.split(/\n+/).find(line => terms.length > 0 && terms.every(term => line.toLowerCase().includes(term)));
+  if (existing?.trim()) return existing.trim().slice(0, 500);
+  return "";
 }
 
 export function suggestedExperienceRole(skill: string, roles: readonly DraftRole[]): DraftRole | undefined {

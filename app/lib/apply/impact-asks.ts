@@ -46,6 +46,7 @@ export const withYourNumber = (before: string, after: string, typed: string): st
   const period = /\b(?:per|each|a)\s+(?:day|week|month|year)\b/gi;
   if ((after.match(period) ?? []).some(value => !before.toLowerCase().includes(value.toLowerCase()))) return null;
   const added = addedFigures(before, after);
+  if (added.length>1 && !isFromTo(before,after)) return null;
   const range = /^(?:about\s+|approximately\s+|~\s*)?(\d[\d,.]*)(?:\s*[-–]\s*)(\d[\d,.]*)(%|x)?$/i.exec(typed.trim());
   if (range && !isFromTo(before, after) && added.length === 1) {
     const low = yours(added[0], `${range[1]}${range[3] ?? ""}`);
@@ -71,7 +72,7 @@ export const withYourNumber = (before: string, after: string, typed: string): st
     line += `${after.slice(from, at)}${mine}`;
     from = at + ai.length;
   }
-  return line + after.slice(from);
+  return (line + after.slice(from)).replace(/(\d)%\s+percent\b/gi, "$1 percent");
 };
 
 /** "from 6 weeks to 2": a from-to the AI wrote, both numbers its own. */

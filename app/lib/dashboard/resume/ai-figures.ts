@@ -116,7 +116,7 @@ const ownFigures = (content: ResumeContent): ResumeAiFigure[] => {
  */
 export const withAiFigures = (content: ResumeContent, accepted: ReadonlyArray<{ before: string; after: string }>): ResumeContent => {
   const addedAt = new Date().toISOString();
-  const fresh: ResumeAiFigure[] = accepted.flatMap(({ before, after }) => addedFigures(before, after).map((figure) => ({ figure, line: after, addedAt })));
+  const fresh: ResumeAiFigure[] = accepted.flatMap(({ before, after }) => addedFigures(before, after).map((figure) => ({ figure, before, line: after, addedAt })));
   if (fresh.length === 0) return content;
   const kept = content.aiFiguresCleared ? [] : pendingAiFigures(content);
   return { ...content, aiFigures: [...ownFigures(content), ...kept, ...fresh], aiFiguresCleared: false };
@@ -128,9 +128,9 @@ export const withAiFigures = (content: ResumeContent, accepted: ReadonlyArray<{ 
  * the line, so the next application uses the person's number, never the AI's guess again. Never
  * shown in the AI numbers pill.
  */
-export const withOwnFigures = (content: ResumeContent, before: string, after: string): ResumeContent => {
+export const withOwnFigures = (content: ResumeContent, before: string, after: string, binding?:{skill:string;entryId:string}): ResumeContent => {
   const addedAt = new Date().toISOString();
-  const fresh: ResumeAiFigure[] = addedFigures(before, after).map((figure) => ({ figure, line: after, addedAt, own: true }));
+  const fresh: ResumeAiFigure[] = addedFigures(before, after).map((figure) => ({ figure, line: after, addedAt, own: true, ...binding }));
   if (fresh.length === 0) return content;
   return { ...content, aiFigures: [...(content.aiFigures ?? []), ...fresh] };
 };

@@ -530,10 +530,11 @@ export interface Suggestion {
    * A small box for the person's own answer, before any `choices` (owner, 2026-10-22, fix plan 1e:
    * "How many web funnels did you build?" takes their number, "Add" puts it in the line).
    */
+  review?: ReactNode;
   input?: { placeholder: string; label: string; mode?: "text" | "decimal"; initialValue?: string; onSubmit: (value: string) => void };
   /** A Yes/No ask that can be ticked with others and answered together: its term (owner, 2026-10-22). */
   batch?: string;
-  placement?: { initialDetail?: string; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: DraftRole[]; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
+  placement?: { initialDetail?: string; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: DraftRole[]; onChange: (skills: boolean, experience: boolean, detail: string, entryId: string) => void; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
 }
 
 /** A small square tick box, the light-brutalism way: hairline when off, lime with a check when on. */
@@ -555,8 +556,11 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
   const suggestedRole = suggestedExperienceRole(row.title, row.placement?.roles ?? []);
   const initialRole = row.placement?.roles.find(role => role.id === row.placement?.entryId) ?? suggestedRole;
   const [entryId, setEntryId] = useState(initialRole?.id ?? "");
-  const [detail, setDetail] = useState(row.placement?.initialDetail || (initialRole ? experienceDraft(row.title, initialRole) : ""));
+  const [detail, setDetail] = useState(row.placement?.initialDetail || (initialRole ? experienceDraft(row.detail ?? row.title, initialRole) : ""));
   const [editedDetail, setEditedDetail] = useState(Boolean(row.placement?.initialDetail));
+  const saveDraft = (next: { skills?: boolean; experience?: boolean; detail?: string; entryId?: string }) => {
+    row.placement?.onChange(next.skills ?? skills, next.experience ?? experience, next.detail ?? detail, next.entryId ?? entryId);
+  };
   const detailRef = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const field = detailRef.current;
@@ -582,11 +586,11 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
       <div className="flex min-h-8 flex-wrap items-center gap-2">
         {onSelect && <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select: ${row.title}`} disabled={disabled} onClick={onSelect} className="cursor-pointer"><TickBox on={selected} /></button>}
         <strong className="min-w-0 flex-1 text-[13px]">{row.title}</strong>
-        <span className="text-xs text-[#5f6062]">Use in:</span>
-        {([{ label: "Skills", on: skills, toggle: () => setSkills(!skills) }, { label: "Experience", on: experience, toggle: () => setExperience(!experience) }]).map(option => (
-          <button key={option.label} type="button" aria-pressed={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled} onClick={option.toggle}
+        <span className="text-xs text-[#5f6062]">Add to either or both:</span>
+        {([{ label: "Skills", on: skills, toggle: () => { setSkills(!skills); saveDraft({ skills: !skills }); } }, { label: "Experience", on: experience, toggle: () => { setExperience(!experience); saveDraft({ experience: !experience }); } }]).map(option => (
+          <button key={option.label} type="button" role="checkbox" aria-checked={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled} onClick={option.toggle}
             className={cn("flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-[11px] font-semibold disabled:opacity-50", option.on ? "border-[#dce89c] bg-[#f2f9c9] text-[#343a18]" : "border-black/15 bg-white text-[#55564f]")}>
-            {option.on && <Check aria-hidden className="h-2.5 w-2.5" />}{option.label}
+            <TickBox on={option.on} />{option.label}
           </button>
         ))}
         {row.placement?.skillsAdded && <span className="text-[11px] text-[#63761a]">In Skills</span>}
@@ -605,7 +609,9 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
           <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => {
             setEntryId(event.target.value);
             const role = row.placement?.roles.find(item => item.id === event.target.value);
-            if (!editedDetail) setDetail(role ? experienceDraft(row.title, role) : "");
+            const nextDetail = editedDetail ? detail : role ? experienceDraft(row.detail ?? row.title, role) : "";
+            setDetail(nextDetail);
+            saveDraft({ entryId: event.target.value, detail: nextDetail });
           }} disabled={disabled} className="min-w-0 max-w-full rounded-md border border-black/15 bg-white px-2 py-1 text-xs text-primary">
             <option value="">Choose a role</option>
             {row.placement?.roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}
@@ -613,11 +619,11 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
         </label>
         <label className="block text-xs font-semibold text-primary">
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span>How did you use {row.title}?</span>
-            <span className="text-[11px] font-normal text-[#73746d]">Suggested draft. Confirm the role and wording; replace brackets only with facts you can support.</span>
+            <span>Your work example</span>
+            <span className="text-[11px] font-normal text-[#73746d]">Describe what you did in this role.</span>
           </span>
-          <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => { setDetail(event.target.value); setEditedDetail(true); }} disabled={disabled} rows={1} maxLength={500}
-            placeholder={`For example: At Acme, I used ${row.title} to…`}
+          <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => { setDetail(event.target.value); setEditedDetail(true); saveDraft({ detail: event.target.value }); }} disabled={disabled} rows={1} maxLength={500}
+            placeholder="What did you do, and what changed?"
             className="mt-1.5 block w-full resize-none overflow-y-auto rounded-lg border border-black/20 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-primary outline-none focus:border-[#222325] focus:ring-1 focus:ring-[#222325] disabled:opacity-50" />
         </label>
       </div>}
@@ -766,13 +772,12 @@ export const FixesTabs: FC<{
         </div>
       )}
 
-      {/* Owner, 2026-10-19: "there should be a point where it's like, nothing left to add, move on". */}
       {tab === "missing" && !busy && missingCount === 0 && unchecked === 0 && suggestions.length === 0 && !note && (
         <div className={cn("flex items-center gap-2.5 rounded-xl px-3.5 py-3 text-[13px]", hasScoreDrop ? "bg-[#f6f6f6]" : "bg-[#f4f9c9]")}>
           <span className={cn("grid h-[22px] w-[22px] flex-none place-content-center rounded-full", hasScoreDrop ? "text-[#73746d]" : "border-[1.5px] border-[#222325] bg-[#e1f073]")}>
             {hasScoreDrop ? <AlertCircle className="h-4 w-4" /> : <Check className="h-3 w-3 text-primary" strokeWidth={3} />}
           </span>
-          <strong className="flex-1">{hasScoreDrop ? "No missing requirements. Review the score change above." : "Nothing left to add. You’re good to move on."}</strong>
+          <strong className="flex-1">{hasScoreDrop ? "Review the score change above." : "No additional edits from this check."}</strong>
         </div>
       )}
 
@@ -861,6 +866,7 @@ export const FixesTabs: FC<{
                 {row.detail && <span className={row.note ? "text-[#d3d1c7]" : "text-[#5f6062]"}> {row.detail}</span>}
               </span>
               {row.onShow && <ShowInResume onClick={row.onShow} />}
+              {row.review}
               {row.input && <RowInput input={row.input} disabled={disabled} />}
               {row.choices?.map((choice) => (
                 <button

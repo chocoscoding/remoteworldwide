@@ -23,6 +23,7 @@ import { downloadPdf, type ServerPdfSource } from "@/app/lib/export/pdf-download
 import { resumePrintSpec } from "@/app/lib/export/print-css";
 import { resumeToDocx } from "@/app/lib/export/resume";
 import { printDocument, safeFileName, saveBlob } from "@/app/lib/export/save";
+import { needsFigureReview } from "@/app/lib/resume/confirmed-content";
 import { draftPaper, type DraftPaper } from "@/app/lib/print/draft-paper";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +74,7 @@ export function useResumeDownload(): {
   function download(whole: ResumeContent, name: string, format: ResumeDownloadFormat, from?: { id: string; version: number | null | undefined } | null) {
     // What is hidden for this application (the step's eyes) never goes into the file: the same
     // paper the server's print page draws (draft-paper.ts).
+    if (needsFigureReview(whole)) { toast.error("Review your unchecked figures before downloading this draft."); return; }
     const paper = draftPaper(whole);
     const title = fileBase(name);
     if (format === "pdf") {

@@ -35,7 +35,9 @@ import { useResumeDesign } from "@/app/components/dashboard/resume/useResumeDesi
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { useSidebarCollapse } from "@/app/components/dashboard/SidebarCollapseContext";
-import { isBlankContent, isStaleCheck, type CheckPosting, type ResumeCheck, type ResumeDocument } from "./resume-document";
+import { displayPostingQuestions } from "@/app/lib/apply/posting-question";
+import { scoreRevision } from "@/app/lib/ats/api";
+import { isBlankContent, isStaleCheck, scoreContentKey, type CheckPosting, type ResumeCheck, type ResumeDocument } from "./resume-document";
 import { useResumeAutosave } from "./useResumeAutosave";
 import { quantifyKey } from "./editor-state";
 import ContentForm from "./content/ContentForm";
@@ -46,6 +48,12 @@ import AtsDockedRail from "./AtsDockedRail";
 import { AiFiguresPill, ReadabilityPill } from "./AtsSidePills";
 import { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures, withOwnFigures, withLonger } from "@/app/lib/dashboard/resume/ai-figures";
 import { readabilityFlags, type ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
+import { confirmedContent, needsFigureReview } from "@/app/lib/resume/confirmed-content";
+import { showWorkSections } from "@/app/lib/dashboard/resume/design-defaults";
+import { roleCoaching, missingWorkPrompt } from "@/app/lib/resume/role-coaching";
+import LinkedNumbers from "@/app/components/dashboard/resume/LinkedNumbers";
+import WorkEvidence, { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
+import AddEmployer from "@/app/components/dashboard/resume/AddEmployer";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
 import { applyToneFix, pinToneFixes, proposalState, type ToneProposal } from "@/app/lib/resume/tone-fixes";
@@ -60,7 +68,7 @@ import type { PickedJob } from "@/app/lib/jobs/fields";
 // only make it slower and occasionally fail. Everything that needs judgment —
 // or a credit — now runs in the AI service through `app/lib/resume/ai.ts`.
 import { askDesignSettings, checkedAskAction, designActionFor } from "@/app/lib/dashboard/resume/ask-actions";
-import { applyQuantify, type AskLonger, type QuantifySuggestion, type RewriteVariant, type TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
+import { applyQuantify, type FitAddition, type AskLonger, type QuantifySuggestion, type RewriteVariant, type TermAdvice } from "@/app/lib/dashboard/resume/ai-tools";
 import { addSkills, hasSkill, reconcileGroups } from "@/app/lib/resume/skills";
 import {
   askForRewrite,
@@ -357,6 +365,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     [content.experience],
   );
   // "Add missing keywords" proposals. Whether each is in is read off Skills and the marks, so Undo moves it back.
+  const [builderQuestions,setBuilderQuestions]=useState<FitAddition[]>([]);
   const [keywordProposals, setKeywordProposals] = useState<string[] | null>(null);
   const keywordRows = (keywordProposals ?? [])
     .map((term) => ({ term, state: hasSkill(content, term) ? ("added" as const) : marks.rejectedKeywords.includes(term.toLowerCase()) ? ("rejected" as const) : ("pending" as const) }));
@@ -448,7 +457,25 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // Against the LIVE content, not `activeDoc.content`: that copy is only
   // written back on a document switch, so it would call a check current while
   // the user was typing past it.
-  const checkIsStale = useMemo(() => isStaleCheck({ check, content }), [check, content]);
+  const scoreContent = useMemo(() => withSectionTitles(content, sections), [content, sections]);
+  const checkIsStale = useMemo(() => isStaleCheck({ check, content: scoreContent }), [check, scoreContent]);
+  useEffect(() => {
+    if (!check || !checkIsStale || checker.checking || autosave.status.kind !== "saved") return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const report = await scoreRevision(check.report.scanId, scoreContent, check.posting?.description ?? null);
+        if (cancelled) return;
+        const updated = { ...check, report, at: new Date(), text: resumeContentToText(scoreContent),
+          contentKey: scoreContentKey(scoreContent) };
+        dispatch({ type: "learn", check: updated });
+        setDocuments(prev => prev.map(doc => doc.id === activeDocId ? { ...doc, check: updated } : doc));
+      } catch {
+        // Keep the last measured score marked stale. The existing check action can retry.
+      }
+    }, 800);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [activeDocId, autosave.status.kind, check, checkIsStale, checker.checking, dispatch, scoreContent, setDocuments]);
   // A job check's findings stand only while the check does — Remove takes the
   // "to match this posting" rewrite away with the posting it was matched to.
   const suggestions = check?.job ? (activeDoc.suggestions ?? null) : null;
@@ -502,6 +529,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   const handleDownload = async (format: DownloadFormat, fileName: string) => {
     // The name from the download dialog's field: the suggestion below, or what they changed it to.
     const base = fileName;
+    if (needsFigureReview(content)) { toast.message("Review your unchecked figures before downloading this older draft."); return; }
     // Some applicant systems (Greenhouse among them) can't read a file over 2.5 MB, and a photo is
     // the usual cause (RWW/ATS-QUALITY-PLAN.md, 13.3). A DOCX is measured; the PDF is the browser's
     // own print, which can't be, so a photo is what's warned about.
@@ -770,18 +798,18 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
 
     if (result.terms.length === 0) {
       setKeywordProposals(null);
-      landAiTool("keywords", `Nothing missing. Your resume already covers what ${job.company} asked for.`);
+      landAiTool("keywords", `No additional skills came back for ${job.role}.`);
       return;
     }
     setKeywordProposals(result.terms);
     landAiTool(
       "keywords",
-      `${result.terms.length} keyword${result.terms.length === 1 ? "" : "s"} from ${job.role} at ${job.company}. Tick the ones to add to Skills.`,
+      `${result.terms.length} keyword${result.terms.length === 1 ? "" : "s"} from ${job.role} at ${job.company}. Choose a skill to place it on your resume.`,
     );
   };
 
   /** A proposal ticked in: into Skills (the last group, when grouped), one undo step. */
-  const acceptKeyword = (term: string) => dispatch({ type: "edit", content: (prev) => addSkills(prev, [term]) });
+  const acceptKeyword = (term: string) => dispatch({ type: "edit", sections:prev=>showWorkSections(prev,true,false), content: (prev) => addSkills(prev, [term]) });
 
   /** A proposal set aside: a step, so Undo brings it back. */
   const rejectKeyword = (term: string) => {
@@ -790,40 +818,26 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   };
 
   /** Every proposal still waiting, ticked in as one step. */
-  const acceptAllKeywords = () => {
-    const waiting = keywordRows.filter((row) => row.state === "pending").map((row) => row.term);
-    if (waiting.length > 0) dispatch({ type: "edit", content: (prev) => addSkills(prev, waiting) });
+  const acceptAllKeywords = (waiting:string[]) => {
+    if (waiting.length > 0) dispatch({ type: "edit", sections:prev=>showWorkSections(prev,true,false), content: (prev) => addSkills(prev, waiting) });
   };
 
   /** Tailor lands here with the job in context, or from the job picker. */
   const handleTailorJob = async (job: CheckPosting) => {
-    const result = await runSuggestion("tailor", () =>
-      tailorToJob({ content: forAi(content), jdText: job.description, company: job.company, role: job.role }),
-    );
-    if (!result) return;
-
-    // `woven` names only what the result carries, so it can be empty. What the resume's history doesn't
-    // show was left out, with advice, never written in (owner, 2026-10-18).
-    const notShown = result.notShown ?? [];
-    const caption =
-      (result.woven.length > 0
-        ? `Tailored to ${job.role} at ${job.company}: wove ${quote(result.woven)} in.`
-        : `Tailored your summary to ${job.role} at ${job.company}.`) + notShownNote(notShown);
-    // Only the two fields the service actually rewrote, folded onto the
-    // content as it is NOW. `tailorToJob` used to be a pure function this
-    // screen could simply re-run against `prev`; it is a round trip now, and
-    // writing `result.content` back whole would silently discard anything the
-    // user typed while it was out. The service asks the model for a narrow
-    // diff — a summary and a skills list — precisely so the rest of the
-    // document never has to travel, and this is the other half of that deal.
-    //
-    // Deliberately NOT a check. This used to stamp a job check with a score
-    // 13 points up, which reported a measurement nobody had taken. Tailoring
-    // changes the text, so any standing check goes stale by itself and the
-    // card offers to run it again — which is the only way to know whether
-    // the tailor actually moved the number.
-    // Sub skill groups follow the tailored list, as they do for keywords (`reconcileGroups`).
-    landAiTool("tailor", caption, (prev) => reconcileGroups({ ...prev, summary: result.content.summary, skills: result.content.skills }));
+    const snapshot=content;
+    const result=await runSuggestion("tailor",()=>tailorToJob({content:forAi(snapshot),jdText:job.description,company:job.company,role:job.role,whole:true,propose:true,checkBeforeApply:true}));
+    if (!result?.checkedScores) return;
+    if (latest.current.content!==snapshot) {
+      landNote("tailor","Your resume changed during tailoring. Run it again on the current wording.");
+      return;
+    }
+    setBuilderQuestions(displayPostingQuestions(result.couldAdd ?? [],job.description));
+    const {before,after}=result.checkedScores;
+    if (after<=before) {landNote("tailor",`Confirmed score ${before}. Review the remaining questions.`);return;}
+    // Use the exact checked result. Keep private custom sections omitted from the request.
+    const checkedCustom = new Map(result.content.customSections?.map(section=>[section.id,section]));
+    const checked = {...result.content,customSections:snapshot.customSections?.map(section=>checkedCustom.get(section.id) ?? section)};
+    landAiTool("tailor",`Confirmed score ${before} → ${after} for ${job.role}.`,now=>now!==snapshot ? now : checked);
   };
 
   // -------------------------------------------------------------------------
@@ -1185,15 +1199,20 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
 
   // Every number Quantify adds is recorded for the person to check (owner, 2026-10-18): the "AI
   // numbers" pill by the ATS check counts them and shows each on the page.
-  const applyQuantifyAt = (index: number, confirmed?: string) => {
+  const applyQuantifyAt = (index: number, confirmed?: string, experience=true, skill?:string) => {
     const original = quantifyList?.[index];
-    if (original?.estimate && (!confirmed || confirmed.trim().split(/\s+/).length < 5)) return;
+    if (original?.estimate && !confirmed?.trim()) return;
     const suggestion = original && confirmed ? { ...original, after: confirmed, estimate: false } : original;
     if (!suggestion || quantifyApplied.has(index)) return;
     dispatch({
       type: "edit",
-      content: (prev) => confirmed ? withOwnFigures(applyQuantify(prev, suggestion), suggestion.before, suggestion.after) : withAiFigures(applyQuantify(prev, suggestion), [suggestion]),
-      marks: (m) => ({ quantified: [...m.quantified, quantifyKey(suggestion)] }),
+      sections:prev=>showWorkSections(prev,!!skill,experience && !suggestion.customId),
+      content: prev=>{
+        const changed=experience ? applyQuantify(prev,suggestion) : prev;
+        const placed=skill ? addSkills(changed,[skill]) : changed;
+        return confirmed ? withOwnFigures(placed,suggestion.before,suggestion.after,experience && skill && prev.experience[suggestion.entryIndex] ? {skill,entryId:prev.experience[suggestion.entryIndex].id}:undefined) : withAiFigures(placed,[suggestion]);
+      },
+      marks: (m) => ({ quantified: [...m.quantified, quantifyKey(original!)] }),
     });
   };
 
@@ -1589,6 +1608,21 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 </div>
               )}
 
+              {docTab === "ai" && <LinkedNumbers content={content} onSave={doc=>dispatch({type:"edit",content:doc})} />}
+              {docTab === "ai" && builderQuestions.map(q=><WorkEvidence key={q.term} content={content} prompt={q.ifTrue} preferExperience={q.place==="experience"} initialSkill={q.term}
+                onSave={fact=>{
+                  dispatch({type:"edit",content:prev=>placeWork(prev,fact),sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
+                  setBuilderQuestions(current=>current.filter(item=>item.term!==q.term));
+                  return true;
+                }} />)}
+              {docTab === "ai" && <WorkEvidence content={content} prompt={roleCoaching(jobInContext?.role ?? content.title,check?.report,content) ?? (!builderQuestions.length ? missingWorkPrompt(check?.report) : undefined)} onSave={fact => {
+                dispatch({type:"edit",content:prev=>placeWork(prev,fact),sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
+                return true;
+              }} />}
+              {docTab === "ai" && <AddEmployer scope="this resume" onAdd={entry => {
+                dispatch({ type:"edit", sections:prev=>showWorkSections(prev,false,true), content:prev=>({...prev, experience:[...prev.experience,entry]}) });
+                return true;
+              }} />}
               {docTab === "ai" && aiLocked && (
                 <button
                   type="button"
@@ -1624,6 +1658,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   onApplyAllFixes={applyAllToneProposals}
                   keywordsFound={cards.find((card) => card.kind === "keywords")?.terms?.length ?? null}
                   keywordProposals={keywordProposals ? keywordRows : null}
+                  keywordPlacement={term=><WorkEvidence key={term} initialSkill={term} prompt={"Place "+term+" in Skills or Experience"} content={content}
+                    onSave={fact=>{
+                      dispatch({type:"edit",content:prev=>placeWork(prev,fact),sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
+                      return true;
+                    }} />}
                   onAcceptKeyword={acceptKeyword}
                   onRejectKeyword={rejectKeyword}
                   onAcceptAllKeywords={acceptAllKeywords}
@@ -1798,7 +1837,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   on every slider step and keystroke, for nobody. */}
               {downloadOpen && (
                 <div ref={printPaperRef} aria-hidden className="pointer-events-none fixed left-[-10000px] top-0">
-                  <ResumePaper design={design} sections={sections} content={content} chrome={design.chrome} />
+                  <ResumePaper design={design} sections={sections} content={confirmedContent(content)} chrome={design.chrome} />
                 </div>
               )}
             </section>

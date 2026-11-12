@@ -11,6 +11,7 @@
 import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
 import type { ResumeDesign, SectionConfig } from "@/app/lib/dashboard/resume/design-types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
+import { confirmedContent } from "@/app/lib/resume/confirmed-content";
 import { reconcileGroups } from "@/app/lib/resume/skills";
 import { visibleContent } from "@/app/lib/resume/visible";
 
@@ -22,6 +23,6 @@ export interface DraftPaper {
 
 /** Skills a tool added to the flat list only are brought into the entries (as the step shows them), then the hidden parts go. */
 export function draftPaper(stored: ResumeContent): DraftPaper {
-  const content = visibleContent(reconcileGroups(stored));
+  const content = confirmedContent(visibleContent(reconcileGroups(stored)));
   return { design: DEFAULT_DESIGN, sections: withContentSections(DEFAULT_SECTIONS, content), content };
 }

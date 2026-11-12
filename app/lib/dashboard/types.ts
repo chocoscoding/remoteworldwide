@@ -203,7 +203,18 @@ export interface ResumeSkillGroup {
   hidden?: boolean;
 }
 
+export interface DraftProposal {
+  entryId: string;
+  before: string;
+  after: string;
+  kind: "detail" | "estimate";
+  signature: string;
+}
+
 export interface ResumeContent {
+  /** Original parsed upload, used to preserve its scan evidence in an unchanged editor copy. */
+  sourceUploadId?: string;
+  draftProposals?: DraftProposal[];
   name: string;
   title: string;
   location: string;
@@ -241,6 +252,9 @@ export interface ResumeContent {
 
 /** One number the AI suggested: the figure, and the line as Quantify wrote it (RWW/ATS-QUALITY-PLAN.md, 13.8). */
 export interface ResumeAiFigure {
+  skill?:string;
+  entryId?:string;
+  before?: string;
   figure: string;
   line: string;
   /** ISO time it was accepted. */

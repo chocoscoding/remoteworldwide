@@ -44,7 +44,7 @@ const {
   bareBullets,
   keepProof,
   languageAsk,
-  matchesEnough,
+  tailorTargets,
   provedIn,
   workedIn,
   worthAdding,
@@ -63,6 +63,7 @@ const {
 } = await import("../app/lib/apply/fixes.ts");
 const { impactMisses, openingWord } = await import("../app/lib/apply/impact.ts");
 const { chipAsks } = await import("../app/lib/apply/chip-asks.ts");
+const { SCORING_VERSION } = await import("../app/lib/ats/scoring-version.ts");
 
 const content = (overrides = {}) => ({
   name: "Ada Obi",
@@ -85,7 +86,7 @@ const report = {
   scanId: "s1",
   resumeVersion: 2,
   score: 61,
-  scoringVersion: 24,
+  scoringVersion: SCORING_VERSION,
   metrics: [],
   gaps: [],
   verdicts: [],
@@ -903,12 +904,11 @@ describe("what is worth a chip (owner, 2026-10-19: \"nothing left to add, move o
     assert.equal(worthAdding(verdict("partial", "required", 3)), false);
   });
 
-  it("asks for nothing once keyword match reaches 90", () => {
-    const at = (value, extra = {}) => ({ metrics: [{ id: "keyword-match", label: "Keyword match", value, ...extra }] });
-    assert.equal(matchesEnough(at(93)), true);
-    assert.equal(matchesEnough(at(90)), true);
-    assert.equal(matchesEnough(at(89)), false);
-    assert.equal(matchesEnough(at(null, { checked: false })), false);
+  it("keeps a specific outstanding requirement visible even on a high-scoring resume", () => {
+    const gap = { requirement: { id:"audit", text:"Conduct post-launch audits", category:"responsibility", type:"required", weight:4 }, state:"partial", score:0.5 };
+    for (const score of [90, 95, 98, 99]) {
+      assert.deepEqual(tailorTargets({score, verdicts:[gap]}), [{id:"audit",label:"Conduct post-launch audits"}]);
+    }
   });
 });
 
@@ -1132,4 +1132,94 @@ describe("what the paper marks", () => {
     assert.ok(marks.some((mark) => mark.text === "SQL"));
     assert.ok(!marks.some((mark) => mark.text === "Built the payments API"));
   });
+});
+
+it("a stretch match can foreground cited experience without duplicating a bullet", async () => {
+  const {leadWithEvidence, keepProof} = await import("../app/lib/apply/fixes.ts");
+  const bullets = ["Managed the customer support queue.", "Supported onboarding for new accounts.", "Reduced onboarding time by improving feedback collection."];
+  const content = {experience:[{id:"a",bullets}],skills:[],summary:""};
+  const report = {score:62,verdicts:[{state:"satisfied",requirement:{weight:4,text:"Improve onboarding",label:"Customer onboarding"},evidence:[{section:"experience",text:bullets[2]}]}]};
+  const candidate = leadWithEvidence(content,content,report);
+  assert.deepEqual(keepProof(content,candidate,report).content.experience[0].bullets,[bullets[2],bullets[0],bullets[1]]);
+  assert.equal(leadWithEvidence(content,content,{...report,score:90}),content);
+});
+
+it("shows the posting's file-import requirement on a saved Photoshop question", async () => {
+  const {postingQuestion} = await import("../app/lib/apply/posting-question.ts");
+  assert.equal(postingQuestion("Partner communities","Candidate has built developer communities.","Build developer communities."),
+    "Have you built developer communities?");
+  assert.equal(postingQuestion("Python","Python, if you have used it?","Language polyglot, advanced experience with at least 2 out of Java, Python, NodeJS+TypeScript."),
+    "What service or tool, if any, have you built or maintained with Python?");
+  assert.equal(postingQuestion("Enterprise partnerships","Candidate has demonstrated experience in enterprise partnerships.","Build enterprise partnerships."),
+    "What experience, if any, do you have with enterprise partnerships?");
+  assert.equal(postingQuestion("Adobe Photoshop","Have you used Adobe Photoshop?",
+    "Lead import and export. Support high-fidelity import from Figma, PSD and legacy tooling."),
+    "Did you ship an import that brought PSD files into an editor ready to edit?");
+  assert.equal(postingQuestion("Photoshop","Have you retouched portraits with Photoshop?","Retouch product photography."),
+    "Have you retouched portraits with Photoshop?");
+});
+
+it("scopes a saved localization question to the audience in the posting", async()=>{
+  const {postingQuestion, localizationQuestion}=await import("../app/lib/apply/posting-question.ts");
+  const job="Our office is in Japan. Create and localise content for Brazilian audiences. Experience adapting English-language content for Brazilian audiences.";
+  assert.equal(postingQuestion("Content localisation","Created localized content for non-English markets?",job),"Have you adapted English-language content for Brazilian audiences?");
+  assert.equal(localizationQuestion("Localise content for German audiences. Adapt copy for French audiences."),undefined);
+});
+
+it("drops official-title checks and scopes procurement to the posting",async()=>{
+  const {asksForTitle,postingQuestion}=await import("../app/lib/apply/posting-question.ts");
+  assert.equal(asksForTitle("Is the candidate’s role officially titled Senior Product Manager in any of the listed positions?"),true);
+  assert.equal(asksForTitle("What is the source for the Senior Product Manager title?","Senior Product Manager title"),true);
+  assert.equal(asksForTitle("Did you work in this role?","Senior Product Manager"),true);
+  assert.equal(asksForTitle("Did you lead product discovery?"),false);
+  const job="Navigate complex, multi-stakeholder procurement processes typical of Japanese enterprise and government accounts.";
+  assert.equal(postingQuestion("Public-sector procurement","Familiar with Japanese public-sector procurement?",job),"Have you guided an enterprise or government customer in Japan through procurement? Which step did you own?");
+});
+
+it("phrases a suggested tool and its intended use as a question", async () => {
+  const {postingQuestion} = await import("../app/lib/apply/posting-question.ts");
+  assert.equal(postingQuestion("Jira", "Jira for backlog and sprint management, if you have used it.",
+    "Hands-on SAFe experience using Azure DevOps or Jira."), "Have you used Jira for backlog and sprint management?");
+});
+
+it("uses the task after a vague posting heading and finishes a clipped generated ask", async () => {
+  const {postingQuestion} = await import("../app/lib/apply/posting-question.ts");
+  assert.equal(postingQuestion("for scale","Did you build for scale?",
+    "- Build for scale. Create repeatable recruiting processes, leverage talent tools, and evaluate hiring."),
+    "Did you create repeatable recruiting processes?");
+  assert.equal(postingQuestion("Applicant tracking","Have you used an applicant tracking system to manage pipelines and","Manage candidate pipelines."),
+    "Have you used an applicant tracking system to manage pipelines?");
+});
+
+it("uses a missing job duty for an empty follow-up without importing the employer's traffic numbers", async () => {
+  const {missingWorkPrompt} = await import("../app/lib/resume/role-coaching.ts");
+  const requirements = ["Maintain our pipeline processing 5TB daily", "Develop back-end services"];
+  const verdicts = requirements.map((text,i)=>({state:"missing",requirement:{id:String(i),text,type:"required",category:"responsibility"}}));
+  assert.equal(missingWorkPrompt({verdicts}),"This role asks you to develop back-end services. Where have you done this, and what did you deliver?");
+  assert.equal(missingWorkPrompt({verdicts:verdicts.map(v=>({...v,state:"satisfied"}))}),undefined);
+});
+
+  it("asks about the gap in a partner channel using only a visible onboarding example", async () => {
+    const {roleCoaching}=await import("../app/lib/resume/role-coaching.ts");
+    const report={score:76,verdicts:[{requirement:{id:"partner",text:"Recruit resellers in Japan"},state:"partial",
+      criteria:[{criterion:"recruit resellers and channel partners",match:"related"}]}]};
+    const doc={experience:[{id:"partner",company:"Studio",bullets:["Built an onboarding system to drive partner acquisition."]}]};
+    assert.match(roleCoaching("Growth Lead",report,doc),/system you built at Studio serve resellers or distributors in Japan/);
+    assert.doesNotMatch(roleCoaching("Growth Lead",report,{...doc,hiddenParts:["exp:partner:0"]})??"",/Studio/);
+  });
+
+  it("asks for a changed decision using the person's visible work in the same role", async () => {
+  const {roleCoaching} = await import("../app/lib/resume/role-coaching.ts");
+  const duty = "A decision you changed because the data told you to";
+  const report = {score:78, verdicts:[{requirement:{id:"a",text:duty},state:"partial",
+    criteria:[{criterion:duty,match:"related"}]}]};
+  const role = {id:"a",company:"Example",bullets:["Ran A/B tests.", "Reworked the permissions flow."]};
+  const ask = (doc, scan = report) => roleCoaching("Product Manager", scan, doc) ?? "";
+  assert.match(ask({experience:[role]}), /At Example, did user feedback change which permissions flow/);
+  assert.match(ask({experience:[{...role,bullets:["Joined client meetings.","Prioritized client integrations."]}]}),
+    /At Example, did feedback from a client meeting change which integration/);
+  assert.doesNotMatch(ask({experience:[role],hiddenParts:["exp:a:1"]}), /permissions flow/);
+  assert.doesNotMatch(ask({experience:[role],draftProposals:[{entryId:"a",after:role.bullets[1]}]}), /permissions flow/);
+  assert.doesNotMatch(ask({experience:[role]}, {...report,verdicts:[{...report.verdicts[0],
+    criteria:[{criterion:duty,match:"direct"}]}]}), /permissions flow/);
 });

@@ -22,7 +22,7 @@ registerHooks({
 });
 
 
-const { confirmAsks, factsFor, appliedAsks, openConfirmedAsks, mergeReviewedAsks } = await import('../app/lib/apply/confirmed-facts.ts');
+const { confirmAsks, factsFor, appliedAsks, openConfirmedAsks, mergeReviewedAsks, confirmationPlacements } = await import('../app/lib/apply/confirmed-facts.ts');
 const { readApplyState } = await import('../app/lib/apply/state.ts');
 const { pendingTerms } = await import('../app/lib/apply/pending-asks.ts');
 const { requirementProgress } = await import('../app/lib/apply/requirement-progress.ts');
@@ -31,6 +31,28 @@ const skills = ask('Excel', 'skills');
 const work = ask('Figma');
 const line = 'Designed mobile onboarding in Figma.';
 const content = { skills: ['Excel'], experience: [{ bullets: [line] }] };
+
+it('bulk add preserves both destinations and the edited example', () => {
+  const selected = { ...work, useSkills: true, useExperience: true, detail: line, entryId: 'role' };
+  assert.deepEqual(confirmationPlacements(selected).map(item => item.place), ['skills', 'experience']);
+  assert.ok(confirmationPlacements(selected).every(item => item.detail === line && item.entryId === 'role'));
+  assert.deepEqual(confirmationPlacements({ ...selected, useSkills: false }).map(item => item.place), ['experience']);
+  assert.deepEqual(confirmationPlacements({ ...selected, useSkills: false, useExperience: false }), []);
+});
+
+it('a Skills-only choice does not confirm an unused experience draft', () => {
+  assert.deepEqual(factsFor([{ ...work, confirmed: true, useSkills: true, useExperience: false, detail: line, entryId: 'role' }]), [{ term: 'Figma' }]);
+});
+
+it('old saved fragment questions are hidden while complete activities remain', () => {
+  assert.deepEqual(openConfirmedAsks(['Train', 'Trainer', 'Trainee', 'Center', 'Excellence', 'Customer training'].map(term => ask(term)), new Set()).map(item => item.term), ['Customer training']);
+});
+
+it('cached scan examples do not recreate fragment questions', async () => {
+  const { exampleAsks } = await import('../app/lib/apply/fixes.ts');
+  const report = { verdicts: [{ requirement: { id: 'training', type: 'required', proof: [] }, unnamed: ['Train', 'Trainer', 'Trainee', 'Center', 'Excellence', 'Salesforce'] }] };
+  assert.deepEqual(exampleAsks(report, { skills: [] }, []).map(item => item.term), ['Salesforce']);
+});
 
 it('undo keeps unanswered questions and restores a question when its insertion is undone', () => {
   const question = { ...work, fromStep: 'tailor', addedIn: null };
@@ -110,4 +132,21 @@ it('retires an already-applied confirmation after rewriting without losing the u
  const next=mergeReviewedAsks([saved],[],['Marketplace design']);
  assert.deepEqual(openConfirmedAsks(next,new Set()),[]);
  assert.deepEqual(factsFor(next),[{term:'Marketplace design',detail:saved.detail,entryId:'role-1'}]);
+});
+
+it("adds only an applicant-supplied reach figure to the correct visible role",async()=>{
+  const {confirmMarketingReach}=await import("../app/lib/apply/confirmed-facts.ts");
+  const before="Led marketing for a brand serving customers in Europe and Asia.";
+  const role={id:"marketing",bullets:[before]};
+  const resume={experience:[{id:"other",bullets:["Other work."]},role]};
+  const ask={entryId:"marketing",before,unit:"customers"};
+  const question={term:"Marketing reach at Studio",ifTrue:"How many customers did your marketing reach?",place:"experience",addedIn:null,reach:ask};
+  assert.deepEqual(openConfirmedAsks([question],new Set()),[]);
+  for(const answer of ["","I don't know","1,2","200 contacts"]) assert.equal(confirmMarketingReach(resume,ask,answer),null);
+  const result=confirmMarketingReach(resume,ask,"about 1,250 customers");
+  assert.equal(result.content.experience[1].bullets[0],before+" Marketing reached about 1,250 customers.");
+  assert.deepEqual(result.content.experience[0],resume.experience[0]);
+  assert.equal(confirmMarketingReach(result.content,ask,"200000"),null);
+  assert.equal(confirmMarketingReach(resume,{...ask,entryId:"other"},"200000"),null);
+  assert.equal(confirmMarketingReach({...resume,hiddenParts:["exp:marketing:0"]},ask,"1250"),null);
 });

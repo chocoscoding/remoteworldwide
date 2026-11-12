@@ -28,6 +28,8 @@ import type { ResumeContent } from "../types";
 // ---------------------------------------------------------------------------
 
 export interface TailorResult {
+  checkedTailor?: string;
+  checkedScores?: {before:number; after:number};
   content: ResumeContent;
   /** The JD terms woven in — surfaced in the done-caption. */
   woven: string[];
@@ -42,6 +44,9 @@ export interface TailorResult {
 
 /** One line "Tailor to this job" changed: lightly ("tune") or led with what the job wants ("reframe"). */
 export interface FitChange {
+  /** Visible source bullets and enumerated items supporting this rewrite. */
+  sourceMarkers?: string[];
+  countedItems?: string[];
   marker: string;
   kind: "tune" | "reframe";
   before: string;
@@ -51,6 +56,7 @@ export interface FitChange {
 
 /** Something the job asks for that the resume does not show: asked of the person ("NetSuite, if you have used it"), never written in. */
 export interface FitAddition {
+  reach?: {entryId:string; before:string; unit:string};
   term: string;
   ifTrue: string;
   /** Where a "Yes" puts it: work into a line of the experience, a tool, language or certification into Skills. */

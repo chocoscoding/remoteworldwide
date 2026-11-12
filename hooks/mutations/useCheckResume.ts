@@ -27,7 +27,7 @@ import type { ScanReport } from "@/app/lib/ats/types";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { importResumeContent, resumeContentToText } from "@/app/lib/resume/api";
 import { qk } from "@/app/lib/query/keys";
-import type { CheckPosting, ResumeCheck } from "@/app/components/dashboard/resume/resume-document";
+import { scoreContentKey, type CheckPosting, type ResumeCheck } from "@/app/components/dashboard/resume/resume-document";
 
 export type CheckStatus = "idle" | "preparing" | "scoring" | "explaining" | "done" | "failed";
 
@@ -82,6 +82,7 @@ export function useCheckResume() {
       // the check must be compared against later. Reading it after the import
       // would stamp the check with whatever the user typed while it ran.
       const text = resumeContentToText(content);
+      const contentKey = scoreContentKey(content);
       const jobLabel = job ? `${job.role} at ${job.company}` : null;
 
       setFailure(null);
@@ -103,13 +104,13 @@ export function useCheckResume() {
         // landed, not when the write-up behind it finished.
         const scored: { at: Date | null } = { at: null };
         const report: ScanReport = await streamScan(
-          { resumeId: imported.resumeId, jdText: job?.description ?? null, jobId: job?.id ?? null },
+          { resumeId: imported.resumeId, jdText: job?.description ?? null, jobId: job?.id ?? null, jobTitle: job?.role ?? null },
           {
             signal: controller.signal,
             onScored: (first) => {
               if (!current()) return;
               scored.at = new Date();
-              onScored({ report: first, at: scored.at, job: jobLabel, posting: job, text });
+              onScored({ report: first, at: scored.at, job: jobLabel, posting: job, text, contentKey });
               setStatus("explaining");
             },
           },
@@ -119,7 +120,7 @@ export function useCheckResume() {
         setStatus("done");
         // A scan spends a credit, so the balance in the header is now behind.
         void queryClient.invalidateQueries({ queryKey: qk.billing.overview() });
-        return { report, at: scored.at ?? new Date(), job: jobLabel, posting: job, text };
+        return { report, at: scored.at ?? new Date(), job: jobLabel, posting: job, text, contentKey };
       } catch (error) {
         // An abort is this hook superseding itself; the newer run owns the state.
         if (!current() || (error instanceof Error && error.name === "AbortError")) return null;

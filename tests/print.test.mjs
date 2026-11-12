@@ -193,14 +193,14 @@ describe("print CSS", () => {
       pageSize: "A4",
       pageMargin: "0",
       // A title keeps with its first line on the next page (page-breaks, 2026-10-18).
-      css: ".rww-print li{break-inside:avoid;}.rww-print [data-resume-keep-with-next]{break-inside:avoid;break-after:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}",
+      css: ".rww-print li{break-inside:avoid;}.rww-print li:nth-last-child(2){break-after:avoid;}.rww-print [data-resume-keep-with-next]{break-inside:avoid;break-after:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}",
     });
     assert.deepEqual(resumePrintSpec({ ...design, doc: { pageFormat: "letter" } }, true), {
       className: "rww-print rww-print-multi",
       pageSize: "Letter",
       pageMargin: "14mm 0",
       css:
-        ".rww-print li{break-inside:avoid;}.rww-print [data-resume-keep-with-next]{break-inside:avoid;break-after:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}" +
+        ".rww-print li{break-inside:avoid;}.rww-print li:nth-last-child(2){break-after:avoid;}.rww-print [data-resume-keep-with-next]{break-inside:avoid;break-after:avoid;}.rww-print [data-resume-page-break]{visibility:hidden;height:0;overflow:hidden;}" +
         ".rww-print-multi>*{min-height:0!important;padding-top:0!important;padding-bottom:0!important;}",
     });
   });

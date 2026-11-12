@@ -107,6 +107,7 @@ export interface ApplyResumeState {
 }
 
 export interface FitAsk {
+  reach?: {entryId:string; before:string; unit:string};
   /** An editorial review replaced or resolved this unanswered label. */
   superseded?: boolean;
   /** The candidate confirmed this fact, independently of insertion success or undo. */
@@ -267,6 +268,9 @@ function readAsks(value: unknown): FitAsk[] {
       term: item.term.slice(0, 120),
       ifTrue: typeof item.ifTrue === "string" && item.ifTrue.trim() !== "" ? item.ifTrue.slice(0, 300) : item.term.slice(0, 120),
       place: item.place === "skills" ? ("skills" as const) : ("experience" as const),
+      ...(isRecord(item.reach) && typeof item.reach.entryId==="string" && typeof item.reach.before==="string" &&
+          typeof item.reach.unit==="string" && /^(?:customers|users|consumers|viewers|subscribers|clients)$/.test(item.reach.unit)
+        ? {reach:{entryId:item.reach.entryId.slice(0,120),before:item.reach.before.slice(0,2000),unit:item.reach.unit}} : {}),
       fromStep: str(item.fromStep),
       no: item.no === true,
       ...(item.superseded === true ? { superseded: true } : {}),

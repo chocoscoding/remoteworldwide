@@ -39,7 +39,6 @@ import {
   coveredKeywords,
   isUnchecked,
   partialLine,
-  projectedLifts,
   scanCoverage,
   scanTier,
   scoreMakeup,
@@ -196,22 +195,8 @@ const AtsResults: FC<AtsResultsProps> = ({
   const makeup = report ? scoreMakeup(report, { keywordChecked }) : null;
 
   const base = report?.score ?? 0;
-  // Nothing scores 100 (owner, 2026-10-18), the projection included, so no fix is worth more than the room left.
-  const headroom = Math.max(0, MAX_SCAN_SCORE - base);
-  // Closing a gap moves keyword match and nothing else, so a scan that could not check it projects nothing.
-  // An old scan, scored when the score was keyword match alone, projects nothing: a rescore gives the real number.
-  const projecting = !partial && keywordChecked && headroom > 0 && makeup?.current !== false;
-  // What closing each gap is projected to add, the scorer's own arithmetic (`projectedLifts`). A real
-  // rescore is the only thing that moves the real number, so this is shown and never written anywhere.
-  const lifts = useMemo(() => (report ? projectedLifts(report) : new Map<string, number>()), [report]);
-  const gapLift = (id: string) => Math.min(headroom, Math.max(1, Math.round(lifts.get(id) ?? 0)));
-  const lift = useMemo(() => {
-    if (!projecting) return 0;
-    const sum = unmet.filter((v) => fixedIds.has(v.requirement.id)).reduce((total, v) => total + (lifts.get(v.requirement.id) ?? 0), 0);
-    return Math.min(headroom, Math.round(sum));
-  }, [unmet, fixedIds, projecting, headroom, lifts]);
-
-  const displayed = clamp(base + lift, 0, MAX_SCAN_SCORE);
+  const canSelect = !partial && keywordChecked && makeup?.current !== false;
+  const displayed = clamp(base, 0, MAX_SCAN_SCORE);
   const tier = scanTier(displayed);
 
   // Everything the report suggests, as the editor's AI will read it ("Fix these in my resume").
@@ -365,11 +350,6 @@ const AtsResults: FC<AtsResultsProps> = ({
             <div className="flex flex-col items-center gap-8 sm:flex-row sm:items-start">
               <div className="relative flex-none">
                 {partial ? <div className="grid h-[164px] w-[164px] place-items-center rounded-full border-8 border-dashed border-gray-200 text-4xl text-gray-400" aria-label="Overall score pending">—</div> : <ScoreRing value={displayed} size={164} fillColor={scoreStep(displayed).color} trackColor={scoreStepTrack(displayed)} />}
-                {lift > 0 && (
-                  <span className="absolute -right-1 -top-1 rounded-full border-[1.5px] border-[#222325] bg-[#e1f073] px-2 py-0.5 text-xs font-bold text-[#222325] tabular-nums">
-                    +{lift}
-                  </span>
-                )}
               </div>
               <div className="flex min-w-0 flex-1 flex-col items-center gap-4 text-center sm:items-start sm:text-left">
                 <div>
@@ -404,10 +384,10 @@ const AtsResults: FC<AtsResultsProps> = ({
                       </p>
                     </>
                   )}
-                  {lift > 0 && (
+                  {canSelect && fixedIds.size > 0 && (
                     <p className="mt-2 max-w-md text-xs leading-relaxed text-black/45">
                       {/* Said plainly: the ring is showing a projection right now. */}
-                      Showing a projected {displayed} with your ticked fixes applied. Your scored number is {base} until you scan again.
+                      Scan your edited resume to see how these changes affect your score.
                     </p>
                   )}
                 </div>
@@ -459,14 +439,12 @@ const AtsResults: FC<AtsResultsProps> = ({
                   {unmet.length === 1 ? "One gap to close" : `${unmet.length} gaps to close`}
                 </p>
                 <p className="mt-0.5 text-xs text-black/45">
-                  {projecting
-                    ? "Read from the posting, heaviest first. Ticking one projects what closing it is worth. Scan again to score it for real."
-                    : "Read from the posting, heaviest first. Scan again once you've closed them to see what they're worth."}
+                  The most important requirements appear first. Select the ones you want to work on.
                 </p>
               </div>
               {unmet.map((verdict) => {
                 const { requirement } = verdict;
-                const fixed = projecting && fixedIds.has(requirement.id);
+                const fixed = canSelect && fixedIds.has(requirement.id);
                 const quoted = verdict.evidence[0];
                 return (
                   <div
@@ -504,13 +482,13 @@ const AtsResults: FC<AtsResultsProps> = ({
                         }}
                         source={{ kind: "ats", ref: job?.id || resume.id }}
                       />
-                      {projecting && (
+                      {canSelect && (
                         <StickerButton
                           variant={fixed ? "outline" : "primary"}
                           size="sm"
                           className="flex-none"
                           onClick={() => onToggleFix(requirement.id)}>
-                          {fixed ? "Undo" : `+${gapLift(requirement.id)}`}
+                          {fixed ? "Deselect" : "Select"}
                         </StickerButton>
                       )}
                     </div>

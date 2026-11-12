@@ -260,3 +260,9 @@ export function stepBy(value: number, steps: number[], direction: 1 | -1): numbe
   const next = Math.min(steps.length - 1, Math.max(0, current + direction));
   return steps[next];
 }
+
+export function showWorkSections(sections: SectionConfig[], skills: boolean, experience: boolean): SectionConfig[] {
+  const requested = DEFAULT_SECTIONS.filter(s=>(skills && s.kind==="skills") || (experience && s.kind==="experience"));
+  const missing = requested.filter(s=>!sections.some(existing=>existing.kind===s.kind));
+  return [...sections.map(s=>!s.visible && requested.some(r=>r.kind===s.kind) ? {...s,visible:true} : s),...missing];
+}

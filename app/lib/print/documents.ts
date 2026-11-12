@@ -27,6 +27,7 @@ import { resumeToDocxBuffer } from "@/app/lib/export/resume";
 import { safeFileName } from "@/app/lib/export/save";
 import type { IngestedResumeDetail } from "@/app/lib/ats/types";
 import type { StoredResumeDocument } from "@/app/lib/resume/api";
+import { needsFigureReview } from "@/app/lib/resume/confirmed-content";
 import { reconcileGroups } from "@/app/lib/resume/skills";
 import type { Settings } from "@/app/lib/settings/types";
 import { draftPaper } from "./draft-paper";
@@ -122,6 +123,7 @@ export async function builtResumeFile(userId: string, id: string, format: Docume
   }
   if (!doc) return NOT_FOUND;
 
+  if (needsFigureReview(doc.content)) return refuse(422,"unreadable","Review the unchecked figures in Resume Creator before downloading.");
   const fileName = `${personFileBase(doc.content?.name, "Resume")}.${format}`;
   let bytes: ArrayBuffer | Uint8Array;
   if (format === "docx") {
@@ -195,6 +197,7 @@ export async function draftResumeFile(userId: string, id: string, format: Docume
   if (row.status !== "ready" || !row.content) return refuse(422, "unreadable", "That resume hasn't been read yet.");
   if (typeof expectVersion === "number" && row.version !== expectVersion) return refuse(409, "stale", "That resume changed a moment ago. Try again.");
 
+  if (needsFigureReview(row.content)) return refuse(422,"unreadable","Review the unchecked figures before downloading this draft.");
   const paper = draftPaper(row.content);
   const fileName = `${personFileBase(paper.content.name, "Resume")}.${format}`;
   let bytes: ArrayBuffer | Uint8Array;

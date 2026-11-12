@@ -28,6 +28,7 @@ import type { DateFormatId, ResumeDesign, SectionConfig } from "@/app/lib/dashbo
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { displayDates } from "@/app/lib/resume/dates";
 import { displayUrl } from "@/app/lib/dashboard/resume/link-platforms";
+import { confirmedContent } from "@/app/lib/resume/confirmed-content";
 import { printableSkills, skillLine } from "@/app/lib/resume/skills";
 
 const TWIPS_PER_MM = 56.6929;
@@ -76,6 +77,7 @@ const bodySections = (sections: SectionConfig[]) => sections.filter((s) => s.vis
  * place is the same file.
  */
 export function buildResumeDocx(content: ResumeContent, design: ResumeDesign, sections: SectionConfig[]): Document {
+  content = confirmedContent(content);
   const accent = hex(design.colors.accent, "222325");
   const text = hex(design.colors.text, "222325");
   const muted = hex(design.colors.textMuted, "5A5A5A");
@@ -291,6 +293,7 @@ export async function resumeToDocxBuffer(content: ResumeContent, design: ResumeD
 
 /** The same content as Markdown: headings, bullets and links, nothing a plain-text reader cannot follow. Dates print in `dateFormat`, as on the paper. */
 export function resumeToMarkdown(content: ResumeContent, sections: SectionConfig[], dateFormat: DateFormatId = "short"): string {
+  content = confirmedContent(content);
   const printed = (dates: string | undefined) => displayDates(dates, dateFormat);
   const lines: string[] = [`# ${clean(content.name) || "Your name"}`];
   if (clean(content.title)) lines.push("", clean(content.title));

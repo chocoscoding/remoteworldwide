@@ -29,13 +29,21 @@ import {
   projectedLifts,
   scoreMakeup,
 } from "./score";
-import type { VaultDoc } from "@/app/lib/dashboard/types";
+import type { ResumeContent, VaultDoc } from "@/app/lib/dashboard/types";
 import { isPostingNote, type BulletRewrite, type ExtractedRequirements, type IngestedResume, type IngestedResumeDetail, type ScanInput, type ScanAdvice, type ScanRecord, type ScanReport, type StoredScan } from "./types";
 import { strictnessCopy } from "./strictness";
 
 export { HEADLINE_SHARES, MAX_SCAN_SCORE, STUFFING_FROM_SCORE, expectedScore, isCurrentScore, isUnchecked, projectedLifts, scoreMakeup };
 
 export const ATS_PATH = "/api/ai/scan";
+export async function scoreRevision(scanId: string, content: ResumeContent, jdText: string | null) {
+  const reading = await apiPost<Record<string, unknown>>(`${ATS_PATH}/${scanId}/revision`, { content, jdText });
+  // The id identifies the original stored scan. A revision reading lives only in the open editor.
+  const report = toReport({ ...reading, scanId });
+  if (!report || report.degraded) throw new Error("The revision could not be scored");
+  return report;
+}
+
 const RESUMES_PATH = "/api/ai/resume";
 
 /** Not an AI-service path: this one is a Next route handler on this origin. */

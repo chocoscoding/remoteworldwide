@@ -50,7 +50,7 @@ export const COVERAGE_STATES = ["satisfied", "partial", "missing", "undetermined
 export type CoverageState = (typeof COVERAGE_STATES)[number];
 
 /** The cascade stage that decided a requirement. Shown nowhere; kept for parity with the service. */
-export type ResolvedBy = "lexical" | "cosine" | "rerank" | "fallback";
+export type ResolvedBy = "lexical" | "cosine" | "rerank" | "semantic" | "fallback";
 
 export type ChunkSection = "summary" | "experience" | "education" | "skills" | "projects" | "certifications" | "header";
 
@@ -64,6 +64,11 @@ export interface Evidence {
 }
 
 export interface RequirementVerdict {
+  /** Separately assessed parts of a compound requirement, with verified source text. */
+  criteria?: Array<{criterion:string;match:"direct"|"related"|"absent";quote:string;tenure?:boolean}>;
+  criterionCredit?: number;
+  /** The resume demonstrates the core activity of a partially covered duty. */
+  coreDemonstrated?: boolean;
   /** Base coverage used by the scorer, before confidence, mention and example weights. */
   coverage?: number;
   requirement: Requirement;
@@ -108,6 +113,8 @@ export interface ScanAdvice {
  * with them absent.
  */
 export interface ScanReport {
+  supportedScore?: number | null;
+  followUpQuestions?: { term: string; ifTrue: string; place: "experience" | "skills"; reach?: {entryId: string; before: string; unit: string} }[];
   /** Missing on legacy reports, which must be rescored before comparisons. */
   scoringVersion?: number;
   scanId: string;

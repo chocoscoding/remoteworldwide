@@ -75,19 +75,22 @@ export interface SuggestionInput {
   keywords?: string[] | null;
   /** `keywords` only: list the posting's missing keywords to tick in (`proposeKeywords`), rather than work terms in. */
   propose?: boolean;
+  excluded?: string[];
   /**
    * `keywords` only: the person picked these and wants each one in (owner, 2026-10-19). With bullets
    * allowed, each must land in a line, never only in Skills.
    */
   insist?: boolean;
   /** `keywords` with `insist`: what each picked term means (the posting's requirement, the words a resume says it with), by the term. */
-  hints?: Record<string, { means: string; proof: string[] }> | null;
+  hints?: Record<string, { means: string; proof: string[]; citations?: string[] }> | null;
   /**
    * `quantify` only: the apply wizard's Impact fix (owner, 2026-10-19): a bullet with a weak opening
    * gets a strong verb from the scorer's own list as well as a number for one with none.
    */
   openers?: boolean;
   /** `tailor` only: the whole resume, line by line, toward the job ("Tailor to this job"), not just the summary and skills. */
+  checkBeforeApply?: boolean;
+  tailorScanId?: string;
   whole?: boolean;
   /** `shorten` only: "page" cuts to one page; absent trims to at most 750 words (owner, 2026-10-18). */
   target?: "page" | null;
@@ -185,9 +188,12 @@ const bodyOf = (input: SuggestionInput) => ({
     role: input.role ?? null,
     keywords: input.keywords ?? null,
     propose: input.propose === true ? true : null,
+    excluded: input.excluded,
     insist: input.insist === true ? true : null,
     openers: input.openers === true ? true : null,
     // "Tailor to this job" (2026-10-20: never sent, so the button ran the summary-and-skills Tailor).
+    checkBeforeApply: input.checkBeforeApply === true,
+    tailorScanId: input.tailorScanId,
     whole: input.whole === true ? true : null,
     hints: input.hints && Object.keys(input.hints).length > 0 ? input.hints : null,
     entryIndex: typeof input.entryIndex === "number" ? input.entryIndex : null,

@@ -14,6 +14,13 @@ export function toReport(data: unknown): ScanReport | null {
     resumeVersion: isNumber(data.resumeVersion) ? data.resumeVersion : 0,
     // Nothing scores 100 (owner, 2026-10-18); a scan cached before the scorer said so still reads 99.
     score: Math.max(0, Math.min(MAX_SCAN_SCORE, data.score)),
+    supportedScore: isNumber(data.supportedScore) ? data.supportedScore : null,
+    ...(isRecord(data.titleFit) && ["same","related","unsure","unrelated"].includes(String(data.titleFit.kind)) &&
+      isNumber(data.titleFit.points) && typeof data.titleFit.jobTitle === "string" && typeof data.titleFit.resumeTitle === "string"
+      ? {titleFit: { kind: data.titleFit.kind as NonNullable<ScanReport["titleFit"]>["kind"], points: data.titleFit.points,
+          jobTitle: data.titleFit.jobTitle, resumeTitle: data.titleFit.resumeTitle }} : {}),
+    followUpQuestions: listOf<NonNullable<ScanReport["followUpQuestions"]>[number]>(data.followUpQuestions)
+      .filter(q => isRecord(q) && typeof q.term === "string" && typeof q.ifTrue === "string" && (q.place === "experience" || q.place === "skills")),
     metrics: data.metrics as ScanReport["metrics"],
     gaps: data.gaps as ScanReport["gaps"],
     verdicts: data.verdicts as ScanReport["verdicts"],

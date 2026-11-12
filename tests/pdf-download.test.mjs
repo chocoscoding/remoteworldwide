@@ -186,3 +186,24 @@ describe("draftPaper", () => {
     assert.ok(Array.isArray(paper.sections) && paper.sections.length > 0);
   });
 });
+
+it("restores pending experience before rendering either file and keeps the employer attribution",()=>{
+  const old="Onboarded enterprise customers.";
+  const estimate="Onboarded 40 enterprise customers.";
+  const draft={name:"Alex",summary:"",skills:[],projects:[],education:[],certifications:[],
+    experience:[{id:"a",role:"CSM",company:"First",dates:"",bullets:[estimate]},{id:"b",role:"CSM",company:"Second",dates:"",bullets:[estimate]}],
+    draftProposals:[{entryId:"a",before:old,after:estimate,kind:"estimate",signature:"saved"}]};
+  assert.deepEqual(draftPaper(draft).content.experience.map(r=>r.bullets),[[old],[estimate]]);
+  assert.equal(draft.experience[0].bullets[0],estimate);
+});
+
+it("corrects a confirmed figure in both selected destinations without changing another employer",async()=>{
+  const {replaceLinkedFigure}=await import("../app/lib/resume/linked-figures.ts");
+  const fact={entryId:"a",own:true,figure:"82%",line:"Retained 82% of accounts.",skill:"Account retention · 82%"};
+  const doc={skills:[fact.skill],experience:[{id:"a",bullets:[fact.line]},{id:"b",bullets:[fact.line]}],aiFigures:[fact]};
+  const changed=replaceLinkedFigure(doc,fact,"84%");
+  assert.equal(changed.skills[0],"Account retention · 84%");
+  assert.deepEqual(changed.experience.map(r=>r.bullets[0]),["Retained 84% of accounts.",fact.line]);
+  assert.equal(changed.aiFigures[0].figure,"84%");
+  assert.equal(replaceLinkedFigure({...doc,skills:[]},fact,"84%"),null);
+});

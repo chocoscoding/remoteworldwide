@@ -18,13 +18,14 @@ export interface Strictness {
 }
 
 export const STRICTNESS: Record<StrictnessLevel, Strictness> = {
-  encouraging: { partialCredit: 0.6, mentionCredit: 0.7, titleUnrelated: -1, parseLossShare: 0.5, maxStuffingPenalty: 0 },
+  encouraging: { partialCredit: 0.75, mentionCredit: 0.9, titleUnrelated: -2, parseLossShare: 0.75, maxStuffingPenalty: 2 },
   balanced: { partialCredit: 0.45, mentionCredit: 0.5, titleUnrelated: -2, parseLossShare: 0.75, maxStuffingPenalty: 2 },
   strict: { partialCredit: 0.3, mentionCredit: 0.25, titleUnrelated: -3, parseLossShare: 1, maxStuffingPenalty: 4 },
 };
 
-/** The level every score uses (owner, 2026-10-21: balanced). */
-export const SCORE_STRICTNESS: StrictnessLevel = "balanced";
+/** Credit relevant evidence more generously, retaining the existing title,
+ * parsing and stuffing rules (owner, 2026-11-10). */
+export const SCORE_STRICTNESS: StrictnessLevel = "encouraging";
 
 export const strictness = (): Strictness => STRICTNESS[SCORE_STRICTNESS];
 

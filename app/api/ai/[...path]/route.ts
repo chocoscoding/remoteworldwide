@@ -28,7 +28,7 @@ const TIMEOUT_MS = 60_000;
 
 // Vercel stops a function at its plan default (15 s) unless told otherwise, which answered a
 // Tailor run (15-21 s) with a 504 while the AI service was still writing it. Matches TIMEOUT_MS.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** Streamed responses pass through untouched; JSON is buffered. */
 const STREAMED = new Set(["text/event-stream"]);
@@ -99,6 +99,7 @@ async function proxy(req: Request, path: string[]): Promise<Response> {
   // A DELETE carries no body: what it removes is in the path, and who asked is
   // the header above, so there is nothing to parse or rewrite.
   let body: string | undefined;
+  let generatingBest = false;
   if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "DELETE") {
     const raw = await req.text();
     let parsed: Record<string, unknown> = {};
@@ -112,6 +113,8 @@ async function proxy(req: Request, path: string[]): Promise<Response> {
     // The session is the only authority on identity. Whatever the client sent
     // for userId is discarded, not merged.
     parsed.userId = session.user.id;
+    const guard = parsed.scoreGuard;
+    generatingBest = typeof guard === "object" && guard !== null && "best" in guard && Boolean(guard.best);
     body = JSON.stringify(parsed);
     headers["content-type"] = "application/json";
   }
@@ -122,7 +125,10 @@ async function proxy(req: Request, path: string[]): Promise<Response> {
   // Once a stream starts, the AI service's own Groq deadlines bound it, and a
   // client that goes away still cancels it through req.signal.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const draftWrite = rest?.startsWith("resume/drafts") && (req.method === "POST" || req.method === "PATCH");
+  // Whole-resume generation may verify several complete drafts before delivery.
+  const timeout = draftWrite ? (generatingBest ? 295_000 : 175_000) : TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeout);
   req.signal.addEventListener("abort", () => controller.abort(), { once: true });
 
   let upstream: Response;

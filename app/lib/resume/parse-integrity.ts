@@ -1,5 +1,5 @@
 /** Structural warnings are independent of match and writing scores. No model or I/O. */
-export const STRUCTURE_VERSION = 2;
+export const STRUCTURE_VERSION = 3;
 export function structureIssues(content: { title: string; experience: Array<{ role: string; company: string; dates: string }> }, source = ""): string[] {
   const issues: string[] = [];
   content.experience.forEach((entry, index) => {
