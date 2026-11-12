@@ -11,6 +11,10 @@ import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
 import LogoMini from "../svg/LogoMini";
 import ChromeLogo from "../svg/ChromeLogo";
+import { FirefoxLogo, SafariLogo } from "../svg/BrowserLogos";
+
+// The Extension pill's browser marks, left to right; later ones sit on top, so Chrome leads (owner, 2026-11-12).
+const BROWSER_LOGOS = [SafariLogo, FirefoxLogo, ChromeLogo];
 import { cn } from "@/app/lib/utils";
 import { loginWithNext, returnTo, signupWithNext } from "@/app/lib/next-url";
 import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
@@ -686,7 +690,13 @@ const Navbar = () => {
               rel="noopener noreferrer"
               className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
               <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
-                <ChromeLogo className="h-4 w-4" aria-hidden />
+                <span className="flex items-center" aria-hidden>
+                  {BROWSER_LOGOS.map((Logo, i) => (
+                    <span key={i} className={cn("flex h-[18px] w-[18px] flex-none rounded-full bg-white ring-[1.5px] ring-secondary", i > 0 && "-ml-[7px]")}>
+                      <Logo className="h-full w-full" />
+                    </span>
+                  ))}
+                </span>
                 Extension
                 <span className="sr-only"> for Chrome, opens the Chrome Web Store in a new tab</span>
               </span>
