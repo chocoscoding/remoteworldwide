@@ -105,11 +105,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
         }}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#f9f8f1_35%,_rgba(249,248,241,0.6)_70%,_rgba(249,248,241,0.2)_100%)]" />
         <div className="relative mx-auto flex max-w-[1440px] flex-col items-center px-4 pb-14 pt-14 text-center md:pb-20 md:pt-20">
-          <span className="inline-flex items-center gap-2 rounded-full border-2 bg-secondary px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary br-shadow">
-            <span aria-hidden className="font-black">{"///"}</span>
-            Free career playbooks
-          </span>
-          <h1 className="mt-6 max-w-[14ch] text-[2.5rem] font-extrabold leading-[1.02] tracking-[-0.025em] text-primary md:text-[3.75rem] lg:text-[4.5rem]">
+          <h1 className="max-w-[14ch] text-[2.5rem] font-extrabold leading-[1.02] tracking-[-0.025em] text-primary md:text-[3.75rem] lg:text-[4.5rem]">
             Get hired remotely,{" "}
             <span className="relative inline-block whitespace-nowrap">
               <span aria-hidden className="absolute inset-x-[-0.08em] bottom-[0.08em] top-[0.55em] -z-0 -rotate-1 rounded-sm bg-secondary" />
@@ -117,8 +113,7 @@ const BlogIndex = async ({ searchParams }: Search) => {
             </span>
           </h1>
           <p className="mt-6 max-w-[54ch] text-lg leading-relaxed text-primary/70 md:text-xl">
-            Practical guides on resumes, interviews and the remote job search, written by people who actually hire, built around the tools that get you the
-            offer.
+            Step-by-step guides on resumes, interviews and finding remote work, with tools that help you put each one into practice.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <a
