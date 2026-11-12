@@ -46,6 +46,9 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [download, setDownload] = useState<{ url: string; fileName: string; returning: boolean } | null>(null);
+  // Whether the email box holds anything; null until the reader types, so a saved email counts.
+  const [typed, setTyped] = useState<boolean | null>(null);
+  const hasEmail = typed ?? savedEmail.length > 0;
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -90,11 +93,13 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
   const horizontal = variant === "inline" || variant === "category";
   const inputId = `lm-${variant}-${placement}-${magnet.slug}`;
   // The hero sits on a page of bigger shadows; in articles everything stays at 2px.
-  const buttonShadow = isSidebar
-    ? "border border-primary/25 bg-white text-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-    : isHero
-    ? "br-bold-press br-lime"
-    : "br-shadow-press br-lime";
+  const buttonShadow = isHero ? "br-bold-press br-lime" : "br-shadow-press br-lime";
+  // The sidebar card stays quiet until used (owner, 2026-11-12): the button wears the card's own
+  // colour while the email box is empty, and turns black with white text once it holds an email.
+  const sidebarButton = cn(
+    "border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+    hasEmail ? "border-primary bg-primary text-white hover:bg-primary/90" : "border-primary/15 bg-primary2 text-primary/70",
+  );
 
   return (
     <aside
@@ -130,7 +135,30 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
           )}
 
           <div aria-live="polite" className={cn("mt-4", isSidebar && "mt-5")}>
-            {status === "success" && download ? (
+            {status === "success" && download && isSidebar ? (
+              // Sidebar: the form goes away, leaving a small check and a plain download link.
+              <div className="text-sm text-primary/75">
+                <p className="flex items-center gap-2">
+                  <Check className="h-4 w-4 flex-none text-primary/55" aria-hidden />
+                  {download.returning ? "Welcome back, here it is again." : "It's yours."}
+                </p>
+                <a
+                  href={download.url}
+                  download={download.fileName}
+                  target="_blank"
+                  rel="noopener"
+                  className="mt-2 inline-flex items-center gap-1.5 font-semibold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary">
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  Download the PDF
+                </a>
+                {nextStep && (
+                  <a href={nextStep.href} className="mt-2 flex items-center gap-1.5 text-primary/75 underline decoration-primary/20 underline-offset-4 hover:text-primary">
+                    Next: {nextStep.label}
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                )}
+              </div>
+            ) : status === "success" && download ? (
               <div className="rounded-xl border-2 border-primary bg-white p-4">
                 <p className="flex items-center gap-2 text-base font-extrabold text-primary">
                   <span className="grid h-6 w-6 place-content-center rounded-full bg-secondary">
@@ -171,6 +199,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                   autoComplete="email"
                   required
                   defaultValue={savedEmail}
+                  onInput={(e) => setTyped(e.currentTarget.value.trim().length > 0)}
                   placeholder="you@email.com"
                   className={cn(
                     "h-11 w-full min-w-0 flex-none rounded-lg border-2 border-primary bg-white px-3.5 text-sm text-primary placeholder:text-primary/40 outline-none focus:ring-2 focus:ring-primary/30",
@@ -184,7 +213,7 @@ const LeadMagnetCard: FC<LeadMagnetCardProps> = ({ magnet, variant, placement, b
                   disabled={status === "submitting"}
                   className={cn(
                     "h-11 w-full flex-none rounded-lg bg-primary px-5 text-sm font-bold text-white sm:w-auto disabled:cursor-default disabled:opacity-70 cursor-pointer",
-                    buttonShadow,
+                    isSidebar ? sidebarButton : buttonShadow,
                   )}>
                   {status === "submitting" ? "Unlocking…" : magnet.buttonLabel}
                 </button>
