@@ -78,8 +78,8 @@ describe("the four plans", () => {
     assert.deepEqual(FALLBACK_CATALOGUE.plans.filter((p) => p.monthlyCredits === most).map((p) => p.key), ["ultra"]);
   });
 
-  it("opens on Quarterly, and works the badges out from the plans (owner, 2026-10-26)", () => {
-    assert.equal(DEFAULT_BILLING, "quarter");
+  it("opens on Monthly (owner, 2026-11-14), and works the badges out from the plans (owner, 2026-10-26)", () => {
+    assert.equal(DEFAULT_BILLING, "month");
     assert.deepEqual(
       ["basic", "pro", "ultra"].map((key) => [savingPercent(plan(key), "quarter"), savingPercent(plan(key), "year")]),
       [

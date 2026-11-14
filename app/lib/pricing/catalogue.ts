@@ -50,8 +50,8 @@ export const RECOMMENDED_PLAN = "pro";
  */
 export type BillingInterval = "month" | "quarter" | "year";
 
-/** The billing /pricing opens on (owner, 2026-10-26): most searches take two or three months. */
-export const DEFAULT_BILLING: BillingInterval = "quarter";
+/** The billing /pricing opens on: Monthly (owner, 2026-11-14; it opened on Quarterly from 2026-10-26). */
+export const DEFAULT_BILLING: BillingInterval = "month";
 
 /** Shortest first: a plan may only move to the same billing or a longer one. */
 export const BILLING_ORDER: BillingInterval[] = ["month", "quarter", "year"];

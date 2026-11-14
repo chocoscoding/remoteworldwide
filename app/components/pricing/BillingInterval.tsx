@@ -23,7 +23,7 @@ const BillingContext = createContext<{ billing: BillingInterval; setBilling: (bi
   setBilling: () => {},
 });
 
-/** Opens on Quarterly (owner, 2026-10-26) unless told otherwise. */
+/** Opens on Monthly (owner, 2026-11-14) unless told otherwise. */
 export const BillingIntervalProvider: FC<{ children: ReactNode; initial?: BillingInterval }> = ({ children, initial = DEFAULT_BILLING }) => {
   const [billing, setBilling] = useState<BillingInterval>(initial);
   const value = useMemo(() => ({ billing, setBilling }), [billing]);
