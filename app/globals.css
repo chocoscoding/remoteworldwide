@@ -181,8 +181,11 @@ body {
   transition: all 0.3s ease;
   box-shadow: 10px 10px #e1f073;
 }
+/* The home hero heading (owner, 2026-11-14): 30% smaller than the old 2.8rem to 5rem, then 10%
+   bigger on desktop (60px at 1536px wide, 3.85rem at most). Phones keep their size (33px at 375px
+   wide), so the heading stays on two lines there. */
 .text-clamp1 {
-  font-size: clamp(2.8rem, 2.3rem + 2.6667vw, 5rem);
+  font-size: clamp(1.96rem, 1.5rem + 2.336vw, 3.85rem);
   line-height: 105%;
 }
 .text-clamp2 {

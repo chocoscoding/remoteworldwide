@@ -13,15 +13,18 @@ const Header = ({ count }: { count: number | null }) => {
           <Globe />
         </div>
       </section>
-      <section className="w-full h-full z-10 absolute top-0 left-0 flex flex-col px-2.5 sm:px-5 md:px-10 pt-5 sm:pt-7 md:pt-12 bg-transparent overflow-hidden">
+      {/* The content sits 10% of the hero's height lower than before (owner, 2026-11-14): the old top
+          padding plus min(10vh, a tenth of the hero's cap), since the hero is the screen's height up to
+          550, 600 or 650px. */}
+      <section className="w-full h-full z-10 absolute top-0 left-0 flex flex-col px-2.5 sm:px-5 md:px-10 pt-[calc(1.25rem+min(10vh,55px))] sm:pt-[calc(1.75rem+min(10vh,60px))] md:pt-[calc(3rem+min(10vh,60px))] lg:pt-[calc(3rem+min(10vh,65px))] bg-transparent overflow-hidden">
         {count !== null && (
           <span className="bg-gray-200 block w-fit p-2.5 md:p-3 text-xs rounded-full md:text-sm" aria-hidden="true" data-nosnippet>
             {count} open positions 🔥
           </span>
         )}
-        {/* Owner, 2026-11-14: one weight, 600, on three lines on large screens (the cap is in em, so it
-            follows the clamped font size). */}
-        <h1 className="font-semibold max-w-[550px] lg:max-w-[9em] mt-4 mb-3 text-clamp1">Verified remote roles &amp; job application tools</h1>
+        {/* Owner, 2026-11-14: one weight, 600, on two lines at every size. The cap is in em, so it follows
+            the clamped font size: "Verified remote roles &" is 10.75em, adding "job" would make 12.45em. */}
+        <h1 className="font-semibold max-w-[11.5em] mt-4 mb-3 text-clamp1">Verified remote roles &amp; job application tools</h1>
         <h2 className="text-gray-700 max-w-[500px] mb-5 text-sm xs:text-base">
           Remote roles that fit your location and skills, plus the tools to apply with confidence.
         </h2>
