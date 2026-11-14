@@ -19,10 +19,11 @@ const Header = ({ count }: { count: number | null }) => {
             {count} open positions 🔥
           </span>
         )}
-        <h1 className="font-bold max-w-[550px] mt-4 mb-3 text-clamp1">Remote jobs worldwide, vetted daily</h1>
+        {/* Owner, 2026-11-14: one weight, 600, on three lines on large screens (the cap is in em, so it
+            follows the clamped font size). */}
+        <h1 className="font-semibold max-w-[550px] lg:max-w-[9em] mt-4 mb-3 text-clamp1">Verified remote roles &amp; job application tools</h1>
         <h2 className="text-gray-700 max-w-[500px] mb-5 text-sm xs:text-base">
-          Discover verified worldwide remote roles. Confidently apply to roles that fit your location, skills, and ambition. No surprises,
-          just opportunities that want you.
+          Remote roles that fit your location and skills, plus the tools to apply with confidence.
         </h2>
         <div className="w-[98%] max-w-[1000px]">
           <Suspense>

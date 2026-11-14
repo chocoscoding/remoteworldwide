@@ -18,7 +18,8 @@ import ConsentScripts from "./components/consent/ConsentScripts";
 
 const font = Manrope({
   subsets: ["latin-ext"],
-  weight: ["200", "300", "400", "500", "700"],
+  // 600: the home page heading (owner, 2026-11-14).
+  weight: ["200", "300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
