@@ -441,7 +441,8 @@ body {
 }
 
 /* The /waitlist live-board strip: a slower rail, the second row running the other way, and both
-   holding still under the pointer so a posting can be read. */
+   holding still under the pointer so a posting can be read. Any rail also holds still while a link
+   in it has keyboard focus (the home page's tools rail). */
 .marquee-track.marquee-slow {
   animation-duration: 60s;
 }
@@ -450,7 +451,8 @@ body {
   animation-direction: reverse;
 }
 
-.marquee-hold:hover .marquee-track {
+.marquee-hold:hover .marquee-track,
+.marquee-hold:focus-within .marquee-track {
   animation-play-state: paused;
 }
 

@@ -1,4 +1,5 @@
 import Header from "@/app/components/Header";
+import ToolsMarquee from "@/app/components/ToolsMarquee";
 import JobListSection from "./JobListSection";
 import Link from "next/link";
 import { fetchLatestJobs, getAllActiveJobsCount } from "@/libs/query";
@@ -42,6 +43,7 @@ export default async function Home() {
     <main>
       {/* the header of the page */}
       <Header count={jobsCount} />
+      <ToolsMarquee />
       <br />
       <section className="w-full max-w-[1200px] m-auto px-3 xl:px-0">
         <h3 className="text-xl md:text-2xl xl:text-3xl font-bold">Explore latest and exciting jobs now</h3>
