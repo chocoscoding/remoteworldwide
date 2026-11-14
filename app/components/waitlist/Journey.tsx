@@ -162,7 +162,7 @@ const Journey: FC<{ jobs: BoardJob[]; role: string }> = ({ jobs, role }) => {
         <div>
           {/* Phone and tablet: which chapter you're on, pinned under the navbar while the chapters scroll. */}
           <div
-            className="sticky top-[65px] z-20 -mx-4 mb-6 border-b border-primary/10 bg-[#f9f8f1]/90 px-4 py-3 backdrop-blur lg:hidden"
+            className="sticky top-[57px] z-20 -mx-4 mb-6 border-b border-primary/10 bg-[#f9f8f1]/90 px-4 py-3 backdrop-blur lg:hidden"
             aria-hidden>
             <div className="flex items-center justify-between text-xs font-bold text-primary">
               <span>

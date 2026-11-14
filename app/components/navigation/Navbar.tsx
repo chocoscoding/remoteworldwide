@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { signOut } from "@/app/lib/authClient";
 import Image from "next/image";
-import { ArrowRight, Bookmark, ChevronDown, LayoutDashboard, LoaderCircle, LogOut, Menu, PenLine, Shield, UserRound, X } from "lucide-react";
+import { ArrowRight, Bookmark, ChevronDown, LayoutDashboard, LoaderCircle, LogOut, Menu, PenLine, Shield, X } from "lucide-react";
 import { EXTENSION_URL } from "@/app/lib/extension/url";
 import { usePathname, useRouter } from "next/navigation";
 import LogoFull from "../svg/LogoFull";
@@ -16,7 +16,7 @@ import { FirefoxLogo, SafariLogo } from "../svg/BrowserLogos";
 // The Extension pill's browser marks, left to right; later ones sit on top, so Chrome leads (owner, 2026-11-12).
 const BROWSER_LOGOS = [SafariLogo, FirefoxLogo, ChromeLogo];
 import { cn } from "@/app/lib/utils";
-import { loginWithNext, returnTo, signupWithNext } from "@/app/lib/next-url";
+import { loginWithNext, returnTo } from "@/app/lib/next-url";
 import { useAuthModal } from "@/app/components/auth/AuthModalProvider";
 import { JOB_BROWSE, SITE_NAV } from "@/app/lib/navigation/siteNav";
 
@@ -39,18 +39,51 @@ const BROWSE: Record<string, typeof JOB_BROWSE> = { Jobs: JOB_BROWSE };
 const OVERVIEW: Record<string, { title: string; href: string }> = { Features: { title: "See all features", href: "/tools" } };
 
 /**
- * The user icon and its menu, below it. The site's pages live in the bar (and the hamburger on a
- * phone), so this is only about you: signed out, Log in and Sign up; signed in, who you are, then
- * Bookmarks, Writer or Admin by role, and Log out.
+ * The bar's two pills, Extension and Sign in: the same size (owner, 2026-11-14: text and padding
+ * 1.5px smaller than before, 14px to 12.5px, 32px tall to 29px). The 44px link or button around
+ * each is the touch target; the pill is what you see.
+ */
+const PILL = "inline-flex h-[29px] items-center rounded-full px-[12.5px] text-[12.5px] font-bold br-shadow-press";
+
+/**
+ * Signed out (owner, 2026-11-14): a black Sign in pill where the user icon was, on every screen
+ * size. It opens the sign-in popup over the page (owner, 2026-10-07), which links to Sign up. The
+ * /login and /signup pages stay for links and for anyone who goes there; on them it is a plain link
+ * to the login page that keeps the `next` they carry.
+ */
+const SignInButton = () => {
+  const { openAuthModal } = useAuthModal();
+  const pathname = usePathname();
+  // From lg up, alone at the bar's right end: larger text and padding, the Extension pill's height
+  // (owner, 2026-11-14).
+  const pill = <span className={cn(PILL, "bg-primary text-white br-lime lg:px-4 lg:text-sm")}>Sign in</span>;
+  const target = cn("group inline-flex h-11 cursor-pointer items-center rounded-full", FOCUS);
+  if (pathname === "/login" || pathname === "/signup") {
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    return (
+      <Link href={loginWithNext(returnTo(pathname, search))} className={target}>
+        {pill}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={() => openAuthModal("login")} className={target}>
+      {pill}
+    </button>
+  );
+};
+
+/**
+ * The signed-in avatar and its menu, below it. The site's pages live in the bar (and the hamburger
+ * on a phone), so this is only about you: who you are, then Bookmarks, Writer or Admin by role, and
+ * Log out.
  */
 const AccountMenu = ({
-  signedIn,
   image,
   role,
   name,
   email,
 }: {
-  signedIn: boolean;
   image?: string | null;
   role?: string | null;
   name?: string | null;
@@ -58,11 +91,6 @@ const AccountMenu = ({
 }) => {
   const { isOpen2: open, toggleNavbar2: toggle, closeNavbar2: close } = useNavbar();
   const { replace } = useRouter();
-  const { openAuthModal } = useAuthModal();
-  const pathname = usePathname();
-  // Log in and Sign up open the popup over the page (owner, 2026-10-07). The /login and /signup
-  // pages stay for links and for anyone who goes there; on them, the items just switch page.
-  const onAuthPage = pathname === "/login" || pathname === "/signup";
   const wrapper = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
 
@@ -85,123 +113,75 @@ const AccountMenu = ({
     };
   }, [open, close]);
 
-  // Signing in comes back to this page, query and all. The menu only renders after a click, so
-  // `window` is always there when this is read (and no useSearchParams Suspense boundary is needed).
-  const here = open && !signedIn ? returnTo(window.location.pathname, window.location.search) : "/";
-
   return (
     <div ref={wrapper} className="relative">
       <button
         ref={button}
         type="button"
         onClick={toggle}
-        aria-label={signedIn ? "Account menu" : "Sign in and more"}
+        aria-label="Account menu"
         aria-expanded={open}
         aria-controls="account-menu"
         className={cn("group grid h-11 w-11 cursor-pointer place-content-center rounded-full text-primary", FOCUS)}>
-        {signedIn ? (
-          <Image
-            width={28}
-            height={28}
-            src={image ?? "/images/noimage.png"}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="h-9 w-9 rounded-full border border-primary/15 object-cover"
-          />
-        ) : (
-          <span
-            className={cn(
-              "grid h-[31px] w-[31px] place-content-center rounded-full border transition-colors group-hover:border-primary group-hover:bg-primary2",
-              open ? "border-primary bg-primary2" : "border-primary/20",
-            )}>
-            <UserRound className="h-3.5 w-3.5" aria-hidden />
-          </span>
-        )}
+        <Image
+          width={28}
+          height={28}
+          src={image ?? "/images/noimage.png"}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="h-9 w-9 rounded-full border border-primary/15 object-cover"
+        />
       </button>
 
       {open ? (
         <div id="account-menu" className={cn("absolute right-0 top-full z-30 mt-2 w-64 p-1.5", MENU_CARD)}>
-          {signedIn ? (
-            <>
-              <div className="flex items-center gap-3 px-2.5 pb-3 pt-2">
-                <Image
-                  width={36}
-                  height={36}
-                  src={image ?? "/images/noimage.png"}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  className="h-9 w-9 shrink-0 rounded-full border border-primary/15 object-cover"
-                />
-                <div className="min-w-0">
-                  {name ? <p className="truncate text-sm font-bold text-primary">{name}</p> : null}
-                  {email ? <p className="truncate text-xs text-primary/60">{email}</p> : null}
-                </div>
-              </div>
-              <div className="mb-1.5 border-t border-primary/10" />
-              <Link href={DASHBOARD} onClick={close} className={MENU_ITEM}>
-                <LayoutDashboard className="h-4 w-4 text-primary/60" aria-hidden />
-                Dashboard
-              </Link>
-              <Link href="/bookmarks" onClick={close} className={MENU_ITEM}>
-                <Bookmark className="h-4 w-4 text-primary/60" aria-hidden />
-                Bookmarks
-              </Link>
-              {role === "AUTHOR" ? (
-                <Link href="/heroshima/blogs" onClick={close} className={MENU_ITEM}>
-                  <PenLine className="h-4 w-4 text-primary/60" aria-hidden />
-                  Writer
-                </Link>
-              ) : null}
-              {role === "ADMIN" ? (
-                <Link href="/heroshima" onClick={close} className={MENU_ITEM}>
-                  <Shield className="h-4 w-4 text-primary/60" aria-hidden />
-                  Admin
-                </Link>
-              ) : null}
-              <div className="my-1.5 border-t border-primary/10" />
-              <button
-                type="button"
-                onClick={async () => {
-                  close();
-                  await signOut();
-                  replace("/");
-                }}
-                className={cn(MENU_ITEM, "cursor-pointer")}>
-                <LogOut className="h-4 w-4 text-primary/60" aria-hidden />
-                Log out
-              </button>
-            </>
-          ) : onAuthPage ? (
-            <>
-              <Link href={loginWithNext(here)} onClick={close} className={cn(MENU_ITEM, "font-bold")}>
-                Log in
-              </Link>
-              <Link href={signupWithNext(here)} onClick={close} className={MENU_ITEM}>
-                Sign up
-              </Link>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  close();
-                  openAuthModal("login");
-                }}
-                className={cn(MENU_ITEM, "cursor-pointer font-bold")}>
-                Log in
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  close();
-                  openAuthModal("signup");
-                }}
-                className={cn(MENU_ITEM, "cursor-pointer")}>
-                Sign up
-              </button>
-            </>
-          )}
+          <div className="flex items-center gap-3 px-2.5 pb-3 pt-2">
+            <Image
+              width={36}
+              height={36}
+              src={image ?? "/images/noimage.png"}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="h-9 w-9 shrink-0 rounded-full border border-primary/15 object-cover"
+            />
+            <div className="min-w-0">
+              {name ? <p className="truncate text-sm font-bold text-primary">{name}</p> : null}
+              {email ? <p className="truncate text-xs text-primary/60">{email}</p> : null}
+            </div>
+          </div>
+          <div className="mb-1.5 border-t border-primary/10" />
+          <Link href={DASHBOARD} onClick={close} className={MENU_ITEM}>
+            <LayoutDashboard className="h-4 w-4 text-primary/60" aria-hidden />
+            Dashboard
+          </Link>
+          <Link href="/bookmarks" onClick={close} className={MENU_ITEM}>
+            <Bookmark className="h-4 w-4 text-primary/60" aria-hidden />
+            Bookmarks
+          </Link>
+          {role === "AUTHOR" ? (
+            <Link href="/heroshima/blogs" onClick={close} className={MENU_ITEM}>
+              <PenLine className="h-4 w-4 text-primary/60" aria-hidden />
+              Writer
+            </Link>
+          ) : null}
+          {role === "ADMIN" ? (
+            <Link href="/heroshima" onClick={close} className={MENU_ITEM}>
+              <Shield className="h-4 w-4 text-primary/60" aria-hidden />
+              Admin
+            </Link>
+          ) : null}
+          <div className="my-1.5 border-t border-primary/10" />
+          <button
+            type="button"
+            onClick={async () => {
+              close();
+              await signOut();
+              replace("/");
+            }}
+            className={cn(MENU_ITEM, "cursor-pointer")}>
+            <LogOut className="h-4 w-4 text-primary/60" aria-hidden />
+            Log out
+          </button>
         </div>
       ) : null}
     </div>
@@ -555,10 +535,10 @@ const MobileMenu = ({ pathname }: { pathname: string | null }) => {
       {open ? (
         <>
           {/* Dim and blur the page beneath the sheet; tapping the backdrop closes the menu. */}
-          <div aria-hidden onClick={close} className="fixed inset-x-0 bottom-0 top-16 z-20 bg-black/20 backdrop-blur-sm" />
+          <div aria-hidden onClick={close} className="fixed inset-x-0 bottom-0 top-14 z-20 bg-black/20 backdrop-blur-sm" />
           <div
             id="mobile-menu"
-            className="absolute inset-x-0 top-full z-30 max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-primary/10 bg-white px-4 pb-5 pt-2">
+            className="absolute inset-x-0 top-full z-30 max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-b border-primary/10 bg-white px-4 pb-5 pt-2">
             {SITE_NAV.map((navGroup, i) => {
               const expanded = group === i;
               return (
@@ -667,7 +647,10 @@ const Navbar = () => {
   return (
     <nav aria-label="Main" className={cn("border-b sticky z-20 top-0", colorToShow)}>
       <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        {/* From lg up, three columns (owner, 2026-11-14): the logo, the menu and Extension centred in
+            the bar, and Sign in or the avatar on the right. Below lg, the logo and the right end only.
+            56px tall (was 64px; owner, 2026-11-14): the phone menu's backdrop and sheet follow it. */}
+        <div className="flex h-14 items-center justify-between lg:grid lg:grid-cols-[1fr_auto_1fr]">
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" aria-label="Remote Worldwide, home page" className={cn("block rounded-md py-2.5", FOCUS)}>
@@ -677,7 +660,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          <div className="flex items-center gap-0.5 sm:gap-2">
+          <div className="hidden items-center gap-3 lg:flex">
             <NavMenu pathname={pathname} />
 
             {/* The 44px link is the touch target; the pill inside is what you see. From lg up only, the
@@ -689,7 +672,7 @@ const Navbar = () => {
               target="_blank"
               rel="noopener noreferrer"
               className={cn("group hidden h-10 items-center rounded-full lg:inline-flex", FOCUS)}>
-              <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-bold text-primary br-shadow-press mr-2">
+              <span className={cn(PILL, "gap-1.5 bg-secondary text-primary")}>
                 <span className="flex items-center" aria-hidden>
                   {BROWSER_LOGOS.map((Logo, i) => (
                     <span key={i} className={cn("flex h-[18px] w-[18px] flex-none rounded-full bg-white ring-[1.5px] ring-secondary", i > 0 && "-ml-[7px]")}>
@@ -701,15 +684,19 @@ const Navbar = () => {
                 <span className="sr-only"> for Chrome, opens the Chrome Web Store in a new tab</span>
               </span>
             </a>
+          </div>
 
-            {/* The user icon on every screen size; a phone also gets the hamburger after it. */}
+          <div className="flex items-center justify-self-end gap-0.5 sm:gap-2">
+            {/* The avatar, or Sign in when signed out, on every screen size; a phone also gets the
+                hamburger after it. */}
             {status === "loading" ? (
               <span role="status" aria-label="Loading your account" className="grid h-11 w-11 place-content-center">
                 <LoaderCircle className="h-3.5 w-3.5 animate-spin text-primary/60" aria-hidden />
               </span>
+            ) : !signedIn ? (
+              <SignInButton />
             ) : (
               <AccountMenu
-                signedIn={signedIn}
                 image={data?.user?.image}
                 role={data?.user?.role}
                 name={data?.user?.name}
