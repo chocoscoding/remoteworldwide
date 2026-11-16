@@ -186,9 +186,21 @@ export const duplicateTemplate = async (id: string) => {
 };
 
 /** Renders content as the events service would send it. 502 "The mail service is not reachable" comes back as `error`. */
-export const previewMail = async ({ content, userId, sampleOffer = true }: { content: TemplateContent; userId?: string; sampleOffer?: boolean }) => {
+export const previewMail = async ({
+  content,
+  userId,
+  sampleOffer = true,
+  markBlocks = false,
+}: {
+  content: TemplateContent;
+  userId?: string;
+  sampleOffer?: boolean;
+  /** Adds data-rww-block="<index>" to each block in the html, so the editor can pick a block by clicking it. */
+  markBlocks?: boolean;
+}) => {
   await requireAdminAction();
   const body: Record<string, unknown> = { content, sampleOffer: Boolean(sampleOffer) };
+  if (markBlocks) body.markBlocks = true;
   if (userId && okId(userId)) body.userId = userId;
   return run<MailPreview>(() => mail("/preview", { method: "POST", body }));
 };
@@ -421,7 +433,15 @@ export const listThreads = async ({ status = "open", page = 1 }: { status?: Thre
   await requireAdminAction();
   const p = int(page, 1, 1, 100_000);
   const s: ThreadStatus = status === "done" ? "done" : "open";
-  return run(() => mail(`/inbox?status=${s}&page=${p}`), (raw) => pagedOf<MailThread>(raw, p, "threads"));
+  return run(
+    () => mail(`/inbox?status=${s}&page=${p}`),
+    (raw): Paged<MailThread> & { counts: { open: number; done: number; unread: number } | null } => {
+      // The backend also sends every thread's counts (open, done, unread open), whatever the page.
+      const c = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as { counts?: Record<string, unknown> }).counts : undefined;
+      const counts = c && typeof c === "object" ? { open: Number(c.open) || 0, done: Number(c.done) || 0, unread: Number(c.unread) || 0 } : null;
+      return { ...pagedOf<MailThread>(raw, p, "threads"), counts };
+    },
+  );
 };
 
 export const getThread = async (id: string) => {

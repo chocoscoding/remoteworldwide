@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FC, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, LoaderCircle, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CornerDownRight, LoaderCircle, Trash2 } from "lucide-react";
 import { listPlaybookRuns } from "@/libs/mail-admin";
 import {
   BOOLEAN_FACTS,
@@ -30,8 +30,14 @@ import {
   type WaitForWhat,
 } from "@/app/lib/mail/types";
 import OfferPicker from "@/app/components/mail/OfferPicker";
-import { BTN_LINK, ChipPicker, INPUT_SM, StatusChip } from "@/app/components/mail/ui";
-import { dateTime, hours, n, numOrUndef } from "@/app/components/mail/format";
+import { BTN, BTN_DANGER, BTN_LINK, ChipPicker, INPUT_SM, StatusChip } from "@/app/components/mail/ui";
+import { dateTime, hours, n, numOrUndef, pct, ratio } from "@/app/components/mail/format";
+import { jumpLine, listText, statsLine, stepLine } from "@/app/components/mail/playbook/summary";
+import { cn } from "@/lib/utils";
+
+// A step three ways: the compact card in the flow (default export), its fields by type
+// (StepFields) and the inspector that holds those fields with reorder, delete and the people at it
+// (StepInspector). Only the selected step's fields are on screen at a time.
 
 export type StepContext = {
   steps: Step[];
@@ -50,6 +56,19 @@ export const stepName = (step: Step, index: number, ctx: Pick<StepContext, "temp
   return `Step ${index + 1}: ${what}`;
 };
 
+/** The numbers of the steps that jump to or read from `id`, so deleting it can say what changes. */
+export const stepsPointingAt = (id: string, steps: Step[]) =>
+  steps
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => {
+      if (s.id === id) return false;
+      if (s.type === "wait_for") return s.onMatch === id || s.onTimeout === id || ((s.what.kind === "click" || s.what.kind === "feedback") && s.what.stepId === id);
+      if (s.type === "if") return s.then === id || s.else === id || s.condition.stepId === id;
+      if (s.type === "wait_offer") return s.offerStepId === id;
+      return false;
+    })
+    .map(({ i }) => i + 1);
+
 const NUMERIC_OPS: ConditionOp[] = ["gte", "lte", "eq", "neq"];
 const opsFor = (fact: ConditionFact): ConditionOp[] => (BOOLEAN_FACTS.includes(fact) ? ["eq", "neq"] : fact === "plan" || fact === "feedback" ? ["eq", "neq", "in"] : NUMERIC_OPS);
 const defaultCondition = (fact: ConditionFact, prev: Condition): Condition => {
@@ -67,7 +86,7 @@ const defaultCondition = (fact: ConditionFact, prev: Condition): Condition => {
 };
 
 const Sel: FC<{ label: string; value: string; onChange: (v: string) => void; children: ReactNode; className?: string }> = ({ label, value, onChange, children, className }) => (
-  <select aria-label={label} className={`${INPUT_SM} ${className ?? ""}`} value={value} onChange={(e) => onChange(e.target.value)}>
+  <select aria-label={label} className={cn(INPUT_SM, "max-w-full", className)} value={value} onChange={(e) => onChange(e.target.value)}>
     {children}
   </select>
 );
@@ -77,24 +96,23 @@ const Num: FC<{ label: string; value: number | undefined; onChange: (v: number) 
     type="number"
     min={min}
     aria-label={label}
-    className={`${INPUT_SM} w-20 tabular-nums ${className ?? ""}`}
+    className={cn(INPUT_SM, "w-20 tabular-nums", className)}
     value={value ?? ""}
     onChange={(e) => onChange(numOrUndef(e.target.value) ?? 0)}
   />
 );
 
-/** One step as a card: its fields by type, move and remove, its numbers, and the people at it. */
-const StepCard: FC<{
-  step: Step;
-  index: number;
-  ctx: StepContext;
-  stats: PlaybookStepStats | undefined;
-  playbookId: string | null;
-  onChange: (step: Step) => void;
-  onMove: (by: -1 | 1) => void;
-  onRemove: () => void;
-}> = ({ step, index, ctx, stats, playbookId, onChange, onMove, onRemove }) => {
-  const [showPeople, setShowPeople] = useState(false);
+/** A labelled line of controls in the inspector. */
+const Row: FC<{ label: string; children: ReactNode; hint?: ReactNode }> = ({ label, children, hint }) => (
+  <div className="flex flex-col gap-1">
+    <span className="text-xs font-semibold text-gray-600">{label}</span>
+    <div className="flex flex-wrap items-center gap-1.5 text-sm">{children}</div>
+    {hint ? <p className="text-xs text-gray-500">{hint}</p> : null}
+  </div>
+);
+
+/** One step's own fields, by type. */
+export const StepFields: FC<{ step: Step; ctx: StepContext; onChange: (step: Step) => void }> = ({ step, ctx, onChange }) => {
   const others = ctx.steps.map((s, i) => ({ s, i })).filter(({ s }) => s.id !== step.id);
   const sendSteps = ctx.steps.map((s, i) => ({ s, i })).filter(({ s }) => s.type === "send" && s.id !== step.id);
   const jumpOptions = (
@@ -119,27 +137,35 @@ const StepCard: FC<{
         ))}
     </>
   );
+  const actionOptions = (
+    <>
+      <option value="">Pick an action</option>
+      {ctx.actions.map((a) => (
+        <option key={a.id} value={a.id}>
+          {a.name}
+        </option>
+      ))}
+    </>
+  );
 
-  let body: ReactNode = null;
   switch (step.type) {
     case "wait":
-      body = (
-        <Line>
-          Wait <Num label="Hours" value={step.hours} min={1} onChange={(v) => onChange({ ...step, hours: v })} /> hours
+      return (
+        <Row label="Wait">
+          <Num label="Hours" value={step.hours} min={1} onChange={(v) => onChange({ ...step, hours: v })} /> hours
           {step.hours >= 24 ? <span className="text-xs text-gray-500">({+(step.hours / 24).toFixed(1)} days)</span> : null}
-        </Line>
+        </Row>
       );
-      break;
     case "wait_for": {
       const what = step.what;
       const setWhat = (w: WaitForWhat) => onChange({ ...step, what: w });
-      body = (
-        <div className="flex flex-col gap-2">
-          <Line>
-            Wait for
+      return (
+        <div className="flex flex-col gap-3">
+          <Row label="Wait for">
             <Sel
               label="What"
               value={what.kind}
+              className="w-full"
               onChange={(kind) =>
                 setWhat(kind === "action" ? { kind, actionId: "" } : kind === "event" ? { kind, event: "subscription_started" } : { kind: kind as "click" | "feedback", stepId: "" })
               }>
@@ -149,20 +175,15 @@ const StepCard: FC<{
               <option value="event">something to happen</option>
             </Sel>
             {what.kind === "click" || what.kind === "feedback" ? (
-              <Sel label="Step" value={what.stepId} onChange={(stepId) => setWhat({ ...what, stepId })}>
+              <Sel label="Step" value={what.stepId} className="w-full" onChange={(stepId) => setWhat({ ...what, stepId })}>
                 {sendOptions()}
               </Sel>
             ) : what.kind === "action" ? (
-              <Sel label="Action" value={what.actionId} onChange={(actionId) => setWhat({ ...what, actionId })}>
-                <option value="">Pick an action</option>
-                {ctx.actions.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
+              <Sel label="Action" value={what.actionId} className="w-full" onChange={(actionId) => setWhat({ ...what, actionId })}>
+                {actionOptions}
               </Sel>
             ) : (
-              <Sel label="Event" value={what.event} onChange={(event) => setWhat({ ...what, event: event as BuiltInEvent })}>
+              <Sel label="Event" value={what.event} className="w-full" onChange={(event) => setWhat({ ...what, event: event as BuiltInEvent })}>
                 {BUILT_IN_EVENTS.map((e) => (
                   <option key={e} value={e}>
                     {EVENT_LABELS[e]}
@@ -170,40 +191,40 @@ const StepCard: FC<{
                 ))}
               </Sel>
             )}
-            up to <Num label="Hours" value={step.maxHours} min={1} onChange={(v) => onChange({ ...step, maxHours: v })} /> hours
-          </Line>
-          <Line>
-            If it happens go to
-            <Sel label="If it happens" value={step.onMatch} onChange={(v) => onChange({ ...step, onMatch: v })}>
+          </Row>
+          <Row label="For at most">
+            <Num label="Hours" value={step.maxHours} min={1} onChange={(v) => onChange({ ...step, maxHours: v })} /> hours
+          </Row>
+          <Row label="If it happens, go to">
+            <Sel label="If it happens" value={step.onMatch} className="w-full" onChange={(v) => onChange({ ...step, onMatch: v })}>
               {jumpOptions}
             </Sel>
-            , if not
-            <Sel label="If not" value={step.onTimeout} onChange={(v) => onChange({ ...step, onTimeout: v })}>
+          </Row>
+          <Row label="If not, go to">
+            <Sel label="If not" value={step.onTimeout} className="w-full" onChange={(v) => onChange({ ...step, onTimeout: v })}>
               {jumpOptions}
             </Sel>
-          </Line>
+          </Row>
         </div>
       );
-      break;
     }
     case "wait_offer": {
       const target = ctx.steps.find((s) => s.id === step.offerStepId);
       const offerStep = target?.type === "send" ? target : null;
       const offer = offerStep?.offer ? ctx.offers.find((o) => o.id === offerStep.offer?.offerId) : undefined;
       const valid = offerStep?.offer?.validHoursOverride ?? offer?.validHours;
-      body = (
-        <div className="flex flex-col gap-1">
-          <Line>
-            Wait until <Num label="Hours before expiry" value={step.hoursBeforeExpiry} min={1} onChange={(v) => onChange({ ...step, hoursBeforeExpiry: v })} /> hours before the code from
-            <Sel label="Offer step" value={step.offerStepId} onChange={(offerStepId) => onChange({ ...step, offerStepId })}>
+      return (
+        <div className="flex flex-col gap-3">
+          <Row label="The code from">
+            <Sel label="Offer step" value={step.offerStepId} className="w-full" onChange={(offerStepId) => onChange({ ...step, offerStepId })}>
               {sendOptions((s) => s.type === "send" && Boolean(s.offer))}
             </Sel>
-            expires
-          </Line>
-          {valid !== undefined ? <p className="text-xs text-gray-500">That code is valid for {hours(valid)}. The reminder can&apos;t be later than that.</p> : null}
+          </Row>
+          <Row label="Wait until" hint={valid !== undefined ? <>That code is valid for {hours(valid)}. The reminder can&apos;t be later than that.</> : undefined}>
+            <Num label="Hours before expiry" value={step.hoursBeforeExpiry} min={1} onChange={(v) => onChange({ ...step, hoursBeforeExpiry: v })} /> hours before it expires
+          </Row>
         </div>
       );
-      break;
     }
     case "if": {
       const c = step.condition;
@@ -233,11 +254,10 @@ const StepCard: FC<{
       } else {
         value = <Num label="Value" value={typeof c.value === "number" ? c.value : undefined} onChange={(v) => setC({ value: v })} />;
       }
-      body = (
-        <div className="flex flex-col gap-2">
-          <Line>
-            If
-            <Sel label="Fact" value={c.fact} onChange={(fact) => onChange({ ...step, condition: defaultCondition(fact as ConditionFact, c) })}>
+      return (
+        <div className="flex flex-col gap-3">
+          <Row label="If">
+            <Sel label="Fact" value={c.fact} className="w-full" onChange={(fact) => onChange({ ...step, condition: defaultCondition(fact as ConditionFact, c) })}>
               {CONDITION_FACTS.map((f) => (
                 <option key={f} value={f}>
                   {FACT_LABELS[f]}
@@ -245,23 +265,20 @@ const StepCard: FC<{
               ))}
             </Sel>
             {STEP_FACTS.includes(c.fact) ? (
-              <Sel label="Of step" value={c.stepId ?? ""} onChange={(stepId) => setC({ stepId })}>
+              <Sel label="Of step" value={c.stepId ?? ""} className="w-full" onChange={(stepId) => setC({ stepId })}>
                 {sendOptions()}
               </Sel>
             ) : null}
             {c.fact === "actionCount" ? (
               <>
-                <Sel label="Action" value={c.actionId ?? ""} onChange={(actionId) => setC({ actionId })}>
-                  <option value="">Pick an action</option>
-                  {ctx.actions.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
+                <Sel label="Action" value={c.actionId ?? ""} className="w-full" onChange={(actionId) => setC({ actionId })}>
+                  {actionOptions}
                 </Sel>
-                in <Num label="Within days" value={c.withinDays} min={1} onChange={(v) => setC({ withinDays: v })} /> days
+                in the last <Num label="Within days" value={c.withinDays} min={1} onChange={(v) => setC({ withinDays: v })} /> days
               </>
             ) : null}
+          </Row>
+          <Row label="Is">
             <Sel
               label="Operator"
               value={c.op}
@@ -273,27 +290,33 @@ const StepCard: FC<{
               ))}
             </Sel>
             {value}
-          </Line>
-          <Line>
-            then go to
-            <Sel label="Then" value={step.then} onChange={(v) => onChange({ ...step, then: v })}>
+          </Row>
+          <Row label="Then go to">
+            <Sel label="Then" value={step.then} className="w-full" onChange={(v) => onChange({ ...step, then: v })}>
               {jumpOptions}
             </Sel>
-            , else
-            <Sel label="Else" value={step.else} onChange={(v) => onChange({ ...step, else: v })}>
+          </Row>
+          <Row label="Else go to">
+            <Sel label="Else" value={step.else} className="w-full" onChange={(v) => onChange({ ...step, else: v })}>
               {jumpOptions}
             </Sel>
-          </Line>
+          </Row>
         </div>
       );
-      break;
     }
     case "send":
-      body = (
-        <div className="flex flex-col gap-2">
-          <Line>
-            Send
-            <Sel label="Template" value={step.templateId} onChange={(templateId) => onChange({ ...step, templateId })} className="max-w-xs">
+      return (
+        <div className="flex flex-col gap-3">
+          <Row
+            label="Send"
+            hint={
+              step.templateId ? (
+                <Link href={`/heroshima/outreach/templates/${step.templateId}`} target="_blank" className="font-semibold text-gray-700 hover:underline">
+                  Edit this mail (opens a new tab)
+                </Link>
+              ) : undefined
+            }>
+            <Sel label="Template" value={step.templateId} className="w-full" onChange={(templateId) => onChange({ ...step, templateId })}>
               <option value="">Pick a template</option>
               {ctx.templates
                 .filter((t) => !t.archived || t.id === step.templateId)
@@ -303,14 +326,9 @@ const StepCard: FC<{
                   </option>
                 ))}
             </Sel>
-            {step.templateId ? (
-              <Link href={`/heroshima/outreach/templates/${step.templateId}`} target="_blank" className="text-xs font-semibold hover:underline">
-                Edit
-              </Link>
-            ) : null}
-          </Line>
-          <div className="text-sm">
-            <p className="mb-1 text-xs font-semibold text-gray-600">With an offer (optional)</p>
+          </Row>
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="text-xs font-semibold text-gray-600">With an offer (optional)</span>
             <OfferPicker
               offers={ctx.offers}
               value={step.offer}
@@ -325,68 +343,148 @@ const StepCard: FC<{
           </div>
         </div>
       );
-      break;
     case "tag":
-      body = (
-        <Line>
-          Tag them
-          <input aria-label="Tag" className={`${INPUT_SM} w-40`} value={step.tag} maxLength={40} onChange={(e) => onChange({ ...step, tag: e.target.value.replace(/[^\w-]/g, "") })} placeholder="unhappy" />
-          <span className="text-xs text-gray-500">Shows in Audience filters.</span>
-        </Line>
+      return (
+        <Row label="Tag them" hint="Shows in Audience filters.">
+          <input aria-label="Tag" className={`${INPUT_SM} w-48`} value={step.tag} maxLength={40} onChange={(e) => onChange({ ...step, tag: e.target.value.replace(/[^\w-]/g, "") })} placeholder="unhappy" />
+        </Row>
       );
-      break;
-    case "stop":
-      body = <p className="text-sm text-gray-600">They leave the playbook here.</p>;
-      break;
+    default:
+      return <p className="text-sm text-gray-600">They leave the playbook here.</p>;
   }
-
-  return (
-    <li className="relative rounded-md border border-gray-300 bg-white p-3">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-xs font-bold text-[#e1f073]">{index + 1}</span>
-        <span className="text-xs font-bold uppercase tracking-wide">{STEP_LABELS[step.type]}</span>
-        <span className="font-mono text-[10px] text-gray-400">{step.id}</span>
-        {stats ? (
-          <span className="ml-2 text-xs text-gray-600">
-            <strong className="tabular-nums">{n(stats.inStep)}</strong> here
-            {step.type === "send" ? (
-              <>
-                {" "}
-                · sent {n(stats.sent)} · opened {n(stats.opened)} · clicked {n(stats.clicked)} · converted {n(stats.converted)}
-              </>
-            ) : null}
-          </span>
-        ) : null}
-        <span className="ml-auto flex items-center gap-1">
-          {playbookId ? (
-            <button type="button" className={BTN_LINK} onClick={() => setShowPeople((v) => !v)} aria-expanded={showPeople}>
-              {showPeople ? "Hide people" : "People here"}
-            </button>
-          ) : null}
-          <IconBtn label="Move up" onClick={() => onMove(-1)} disabled={index === 0}>
-            <ArrowUp className="h-3.5 w-3.5" aria-hidden />
-          </IconBtn>
-          <IconBtn label="Move down" onClick={() => onMove(1)} disabled={index === ctx.steps.length - 1}>
-            <ArrowDown className="h-3.5 w-3.5" aria-hidden />
-          </IconBtn>
-          <IconBtn label="Remove step" onClick={onRemove}>
-            <Trash2 className="h-3.5 w-3.5 text-[#b23c26]" aria-hidden />
-          </IconBtn>
-        </span>
-      </div>
-      {body}
-      {showPeople && playbookId ? <RunList playbookId={playbookId} stepId={step.id} /> : null}
-    </li>
-  );
 };
 
-const Line: FC<{ children: ReactNode }> = ({ children }) => <div className="flex flex-wrap items-center gap-1.5 text-sm">{children}</div>;
+/** A step in the flow: its number, type, one line, its numbers and where it jumps. Pressing it opens the inspector. */
+const StepCard: FC<{
+  step: Step;
+  index: number;
+  ctx: StepContext;
+  stats: PlaybookStepStats | undefined;
+  selected: boolean;
+  onSelect: () => void;
+}> = ({ step, index, ctx, stats, selected, onSelect }) => {
+  const line = stepLine(step, ctx);
+  const jumps = jumpLine(step, ctx.steps);
+  const numbers = statsLine(step, stats);
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      aria-label={`Step ${index + 1}, ${STEP_LABELS[step.type]}: ${line.text}`}
+      className={cn("block w-full rounded-md bg-white px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black", selected ? "br-shadow" : "br-plain-press")}>
+      <span className="flex items-start gap-3">
+        <span className={cn("mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold", selected ? "bg-[#e1f073] text-black ring-1 ring-black" : "bg-black text-[#e1f073]")}>
+          {index + 1}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[11px] font-bold uppercase tracking-wide text-gray-500">{STEP_LABELS[step.type]}</span>
+          <span className={cn("block truncate text-sm", line.missing ? "text-[#b23c26]" : "text-black")}>{line.text}</span>
+          {jumps ? (
+            <span className={cn("mt-0.5 flex items-center gap-1 text-xs", jumps.broken ? "text-[#b23c26]" : "text-gray-600")}>
+              <CornerDownRight className="h-3 w-3 flex-none" aria-hidden />
+              <span className="truncate">{jumps.text}</span>
+            </span>
+          ) : null}
+          {numbers ? <span className="mt-1 block text-xs tabular-nums text-gray-500">{numbers}</span> : null}
+        </span>
+      </span>
+    </button>
+  );
+};
 
 const IconBtn: FC<{ label: string; onClick: () => void; disabled?: boolean; children: ReactNode }> = ({ label, onClick, disabled, children }) => (
   <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled} className="rounded border border-gray-300 bg-white p-1 hover:border-black disabled:opacity-40">
     {children}
   </button>
 );
+
+/** The selected step in the inspector: reorder, delete, its fields, its numbers and the people at it. Keyed by step id, so the delete question resets per step. */
+export const StepInspector: FC<{
+  step: Step;
+  index: number;
+  ctx: StepContext;
+  stats: PlaybookStepStats | undefined;
+  playbookId: string | null;
+  onChange: (step: Step) => void;
+  onMove: (by: -1 | 1) => void;
+  onRemove: () => void;
+}> = ({ step, index, ctx, stats, playbookId, onChange, onMove, onRemove }) => {
+  const [askDelete, setAskDelete] = useState(false);
+  const [showPeople, setShowPeople] = useState(false);
+  const pointing = askDelete ? stepsPointingAt(step.id, ctx.steps) : [];
+  const sent = Number(stats?.sent) || 0;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-black text-xs font-bold text-[#e1f073]">{index + 1}</span>
+        <h2 className="text-sm font-bold">
+          Step {index + 1} · {STEP_LABELS[step.type]}
+        </h2>
+        <span className="font-mono text-[10px] text-gray-400">{step.id}</span>
+        <span className="ml-auto flex items-center gap-1">
+          <IconBtn label="Move up" onClick={() => onMove(-1)} disabled={index === 0}>
+            <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+          </IconBtn>
+          <IconBtn label="Move down" onClick={() => onMove(1)} disabled={index === ctx.steps.length - 1}>
+            <ArrowDown className="h-3.5 w-3.5" aria-hidden />
+          </IconBtn>
+        </span>
+      </div>
+
+      {stats && (sent > 0 || Number(stats.inStep) > 0) ? (
+        <p className="text-xs tabular-nums text-gray-600">
+          <strong className="text-black">{n(stats.inStep)}</strong> here now
+          {step.type === "send" ? (
+            <>
+              {" "}
+              · {n(sent)} sent · {n(stats.opened)} opened · {n(stats.clicked)} clicked ({pct(ratio(stats.clicked, sent), 0)}) · {n(stats.converted)} converted
+            </>
+          ) : null}
+        </p>
+      ) : null}
+
+      <StepFields step={step} ctx={ctx} onChange={onChange} />
+
+      {playbookId ? (
+        <div className="border-t border-gray-200 pt-3">
+          <button type="button" className={BTN_LINK} onClick={() => setShowPeople((v) => !v)} aria-expanded={showPeople}>
+            {showPeople ? "Hide people" : "People at this step"}
+          </button>
+          {showPeople ? <RunList playbookId={playbookId} stepId={step.id} /> : null}
+        </div>
+      ) : null}
+
+      <div className="border-t border-gray-200 pt-3">
+        {askDelete ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm">
+              Delete step {index + 1}?
+              {pointing.length ? (
+                <span className="block text-xs text-gray-600">
+                  {pointing.length === 1 ? "Step" : "Steps"} {listText(pointing.map(String))} {pointing.length === 1 ? "points" : "point"} at it. Jumps to it become &quot;Next step&quot; and picks of it are cleared.
+                </span>
+              ) : null}
+            </p>
+            <span className="flex gap-2">
+              <button type="button" className={BTN_DANGER} onClick={onRemove}>
+                Yes, delete
+              </button>
+              <button type="button" className={BTN} onClick={() => setAskDelete(false)}>
+                Keep
+              </button>
+            </span>
+          </div>
+        ) : (
+          <button type="button" className={`${BTN_DANGER} gap-1.5`} onClick={() => setAskDelete(true)}>
+            <Trash2 className="h-3.5 w-3.5" aria-hidden /> Delete step
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 /** The people at one step, a page at a time. */
 const RunList: FC<{ playbookId: string; stepId: string }> = ({ playbookId, stepId }) => {
@@ -421,7 +519,7 @@ const RunList: FC<{ playbookId: string; stepId: string }> = ({ playbookId, stepI
 
   const loading = loadedKey !== key;
   return (
-    <div className="mt-3 border-t border-gray-200 pt-2">
+    <div className="mt-2">
       {loading ? (
         <p className="flex items-center gap-2 text-xs text-gray-500">
           <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> Loading people
@@ -435,7 +533,7 @@ const RunList: FC<{ playbookId: string; stepId: string }> = ({ playbookId, stepI
           <ul className="flex flex-col text-sm">
             {data.items.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-2 border-b border-gray-100 py-1.5">
-                <Link href={`/heroshima/users/${r.userId}`} className="font-semibold hover:underline">
+                <Link href={`/heroshima/users/${r.userId}`} className="min-w-0 truncate font-semibold hover:underline">
                   {r.email || r.userId}
                 </Link>
                 <StatusChip status={r.status} />

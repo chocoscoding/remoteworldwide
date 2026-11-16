@@ -9,7 +9,8 @@ import { useChartWidth } from "./useChartWidth";
 // A line chart over time: one axis, 2px lines (dashed for an estimate), an area wash when one
 // series stands alone, a crosshair that snaps to the nearest day with one tooltip for every series,
 // arrow keys to read it, end labels when they don't collide, a legend that shows or hides a series,
-// and the table view. Gaps (null) break the line instead of pretending to be zero.
+// and the table view. Gaps (null) break the line instead of pretending to be zero. A series with
+// its own dates (`at`, the previous period on the overview) names them in the tooltip and table.
 
 export type LineSeries = {
   key: string;
@@ -19,6 +20,8 @@ export type LineSeries = {
   dashed?: boolean;
   /** A shorter name for the end label. */
   short?: string;
+  /** This series' own x values, when they differ from the chart's (the previous period's days): named in the tooltip and the table. */
+  at?: Array<string | null>;
 };
 
 export type TimeSeriesProps = {
@@ -45,6 +48,12 @@ const finite = (v: number | null | undefined): v is number => v !== null && v !=
 const lastIndex = (values: Array<number | null>) => {
   for (let i = values.length - 1; i >= 0; i--) if (finite(values[i])) return i;
   return -1;
+};
+
+/** A series' own x at a position, in words, when it has its own dates. */
+const ownX = (s: LineSeries, i: number, kind: XKind) => {
+  const own = s.at?.[i];
+  return own ? xLabel(own, kind) : "";
 };
 
 const TimeSeries: FC<TimeSeriesProps> = ({ label, x, xKind = "day", series, unit = "count", area = false, height = 220, empty = "Nothing in this range yet.", table = true }) => {
@@ -183,12 +192,16 @@ const TimeSeries: FC<TimeSeriesProps> = ({ label, x, xKind = "day", series, unit
             x={xAt(active)}
             width={width}
             title={xLabel(x[active], xKind, true)}
-            rows={shown.map((s) => ({ key: s.key, color: s.color, dashed: s.dashed, value: formatValue(s.values[active], unit), label: s.label }))}
+            rows={shown.map((s) => ({ key: s.key, color: s.color, dashed: s.dashed, value: formatValue(s.values[active], unit), label: ownX(s, active, xKind) ? `${s.label}, ${ownX(s, active, xKind)}` : s.label }))}
           />
         ) : null}
       </div>
       {table ? (
-        <TableView caption={label} head={[X_HEADINGS[xKind], ...series.map((s) => s.label)]} rows={x.map((xi, i) => [xLabel(xi, xKind, true), ...series.map((s) => formatValue(s.values[i], unit))])} />
+        <TableView
+          caption={label}
+          head={[X_HEADINGS[xKind], ...series.map((s) => s.label)]}
+          rows={x.map((xi, i) => [xLabel(xi, xKind, true), ...series.map((s) => (ownX(s, i, xKind) && finite(s.values[i]) ? `${formatValue(s.values[i], unit)} (${ownX(s, i, xKind)})` : formatValue(s.values[i], unit)))])}
+        />
       ) : null}
     </div>
   );

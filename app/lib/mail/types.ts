@@ -23,8 +23,36 @@ export type Block =
   | { type: "divider" }
   | { type: "signature" }
   | { type: "feedback" }
-  | { type: "offer" };
+  /** The offer box. Empty text falls back to OFFER_COPY_DEFAULTS; all three may use the variables. */
+  | { type: "offer"; kicker?: string; headline?: string; button?: string };
 export type BlockType = Block["type"];
+
+/** What an offer box says when its block leaves a line empty (OUTREACH-REDESIGN-SPEC.md section 1). */
+export const OFFER_COPY_DEFAULTS = { kicker: "Your personal offer", headline: "{{offerDiscount}} off", button: "Use my discount" } as const;
+export const OFFER_COPY_MAX = { kicker: 60, headline: 80, button: 40 } as const;
+
+/* ----------------------------------------------------------------------------- design */
+
+/** How a marketing mail looks: brand (the product shell), letter (a plain personal note) or bold (an accent band up top). */
+export type MailLook = "brand" | "letter" | "bold";
+export type MailAccent = "lime" | "ink" | "blue" | "orange";
+export type MailButtonShape = "square" | "round";
+export type MailDesign = { look: MailLook; accent: MailAccent; button: MailButtonShape };
+
+export const MAIL_LOOKS: readonly MailLook[] = ["brand", "letter", "bold"];
+export const MAIL_ACCENTS: readonly MailAccent[] = ["lime", "ink", "blue", "orange"];
+export const MAIL_BUTTON_SHAPES: readonly MailButtonShape[] = ["square", "round"];
+export const LOOK_LABELS: Record<MailLook, string> = { brand: "Brand", letter: "Letter", bold: "Bold" };
+export const ACCENT_LABELS: Record<MailAccent, string> = { lime: "Lime", ink: "Ink", blue: "Blue", orange: "Orange" };
+export const BUTTON_SHAPE_LABELS: Record<MailButtonShape, string> = { square: "Square", round: "Round" };
+/** The accent swatches: fill, the text on it, and its edge. The events renderer uses the same values. */
+export const ACCENT_COLORS: Record<MailAccent, { fill: string; text: string; edge: string }> = {
+  lime: { fill: "#e1f073", text: "#222325", edge: "#222325" },
+  ink: { fill: "#222325", text: "#ffffff", edge: "#222325" },
+  blue: { fill: "#2a78d6", text: "#ffffff", edge: "#1c5aa6" },
+  orange: { fill: "#c2511f", text: "#ffffff", edge: "#8f3a15" },
+};
+export const DEFAULT_DESIGN: MailDesign = { look: "brand", accent: "lime", button: "square" };
 export const BLOCK_TYPES: readonly BlockType[] = ["heading", "paragraph", "button", "image", "divider", "signature", "feedback", "offer"];
 export const BLOCK_LABELS: Record<BlockType, string> = {
   heading: "Heading",
@@ -57,9 +85,11 @@ export type TemplateContent = {
   sender: MailSender;
   pref: MarketingPref | null;
   feedbackFooter: boolean;
+  /** This mail's look; null or missing uses the brand default from Outreach settings. */
+  design?: MailDesign | null;
 };
 
-export const EMPTY_CONTENT: TemplateContent = { subject: "", preview: "", blocks: [], sender: "brand", pref: "emailProductNews", feedbackFooter: false };
+export const EMPTY_CONTENT: TemplateContent = { subject: "", preview: "", blocks: [], sender: "brand", pref: "emailProductNews", feedbackFooter: false, design: null };
 
 export type MailTemplate = TemplateContent & {
   id: string;
@@ -88,6 +118,8 @@ export type MailSettings = {
   alarms: MailAlarms;
   senders: { brand: { name: string; email: string }; founder: { name: string; email: string } };
   replyDomain: string;
+  /** The look of every mail whose template has no design of its own. */
+  design: MailDesign;
   updatedBy?: string | null;
   updatedAt?: When | null;
 };
@@ -105,6 +137,7 @@ export const DEFAULT_SETTINGS: MailSettings = {
   alarms: { complaintWarn: 0.001, complaintPause: 0.003, bounceWarn: 0.02, bouncePause: 0.04 },
   senders: { brand: { name: "RemoteWorldwide", email: "" }, founder: { name: "Theo", email: "" } },
   replyDomain: "",
+  design: DEFAULT_DESIGN,
 };
 
 export type AuditRow = { id: string; at: When; by: string | null; byEmail: string | null; action: string; target: string | null; detail: unknown };
@@ -374,6 +407,10 @@ export type MailPlaybook = {
   steps: Step[];
   seedKey: string | null;
   counts?: PlaybookCounts;
+  /** List only: people entering a UTC day, the last 30 days, oldest first (30 numbers). */
+  trend?: number[];
+  /** List only: of the people who entered in the last 30 days, how many reached the goal. */
+  stats30?: { entered: number; converted: number };
   createdAt?: When;
   updatedAt?: When;
 };
@@ -585,6 +622,15 @@ export type OverviewDay = {
   unsubscribed?: number;
   bounced?: number;
   complained?: number;
+  /** Revenue credited to mail that UTC day. */
+  revenueCents?: number;
+};
+/** The same length window just before the current one, for the headline comparisons. */
+export type OverviewPrevious = {
+  totals: Totals;
+  rates: Rates;
+  /** Aligned by position with Overview.daily: previous.daily[i] is the day `days` before daily[i]. */
+  daily: Array<{ day: string; sent: number; delivered: number; clicked: number; converted: number; revenueCents: number }>;
 };
 export type SourceDay = { day: string; product: number; campaign: number; playbook: number };
 export type OfferDay = { day: string; granted: number; redeemed: number; revenueCents?: number };
@@ -617,6 +663,8 @@ export type Overview = {
   actions: Array<{ actionId: string; name: string; people7d: number; entered7d: number }>;
   /** Optional: conversions credited to (or influenced by) a mail, by goal and a day. */
   conversions?: { byGoal: ConversionGoal[]; daily: ConversionDay[] };
+  /** Optional until the backend sends it: the previous window, for the headline deltas and the dashed line. */
+  previous?: OverviewPrevious;
 };
 
 export type TableBy = "campaign" | "playbook_step" | "template" | "kind";

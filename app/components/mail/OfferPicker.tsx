@@ -7,8 +7,9 @@ import { INPUT, INPUT_SM } from "./ui";
 import { numOrUndef, offerChoiceProblem, offerLabel } from "./format";
 
 /**
- * An optional personal discount on a send: the offer, then `[ percent ]% valid for [ hours ]`
- * overrides for this send only (empty keeps the offer's own numbers).
+ * An optional personal discount on a send: the offer (with a link to its rules), then
+ * `[ percent ]% valid for [ hours ]` overrides for this send only (empty keeps the offer's own numbers).
+ * The mail's offer box shows it; the box's words are edited in the content editor.
  */
 const OfferPicker: FC<{
   offers: MailOffer[];
@@ -35,8 +36,12 @@ const OfferPicker: FC<{
             </option>
           ))}
         </select>
-        {!live.length ? (
-          <Link href="/heroshima/outreach/offers/new" className="text-xs font-semibold hover:underline">
+        {offer ? (
+          <Link href={`/heroshima/outreach/offers/${offer.id}`} target="_blank" className="text-xs font-semibold text-gray-600 hover:text-black hover:underline">
+            Discount rules
+          </Link>
+        ) : !live.length ? (
+          <Link href="/heroshima/outreach/offers/new" target="_blank" className="text-xs font-semibold hover:underline">
             Make an offer
           </Link>
         ) : null}
