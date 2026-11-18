@@ -15,10 +15,11 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { apiPut } from "@/app/lib/api/client";
+import { apiPost, apiPut } from "@/app/lib/api/client";
 import { apiMessage } from "@/app/lib/api/core";
 import { qk } from "@/app/lib/query/keys";
 import type {
+  EmailStatus,
   JobPreferences,
   NotificationSettings,
   PrivacySettings,
@@ -89,6 +90,29 @@ export function useSaveSettingsSection<S extends SettingsSection>(section: S) {
 
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: qk.settings.me() });
+      // A switch turned back on by hand is no longer an unsubscribe to undo.
+      if (section === "notifications") void queryClient.invalidateQueries({ queryKey: qk.settings.emailStatus() });
+    },
+  });
+}
+
+/**
+ * The notifications tab's Resubscribe: every switch an emailed unsubscribe turned off goes back on
+ * and a block on marketing mail is lifted. The answer carries the whole settings object and the
+ * status as it now stands, so both caches take what the backend stored.
+ */
+export function useResubscribe() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ settings: Settings; status: EmailStatus }, unknown, void>({
+    mutationFn: () => apiPost<{ settings: Settings; status: EmailStatus }>("/api/settings/resubscribe"),
+    onSuccess: ({ settings, status }) => {
+      queryClient.setQueryData(qk.settings.me(), settings);
+      queryClient.setQueryData(qk.settings.emailStatus(), status);
+      toast.success("You're resubscribed");
+    },
+    onError: (error) => {
+      toast.error(apiMessage(error));
     },
   });
 }

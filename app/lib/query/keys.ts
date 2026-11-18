@@ -19,6 +19,8 @@ export const qk = {
   settings: {
     all: ["settings"] as const,
     me: () => [...qk.settings.all, "me"] as const,
+    /** Emailed unsubscribes and a mail block, for the notifications tab's Resubscribe. */
+    emailStatus: () => [...qk.settings.all, "email-status"] as const,
   },
   billing: {
     all: ["billing"] as const,

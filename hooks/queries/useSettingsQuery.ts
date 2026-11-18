@@ -14,7 +14,7 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { apiGet } from "@/app/lib/api/client";
 import { STALE_TIME, qk } from "@/app/lib/query/keys";
-import type { Settings } from "@/app/lib/settings/types";
+import type { EmailStatus, Settings } from "@/app/lib/settings/types";
 
 export const SETTINGS_PATH = "/api/settings/me";
 
@@ -72,5 +72,21 @@ export function useProfileSettings({ fresh = false }: { fresh?: boolean } = {}) 
     queryFn: ({ signal }) => fetchSettings(signal),
     staleTime: STALE_TIME.settings,
     refetchOnMount: fresh ? "always" : true,
+  });
+}
+
+export const EMAIL_STATUS_PATH = "/api/settings/email-status";
+
+/**
+ * What the notifications tab may offer to undo: switches an emailed unsubscribe turned off, and a
+ * block on marketing mail. Read only there, and asked again each time the tab opens, because an
+ * unsubscribe happens in a mail client this tab never hears about.
+ */
+export function useEmailStatusQuery() {
+  return useQuery({
+    queryKey: qk.settings.emailStatus(),
+    queryFn: ({ signal }) => apiGet<EmailStatus>(EMAIL_STATUS_PATH, signal),
+    staleTime: STALE_TIME.settings,
+    refetchOnMount: "always",
   });
 }
