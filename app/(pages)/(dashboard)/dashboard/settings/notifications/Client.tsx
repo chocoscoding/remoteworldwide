@@ -1,6 +1,6 @@
 "use client";
 
-import { FC } from "react";
+import { FC, useState } from "react";
 import { Info, MailMinus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActivity } from "@/app/components/dashboard/activity/ActivityProvider";
@@ -87,6 +87,8 @@ const NotificationsClient: FC = () => {
   const { notifications, setNotifications } = useSettings();
   // huntHour is owned by ActivityProvider — the at-risk banner reads it too.
   const { goals, setHuntHour } = useActivity();
+  // The reminders note stays folded away until someone asks for it with the info button.
+  const [aboutReminders, setAboutReminders] = useState(false);
 
   return (
     <>
@@ -103,7 +105,24 @@ const NotificationsClient: FC = () => {
         ))}
       </SettingsSection>
 
-      <SettingsSection title="Reminders" description="The streak reminder comes by email. Interview reminders aren't sent yet.">
+      <SettingsSection
+        title="Reminders"
+        description="The streak reminder comes by email. Interview reminders aren't sent yet."
+        action={
+          <button
+            type="button"
+            onClick={() => setAboutReminders((open) => !open)}
+            aria-expanded={aboutReminders}
+            aria-controls="about-reminders"
+            aria-label="How reminders work"
+            title="How reminders work"
+            className={cn(
+              "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border transition-colors",
+              aboutReminders ? "border-[#222325] text-primary" : "border-black/10 text-black/40 hover:border-[#222325] hover:text-primary",
+            )}>
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        }>
         <SettingsRow label="Your hunting hour" hint="When you usually job hunt. Reminders land around then, never before." stacked>
           <select
             aria-label="Hunting hour"
@@ -128,14 +147,16 @@ const NotificationsClient: FC = () => {
           </SettingsRow>
         ))}
 
-        <div className="mt-4 flex gap-2.5 rounded-xl border border-black/10 bg-[#fbfbf7] px-3.5 py-3">
-          <Info className="mt-0.5 h-4 w-4 flex-none text-black/40" />
-          <p className="text-xs leading-relaxed text-black/60">
-            The streak reminder is an email to the address on your account, at most once a day, while you have a streak
-            going or logged something this week. Interview reminders aren&apos;t sent yet; that switch records your
-            preference for when they are.
-          </p>
-        </div>
+        {aboutReminders && (
+          <div id="about-reminders" className="mt-4 flex gap-2.5 rounded-xl border border-black/10 bg-[#fbfbf7] px-3.5 py-3">
+            <Info className="mt-0.5 h-4 w-4 flex-none text-black/40" />
+            <p className="text-xs leading-relaxed text-black/60">
+              The streak reminder is an email to the address on your account, at most once a day, while you have a streak
+              going or logged something this week. Interview reminders aren&apos;t sent yet; that switch records your
+              preference for when they are.
+            </p>
+          </div>
+        )}
       </SettingsSection>
     </>
   );
