@@ -35,6 +35,24 @@ export function useChangePassword(onDone?: () => void) {
   });
 }
 
+/**
+ * A first password for an account that signs in with Google or GitHub. Afterwards the account has
+ * one, so the sign-in methods are asked again: the Account tab then offers "Change password", and
+ * the last provider can be disconnected.
+ */
+export function useSetPassword(onDone?: () => void) {
+  const queryClient = useQueryClient();
+  return useMutation<ChangeResult, unknown, { password: string }>({
+    mutationFn: (body) => apiPost<ChangeResult>("/api/users/password", body),
+    onSuccess: (result) => {
+      toast.success("Password set", { description: devicesSignedOut(result.sessionsRevoked) });
+      void queryClient.invalidateQueries({ queryKey: qk.account.signIn() });
+      onDone?.();
+    },
+    onError: (error) => toast.error(apiMessage(error)),
+  });
+}
+
 export function useResendVerification() {
   return useMutation<{ sent: boolean }, unknown, void>({
     mutationFn: () => apiPost<{ sent: boolean }>("/api/users/verification/resend", {}),

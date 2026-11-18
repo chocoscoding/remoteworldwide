@@ -72,7 +72,7 @@ const AccountClient: FC<{ verified: boolean; accountEmail: string | null }> = ({
           <input id="a-phone" className={INPUT} value={profile.phone} onChange={(e) => setProfile({ phone: e.target.value })} />
         </SettingsRow>
 
-        <ChangePassword />
+        <ChangePassword hasPassword={methods?.hasPassword} />
       </SettingsSection>
 
       <SettingsSection
