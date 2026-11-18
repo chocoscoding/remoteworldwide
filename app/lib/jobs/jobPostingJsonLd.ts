@@ -16,10 +16,30 @@ import { applicantCountries } from "./regionCountries";
 import { effectiveExpiry } from "./jobLifetime";
 import type { JobFacts } from "./jobFacts";
 
+/**
+ * When this markup last changed in a way Google should read again (2026-11-18: every live job names
+ * its countries, and validThrough follows the 90-day lifetime). The jobs sitemap never gives a live
+ * listing an older lastmod, so Google re-crawls pages it last saw before the change. Move it forward
+ * whenever the markup changes for every listing at once.
+ */
+export const JOB_POSTING_MARKUP_REVISED_AT = "2026-11-18T00:00:00.000Z";
+
+/**
+ * The countries applicants may work from, in the order the page shows places (publicJobFacts.ts
+ * jobLocations): worldwide, then the facts' regions and countries, then the admin's Region. Never
+ * empty: Google drops a TELECOMMUTE posting without one (Search Console, 2026-11-17: 7 jobs whose
+ * facts named no place and that had no Region), so a job nothing places is open worldwide, as its
+ * page says.
+ */
+function jobCountries(job: JobAndCompany): string[] {
+  if (job.facts?.worldwideEligible === true) return applicantCountries([]);
+  const fromFacts = [...(job.facts?.regions ?? []), ...(job.facts?.countries ?? [])].filter((place) => place.trim());
+  return applicantCountries(fromFacts.length ? fromFacts : (job.region ?? []));
+}
+
 export function jobPostingJsonLd(job: JobAndCompany, facts: JobFacts) {
   const { company } = job;
-  const regions = job.facts?.regions.length ? job.facts.regions : job.region;
-  const countries = job.facts?.countries.length ? job.facts.countries : regions.length ? applicantCountries(regions) : [];
+  const countries = jobCountries(job);
   const remote = !["hybrid", "onsite"].includes(job.facts?.remotePolicy ?? "");
   return {
     "@context": "https://schema.org",

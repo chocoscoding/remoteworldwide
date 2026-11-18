@@ -7,6 +7,7 @@ import {
 import { LANDINGS, isLive, landingPath } from "@/app/lib/landing/catalogue";
 import { landingInventory } from "@/app/lib/landing/data";
 import { TOOLS, toolPath } from "@/app/lib/tools/catalogue";
+import { JOB_POSTING_MARKUP_REVISED_AT } from "@/app/lib/jobs/jobPostingJsonLd";
 import type { SitemapUrl } from "./sitemapXml";
 export const SITEMAP_SECTIONS = [
   "pages",
@@ -43,8 +44,16 @@ export async function sitemapSection(
     const rows = await backend<Entry[]>(
       `/jobs/sitemap${section === "archives" ? "?status=archived" : ""}`,
     );
+    // A live listing's page carries JobPosting markup, so it changed when the markup did, even
+    // if the listing itself did not. Archived pages have no markup and keep their own date.
+    const floor = section === "jobs" ? Date.parse(JOB_POSTING_MARKUP_REVISED_AT) : 0;
     return rows.map((row) =>
-      url(`/jobs/${encodeURIComponent(row.slug)}`, row.updatedAt),
+      url(
+        `/jobs/${encodeURIComponent(row.slug)}`,
+        new Date(row.updatedAt).getTime() < floor
+          ? JOB_POSTING_MARKUP_REVISED_AT
+          : row.updatedAt,
+      ),
     );
   }
   if (section === "companies") {
