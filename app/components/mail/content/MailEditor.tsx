@@ -153,7 +153,14 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
       <InboxLine content={content} onChange={onChange} shownSubject={preview.rendered?.subject} disabled={Boolean(locked)} />
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <section aria-label="Mail" className="min-w-0 overflow-clip rounded-md border border-gray-300 bg-white">
+        {/* At least a screen tall (the inspector's own cap), so the canvas fills the editor instead of
+            stopping under a short mail; the 1fr rows hand the extra height to the grey canvas. */}
+        <section
+          aria-label="Mail"
+          className={cn(
+            "grid min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr] overflow-clip rounded-md border border-gray-300 bg-white",
+            underBar ? "lg:min-h-[calc(100vh-5rem)]" : "lg:min-h-[calc(100vh-2rem)]",
+          )}>
           <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-3 py-2">
             <div className="flex items-center gap-1" role="radiogroup" aria-label="Width">
               {(
@@ -183,7 +190,7 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
             </div>
           </div>
 
-          <div className={cn("grid", locked ? "" : "xl:grid-cols-[190px_minmax(0,1fr)]")}>
+          <div className={cn("grid", locked ? "grid-rows-[1fr]" : "grid-rows-[auto_1fr] xl:grid-cols-[190px_minmax(0,1fr)] xl:grid-rows-[1fr]")}>
             {locked ? null : (
               <div className="border-b border-gray-200 p-2 xl:border-b-0 xl:border-r">
                 <div className={cn("xl:sticky", underBar ? "xl:top-16" : "xl:top-4")}>
