@@ -174,7 +174,7 @@ const MailCard: FC<{ template: MailTemplate; design: MailDesign }> = ({ template
 const OfferCard: FC<{ offer: MailOffer; design: MailDesign }> = ({ offer: o, design }) => (
   <Link href={`/heroshima/outreach/offers/${o.id}`} className="group flex h-full flex-col overflow-hidden rounded-md bg-white br-plain-press">
     <div className="bg-[#f9f8f1] px-4 py-4">
-      <OfferBox design={design} size="sm" kicker="Your personal offer" headline={`${offerLabel(o)} off`} detail={`Code valid ${validFor(o.validHours)}`} button="Use my discount" />
+      <OfferBox design={design} look={o.look} size="sm" kicker="Your personal offer" headline={`${offerLabel(o)} off`} detail={`Code valid ${validFor(o.validHours)}`} button="Use my discount" />
     </div>
     <div className="flex flex-1 flex-col gap-0.5 border-t border-gray-200 px-3 py-2.5">
       <p className="flex items-center gap-1.5">

@@ -7,7 +7,17 @@ import { toast } from "sonner";
 import { qk } from "@/app/lib/query/keys";
 import { apiGet, apiPost } from "@/app/lib/api/client";
 import { Check, CreditCard, Tag, Zap } from "lucide-react";
-import { isOfferToken, offerCovers, offerHeadline, offerUntil, usableGrant, type CurrentOffer, type OfferGrantView } from "@/app/lib/mail/userMail";
+import {
+  forgetOfferToken,
+  isOfferToken,
+  offerCovers,
+  offerHeadline,
+  offerUntil,
+  storedOfferToken,
+  usableGrant,
+  type CurrentOffer,
+  type OfferGrantView,
+} from "@/app/lib/mail/userMail";
 import { cn } from "@/lib/utils";
 import ProgressBar from "@/app/components/dashboard/ui/ProgressBar";
 import { BillingSwitch, PERIOD_SUFFIX, PERIOD_WORDS } from "@/app/components/pricing/BillingInterval";
@@ -69,15 +79,23 @@ const BillingClient: FC<{
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // The personal offer. Read once: the address loses `?offer=` when this screen tidies it away.
-  const [offerToken] = useState(() => (isOfferToken(offerParam) ? offerParam : null));
+  // The personal offer: the address's, else one kept from an earlier page (app/lib/mail/userMail.ts,
+  // stored by the tracker when a page loads with `?offer=`). Read once: the address loses `?offer=`
+  // when this screen tidies it away. Back from a paid checkout, the kept one is spent (dropped below).
+  // Not rendered itself, so reading the browser's storage here can't upset hydration.
+  const [offerToken] = useState(() => (isOfferToken(offerParam) ? offerParam : returned === "success" ? null : storedOfferToken()));
   const [offer, setOffer] = useState<{ loading: boolean; grant: OfferGrantView | null }>(() => ({ loading: offerToken !== null, grant: null }));
   useEffect(() => {
     if (!offerToken) return;
     let live = true;
-    // No grant (not theirs, expired, used, or anything else the backend says) shows nothing.
+    // No grant (not theirs, expired, used, or anything else the backend says) shows nothing, and
+    // the kept token goes. A failed request keeps it for the next visit.
     apiGet<CurrentOffer>(`/api/mail/offers/current?token=${encodeURIComponent(offerToken)}`).then(
-      (answer) => live && setOffer({ loading: false, grant: usableGrant(answer?.grant) }),
+      (answer) => {
+        const grant = usableGrant(answer?.grant);
+        if (!grant) forgetOfferToken(offerToken);
+        if (live) setOffer({ loading: false, grant });
+      },
       () => live && setOffer({ loading: false, grant: null }),
     );
     return () => {
@@ -97,6 +115,7 @@ const BillingClient: FC<{
     toast.dismiss();
     const refresh = () => void queryClient.invalidateQueries({ queryKey: qk.billing.all });
     if (returned === "success") {
+      forgetOfferToken();
       toast.success("Payment received", { description: "Your plan and credits will show here in a moment." });
       if (sessionId) void apiPost("/api/billing/checkout/confirm", { sessionId }).then(refresh, refresh);
     } else if (returned === "canceled") {

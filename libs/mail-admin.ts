@@ -30,6 +30,7 @@ import type {
   MailTemplate,
   MailThread,
   OfferInput,
+  OfferSampleAsk,
   Overview,
   Paged,
   PlaybookInput,
@@ -45,6 +46,7 @@ import type {
   ThreadDetail,
   ThreadStatus,
 } from "@/app/lib/mail/types";
+import { OFFER_VALID_HOURS_MAX } from "@/app/lib/mail/types";
 
 /** A write body without Mongo `_id` keys (a document read back and edited must not try to set them). */
 function strip(value: unknown): unknown {
@@ -191,16 +193,27 @@ export const previewMail = async ({
   userId,
   sampleOffer = true,
   markBlocks = false,
+  offerSample,
 }: {
   content: TemplateContent;
   userId?: string;
   sampleOffer?: boolean;
   /** Adds data-rww-block="<index>" to each block in the html, so the editor can pick a block by clicking it. */
   markBlocks?: boolean;
+  /** The offer page's sample (with sampleOffer): its discount, validity, look and link instead of the fixed 20% / 72 h. */
+  offerSample?: OfferSampleAsk;
 }) => {
   await requireAdminAction();
   const body: Record<string, unknown> = { content, sampleOffer: Boolean(sampleOffer) };
   if (markBlocks) body.markBlocks = true;
+  if (sampleOffer && offerSample) {
+    body.offerSample = {
+      discountLabel: String(offerSample.discountLabel ?? "").trim().slice(0, 20),
+      validHours: int(offerSample.validHours, 72, 1, OFFER_VALID_HOURS_MAX),
+      look: offerSample.look,
+      link: offerSample.link,
+    };
+  }
   if (userId && okId(userId)) body.userId = userId;
   return run<MailPreview>(() => mail("/preview", { method: "POST", body }));
 };

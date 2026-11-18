@@ -239,6 +239,51 @@ export interface CurrentOffer {
 /** `?offer=<grantId>.<signature>`, the shape the backend signs (MAIL-BUILD-SPEC.md section 6). */
 export const isOfferToken = (value: unknown): value is string => typeof value === "string" && /^[a-f\d]{24}\.[A-Za-z0-9_-]{16,128}$/i.test(value);
 
+// Keeping the discount across pages (OUTREACH-REDESIGN-SPEC.md section 6): an offer link may land on
+// /pricing or any page, so the token is kept in this browser (`rww:offer`, with when it was kept)
+// until the billing page uses it. Browser only; on the server these do nothing.
+
+const OFFER_STORE_KEY = "rww:offer";
+const OFFER_KEEP_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** Keeps `?offer=<token>` from a query string, when it has one; a newer token replaces the last. */
+export function keepOfferToken(search: string): void {
+  try {
+    const token = new URLSearchParams(search).get("offer");
+    if (isOfferToken(token)) localStorage.setItem(OFFER_STORE_KEY, JSON.stringify({ token, at: Date.now() }));
+  } catch {
+    /* No storage (or not a browser): the address still carries it. */
+  }
+}
+
+/** The kept token while it is under 14 days old; an older or unreadable one is dropped. */
+export function storedOfferToken(): string | null {
+  try {
+    const raw = localStorage.getItem(OFFER_STORE_KEY);
+    if (!raw) return null;
+    const kept = JSON.parse(raw) as { token?: unknown; at?: unknown } | null;
+    const age = typeof kept?.at === "number" ? Date.now() - kept.at : Number.NaN;
+    if (isOfferToken(kept?.token) && age >= 0 && age < OFFER_KEEP_MS) return kept.token;
+    localStorage.removeItem(OFFER_STORE_KEY);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Drops the kept token: any, or only `token` when that is the one kept. */
+export function forgetOfferToken(token?: string): void {
+  try {
+    if (token) {
+      const kept = JSON.parse(localStorage.getItem(OFFER_STORE_KEY) ?? "null") as { token?: unknown } | null;
+      if (kept?.token !== token) return;
+    }
+    localStorage.removeItem(OFFER_STORE_KEY);
+  } catch {
+    /* Nothing kept, or no storage. */
+  }
+}
+
 /** A grant the banner can show: every field it reads present, and not yet expired. */
 export function usableGrant(value: unknown, now = Date.now()): OfferGrantView | null {
   if (!value || typeof value !== "object") return null;

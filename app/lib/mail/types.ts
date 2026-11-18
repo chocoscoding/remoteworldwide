@@ -75,7 +75,7 @@ export const TEMPLATE_VARS: ReadonlyArray<{ name: string; hint: string }> = [
   { name: "offerDiscount", hint: "20% or $5" },
   { name: "offerExpiresAt", hint: "When the code ends" },
   { name: "offerCode", hint: "Their code" },
-  { name: "offerUrl", hint: "Billing link with the code" },
+  { name: "offerUrl", hint: "The offer's link with the code" },
 ];
 
 export type TemplateContent = {
@@ -460,6 +460,24 @@ export type OfferVersion = {
   at: When;
 };
 
+/** Where an offer's button (and `{{offerUrl}}`) goes: the billing page, /pricing, or a path on the site. `path` only with kind "path". */
+export type OfferLink = { kind: "billing" | "pricing" | "path"; path?: string };
+/** How the offer box is drawn: "auto" follows the mail's look. */
+export type OfferBoxStyle = "auto" | "filled" | "outline" | "coupon";
+/** The box's style, its accent (null = the mail's accent) and the live countdown. */
+export type OfferLook = { style: OfferBoxStyle; accent: MailAccent | null; countdown: boolean };
+export const DEFAULT_OFFER_LINK: OfferLink = { kind: "billing" };
+export const DEFAULT_OFFER_LOOK: OfferLook = { style: "auto", accent: null, countdown: false };
+export const OFFER_BOX_STYLES: readonly OfferBoxStyle[] = ["auto", "filled", "outline", "coupon"];
+export const OFFER_BOX_STYLE_LABELS: Record<OfferBoxStyle, string> = { auto: "Match the mail", filled: "Filled", outline: "Outline", coupon: "Coupon" };
+/** A page on the site for a "path" link: starts with / (not //), then [A-Za-z0-9/_-.~], then an optional ?query of [A-Za-z0-9_-.~=&%]. */
+export const OFFER_PATH_PATTERN = /^\/(?!\/)[A-Za-z0-9/_\-.~]*(?:\?[A-Za-z0-9_\-.~=&%]*)?$/;
+export const OFFER_PATH_MAX = 200;
+/** How long a code may be valid for, in hours (90 days). */
+export const OFFER_VALID_HOURS_MAX = 24 * 90;
+/** The offer page's live sample, sent with previewMail: the events service draws it instead of its fixed 20% / 72 h one. */
+export type OfferSampleAsk = { discountLabel: string; validHours: number; look: OfferLook; link: OfferLink };
+
 export type OfferStats = { granted: number; clicked?: number; redeemed: number; revenueCents: number; discountCents: number; thisMonth?: number };
 
 export type OfferGrantRow = {
@@ -490,6 +508,10 @@ export type MailOffer = {
   plans: string[];
   intervals: string[];
   monthlyCap: number | null;
+  /** Where its button goes. Always sent by the backend (defaults filled in); an older backend leaves it out. */
+  link: OfferLink;
+  /** How its box looks. Always sent by the backend (defaults filled in); an older backend leaves it out. */
+  look: OfferLook;
   version: number;
   stripeCouponId: string | null;
   history: OfferVersion[];
@@ -514,6 +536,9 @@ export type OfferInput = {
   plans: string[];
   intervals: string[];
   monthlyCap: number | null;
+  /** Presentation: editing it (or look) doesn't make a new version. */
+  link: OfferLink;
+  look: OfferLook;
 };
 
 /* ----------------------------------------------------------------------------- inbox */

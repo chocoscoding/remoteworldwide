@@ -11,8 +11,16 @@
 // else from the query string is read.
 //
 // Browser-only: `ActivityTracker` starts and stops it.
+//
+// One more read of the query string, which sends nothing: a personal offer's `?offer=<token>` is kept
+// in this browser (app/lib/mail/userMail.ts) when any page of the site loads with it, tracking on or
+// not, so the discount still applies when the billing page is reached later.
 
 import type { TrackKind } from "./types";
+import { keepOfferToken } from "@/app/lib/mail/userMail";
+
+// Every page load runs this module (ActivityTracker sits in the root layout); a mail's link is always one.
+if (typeof window !== "undefined") keepOfferToken(window.location.search);
 
 const ENDPOINT = "/api/track";
 const FLUSH_MS = 5000;

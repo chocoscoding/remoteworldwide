@@ -1,9 +1,12 @@
+import type { FC, ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { getMailSettings, getOffer } from "@/libs/mail-admin";
 import { DEFAULT_SETTINGS } from "@/app/lib/mail/types";
 import { StatTile } from "@/app/components/ADMIN/analytics/Charts";
 import MailShell from "@/app/components/mail/MailShell";
+import MailTabs from "@/app/components/mail/MailTabs";
 import { CONTEXT, METRIC, TimeSeries, num } from "@/app/components/mail/charts";
 import Fold from "@/app/components/mail/content/Fold";
 import { OFFERS_HREF } from "@/app/components/mail/content/blocks";
@@ -18,6 +21,18 @@ export const metadata = { title: "Outreach offer", robots: { index: false, follo
 
 const BACK = { href: OFFERS_HREF, label: "Content" };
 
+/** MailShell's frame without its title: the editor's name field is the title here, edited in place. */
+const OfferShell: FC<{ children: ReactNode }> = ({ children }) => (
+  <div className="w-full min-h-screen min-w-0 p-4">
+    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">Outreach</p>
+    <MailTabs />
+    <Link href={BACK.href} className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-black">
+      <ArrowLeft className="h-4 w-4" aria-hidden /> {BACK.label}
+    </Link>
+    {children}
+  </div>
+);
+
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const isNew = id === "new";
@@ -29,9 +44,9 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
 
   if (isNew) {
     return (
-      <MailShell title="New offer" description="A personal discount a campaign or playbook step gives with its mail." back={BACK}>
+      <OfferShell>
         <OfferEditor offer={null} maxDiscountPercent={maxDiscountPercent} brandDesign={brandDesign} />
-      </MailShell>
+      </OfferShell>
     );
   }
   if (!offerRes || offerRes.error || !offerRes.data) {
@@ -50,7 +65,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
   const historySummary = [`Version ${offer.version}`, grants.length ? `${n(grants.length)} codes listed` : "no codes yet"].join(" · ");
 
   return (
-    <MailShell title={offer.name} description={`${offerLabel(offer)} · ${durationText(offer)} · version ${offer.version}${offer.archived ? " · archived" : ""}`} back={BACK}>
+    <OfferShell>
       <div className="flex flex-col gap-4">
         <OfferEditor offer={offer} maxDiscountPercent={maxDiscountPercent} brandDesign={brandDesign} />
 
@@ -170,7 +185,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
           </div>
         </Fold>
       </div>
-    </MailShell>
+    </OfferShell>
   );
 };
 

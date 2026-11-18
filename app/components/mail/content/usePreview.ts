@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { previewMail } from "@/libs/mail-admin";
-import type { TemplateContent } from "@/app/lib/mail/types";
+import type { OfferSampleAsk, TemplateContent } from "@/app/lib/mail/types";
 
-export type PreviewAsk = { content: TemplateContent; sampleOffer?: boolean; userId?: string; markBlocks?: boolean };
+export type PreviewAsk = { content: TemplateContent; sampleOffer?: boolean; userId?: string; markBlocks?: boolean; offerSample?: OfferSampleAsk };
 
 /**
  * The mail as the events service renders it (POST /preview through previewMail), asked again 700 ms
@@ -17,7 +17,13 @@ export function usePreview(ask: PreviewAsk, enabled = true) {
   const [attempt, setAttempt] = useState(0);
   const seq = useRef(0);
   // One string for "what to render", so the effect runs only when it really changed.
-  const request = JSON.stringify({ content: ask.content, sampleOffer: ask.sampleOffer ?? true, userId: ask.userId || "", markBlocks: Boolean(ask.markBlocks) });
+  const request = JSON.stringify({
+    content: ask.content,
+    sampleOffer: ask.sampleOffer ?? true,
+    userId: ask.userId || "",
+    markBlocks: Boolean(ask.markBlocks),
+    offerSample: ask.offerSample ?? null,
+  });
 
   useEffect(() => {
     if (!enabled) return;
@@ -25,8 +31,14 @@ export function usePreview(ask: PreviewAsk, enabled = true) {
       () => {
         const mine = ++seq.current;
         setLoading(true);
-        const body = JSON.parse(request) as { content: TemplateContent; sampleOffer: boolean; userId: string; markBlocks: boolean };
-        previewMail({ content: body.content, sampleOffer: body.sampleOffer, userId: body.userId || undefined, markBlocks: body.markBlocks }).then(
+        const body = JSON.parse(request) as { content: TemplateContent; sampleOffer: boolean; userId: string; markBlocks: boolean; offerSample: OfferSampleAsk | null };
+        previewMail({
+          content: body.content,
+          sampleOffer: body.sampleOffer,
+          userId: body.userId || undefined,
+          markBlocks: body.markBlocks,
+          offerSample: body.offerSample ?? undefined,
+        }).then(
           (res) => {
             if (mine !== seq.current) return;
             setLoading(false);
