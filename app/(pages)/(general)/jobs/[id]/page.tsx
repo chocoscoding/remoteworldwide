@@ -9,8 +9,8 @@ import { Listing, listingMetadata } from "./listing";
 //
 // Only listings arrive here. The landing pages share /jobs/<slug> but read the query string and
 // the request, which a cached route may not do (Next answers DYNAMIC_SERVER_USAGE, a 500), so
-// next.config.mjs rewrites every single-segment slug without the listings' long number to
-// ../landing/[slug], which renders per request.
+// next.config.mjs rewrites every single-segment slug without a listing's mark (a long number, or
+// "-<8 hex>" at the end) to ../landing/[slug], which renders per request.
 export const revalidate = 86400; // JOB_PAGE_REVALIDATE_S (app/lib/backend.ts); must be a literal.
 // An empty list is what lets listings not built at deploy be cached on their first visit.
 export async function generateStaticParams() {
@@ -21,7 +21,7 @@ type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props) {
   const slug = (await params).id;
-  // A landing slug with a 10-digit run would skip the rewrite. None has one; this keeps it a 404.
+  // A landing slug with a 10-digit run or a "-<8 hex>" ending would skip the rewrite. None has one; this keeps it a 404.
   if (landingBySlug("jobs", slug)) return { title: "Job Not Found", robots: { index: false, follow: true } };
   return listingMetadata(slug);
 }

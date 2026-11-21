@@ -154,6 +154,12 @@ const nextConfig = {
         source: "/api/documents/:path*",
         destination: `${backend}/api/documents/:path*`,
       },
+      // The user's job-board bookmarks (app/lib/bookmarks/api.ts). The job page's bookmark button
+      // asks on every signed-in visit, so it must not be a server action (one function run each).
+      {
+        source: "/api/bookmarks/:path*",
+        destination: `${backend}/api/bookmarks/:path*`,
+      },
       // The bell polls this from every dashboard screen.
       {
         source: "/api/notifications",
@@ -343,13 +349,17 @@ const nextConfig = {
       },
       // /jobs/<slug> is a listing or a landing page (app/lib/landing/catalogue.ts). Listings are
       // cached (app/(pages)/(general)/jobs/[id]); landing pages read ?page= and the request, which
-      // a cached route may not. Listing slugs end in a long number (title-<hex><13-digit time>), so
-      // a one-segment slug without a 10-digit run goes to the per-request route, which shows the
-      // landing page, or the listing when an admin wrote its slug by hand. An array of rewrites is
-      // checked after the filesystem, so the static landing folders (/jobs/latest, ...) and
-      // two-segment landings (jobs/[id]/[segment]) never reach this.
+      // a cached route may not. Listing slugs carry a mark no landing slug has: older ones a long
+      // number (title-<hex><13-digit time>), and since 2026-11-05 a dash and eight random hex
+      // characters at the end (title-f42ba172, the backend's jobSlug in jobAdminService.ts). A
+      // one-segment slug with neither goes to the per-request route, which shows the landing page,
+      // or the listing when an admin wrote its slug by hand. Missing the second shape sent every
+      // listing posted since Nov 5 to the per-request route: ~19K function runs in 12 hours
+      // (Vercel, 2026-11-21). An array of rewrites is checked after the filesystem, so the static
+      // landing folders (/jobs/latest, ...) and two-segment landings (jobs/[id]/[segment]) never
+      // reach this.
       {
-        source: "/jobs/:slug((?![^/]*\\d{10})[^/]+)",
+        source: "/jobs/:slug((?![^/]*\\d{10})(?![^/]*-[0-9a-f]{8}(?![^/]))[^/]+)",
         destination: "/jobs/landing/:slug",
       },
     ];

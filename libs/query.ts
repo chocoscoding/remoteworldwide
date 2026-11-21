@@ -19,7 +19,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { backend, BackendError, backendCached, backendOrNull, BOARD_TAGS, idSegment, isObjectId, jobPageTag, type BackendInit } from "@/app/lib/backend";
-import type { Company, CompanyWithJobsCount, FilterData, Job, OneBookmarkType } from "@/types/main";
+import type { Company, CompanyWithJobsCount, FilterData, Job } from "@/types/main";
 import type { PublicJobFacts, CompanyHiringProfile } from "@/types/main";
 import type { Author, Blog, BlogStatus, EditableBlog } from "@/app/lib/blog/types";
 import { requireAdminAction, requireRoleAction, requireUserAction } from "@/app/lib/auth/action-guards";
@@ -452,46 +452,14 @@ const opaque = (action: string, error: unknown): never => {
   throw new Error("something went wrong");
 };
 
-// The bookmarks below are the session user's own: the backend reads the user from the
-// session cookie, never from an argument.
-export const getAllBookmarksForUser = async (page: number) => {
-  await requireUserAction();
-  try {
-    const { items, count } = await backend<{ items: OneBookmarkType[]; count: number }>(`/bookmarks?page=${Math.max(1, page | 0)}`, { session: true });
-    return { data: items, count };
-  } catch (error) {
-    return opaque("getAllBookmarksForUser", error);
-  }
-};
-
-//delete a bookmark
-export const deleteBookmarkForUser = async (jobId: string) => {
-  await requireUserAction();
-  try {
-    await backend(`/bookmarks/${idSegment(jobId)}`, { method: "DELETE", session: true });
-    return { status: "deleted bookmark successfully" };
-  } catch (error) {
-    if (error instanceof BackendError && error.status === 404) throw new Error("Record to delete does not exist");
-    return opaque("deleteBookmarkForUser", error);
-  }
-};
-
-//crate a bookmark
-// Only a live listing can be saved; the backend refuses any other id with "Job not found".
-export const createBookmarkForUser = async (jobId: string) => {
-  await requireUserAction();
-  try {
-    if (!isObjectId(jobId)) throw new BackendError(404, "Job not found");
-    return { data: await backend<BookmarkRow>("/bookmarks", { method: "POST", body: { jobId }, session: true }) };
-  } catch (error) {
-    if (error instanceof BackendError && (error.status === 404 || error.status === 409)) throw new Error(error.message);
-    return opaque("createBookmarkForUser", error);
-  }
-};
-
+// The bookmarks are the session user's own: the backend reads the user from the session
+// cookie, never from an argument. The browser lists, adds and removes them through the
+// /api/bookmarks rewrite (app/lib/bookmarks/api.ts), not server actions: an action is a
+// function run here per call, and the job page's button asked on every signed-in visit.
 type BookmarkRow = { id: string; userId: string; jobId: string; createdAt: Date };
 
-//check if a user has job bookmarked
+// Check if a user has a job bookmarked. Only the dashboard's job page calls this, during its
+// own (per-request) render; the public job page's button asks the backend from the browser.
 export const checkBookmarkForUser = async (jobId: string) => {
   await requireUserAction();
   try {

@@ -5,7 +5,7 @@ import BookmarkTile from "../../../components/main/BookmarkTile";
 import { useSession } from "next-auth/react";
 import { LoaderCircle } from "lucide-react";
 import { OneBookmarkType } from "@/types/main";
-import { deleteBookmarkForUser, getAllBookmarksForUser } from "@/libs/query";
+import { bookmarksApi } from "@/app/lib/bookmarks/api";
 import { toast } from "react-toastify";
 import JobTileSkeletonList from "@/app/components/main/JobTileSkeletonList";
 import PaginationControl from "@/app/components/main/PaginationControl";
@@ -25,7 +25,7 @@ const BookmarkClient = () => {
     const fetchBookmarks = async () => {
       setLoading(true); // Set loading to true before fetching data
       try {
-        const { data: fetchedJobs, count: total } = await getAllBookmarksForUser(currentPage);
+        const { data: fetchedJobs, count: total } = await bookmarksApi.list(currentPage);
         setBookmarks(fetchedJobs);
         console.log(total);
         setTotalBookmarks(total);
@@ -55,7 +55,7 @@ const BookmarkClient = () => {
     try {
       setBookmarks((prevJobs) => prevJobs.filter((bookmark) => bookmark.job.id !== id));
       setTotalBookmarks((prevTotal) => prevTotal - 1);
-      await deleteBookmarkForUser(id);
+      await bookmarksApi.remove(id);
     } catch {
       toast.error("Error encountered removing bookmark");
     }

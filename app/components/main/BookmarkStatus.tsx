@@ -2,7 +2,7 @@
 import { Bookmark } from "lucide-react";
 import React, { FC, useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { checkBookmarkForUser, createBookmarkForUser, deleteBookmarkForUser } from "@/libs/query";
+import { bookmarksApi } from "@/app/lib/bookmarks/api";
 import { toast } from "react-toastify";
 
 const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean; onLogin?: () => void }> = ({ jobId, hasUserBookmarked, onLogin }) => {
@@ -13,13 +13,14 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean; onLogin?:
 
   // No answer from the server (the public job page is cached, so it can't know who is looking):
   // ask once the session says they're signed in. A press made meanwhile wins over the answer.
+  // Straight to the backend through the /api rewrite, never a server action (app/lib/bookmarks/api.ts).
   const signedInId = status === "authenticated" && !session?.user?.deletionDueAt ? session?.user?.id : undefined;
   useEffect(() => {
     if (hasUserBookmarked !== undefined || !signedInId) return;
     let live = true;
-    checkBookmarkForUser(jobId)
-      .then((res) => {
-        if (live && !touched.current) setIsBookmarked(Boolean(res.data?.id));
+    bookmarksApi.check(jobId)
+      .then((row) => {
+        if (live && !touched.current) setIsBookmarked(Boolean(row?.id));
       })
       .catch(() => {});
     return () => {
@@ -35,9 +36,9 @@ const BookmarkStatus: FC<{ jobId: string; hasUserBookmarked?: boolean; onLogin?:
       try {
         // The actions take the user from the session, not from here.
         if (pendingAction) {
-          await createBookmarkForUser(jobId);
+          await bookmarksApi.add(jobId);
         } else {
-          await deleteBookmarkForUser(jobId);
+          await bookmarksApi.remove(jobId);
         }
       } catch {
         toast.error("An error occurred. Please try again.");

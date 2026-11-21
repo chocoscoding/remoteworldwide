@@ -6,7 +6,7 @@ import { FC, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteBookmarkForUser, getAllBookmarksForUser } from "@/libs/query";
+import { bookmarksApi } from "@/app/lib/bookmarks/api";
 import type { OneBookmarkType } from "@/types/main";
 import { saveJob } from "@/app/lib/jobs/api";
 import { jobLocations } from "@/app/lib/jobs/publicJobFacts";
@@ -26,10 +26,10 @@ const BOOKMARKS_KEY = ["bookmarks"] as const;
 
 // Deleted listings can leave short pages. Follow the total rather than page length.
 async function listBookmarks() {
-  const first = await getAllBookmarksForUser(1);
+  const first = await bookmarksApi.list(1);
   const items = [...first.data];
   for (let page = 2; page <= Math.ceil(first.count / 30); page++) {
-    const next = await getAllBookmarksForUser(page);
+    const next = await bookmarksApi.list(page);
     items.push(...next.data);
   }
   return items;
@@ -45,7 +45,7 @@ const SavedJobRow: FC<{ job: OneBookmarkType["job"] }> = ({ job }) => {
   const queryClient = useQueryClient();
   const router = useRouter();
   const remove = useMutation({
-    mutationFn: deleteBookmarkForUser,
+    mutationFn: bookmarksApi.remove,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: BOOKMARKS_KEY }),
     onError: () => toast.error("Couldn't remove this saved job. Try again."),
   });
