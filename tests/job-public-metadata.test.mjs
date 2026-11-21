@@ -68,7 +68,18 @@ it("keeps useful archives indexable without treating them as live",()=>{
 });
 it("does not invent chips, salary or worldwide eligibility, and shows an unknown employment type as full-time",async()=>{
   assert.deepEqual(jobFactChips(null),[{kind:"employment",label:"Full-time"}]);
-  assert.deepEqual(jobLocations(null,[]),["Location not specified"]);
+  assert.deepEqual(jobLocations(null,[]),["Anywhere in the world"]);
+  // Facts with no places keep the Region the admin picked, then the stated location (2026-11-18).
+  assert.deepEqual(jobLocations(facts,["Europe","LATAM"]),["Europe","LATAM"]);
+  assert.deepEqual(jobLocations({...facts,regions:["EMEA"]},["Europe"]),["EMEA"]);
+  assert.deepEqual(jobLocations({...facts,workLocation:"Berlin, Germany"},[]),["Berlin, Germany"]);
+  assert.deepEqual(jobLocations(facts,[]),["Anywhere in the world"]);
+  assert.deepEqual(jobLocations({...facts,worldwideEligible:true},["Europe"]),["Worldwide"]);
+  // A stored "Location not specified" is never a pill: it counts as no place (2026-11-20).
+  assert.deepEqual(jobLocations({...facts,regions:["Location not specified"]},["Europe"]),["Europe"]);
+  assert.deepEqual(jobLocations({...facts,regions:["Not specified","EMEA"]},[]),["EMEA"]);
+  assert.deepEqual(jobLocations({...facts,workLocation:"Location not specified"},["location not specified"]),["Anywhere in the world"]);
+  assert.deepEqual(jobLocations({...facts,workLocation:"Unknown"},[]),["Anywhere in the world"]);
   assert.deepEqual(await jobFacts({}),{employmentType:"FULL_TIME",salary:null});
   assert.deepEqual(jobFactChips(facts),[{kind:"employment",label:"Full-time"}]);
   assert.equal(jobFactChips({...facts,employmentType:"contract"})[0].label,"Contract");

@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteBookmarkForUser, getAllBookmarksForUser } from "@/libs/query";
 import type { OneBookmarkType } from "@/types/main";
 import { saveJob } from "@/app/lib/jobs/api";
+import { jobLocations } from "@/app/lib/jobs/publicJobFacts";
 import { qk } from "@/app/lib/query/keys";
 import { ArrowUpRight, FileText, Mail, Plus, ScanSearch, Search, SearchX, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -61,7 +62,7 @@ const SavedJobRow: FC<{ job: OneBookmarkType["job"] }> = ({ job }) => {
   const title = job.title || "Untitled role";
   const company = job.company.name || "Unknown company";
   const posting = `/jobs/${encodeURIComponent(job.slug)}`;
-  const meta = [job.region.join(", "), job.seniority, job.category, "Remote Worldwide listing"].filter(Boolean).join(" · ");
+  const meta = [jobLocations(null, job.region).join(", "), job.seniority, job.category, "Remote Worldwide listing"].filter(Boolean).join(" · ");
   const openAsk = () => openTool.mutate((context) => askHref(context.savedJobId!));
 
   // "Back to the job" on each tool returns to the job's own screen (Ask about a job).

@@ -41,8 +41,28 @@ export function jobFactChips(facts: PublicJobFacts | null | undefined): {label:s
   chips.push({kind:"employment",label:employment.charAt(0).toUpperCase()+employment.slice(1)});
   return chips;
 }
-export function jobLocations(facts: PublicJobFacts | null | undefined, legacy: string[] = []): string[] {
+/** A job with no location anywhere is shown as open worldwide (owner, 2026-11-18: never "Location not specified"). */
+export const ANYWHERE = "Anywhere in the world";
+/**
+ * A stored place that only says no place was given ("Location not specified", "Unknown", "N/A"). It is never
+ * a pill or a place (owner, 2026-11-20): it counts as missing, so the next source, or "Anywhere in the world", shows.
+ */
+const NO_PLACE = /^(?:(?:job\s+)?location\s*:?\s*)?(?:not\s+(?:specified|stated|provided|mentioned|listed|given|available)|unspecified|unknown|n\/?a|none|tbd|tba)\.?$/i;
+const realPlace = (place: string | null | undefined): string => {
+  const trimmed = place?.trim() ?? "";
+  return NO_PLACE.test(trimmed) ? "" : trimmed;
+};
+/**
+ * The places a listing is open to: the reviewed facts first, then the Region the admin picked (the admin
+ * page shows that one, so a job with facts but no places in them must not lose it), then the stated work
+ * location, and "Anywhere in the world" when none of them says.
+ */
+export function jobLocations(facts: PublicJobFacts | null | undefined, adminRegions: string[] = []): string[] {
   if (facts?.worldwideEligible === true) return ["Worldwide"];
-  const locations = facts ? [...facts.regions, ...facts.countries] : legacy;
-  return [...new Set(locations)].length ? [...new Set(locations)] : [facts?.workLocation ?? "Location not specified"];
+  const clean = (list: string[] | undefined) => [...new Set((list ?? []).map(realPlace).filter(Boolean))];
+  const fromFacts = clean([...(facts?.regions ?? []), ...(facts?.countries ?? [])]);
+  if (fromFacts.length) return fromFacts;
+  const fromAdmin = clean(adminRegions);
+  if (fromAdmin.length) return fromAdmin;
+  return [realPlace(facts?.workLocation) || ANYWHERE];
 }

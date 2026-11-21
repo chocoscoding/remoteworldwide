@@ -121,6 +121,8 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
       !finalValue.applicationUrl && "applicationUrl",
       !finalValue.category && "category",
       !finalValue.seniority && "seniority",
+      // Every listing names where it hires (owner, 2026-11-18): pick "Anywhere in the world" when it is open to all.
+      finalValue.region.length === 0 && "region",
       hasDuplicateRegions && "duplicate regions",
     ].filter(Boolean) as string[];
     if (isLoading) return;
@@ -204,7 +206,8 @@ const UpdateJob: FC<UpdateJobType> = ({ allCompanies, filters, job }) => {
             value={formValues.region}
             options={getRegionOptions(filters.region, formValues.region)}
             onChange={(value) => handleRegionChange(value as Option[] | null)}
-            placeholder="Select region(s), or leave unknown"
+            placeholder="Select region(s)"
+            required
             isMulti
           />
 

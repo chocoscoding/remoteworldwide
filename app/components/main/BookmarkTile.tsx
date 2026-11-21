@@ -3,9 +3,10 @@ import { Bookmark, ChartNoAxesColumnIncreasing, MapPinned } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { FC } from "react";
+import { jobLocations } from "@/app/lib/jobs/publicJobFacts";
 
 const BookmarkTile: FC<{ job: OneBookmarkType["job"]; removeBookmark: (id: string) => Promise<void> }> = ({ removeBookmark, job }) => {
-  const regionLabel = job.region.length > 0 ? job.region.join(", ") : "Anywhere in the world";
+  const regionLabel = jobLocations(null, job.region).join(", ");
   return (
     <div className="flex p-4 mb-5 rounded-xl gap-2 md:gap-3 shadow-sm transition-all bg-white">
       {/* logo

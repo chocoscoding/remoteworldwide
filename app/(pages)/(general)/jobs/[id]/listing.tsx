@@ -7,7 +7,7 @@ import { absoluteUrl, breadcrumbJsonLd, jsonLd } from "@/app/lib/seo";
 import { jobPostingJsonLd } from "@/app/lib/jobs/jobPostingJsonLd";
 import { isJobLive, isJobIndexable, effectiveExpiry } from "@/app/lib/jobs/jobLifetime";
 import { jobFacts } from "@/app/lib/jobs/jobFacts";
-import { jobLocations } from "@/app/lib/jobs/publicJobFacts";
+import { ANYWHERE, jobLocations } from "@/app/lib/jobs/publicJobFacts";
 import { backendCachedOrNull, jobReadCache, JOB_PAGE_REVALIDATE_S } from "@/app/lib/backend";
 
 // One listing's page, shared by its two routes: ./page.tsx (cached, every slug with the long
@@ -38,9 +38,10 @@ export async function listingMetadata(slug: string) {
   if (!job) return {title:"Job Not Found",robots:{index:false,follow:true}};
   const live = isJobLive(job);
   const region = jobLocations(job.facts,job.region).join(", ");
-  const title = `${job.title} at ${job.company.name} (Remote${region !== "Location not specified" ? `, ${region}` : ""})${live ? "" : " — Archived"} | Remote Worldwide`;
+  // The "Anywhere in the world" fallback stays out of the title, which already says Remote, to keep it short.
+  const title = `${job.title} at ${job.company.name} (Remote${region !== ANYWHERE ? `, ${region}` : ""})${live ? "" : " — Archived"} | Remote Worldwide`;
   const description = live
-    ? `${job.company.name} is hiring a ${job.title}. ${region !== "Location not specified" ? `Location: ${region}. ` : ""}Read the job details and apply.`
+    ? `${job.company.name} is hiring a ${job.title}. Location: ${region}. Read the job details and apply.`
     : `Archived ${job.title} listing at ${job.company.name}. Read the original role details and explore current remote opportunities.`;
   const image = absoluteUrl(`/api/og/job?${new URLSearchParams({title:job.title,type:region,company:job.company.name,...(job.company.logo ? {logo:job.company.logo} : {})})}`);
   return {
