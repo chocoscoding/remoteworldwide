@@ -41,8 +41,8 @@ const BLOCK_REASONS: Record<string, string> = {
 };
 
 /**
- * Undoing an opt-out made outside this tab: switches an emailed unsubscribe turned off (still off,
- * here or in an unsaved edit) and a block on marketing mail, which no switch shows. Nothing to undo,
+ * Undoing an opt-out made outside this tab: switches an unsubscribe turned off (still off, here or
+ * in an unsaved edit) and a block on marketing mail, which no switch shows. Nothing to undo,
  * nothing shown: the switches below stay the everyday way in and out.
  */
 const Resubscribe: FC = () => {
@@ -61,7 +61,7 @@ const Resubscribe: FC = () => {
       <div className="flex min-w-0 gap-2.5">
         <MailMinus className="mt-0.5 h-4 w-4 flex-none text-black/40" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-primary">{blocked ? "Emails to you are paused" : "You unsubscribed by email"}</p>
+          <p className="text-sm font-semibold text-primary">{blocked ? "Emails to you are paused" : "You're unsubscribed"}</p>
           {blocked && <p className="mt-0.5 text-xs leading-relaxed text-black/55">{BLOCK_REASONS[blocked.reason] ?? "Delivery to your address failed."}</p>}
           {off.length > 0 && (
             <p className="mt-0.5 text-xs leading-relaxed text-black/55">

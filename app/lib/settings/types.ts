@@ -128,12 +128,13 @@ export interface NotificationSettings {
 
 /**
  * Why mail may not be reaching someone, beyond the switches (GET /api/settings/email-status): the
- * switches an emailed unsubscribe turned off that are still off, latest first, and a block on the
+ * switches that went off some way other than the user turning them off on the tab (an emailed
+ * unsubscribe, latest first; one from before they were logged has `at` null), and a block on the
  * account's marketing mail after a hard bounce, a spam complaint or the mail provider's own list.
  * The notifications tab's Resubscribe undoes both (POST /api/settings/resubscribe).
  */
 export interface EmailStatus {
-  unsubscribed: { pref: keyof NotificationSettings; at: string }[];
+  unsubscribed: { pref: keyof NotificationSettings; at: string | null }[];
   blocked: { reason: "hard_bounce" | "complaint" | "suppressed" | (string & {}); at: string } | null;
 }
 
