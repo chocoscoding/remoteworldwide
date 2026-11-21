@@ -2,7 +2,7 @@
 // backend's contract (remoteworldwidebackend src/types/tracking.ts, services/admin/analyticsService.ts).
 
 import type { PlanTier } from "@/app/lib/settings/types";
-import type { UserMailBrief } from "@/app/lib/mail/userMail";
+import type { MailLevel, UserMailBrief } from "@/app/lib/mail/userMail";
 
 export const TRACK_KINDS = ["page_view", "click", "submit", "api", "session_start", "custom"] as const;
 export type TrackKind = (typeof TRACK_KINDS)[number];
@@ -59,6 +59,34 @@ export interface ActivityOverview {
 export const USER_SORTS = ["last_seen", "newest", "most_active"] as const;
 export type UserSort = (typeof USER_SORTS)[number];
 export const USER_SORT_LABELS: Record<UserSort, string> = { last_seen: "Last active", newest: "Newest", most_active: "Most active" };
+
+/** The users screen's chart range: the last 30, 90 or 365 days, or since the first account. */
+export const USER_RANGES = ["30", "90", "365", "all"] as const;
+export type UserRange = (typeof USER_RANGES)[number];
+export const USER_RANGE_LABELS: Record<UserRange, string> = { "30": "30 days", "90": "90 days", "365": "12 months", all: "All time" };
+/** The range as a tile's label reads it: "New, 90 d". */
+export const USER_RANGE_SHORT: Record<UserRange, string> = { "30": "30 d", "90": "90 d", "365": "12 mo", all: "all time" };
+
+/** Every account at a glance (GET /api/admin/analytics/users/summary): the users screen's charts. */
+export interface UsersSummary {
+  range: UserRange;
+  /** The first day the chart covers (UTC, YYYY-MM-DD); `daily` runs from it to today. */
+  from: string;
+  total: number;
+  verified: number;
+  /** Accounts made before `from`, and any with no creation date: where the growth line starts. */
+  before: number;
+  /** Accounts made in the range (the sum of `daily`), and in the same length of time just before it (null for "all"). */
+  added: number;
+  addedBefore: number | null;
+  /** Every day of the range, quiet days as zeros. */
+  daily: { day: string; signups: number }[];
+  /** When each account was last here, in bands that don't overlap: the last 24 h, 1 to 7 days, 7 to 30 days, longer, never. */
+  lastSeen: { day: number; week: number; month: number; older: number; never: number };
+  plans: Record<PlanTier, number>;
+  /** Accounts at each mail engagement level: the Outreach filter's counts. */
+  mail: Record<MailLevel, number>;
+}
 
 export interface AdminUserRow extends UserBrief {
   role: string;

@@ -64,6 +64,13 @@ export const BarList: FC<{
   );
 };
 
+/** "12%", "0.4%" under one in a hundred, "0%" for none. */
+export const percent = (share: number) => {
+  if (!share) return "0%";
+  const pct = share * 100;
+  return pct < 1 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
+};
+
 /** One column per day, its height the day's share of the busiest; the hover title says the numbers. */
 export const DayColumns: FC<{ days: { day: string; value: number; title?: string }[]; height?: number }> = ({ days, height = 120 }) => {
   const max = Math.max(...days.map((d) => d.value), 1);

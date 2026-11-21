@@ -12,6 +12,7 @@ import { isMailLevel, type MailLevel, type MailTimelinePage, type UserMailDetail
 import {
   ACTIVITY_CARDS,
   TRACK_KINDS,
+  USER_RANGES,
   USER_SORTS,
   type ActivityCard,
   type ActivityOverview,
@@ -19,7 +20,9 @@ import {
   type AdminUserList,
   type CardEventPage,
   type EventPage,
+  type UserRange,
   type UserSort,
+  type UsersSummary,
 } from "@/app/lib/tracking/types";
 
 const analytics = <T>(path: string, init: Omit<BackendInit, "session"> = {}) => backend<T>(`/admin/analytics${path}`, { ...init, session: true });
@@ -49,6 +52,12 @@ export const listUsers = async ({ q = "", page = 1, sort = "last_seen", mail }: 
   if (search) params.set("q", search);
   if (isMailLevel(mail)) params.set("mail", mail);
   return analytics<AdminUserList>(`/users?${params.toString()}`);
+};
+
+/** The users screen's charts: growth and sign-ups over the range, then plans, last active, outreach and devices across every account. */
+export const getUsersSummary = async (range: UserRange = "90") => {
+  await requireAdminAction();
+  return analytics<UsersSummary>(`/users/summary?range=${(USER_RANGES as readonly string[]).includes(range) ? range : "90"}`);
 };
 
 /**
