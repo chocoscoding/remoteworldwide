@@ -20,9 +20,9 @@ const Group: FC<{ title: string; hint?: string; children: ReactNode }> = ({ titl
 );
 
 /**
- * A playbook's rules in a drawer: name and purpose, who may enter, re-entry, group, goal, holdout,
- * and the key under "Advanced". Edits go straight into the editor's form; the editor's one Save
- * keeps them.
+ * A playbook's rules in a drawer: its purpose and version, who may enter, re-entry, group, goal,
+ * holdout, and the key under "Advanced". The name is the editor's title. Edits go straight into the
+ * editor's form; the editor's one Save keeps them.
  */
 const RulesDrawer: FC<{
   open: boolean;
@@ -32,7 +32,9 @@ const RulesDrawer: FC<{
   actions: MailAction[];
   /** The key can't change once the playbook exists. */
   keyLocked: boolean;
-}> = ({ open, onOpenChange, form, update, actions, keyLocked }) => {
+  /** The saved version, once the playbook exists. */
+  version?: number;
+}> = ({ open, onOpenChange, form, update, actions, keyLocked, version }) => {
   const entry = form.entry ?? {};
   const setEntry = (next: Entry) => update({ entry: next });
   const g = form.goal;
@@ -59,10 +61,7 @@ const RulesDrawer: FC<{
           Done
         </button>
       }>
-      <Group title="Playbook">
-        <Field label="Name">
-          <input className={INPUT} value={form.name} maxLength={120} onChange={(e) => update({ name: e.target.value })} placeholder="Eyeing plans" />
-        </Field>
+      <Group title="Playbook" hint={version ? `Version ${version}` : undefined}>
         <Field label="What it is for">
           <input className={INPUT} value={form.description} maxLength={300} onChange={(e) => update({ description: e.target.value })} />
         </Field>

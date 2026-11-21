@@ -14,11 +14,13 @@ import {
   type UserSort,
   type UsersSummary,
 } from "@/app/lib/tracking/types";
-import { MAIL_LEVELS, MAIL_LEVEL_HINTS, MAIL_LEVEL_LABELS, isMailLevel, type MailLevel } from "@/app/lib/mail/userMail";
+import { X } from "lucide-react";
+import { MAIL_LEVEL_LABELS, isMailLevel, type MailLevel } from "@/app/lib/mail/userMail";
 import { Panel, StatTile, TierBadge, percent } from "@/app/components/ADMIN/analytics/Charts";
 import UsersGrowthChart from "@/app/components/ADMIN/analytics/UsersGrowthChart";
 import UsersTable from "@/app/components/ADMIN/analytics/UsersTable";
 import MailLevelBadge from "./MailLevelBadge";
+import UsersFilters from "./UsersFilters";
 
 // Every account. On top, four totals and accounts over time with new accounts per period (range
 // picked in the header: 30 or 90 days, 12 months, all time), from GET /api/admin/analytics/users/summary,
@@ -37,6 +39,9 @@ const PAGE_SIZE = 50;
 
 const chip = (on: boolean) =>
   `rounded-md border px-3 py-1.5 text-xs font-bold ${on ? "border-black bg-black text-[#e1f073]" : "border-gray-300 bg-white text-gray-700 hover:border-black"}`;
+
+/** A filter in use, beside the Filters button; its x clears it. */
+const activeChip = "inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold hover:border-black";
 
 /** "Clicked 3 d ago", "Clicked just now". */
 const clicked = (iso: string) => `Clicked ${ago(iso).replace(/^Just now$/, "just now")}`;
@@ -125,7 +130,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
             <StatTile label="Paying" value={paying} hint={`${percent(total ? paying / total : 0)} · Basic ${n(summary.plans.basic)} · Pro ${n(summary.plans.pro)} · Ultra ${n(summary.plans.ultra)}`} />
           </div>
 
-          <Panel title="Accounts over time" aside={<span className="text-xs text-gray-500">{USER_RANGE_LABELS[range]}, UTC days</span>}>
+          <Panel title="New accounts" aside={<span className="text-xs text-gray-500">{USER_RANGE_LABELS[range]}, UTC days</span>}>
             <UsersGrowthChart daily={summary.daily} before={summary.before} />
           </Panel>
         </div>
@@ -143,7 +148,7 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
           )}
         </div>
 
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <form method="get" action="/heroshima/users#people" role="search" className="flex min-w-[260px] flex-1 gap-2 lg:max-w-xl">
             <input type="hidden" name="sort" value={sort} />
             {mail ? <input type="hidden" name="mail" value={mail} /> : null}
@@ -169,39 +174,27 @@ const Page = async ({ searchParams }: { searchParams: Promise<{ q?: string; page
             )}
           </form>
 
-          <nav aria-label="Sort" className="ml-auto flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Sort</span>
-            <span className="inline-flex rounded-md border border-gray-300 bg-white p-0.5">
-              {USER_SORTS.map((s) => (
-                <Link
-                  key={s}
-                  href={`${href({ sort: s })}#people`}
-                  aria-current={s === sort ? "page" : undefined}
-                  className={`rounded px-3 py-1 text-xs font-bold ${s === sort ? "bg-black text-[#e1f073]" : "text-gray-700 hover:bg-gray-100"}`}>
-                  {USER_SORT_LABELS[s]}
-                </Link>
-              ))}
-            </span>
-          </nav>
-        </div>
+          <UsersFilters sort={sort} mail={mail} q={q} range={range} counts={summary?.mail ?? null} />
 
-        <nav aria-label="Filter by outreach engagement" className="mb-4 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-bold uppercase tracking-wide text-gray-500">Outreach</span>
-          <Link href={`${href({ mail: null })}#people`} aria-current={!mail ? "page" : undefined} className={chip(!mail)}>
-            Anyone
-          </Link>
-          {MAIL_LEVELS.map((level) => (
-            <Link
-              key={level}
-              href={`${href({ mail: level })}#people`}
-              aria-current={level === mail ? "page" : undefined}
-              title={MAIL_LEVEL_HINTS[level]}
-              className={chip(level === mail)}>
-              {MAIL_LEVEL_LABELS[level]}
-              {summary ? <span className={`ml-1.5 font-semibold tabular-nums ${level === mail ? "text-white/70" : "text-gray-400"}`}>{n(summary.mail[level])}</span> : null}
-            </Link>
-          ))}
-        </nav>
+          {/* What the Filters pane has set, each one cleared by its x. */}
+          {sort !== "last_seen" || mail ? (
+            <div aria-label="Filters in use" className="flex flex-wrap items-center gap-1.5">
+              {sort !== "last_seen" ? (
+                <Link href={`${href({ sort: "last_seen" })}#people`} className={activeChip} aria-label={`Clear the sort: ${USER_SORT_LABELS[sort]}`}>
+                  {USER_SORT_LABELS[sort]}
+                  <X className="h-3 w-3" aria-hidden />
+                </Link>
+              ) : null}
+              {mail ? (
+                <Link href={`${href({ mail: null })}#people`} className={activeChip} aria-label={`Clear the outreach filter: ${MAIL_LEVEL_LABELS[mail]}`}>
+                  {MAIL_LEVEL_LABELS[mail]}
+                  {summary ? <span className="tabular-nums text-gray-400">{n(summary.mail[mail])}</span> : null}
+                  <X className="h-3 w-3" aria-hidden />
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         {!list ? (
           <Failed what="The users" failure={listFailure} />

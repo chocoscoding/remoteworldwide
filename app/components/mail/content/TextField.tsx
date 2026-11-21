@@ -85,21 +85,7 @@ const TextField: FC<{
               className="inline-flex items-center gap-1 rounded px-1 text-[11px] font-semibold text-gray-500 hover:text-black">
               <Braces className="h-3 w-3" aria-hidden /> Variable
             </button>
-            {open ? (
-              <div role="menu" className="absolute right-0 top-full z-30 mt-1 w-64 rounded-md border border-gray-300 bg-white py-1">
-                {TEMPLATE_VARS.map((v) => (
-                  <button
-                    key={v.name}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => insert(v.name)}
-                    className="flex w-full items-baseline justify-between gap-2 px-3 py-1.5 text-left hover:bg-gray-50">
-                    <span className="font-mono text-[11px] text-black">{`{{${v.name}}}`}</span>
-                    <span className="truncate text-[11px] text-gray-500">{v.hint}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            {open ? <VarMenu onPick={insert} className="right-0" /> : null}
           </div>
         ) : null}
       </div>
@@ -112,5 +98,26 @@ const TextField: FC<{
     </div>
   );
 };
+
+/**
+ * The variables as a dropdown: each on its own line with what it becomes under it, so nothing is cut
+ * off in a narrow panel. `keepFocus`: pressing an item doesn't take the focus (the canvas keeps its caret).
+ */
+export const VarMenu: FC<{ onPick: (name: string) => void; className?: string; keepFocus?: boolean }> = ({ onPick, className, keepFocus }) => (
+  <div role="menu" className={cn("absolute top-full z-30 mt-1 max-h-[60vh] w-64 overflow-y-auto rounded-md border border-gray-300 bg-white py-1", className)}>
+    {TEMPLATE_VARS.map((v) => (
+      <button
+        key={v.name}
+        type="button"
+        role="menuitem"
+        onMouseDown={keepFocus ? (e) => e.preventDefault() : undefined}
+        onClick={() => onPick(v.name)}
+        className="flex w-full flex-col items-start gap-0.5 px-3 py-1.5 text-left hover:bg-gray-50">
+        <span className="break-all font-mono text-[11px] text-black">{`{{${v.name}}}`}</span>
+        <span className="text-[11px] leading-snug text-gray-500">{v.hint}</span>
+      </button>
+    ))}
+  </div>
+);
 
 export default TextField;

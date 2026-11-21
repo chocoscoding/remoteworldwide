@@ -2,7 +2,7 @@
 
 import type { FC, ReactNode } from "react";
 import { BUILT_IN_EVENTS, EVENT_LABELS, type BuiltInEvent, type MailAction, type MailAudience, type Trigger } from "@/app/lib/mail/types";
-import { BTN_LINK, INPUT_SM, Segmented } from "@/app/components/mail/ui";
+import { BTN_LINK, INPUT_SM } from "@/app/components/mail/ui";
 import { numOrUndef } from "@/app/components/mail/format";
 
 const Row: FC<{ label: string; children: ReactNode; hint?: ReactNode }> = ({ label, children, hint }) => (
@@ -13,7 +13,13 @@ const Row: FC<{ label: string; children: ReactNode; hint?: ReactNode }> = ({ lab
   </div>
 );
 
-/** The trigger in the inspector: what kind, then the one picker it needs. "+ New trigger" opens the triggers drawer on its form. */
+const KINDS: ReadonlyArray<{ value: Trigger["type"]; label: string }> = [
+  { value: "event", label: "Something happens" },
+  { value: "action", label: "They do something" },
+  { value: "audience", label: "They join an audience" },
+];
+
+/** The trigger in the inspector: what kind (one select, so it never wraps), then the one picker it needs. "+ New trigger" opens the triggers drawer on its form. */
 const TriggerFields: FC<{
   trigger: Trigger;
   onChange: (trigger: Trigger) => void;
@@ -22,19 +28,24 @@ const TriggerFields: FC<{
   onNewTrigger: () => void;
 }> = ({ trigger: t, onChange, actions, audiences, onNewTrigger }) => (
   <div className="flex flex-col gap-4">
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-1.5">
       <h2 className="text-sm font-bold">When they enter</h2>
+      <select
+        aria-label="Kind of trigger"
+        className={`${INPUT_SM} w-full`}
+        value={t.type}
+        onChange={(e) => {
+          const type = e.target.value as Trigger["type"];
+          if (type === t.type) return;
+          onChange(type === "action" ? { type, actionId: "", count: 2, withinDays: 3 } : type === "event" ? { type, event: "signup" } : { type, audienceId: "" });
+        }}>
+        {KINDS.map((k) => (
+          <option key={k.value} value={k.value}>
+            {k.label}
+          </option>
+        ))}
+      </select>
     </div>
-    <Segmented
-      label="Trigger"
-      value={t.type}
-      onChange={(type) => onChange(type === "action" ? { type, actionId: "", count: 2, withinDays: 3 } : type === "event" ? { type, event: "signup" } : { type, audienceId: "" })}
-      options={[
-        { value: "action", label: "They do something" },
-        { value: "event", label: "Something happens" },
-        { value: "audience", label: "They join an audience" },
-      ]}
-    />
     {t.type === "action" ? (
       <>
         <Row label="Trigger">

@@ -1,21 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FC, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, LoaderCircle, Monitor, Smartphone, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Braces, LoaderCircle, Monitor, Smartphone, SlidersHorizontal, Trash2 } from "lucide-react";
 import { getMailSettings } from "@/libs/mail-admin";
 import { BLOCK_LABELS, DEFAULT_DESIGN, type Block, type BlockType, type MailDesign, type TemplateContent } from "@/app/lib/mail/types";
 import { cn } from "@/lib/utils";
 import BlockEditor, { IconButton } from "../BlockEditor";
 import ContentFields from "../ContentFields";
-import { ErrorBox, INPUT_SM } from "../ui";
+import { ErrorBox } from "../ui";
 import BlockFields, { type OfferContext } from "./BlockFields";
 import BlockOutline, { AddBlockMenu } from "./BlockOutline";
 import DesignPanel from "./DesignPanel";
 import Fold from "./Fold";
 import InboxLine from "./InboxLine";
-import MailFrame from "./MailFrame";
+import MailFrame, { type CanvasField, type MailFrameHandle } from "./MailFrame";
+import PreviewUserPicker from "./PreviewUserPicker";
 import TestSend from "./TestSend";
+import { VarMenu } from "./TextField";
 import { BLOCK_ICONS, freshBlock } from "./blocks";
+import { canvasPatches, withCanvasText } from "./canvasText";
 import { useDismiss } from "./useDismiss";
 import { usePreview } from "./usePreview";
 
@@ -42,10 +45,17 @@ type Props = {
  * preview) is edited in place; beside it a compact outline of the blocks; on the right an inspector
  * with the picked block's fields (Content) or the mail's look (Design). Clicking a part of the mail
  * picks it once the renderer marks blocks (previewMail markBlocks); until then the outline picks.
+ * In Edit the canvas is the editor render: its text (headings, paragraphs, button labels, the offer
+ * box's lines) is typed into in place, variables shown as tokens, and each keystroke lands in the
+ * content at once; the server's render follows once the caret leaves (MailFrame). Preview asks
+ * without markBlocks, so the sample data or the person previewed as fill real values.
  * When the preview fails, the plain block list takes the canvas's place so the mail stays editable.
  */
 const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, offer, locked, underBar }) => {
   const [picked, setPicked] = useState<number | null>(null);
+  // Edit: canvas, block list and inspector. Preview: only the mail, as the reader gets it.
+  const [view, setView] = useState<"edit" | "preview">("edit");
+  const previewing = view === "preview";
   const [tab, setTab] = useState<"content" | "design">("content");
   const [width, setWidth] = useState<keyof typeof WIDTHS>("desktop");
   const [sampleOffer, setSampleOffer] = useState(true);
@@ -53,12 +63,18 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
   const [marked, setMarked] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [fetchedBrand, setFetchedBrand] = useState<MailDesign | null>(null);
+  // The canvas field with the caret (null: none), and the canvas's Variable menu.
+  const [canvasField, setCanvasField] = useState<{ index: number; field: CanvasField } | null>(null);
+  const [varMenu, setVarMenu] = useState(false);
+  const frameApi = useRef<MailFrameHandle>(null);
 
   const blocks = content.blocks;
   const selected = picked !== null && picked < blocks.length ? picked : null;
   const userId = OBJECT_ID.test(asUser.trim()) ? asUser.trim() : "";
   const empty = !blocks.length && !content.subject.trim();
-  const preview = usePreview({ content, sampleOffer, userId, markBlocks: true }, !empty);
+  // Edit shows the editor render (fields and variable tokens); Preview and a locked mail show real values.
+  const editing = !locked && !previewing;
+  const preview = usePreview({ content, sampleOffer, userId, markBlocks: editing }, !empty);
   const brand = brandDesign === undefined ? fetchedBrand : (brandDesign ?? DEFAULT_DESIGN);
 
   // The brand default, when the page didn't pass it.
@@ -98,11 +114,31 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
     setBlocks(blocks.filter((_, j) => j !== i));
     pick(null);
   };
+  // Typed in the canvas: into the content at once (the frame already shows it), and that block picked.
+  const editFromCanvas = (index: number, field: CanvasField, text: string) => {
+    const block = blocks[index];
+    const next = block ? withCanvasText(block, field, text) : null;
+    if (!next) return;
+    setVarMenu(false);
+    setBlocks(blocks.map((b, j) => (j === index ? next : b)));
+    if (selected !== index) pick(index);
+  };
+  const focusFromCanvas = (at: { index: number; field: CanvasField } | null) => {
+    setCanvasField(at);
+    if (!at) setVarMenu(false);
+    else if (selected !== at.index) pick(at.index);
+  };
+  // Changed in the inspector: the canvas redraws those fields at once, before the server's render arrives.
+  const changeFromInspector = (index: number, block: Block) => {
+    const patches = canvasPatches(blocks[index], block);
+    setBlocks(blocks.map((x, j) => (j === index ? block : x)));
+    for (const p of patches) frameApi.current?.patch(index, p.field, p.text);
+  };
 
   const canvasBody = empty ? (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
       <p className="text-sm text-gray-500">Write a subject or add a block to see the mail.</p>
-      {!locked ? <AddBlockMenu onPick={(type) => insert(0, type)} className="w-48" /> : null}
+      {!locked && !previewing ? <AddBlockMenu onPick={(type) => insert(0, type)} className="w-48" /> : null}
     </div>
   ) : preview.error && !preview.rendered ? (
     // Never drawn: the plain block list stands in for the canvas, so the mail stays editable.
@@ -113,7 +149,7 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
           Try again
         </button>
       </ErrorBox>
-      {locked ? null : (
+      {locked || previewing ? null : (
         <div className="rounded-md border border-gray-300 bg-white p-3">
           <p className="mb-2 text-xs text-gray-600">You can keep editing the blocks here meanwhile.</p>
           <BlockEditor blocks={blocks} onChange={setBlocks} offer={offer} />
@@ -133,14 +169,22 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
       ) : null}
       <div className={cn(preview.error && "opacity-50")}>
         <MailFrame
+          ref={frameApi}
           html={preview.rendered.html}
           width={WIDTHS[width]}
           minHeight={480}
-          interactive={!locked}
-          selected={selected}
+          interactive={editing}
+          selected={previewing ? null : selected}
           blockCount={blocks.length}
-          onSelect={pick}
+          onSelect={(index) => {
+            setVarMenu(false);
+            pick(index);
+          }}
           onMarked={setMarked}
+          onEdit={editFromCanvas}
+          onFieldFocus={focusFromCanvas}
+          onVarMenu={() => setVarMenu(true)}
+          upToDate={preview.upToDate}
         />
       </div>
     </div>
@@ -150,9 +194,9 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
 
   return (
     <div className="flex flex-col gap-3">
-      <InboxLine content={content} onChange={onChange} shownSubject={preview.rendered?.subject} disabled={Boolean(locked)} />
+      <InboxLine content={content} onChange={onChange} shownSubject={preview.rendered?.subject} disabled={Boolean(locked) || previewing} />
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className={cn("grid items-start gap-4", !previewing && "lg:grid-cols-[minmax(0,1fr)_340px]")}>
         {/* At least a screen tall (the inspector's own cap), so the canvas fills the editor instead of
             stopping under a short mail; the 1fr rows hand the extra height to the grey canvas. */}
         <section
@@ -162,6 +206,25 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
             underBar ? "lg:min-h-[calc(100vh-5rem)]" : "lg:min-h-[calc(100vh-2rem)]",
           )}>
           <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-3 py-2">
+            <div className="inline-flex rounded-md border border-gray-300 p-0.5" role="radiogroup" aria-label="Mode">
+              {(
+                [
+                  { value: "edit", label: "Edit" },
+                  { value: "preview", label: "Preview" },
+                ] as const
+              ).map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={view === value}
+                  onClick={() => setView(value)}
+                  className={cn("rounded px-2.5 py-1 text-xs font-bold", view === value ? "bg-black text-[#e1f073]" : "text-gray-600 hover:text-black")}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span aria-hidden className="h-5 w-px bg-gray-200" />
             <div className="flex items-center gap-1" role="radiogroup" aria-label="Width">
               {(
                 [
@@ -183,6 +246,17 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
                 </button>
               ))}
             </div>
+            {editing ? (
+              <CanvasVariable
+                enabled={canvasField !== null}
+                open={varMenu && canvasField !== null}
+                setOpen={setVarMenu}
+                onPick={(name) => {
+                  setVarMenu(false);
+                  frameApi.current?.insertVar(name);
+                }}
+              />
+            ) : null}
             <PreviewOptions sampleOffer={sampleOffer} setSampleOffer={setSampleOffer} asUser={asUser} setAsUser={setAsUser} />
             {preview.loading ? <LoaderCircle className="h-4 w-4 animate-spin text-gray-500" aria-label="Updating the preview" /> : null}
             <div className="ml-auto">
@@ -190,8 +264,8 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
             </div>
           </div>
 
-          <div className={cn("grid", locked ? "grid-rows-[1fr]" : "grid-rows-[auto_1fr] xl:grid-cols-[190px_minmax(0,1fr)] xl:grid-rows-[1fr]")}>
-            {locked ? null : (
+          <div className={cn("grid", locked || previewing ? "grid-rows-[1fr]" : "grid-rows-[auto_1fr] xl:grid-cols-[190px_minmax(0,1fr)] xl:grid-rows-[1fr]")}>
+            {locked || previewing ? null : (
               <div className="border-b border-gray-200 p-2 xl:border-b-0 xl:border-r">
                 <div className={cn("xl:sticky", underBar ? "xl:top-16" : "xl:top-4")}>
                   <BlockOutline blocks={blocks} selected={selected} onSelect={pick} onInsert={insert} />
@@ -207,6 +281,7 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
 
         <aside
           aria-label="Inspector"
+          hidden={previewing}
           className={cn(
             "min-w-0 rounded-md border border-gray-300 bg-white lg:sticky lg:overflow-y-auto",
             underBar ? "lg:top-16 lg:max-h-[calc(100vh-5rem)]" : "lg:top-4 lg:max-h-[calc(100vh-2rem)]",
@@ -243,7 +318,7 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
                     count={blocks.length}
                     offer={offer}
                     confirmDelete={confirmDelete === selected}
-                    onChange={(b) => setBlocks(blocks.map((x, j) => (j === selected ? b : x)))}
+                    onChange={(b) => changeFromInspector(selected, b)}
                     onMove={(by) => move(selected, by)}
                     onDelete={() => (confirmDelete === selected ? remove(selected) : setConfirmDelete(selected))}
                     onCancelDelete={() => setConfirmDelete(null)}
@@ -251,7 +326,9 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
                   />
                 ) : (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-gray-600">{marked ? "Click a part of the mail to edit it, or pick a block from the list." : "Pick a block from the list to edit it."}</p>
+                    <p className="text-sm text-gray-600">
+                      {marked ? "Click any text in the mail to type in it. Click any other part, or pick a block from the list, to edit it here." : "Pick a block from the list to edit it."}
+                    </p>
                     <Fold title="Mail settings" variant="line" className="border-t border-gray-200 pt-2" summary={mailSettingsSummary(content)}>
                       <ContentFields content={content} onChange={onChange} prefRequired={prefRequired} />
                     </Fold>
@@ -326,12 +403,40 @@ const BlockInspector: FC<{
   );
 };
 
+/**
+ * The canvas's Variable menu: puts a variable token where the caret is in the mail. Usable while a
+ * field in the canvas has the caret; pressing it never takes the focus, so the caret stays put.
+ */
+const CanvasVariable: FC<{ enabled: boolean; open: boolean; setOpen: (open: boolean) => void; onPick: (name: string) => void }> = ({ enabled, open, setOpen, onPick }) => {
+  const box = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), [setOpen]);
+  useDismiss(box, open, close);
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        disabled={!enabled}
+        title={enabled ? "Put a variable where the caret is" : "Click into the mail's text first"}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100 hover:text-black disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent">
+        <Braces className="h-3.5 w-3.5" aria-hidden /> Variable
+      </button>
+      {open ? <VarMenu onPick={onPick} keepFocus className="left-0" /> : null}
+    </div>
+  );
+};
+
 /** The preview's options, folded: the sample offer and "preview as" a user. */
 const PreviewOptions: FC<{ sampleOffer: boolean; setSampleOffer: (v: boolean) => void; asUser: string; setAsUser: (v: string) => void }> = ({ sampleOffer, setSampleOffer, asUser, setAsUser }) => {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(box, open, close);
+  // The name of the person picked to preview as; the editor itself keeps only their id.
+  const [asWho, setAsWho] = useState<{ id: string; label: string } | null>(null);
   const changed = !sampleOffer || Boolean(asUser.trim());
   return (
     <div ref={box} className="relative">
@@ -340,17 +445,23 @@ const PreviewOptions: FC<{ sampleOffer: boolean; setSampleOffer: (v: boolean) =>
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={cn("inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold hover:bg-gray-100", changed ? "text-black" : "text-gray-600")}>
-        <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Preview{changed ? " (changed)" : ""}
+        <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Sample data{changed ? " (changed)" : ""}
       </button>
       {open ? (
         <div className="absolute left-0 top-full z-30 mt-1 flex w-72 flex-col gap-3 rounded-md border border-gray-300 bg-white p-3 text-xs">
           <label className="flex items-center gap-2 font-semibold text-gray-700">
             <input type="checkbox" checked={sampleOffer} onChange={(e) => setSampleOffer(e.target.checked)} /> Fill the offer box with a sample offer
           </label>
-          <label className="flex flex-col gap-1 font-semibold text-gray-700">
-            Preview as a user (id)
-            <input value={asUser} onChange={(e) => setAsUser(e.target.value)} placeholder="Optional" className={`${INPUT_SM} font-mono text-xs`} maxLength={24} />
-          </label>
+          <div className="flex flex-col gap-1 font-semibold text-gray-700">
+            Preview as someone
+            <PreviewUserPicker
+              value={asUser && asWho?.id === asUser ? asWho : null}
+              onChange={(picked) => {
+                setAsWho(picked);
+                setAsUser(picked?.id ?? "");
+              }}
+            />
+          </div>
           <button type="button" onClick={close} className="self-end font-semibold text-gray-500 hover:text-black">
             Done
           </button>

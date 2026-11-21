@@ -22,7 +22,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
 
   if (isNew) {
     return (
-      <MailShell title="New mail" back={BACK}>
+      <MailShell back={BACK}>
         <TemplateEditor template={null} brandDesign={brandDesign} />
       </MailShell>
     );
@@ -35,7 +35,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     );
   }
   return (
-    <MailShell title={res.data.name || "Mail"} description={res.data.archived ? "Archived" : undefined} back={BACK}>
+    <MailShell back={BACK}>
       <TemplateEditor template={res.data} brandDesign={brandDesign} />
     </MailShell>
   );

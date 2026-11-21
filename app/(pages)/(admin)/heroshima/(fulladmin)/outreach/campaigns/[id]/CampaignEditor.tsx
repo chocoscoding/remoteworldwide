@@ -3,7 +3,7 @@
 import { useState, useTransition, type FC, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LoaderCircle } from "lucide-react";
+import { Info, LoaderCircle } from "lucide-react";
 import { createCampaign, scheduleCampaign, updateCampaign } from "@/libs/mail-admin";
 import {
   EMPTY_CONTENT,
@@ -22,11 +22,15 @@ import MailEditor from "@/app/components/mail/content/MailEditor";
 import { pickContent } from "@/app/components/mail/content/blocks";
 import OfferPicker from "@/app/components/mail/OfferPicker";
 import { useAudienceCount } from "@/app/components/mail/useAudienceCount";
-import { BTN, BTN_PRIMARY, ErrorBox, Field, INPUT, INPUT_SM, Segmented } from "@/app/components/mail/ui";
-import { filterSummary, fromLocalInput, n, numOrUndef, offerChoiceProblem, toLocalInput } from "@/app/components/mail/format";
+import { BTN, BTN_LINK, BTN_PRIMARY, ErrorBox, INPUT, INPUT_SM, Switch } from "@/app/components/mail/ui";
+import { fromLocalInput, n, numOrUndef, offerChoiceProblem, toLocalInput } from "@/app/components/mail/format";
+import { cn } from "@/lib/utils";
 
 /** Over this many people, sending asks for the count to be typed. */
 const CONFIRM_OVER = 500;
+/** Picker values that aren't ids: write a one-off here, or make a new one in another tab. */
+const ONE_OFF = "__one-off";
+const NEW_ONE = "__new";
 
 /** A template's mail, field by field (its design included). */
 const contentOf = (t: MailTemplate): TemplateContent => pickContent(t);
@@ -68,6 +72,7 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const [sendAt, setSendAt] = useState(toLocalInput(campaign?.sendAt ?? null));
   const [typed, setTyped] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [showMail, setShowMail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
@@ -77,6 +82,20 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const count = live.data?.count ?? null;
   const needsTyped = count !== null && count > CONFIRM_OVER;
   const usableTemplates = templates.filter((t) => !t.archived || t.id === templateId);
+
+  /** The Mail picker: a saved mail, a one-off written here, or a new saved mail made in another tab. */
+  const chooseMail = (value: string) => {
+    if (value === NEW_ONE) {
+      window.open("/heroshima/outreach/templates/new", "_blank", "noopener");
+      return;
+    }
+    if (value === ONE_OFF) {
+      setMode("oneoff");
+      return;
+    }
+    setMode("template");
+    pickTemplate(value);
+  };
 
   const pickTemplate = (id: string) => {
     setTemplateId(id);
@@ -179,213 +198,236 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
     });
   };
 
-  const sendLabel = when === "now" ? `Send now${count !== null ? ` to ${n(count)} people` : ""}` : "Schedule";
+  const sendLabel = when === "now" ? `Send now${count !== null ? ` to ${n(count)} ${count === 1 ? "person" : "people"}` : ""}` : "Schedule";
 
   const templateName = templates.find((t) => t.id === templateId)?.name ?? "this mail";
   const hasOfferBlock = content.blocks.some((b) => b.type === "offer");
   const offerPicker = <OfferPicker offers={offers} value={offer} onChange={setOffer} maxDiscountPercent={maxDiscountPercent} />;
-  const prefSelect = (
-    <Field label="Who can get it" hint="Only people with this mail switched on.">
-      <select className={INPUT} value={content.pref ?? "emailProductNews"} onChange={(e) => setContent({ ...content, pref: e.target.value as MarketingPref })}>
-        {(Object.keys(PREF_LABELS) as MarketingPref[]).map((p) => (
-          <option key={p} value={p}>
-            {PREF_LABELS[p]} on
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
+  const hasMail = mode === "oneoff" || Boolean(templateId);
+  // A one-off is written here, so its editor is always open; a saved mail is only previewed, on request.
+  const mailOpen = mode === "oneoff" || showMail;
+  const pref = content.pref ?? "emailProductNews";
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Step title="Name">
-        <Field label="Only admins see it">
-          <input className={`${INPUT} max-w-xl`} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="November product news" />
-        </Field>
-      </Step>
+      <header className="flex min-w-0 flex-col gap-1">
+        <h1 className="sr-only">{name.trim() || "New campaign"}</h1>
+        <input
+          aria-label="Campaign name"
+          value={name}
+          maxLength={120}
+          placeholder="Untitled campaign"
+          onChange={(e) => setName(e.target.value)}
+          className="-mx-1.5 w-full max-w-2xl rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-2xl font-bold placeholder:text-gray-400 hover:border-gray-300 focus:border-black focus:outline-none"
+        />
+      </header>
 
-      <Step title="1. Content">
-        <div className="flex flex-wrap items-center gap-3">
-          <Segmented
-            label="Content"
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: "template", label: "Use a saved mail" },
-              { value: "oneoff", label: "Write a one-off" },
-            ]}
-          />
-          {mode === "template" ? (
-            <>
-              <select aria-label="Saved mail" className={`${INPUT} max-w-md`} value={templateId} onChange={(e) => pickTemplate(e.target.value)}>
-                <option value="">Pick a mail</option>
-                {usableTemplates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              {templateId ? null : (
-                <Link href="/heroshima/outreach/templates/new" target="_blank" className="text-xs font-semibold hover:underline">
-                  New mail
-                </Link>
-              )}
-            </>
-          ) : null}
-        </div>
-        {mode === "template" && !templateId ? null : (
-          <div className="mt-4">
-            <MailEditor
-              content={content}
-              onChange={setContent}
-              prefRequired
-              offer={{ picker: offerPicker, href: offer ? `/heroshima/outreach/offers/${offer.offerId}` : undefined }}
-              locked={
-                mode === "template" ? (
-                  <div className="flex flex-col gap-4">
-                    <p className="text-sm text-gray-700">
-                      <strong>{templateName}</strong> is a saved mail. When you send or schedule, it goes out as it is at that moment.
-                    </p>
-                    {prefSelect}
-                    <div className="flex flex-col items-start gap-2 border-t border-gray-200 pt-3">
-                      <Link href={`/heroshima/outreach/templates/${templateId}`} target="_blank" className="text-xs font-semibold hover:underline">
-                        Edit the saved mail
-                      </Link>
-                      <button type="button" onClick={() => setMode("oneoff")} className="text-xs font-semibold text-gray-600 hover:text-black hover:underline">
-                        Change it for this campaign only (a one-off copy)
-                      </button>
-                    </div>
-                  </div>
-                ) : undefined
-              }
-            />
-          </div>
-        )}
-      </Step>
-
-      <Step title="2. Audience">
-        <div className="flex flex-wrap items-center gap-2">
-          <select aria-label="Audience" className={`${INPUT} max-w-md`} value={audienceId} onChange={(e) => setAudienceId(e.target.value)}>
-            <option value="">Pick an audience</option>
-            {audiences.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-          <Link href="/heroshima/outreach/audience/new" target="_blank" className="text-xs font-semibold hover:underline">
-            New audience
-          </Link>
-        </div>
-        {audience ? (
-          <div className="mt-2 text-sm">
-            <p className="text-gray-600">{filterSummary(audience.filter)}</p>
-            <p className="mt-1">
-              {live.loading ? (
-                <LoaderCircle className="inline h-4 w-4 animate-spin text-gray-500" aria-label="Counting" />
-              ) : live.error ? (
-                <span className="text-[#b23c26]">{live.error}</span>
-              ) : (
-                <>
-                  <strong className="tabular-nums">{count !== null ? n(count) : "..."}</strong> people can get it now
-                  {content.pref ? ` (before the ${PREF_LABELS[content.pref]} switch, caps and quiet hours)` : ""}.
-                </>
-              )}
-            </p>
-          </div>
-        ) : null}
-      </Step>
-
-      <Step title="3. Offer (optional)">
-        {offerPicker}
-        {offer && !hasOfferBlock ? (
-          <p className="mt-2 text-xs text-gray-500">The mail has no offer box. Add one in the content, or link a button to {"{{offerUrl}}"}.</p>
-        ) : !offer && hasOfferBlock ? (
-          <p className="mt-2 text-xs text-gray-500">The mail has an offer box. Without an offer here it is left out.</p>
-        ) : null}
-      </Step>
-
-      <Step title="4. Subject test (optional)">
-        <label className="flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" checked={Boolean(ab)} onChange={(e) => setAb(e.target.checked ? { ...DEFAULT_AB } : null)} /> Test a second subject
-        </label>
-        {ab ? (
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <Field label="Subject A">
-              <input className={INPUT} value={content.subject} readOnly={mode === "template"} onChange={(e) => setContent({ ...content, subject: e.target.value })} />
-            </Field>
-            <Field label="Subject B">
-              <input className={INPUT} value={ab.subjectB} maxLength={200} onChange={(e) => setAb({ ...ab, subjectB: e.target.value })} />
-            </Field>
-            <div className="flex flex-wrap items-center gap-1.5 text-sm md:col-span-2">
-              <input
-                type="number"
-                min={1}
-                max={50}
-                aria-label="Percent per side"
-                className={`${INPUT_SM} w-16 tabular-nums`}
-                value={ab.testPercent}
-                onChange={(e) => setAb({ ...ab, testPercent: numOrUndef(e.target.value) ?? 0 })}
-              />
-              % get A and as many get B; after
-              <input
-                type="number"
-                min={1}
-                aria-label="Decide after hours"
-                className={`${INPUT_SM} w-16 tabular-nums`}
-                value={ab.decideAfterHours}
-                onChange={(e) => setAb({ ...ab, decideAfterHours: numOrUndef(e.target.value) ?? 0 })}
-              />
-              hours the rest get
-              <select aria-label="Winner" className={INPUT_SM} value={ab.mode} onChange={(e) => setAb({ ...ab, mode: e.target.value as AbTestInput["mode"] })}>
-                <option value="auto">the subject with more unique clicks</option>
-                <option value="manual">the subject I pick</option>
-              </select>
-            </div>
-          </div>
-        ) : null}
-      </Step>
-
-      <Step title="5. Send">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Segmented
-              label="When"
-              value={when}
-              onChange={(w) => {
-                setWhen(w);
-                setConfirming(false);
-              }}
-              options={[
-                { value: "now", label: "Now" },
-                { value: "later", label: "Later" },
-              ]}
-            />
-            {when === "later" ? (
-              <input type="datetime-local" aria-label="Send at" className={`${INPUT_SM}`} value={sendAt} onChange={(e) => setSendAt(e.target.value)} />
+      <section aria-label="Campaign" className="rounded-md border border-gray-300 bg-white">
+        <div className="divide-y divide-gray-200 px-4">
+          <Row label="Mail">
+            <select aria-label="Mail" className={cn(INPUT_SM, "w-full max-w-sm")} value={mode === "oneoff" ? ONE_OFF : templateId} onChange={(e) => chooseMail(e.target.value)}>
+              <option value="">Pick a mail</option>
+              {usableTemplates.length ? (
+                <optgroup label="Saved mails">
+                  {usableTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              <optgroup label="Or">
+                <option value={ONE_OFF}>Write a one-off for this campaign</option>
+                <option value={NEW_ONE}>+ New saved mail (opens a tab)</option>
+              </optgroup>
+            </select>
+            {hasMail && content.subject ? (
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+                <span className="truncate">
+                  Subject: <span className="font-semibold text-black">{content.subject}</span>
+                </span>
+                {mode === "template" ? (
+                  <>
+                    <button type="button" onClick={() => setShowMail((v) => !v)} className={BTN_LINK}>
+                      {showMail ? "Hide the mail" : "Show the mail"}
+                    </button>
+                    <Link href={`/heroshima/outreach/templates/${templateId}`} target="_blank" className={BTN_LINK}>
+                      Edit it
+                    </Link>
+                  </>
+                ) : null}
+              </p>
             ) : null}
-          </div>
-          <p className="text-xs text-gray-500">Caps (per person, per day and week) and quiet hours apply. People over the cap are skipped and counted.</p>
-          {needsTyped ? (
-            <Field label={`To send to ${n(count)} people, type the number`}>
-              <input inputMode="numeric" className={`${INPUT} max-w-[200px] tabular-nums`} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={String(count)} />
-            </Field>
-          ) : null}
+          </Row>
 
-          {error ? <ErrorBox>{error}</ErrorBox> : null}
+          <Row label="Goes to">
+            <select
+              aria-label="Audience"
+              className={cn(INPUT_SM, "w-full max-w-sm")}
+              value={audienceId}
+              onChange={(e) => {
+                if (e.target.value === NEW_ONE) window.open("/heroshima/outreach/audience/new", "_blank", "noopener");
+                else setAudienceId(e.target.value);
+              }}>
+              <option value="">Pick an audience</option>
+              {audiences.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+              <option value={NEW_ONE}>+ New audience (opens a tab)</option>
+            </select>
+            {audience ? (
+              <p className="mt-1.5 text-xs text-gray-600">
+                {live.loading ? (
+                  <LoaderCircle className="inline h-3.5 w-3.5 animate-spin text-gray-500" aria-label="Counting" />
+                ) : live.error ? (
+                  <span className="text-[#b23c26]">{live.error}</span>
+                ) : (
+                  <>
+                    <strong className="tabular-nums text-black">{count !== null ? n(count) : "..."}</strong> can get it
+                  </>
+                )}
+              </p>
+            ) : null}
+          </Row>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <Row label="Only if">
+            <div className="flex flex-wrap items-center gap-2">
+              {(Object.keys(PREF_LABELS) as MarketingPref[]).map((p) => (
+                <Choice key={p} on={pref === p} onClick={() => setContent({ ...content, pref: p })}>
+                  {PREF_LABELS[p]} emails on
+                </Choice>
+              ))}
+            </div>
+          </Row>
+
+          <Row label="Offer">
+            {offerPicker}
+            {offer && !hasOfferBlock ? (
+              <p className="mt-1.5 text-xs text-gray-500">The mail has no offer box, so add one or link a button to {"{{offerUrl}}"}.</p>
+            ) : !offer && hasOfferBlock ? (
+              <p className="mt-1.5 text-xs text-gray-500">The mail&apos;s offer box is left out without an offer.</p>
+            ) : null}
+          </Row>
+
+          <Row label="Subject test">
+            <Switch checked={Boolean(ab)} onChange={(on) => setAb(on ? { ...DEFAULT_AB } : null)} label="Test a second subject" />
+            {ab ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <input
+                  aria-label="Subject B"
+                  className={cn(INPUT, "max-w-xl")}
+                  value={ab.subjectB}
+                  maxLength={200}
+                  placeholder="Subject B"
+                  onChange={(e) => setAb({ ...ab, subjectB: e.target.value })}
+                />
+                <p className="flex flex-wrap items-center gap-1.5 text-sm text-gray-700">
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    aria-label="Percent per side"
+                    className={cn(INPUT_SM, "w-16 tabular-nums")}
+                    value={ab.testPercent}
+                    onChange={(e) => setAb({ ...ab, testPercent: numOrUndef(e.target.value) ?? 0 })}
+                  />
+                  % get each subject, then after
+                  <input
+                    type="number"
+                    min={1}
+                    aria-label="Decide after hours"
+                    className={cn(INPUT_SM, "w-16 tabular-nums")}
+                    value={ab.decideAfterHours}
+                    onChange={(e) => setAb({ ...ab, decideAfterHours: numOrUndef(e.target.value) ?? 0 })}
+                  />
+                  h the rest get
+                  <select aria-label="Winner" className={INPUT_SM} value={ab.mode} onChange={(e) => setAb({ ...ab, mode: e.target.value as AbTestInput["mode"] })}>
+                    <option value="auto">the one with more clicks</option>
+                    <option value="manual">the one I pick</option>
+                  </select>
+                </p>
+              </div>
+            ) : null}
+          </Row>
+
+          <Row label="When">
+            <div className="flex flex-wrap items-center gap-2">
+              <Choice
+                on={when === "now"}
+                onClick={() => {
+                  setWhen("now");
+                  setConfirming(false);
+                }}>
+                Now
+              </Choice>
+              <Choice
+                on={when === "later"}
+                onClick={() => {
+                  setWhen("later");
+                  setConfirming(false);
+                }}>
+                Later
+              </Choice>
+              {when === "later" ? <input type="datetime-local" aria-label="Send at" className={INPUT_SM} value={sendAt} onChange={(e) => setSendAt(e.target.value)} /> : null}
+            </div>
+          </Row>
+        </div>
+      </section>
+
+      {hasMail && mailOpen ? (
+        <section aria-label="The mail" className="min-w-0">
+          <MailEditor
+            content={content}
+            onChange={setContent}
+            prefRequired
+            offer={{ picker: offerPicker, href: offer ? `/heroshima/outreach/offers/${offer.offerId}` : undefined }}
+            locked={
+              mode === "template" ? (
+                <div className="flex flex-col gap-3 text-sm text-gray-700">
+                  <p>
+                    <strong>{templateName}</strong> goes out as it is when you send.
+                  </p>
+                  <button type="button" onClick={() => setMode("oneoff")} className={cn(BTN_LINK, "self-start")}>
+                    Change it for this campaign only
+                  </button>
+                </div>
+              ) : undefined
+            }
+          />
+        </section>
+      ) : null}
+
+      <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-gray-300 bg-white/95 py-3">
+        {error ? <ErrorBox>{error}</ErrorBox> : null}
+        {needsTyped && !confirming ? (
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            Type {n(count)} to send to that many people
+            <input inputMode="numeric" aria-label="Number of people" className={cn(INPUT_SM, "w-28 tabular-nums")} value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={String(count)} />
+          </label>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={onSaveDraft} disabled={busy} className={BTN}>
+            {busy && !confirming ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+            Save draft
+          </button>
+          {note ? <span className="text-xs text-[#5b6b12]">{note}</span> : null}
+          <span className="ml-auto flex flex-wrap items-center gap-2">
+            <span title="Daily and weekly limits per person and quiet hours apply; people over a limit are skipped and counted." className="text-gray-400">
+              <Info className="h-4 w-4" aria-label="Limits and quiet hours apply" />
+            </span>
             {confirming ? (
               <>
                 <span className="text-sm font-semibold">
                   {when === "now" ? `Send to ${count !== null ? n(count) : "everyone in the audience"} now?` : `Schedule for ${new Date(sendAt).toLocaleString("en-GB")}?`}
                 </span>
+                <button type="button" onClick={() => setConfirming(false)} disabled={busy} className={BTN_LINK}>
+                  Cancel
+                </button>
                 <button type="button" onClick={onSend} disabled={busy} className="inline-flex items-center gap-2 rounded-md bg-black px-4 py-2 text-sm font-bold text-[#e1f073] br-bold-press br-lime disabled:opacity-60">
                   {busy ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : null}
                   Yes, {when === "now" ? "send" : "schedule"}
-                </button>
-                <button type="button" onClick={() => setConfirming(false)} disabled={busy} className="px-2 text-xs font-semibold text-gray-500">
-                  Cancel
                 </button>
               </>
             ) : (
@@ -401,23 +443,31 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
                 {sendLabel}
               </button>
             )}
-            <button type="button" onClick={onSaveDraft} disabled={busy} className={BTN}>
-              {busy && !confirming ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-              Save draft
-            </button>
-            {note ? <span className="text-xs text-[#5b6b12]">{note}</span> : null}
-          </div>
+          </span>
         </div>
-      </Step>
+      </div>
     </div>
   );
 };
 
-const Step: FC<{ title: string; children: ReactNode }> = ({ title, children }) => (
-  <section className="rounded-md border border-gray-300 bg-white p-4">
-    <h2 className="mb-3 text-sm font-bold">{title}</h2>
+/** A label column and its control, one compact row. */
+const Row: FC<{ label: string; children: ReactNode }> = ({ label, children }) => (
+  <div className="grid gap-1.5 py-3 sm:grid-cols-[104px_minmax(0,1fr)] sm:items-start sm:gap-3">
+    <p className="text-xs font-semibold text-gray-600 sm:pt-1.5">{label}</p>
+    <div className="min-w-0">{children}</div>
+  </div>
+);
+
+/** One of a few choices, as a chip. */
+const Choice: FC<{ on: boolean; onClick: () => void; children: ReactNode }> = ({ on, onClick, children }) => (
+  <button
+    type="button"
+    role="radio"
+    aria-checked={on}
+    onClick={onClick}
+    className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", on ? "border-black bg-black text-[#e1f073]" : "border-gray-300 bg-white text-gray-700 hover:border-black")}>
     {children}
-  </section>
+  </button>
 );
 
 export default CampaignEditor;

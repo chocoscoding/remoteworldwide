@@ -16,6 +16,10 @@ import type {
   AudienceCount,
   AudienceFilter,
   AudienceInput,
+  AudiencePageSize,
+  AudiencePeople,
+  AudiencePeopleAsk,
+  AudiencePeopleCounts,
   AuditRow,
   CampaignInput,
   CampaignReport,
@@ -46,7 +50,7 @@ import type {
   ThreadDetail,
   ThreadStatus,
 } from "@/app/lib/mail/types";
-import { OFFER_VALID_HOURS_MAX } from "@/app/lib/mail/types";
+import { AUDIENCE_BUILT_INS, AUDIENCE_PAGE_SIZES, AUDIENCE_PICK_MAX, OFFER_VALID_HOURS_MAX } from "@/app/lib/mail/types";
 
 /** A write body without Mongo `_id` keys (a document read back and edited must not try to set them). */
 function strip(value: unknown): unknown {
@@ -266,6 +270,43 @@ export const countAudience = async (filter: AudienceFilter) => {
     (raw) => {
       const r = (raw ?? {}) as Partial<AudienceCount>;
       return { count: Number(r.count ?? 0) || 0, sample: Array.isArray(r.sample) ? r.sample : [] };
+    },
+  );
+};
+
+/** Hand-picked ids as the backend takes them: object ids only, once each, at most AUDIENCE_PICK_MAX. */
+const pickedIds = (ids: unknown): string[] | undefined =>
+  Array.isArray(ids) ? [...new Set(ids.filter((id): id is string => okId(id)))].slice(0, AUDIENCE_PICK_MAX) : undefined;
+
+/**
+ * One page of an audience's people (or of everyone, to tick someone in), each with whether they can
+ * get mail and how they are in it. A fixed audience is asked by `builtIn`.
+ */
+export const audiencePeople = async (ask: AudiencePeopleAsk) => {
+  await requireAdminAction();
+  const page = int(ask?.page, 1, 1, 100_000);
+  const pageSize: AudiencePageSize = AUDIENCE_PAGE_SIZES.find((s) => s === Number(ask?.pageSize)) ?? 25;
+  const filter: AudienceFilter = { ...(ask?.filter ?? { kind: "users" }) };
+  if (filter.includeIds !== undefined) filter.includeIds = pickedIds(filter.includeIds);
+  if (filter.excludeIds !== undefined) filter.excludeIds = pickedIds(filter.excludeIds);
+  const body: Record<string, unknown> = { filter, page, pageSize };
+  if (ask?.builtIn && AUDIENCE_BUILT_INS.includes(ask.builtIn)) body.builtIn = ask.builtIn;
+  const q = typeof ask?.q === "string" ? ask.q.trim().slice(0, 200) : "";
+  if (q) body.q = q;
+  if (ask?.scope === "everyone" || ask?.scope === "removed") body.scope = ask.scope;
+  return run<AudiencePeople>(
+    () => mail("/audiences/people", { method: "POST", body }),
+    (raw) => {
+      const r = (raw ?? {}) as Partial<AudiencePeople>;
+      const c = (r.counts ?? {}) as Partial<AudiencePeopleCounts>;
+      const total = Number(r.total) || 0;
+      return {
+        rows: Array.isArray(r.rows) ? r.rows : [],
+        total,
+        page: Number(r.page) || page,
+        pages: Math.max(1, Number(r.pages) || Math.ceil(total / pageSize)),
+        counts: { matching: Number(c.matching) || 0, added: Number(c.added) || 0, removed: Number(c.removed) || 0, reachable: Number(c.reachable) || 0 },
+      };
     },
   );
 };

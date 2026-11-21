@@ -1,10 +1,10 @@
 "use client";
 
-// The users screen's growth chart (/heroshima/users): accounts in total over the range as a line,
-// and new accounts per day, week or month as columns underneath, two panels on one time axis (never
-// two scales on one plot). A crosshair finds the nearest period and one readout gives both numbers;
-// arrow keys do the same from the keyboard, and "See the numbers" lists every period as a table.
-// Plain SVG sized to its box, no chart library, in the admin's black and lime.
+// The users screen's growth chart (/heroshima/users): new accounts per day, week or month as one row
+// of columns (the total lives in the Accounts tile above, and in the readout and the table). A hover
+// finds the nearest period and one readout gives its new accounts and the running total; arrow keys do
+// the same from the keyboard, and "See the numbers" lists every period as a table. Plain SVG sized to
+// its box, no chart library, in the admin's black and lime.
 
 import { useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent, type PointerEvent } from "react";
 
@@ -34,7 +34,7 @@ const fmt = (day: string, opts: Intl.DateTimeFormatOptions) => asDate(day).toLoc
 /** Days up to three months, weeks up to two years, months past that. */
 const grainOf = (days: number): Grain => (days <= 92 ? "day" : days <= 730 ? "week" : "month");
 
-const GRAIN_NOUN: Record<Grain, string> = { day: "a day", week: "a week", month: "a month" };
+const GRAIN_LABEL: Record<Grain, string> = { day: "Per day", week: "Per week", month: "Per month" };
 
 /** The days grouped by the grain, the running total carried through. Weeks are counted back from today, so the last one ends today. */
 function periodsOf(daily: UsersGrowthChartProps["daily"], before: number, grain: Grain): Period[] {
@@ -82,13 +82,11 @@ const columnPath = (x: number, y: number, w: number, h: number) => {
 
 // The plot's geometry, in px.
 const LEFT = 44;
-const RIGHT = 56;
-const TOP = 22;
-const LINE_H = 190;
-const GAP = 42;
-const COL_H = 76;
+const RIGHT = 16;
+const TOP = 24;
+const COL_H = 112;
 const AXIS_H = 22;
-const HEIGHT = TOP + LINE_H + GAP + COL_H + AXIS_H;
+const HEIGHT = TOP + COL_H + AXIS_H;
 
 const UsersGrowthChart: FC<UsersGrowthChartProps> = ({ daily, before }) => {
   const box = useRef<HTMLDivElement>(null);
@@ -114,19 +112,10 @@ const UsersGrowthChart: FC<UsersGrowthChartProps> = ({ daily, before }) => {
   const slot = plotW / periods.length;
   const cx = (i: number) => LEFT + slot * (i + 0.5);
 
-  const totals = periods.map((p) => p.total);
-  const lineTicks = niceTicks(Math.min(before, ...totals), Math.max(...totals), 3);
-  const lineLo = lineTicks[0];
-  const lineHi = lineTicks[lineTicks.length - 1];
-  const ly = (v: number) => TOP + LINE_H - ((v - lineLo) / (lineHi - lineLo || 1)) * LINE_H;
-
-  const colTop = TOP + LINE_H + GAP;
-  const colBase = colTop + COL_H;
-  const colTicks = niceTicks(0, Math.max(1, ...periods.map((p) => p.signups)), 2);
+  const colBase = TOP + COL_H;
+  const colTicks = niceTicks(0, Math.max(1, ...periods.map((p) => p.signups)), 3);
   const colHi = colTicks[colTicks.length - 1];
   const colW = Math.max(1, Math.min(24, slot - 2));
-
-  const linePath = periods.map((p, i) => `${i ? "L" : "M"}${cx(i).toFixed(1)},${ly(p.total).toFixed(1)}`).join("");
   const last = periods.length - 1;
 
   // Five or so axis names, the last one always today's period.
@@ -167,29 +156,11 @@ const UsersGrowthChart: FC<UsersGrowthChartProps> = ({ daily, before }) => {
         style={{ height: HEIGHT }}>
         {width > 0 && (
           <svg width={width} height={HEIGHT} className="block select-none overflow-visible" aria-hidden>
-            {/* The hovered period, a lime band through both panels. */}
+            {/* The hovered period, a lime band behind its column. */}
             {shown !== null && <rect x={cx(shown) - Math.max(colW, 8) / 2 - 3} y={TOP - 6} width={Math.max(colW, 8) + 6} height={colBase - TOP + 6} rx={4} fill="#e1f073" opacity={0.45} />}
 
             <text x={LEFT} y={10} className="fill-gray-500 text-[11px] font-semibold uppercase tracking-wide">
-              Accounts in total
-            </text>
-            {lineTicks.map((t) => (
-              <g key={`l${t}`}>
-                <line x1={LEFT} x2={LEFT + plotW} y1={ly(t)} y2={ly(t)} stroke="#ececec" strokeWidth={1} />
-                <text x={LEFT - 8} y={ly(t)} dy="0.32em" textAnchor="end" className="fill-gray-500 text-[10px] tabular-nums">
-                  {compact(t)}
-                </text>
-              </g>
-            ))}
-            <path d={linePath} fill="none" stroke="#111" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-            <circle cx={cx(last)} cy={ly(periods[last].total)} r={4} fill="#111" stroke="#fff" strokeWidth={2} />
-            <text x={cx(last) + 9} y={ly(periods[last].total)} dy="0.32em" className="fill-black text-[12px] font-bold">
-              {compact(periods[last].total)}
-            </text>
-            {shown !== null && shown !== last && <circle cx={cx(shown)} cy={ly(periods[shown].total)} r={4} fill="#111" stroke="#fff" strokeWidth={2} />}
-
-            <text x={LEFT} y={colTop - 12} className="fill-gray-500 text-[11px] font-semibold uppercase tracking-wide">
-              New accounts {GRAIN_NOUN[grain]}
+              {GRAIN_LABEL[grain]}
             </text>
             {colTicks.map((t) => (
               <g key={`c${t}`}>
@@ -223,14 +194,12 @@ const UsersGrowthChart: FC<UsersGrowthChartProps> = ({ daily, before }) => {
             style={flip ? { right: width - readoutLeft + 14 } : { left: readoutLeft + 14 }}>
             <p className="mb-1 font-semibold text-gray-500">{readout.label}</p>
             <p className="flex items-center gap-2">
-              <span aria-hidden className="h-0.5 w-3 rounded bg-black" />
-              <strong className="text-sm tabular-nums">{n(readout.total)}</strong>
-              <span className="text-gray-500">accounts</span>
-            </p>
-            <p className="flex items-center gap-2">
-              <span aria-hidden className="h-0.5 w-3 rounded bg-black" />
+              <span aria-hidden className="h-2.5 w-2.5 rounded-sm bg-black" />
               <strong className="text-sm tabular-nums">{readout.signups ? `+${n(readout.signups)}` : "0"}</strong>
               <span className="text-gray-500">new</span>
+            </p>
+            <p className="mt-0.5 text-gray-500">
+              <span className="tabular-nums">{n(readout.total)}</span> accounts in total
             </p>
           </div>
         )}

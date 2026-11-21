@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useMemo, useRef, useState, useTransition, type FC, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState, useTransition, type FC, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Pencil, Plus, X, Zap } from "lucide-react";
+import { LoaderCircle, MoreHorizontal, Plus, X, Zap } from "lucide-react";
 import { createPlaybook, setPlaybookStatus, updatePlaybook } from "@/libs/mail-admin";
 import {
   STEP_FACTS,
@@ -20,8 +20,9 @@ import {
   type StepType,
   type Trigger,
 } from "@/app/lib/mail/types";
-import { BTN, BTN_LINK, BTN_PRIMARY, ErrorBox, INPUT, Notice, StatusChip } from "@/app/components/mail/ui";
+import { BTN, BTN_LINK, BTN_PRIMARY, ErrorBox, Notice, StatusChip } from "@/app/components/mail/ui";
 import { offerChoiceProblem, slugify } from "@/app/components/mail/format";
+import { Popover } from "@/app/components/mail/audience/Popover";
 import TriggersDrawer from "@/app/components/mail/playbook/TriggersDrawer";
 import { rulesSentence, triggerSentence } from "@/app/components/mail/playbook/summary";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,9 @@ import StepCard, { StepInspector, type StepContext } from "./StepCard";
 import TriggerFields from "./TriggerFields";
 
 const STATUS_LABEL: Record<PlaybookStatus, string> = { draft: "Draft", live: "Live", paused: "Paused" };
+
+/** The rules line starts a line on its own now, so it opens with a capital ("Not Pro or Ultra · once"). */
+const upperFirst = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 const inputOf = (p: MailPlaybook | null): PlaybookInput =>
   p
@@ -103,14 +107,15 @@ type Props = {
   audiences: MailAudience[];
   maxDiscountPercent: number;
   stats: PlaybookStepStats[];
-  /** The one line of numbers (and the folded report charts) the page renders from the report. */
+  /** The quiet line of numbers (and the folded report charts) the page renders once people have entered. */
   numbers?: ReactNode;
 };
 
 /**
- * The playbook editor: a header (rename, status and its actions), the rules as one sentence with
- * a drawer to edit them, then the flow (the trigger, then each step as a compact card). Pressing a
- * card opens only its fields in the inspector on the right. One Save keeps everything.
+ * The playbook editor: the name as the page title (edited in place) with the status and its one
+ * action, the rules as one quiet line that opens their drawer, then the flow (the trigger, then
+ * each step as a compact card). Pressing a card opens only its fields in the inspector on the
+ * right. One Save, in the sticky bar, keeps everything.
  */
 const PlaybookEditor: FC<Props> = ({ playbook, templates, offers, actions, audiences, maxDiscountPercent, stats, numbers }) => {
   const router = useRouter();
@@ -121,14 +126,17 @@ const PlaybookEditor: FC<Props> = ({ playbook, templates, offers, actions, audie
   const [error, setError] = useState<Problem | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
-  const [selected, setSelected] = useState<Selection>(null);
+  // A new playbook starts on its trigger: that is the first thing to set.
+  const [selected, setSelected] = useState<Selection>(() => (playbook ? null : { kind: "trigger" }));
   const [adding, setAdding] = useState<number | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [newTriggerOpen, setNewTriggerOpen] = useState(false);
-  const [renaming, setRenaming] = useState(!playbook);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const closeMore = useCallback(() => setMoreOpen(false), []);
   // A trigger made here, until the refreshed page lists it.
   const [madeHere, setMadeHere] = useState<MailAction[]>([]);
   const inspectorRef = useRef<HTMLElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const dirty = JSON.stringify(form) !== saved;
 
   const allActions = useMemo(() => [...actions, ...madeHere.filter((m) => !actions.some((a) => a.id === m.id))], [actions, madeHere]);
@@ -195,9 +203,9 @@ const PlaybookEditor: FC<Props> = ({ playbook, templates, offers, actions, audie
     return null;
   };
 
-  /** Show where a failed check points: the name field, the trigger or the step in the inspector. */
+  /** Show where a failed check points: the name (the title), the trigger or the step in the inspector. */
   const reveal = (issue: Problem) => {
-    if (issue.at === "name") setRenaming(true);
+    if (issue.at === "name") nameRef.current?.focus();
     else if (issue.at === "trigger") select({ kind: "trigger" });
     else if (issue.at && typeof issue.at === "object") select({ kind: "step", id: issue.at.step });
   };
@@ -278,109 +286,120 @@ const PlaybookEditor: FC<Props> = ({ playbook, templates, offers, actions, audie
   const setTrigger = (trigger: Trigger) => set("trigger", trigger);
   const selectedIndex = selected?.kind === "step" ? form.steps.findIndex((s) => s.id === selected.id) : -1;
   const selectedStep = selectedIndex >= 0 ? form.steps[selectedIndex] : null;
-  const renamed = playbook && form.name.trim() !== playbook.name;
 
   const onNameKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    // Enter would submit the whole form; here it only closes the name field.
+    // Enter would submit the whole form; here it only leaves the title. Escape puts the saved name back.
     if (e.key === "Enter") {
       e.preventDefault();
-      if (playbook && form.name.trim()) setRenaming(false);
+      e.currentTarget.blur();
     }
     if (e.key === "Escape" && playbook) {
       e.preventDefault();
       set("name", playbook.name);
-      setRenaming(false);
+      e.currentTarget.blur();
     }
   };
 
   return (
     <form onSubmit={save} className="flex flex-col gap-4">
-      {/* Header: name, status and its actions. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        {renaming ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <label className="sr-only" htmlFor="playbook-name">
-              Name
-            </label>
-            <input
-              id="playbook-name"
-              className={`${INPUT} w-72 max-w-full font-semibold`}
-              value={form.name}
-              maxLength={120}
-              autoFocus={Boolean(playbook)}
-              onKeyDown={onNameKey}
-              onChange={(e) => set("name", e.target.value)}
-              placeholder={playbook ? "Name" : "Name this playbook"}
-            />
-            {playbook ? (
-              <button type="button" className={BTN} onClick={() => setRenaming(false)} disabled={!form.name.trim()}>
-                Done
-              </button>
-            ) : null}
-          </span>
-        ) : (
-          <button type="button" onClick={() => setRenaming(true)} className={`${BTN_LINK} inline-flex items-center gap-1`}>
-            <Pencil className="h-3.5 w-3.5" aria-hidden />
-            Rename
-          </button>
-        )}
-        {!renaming && renamed ? <span className="text-xs text-gray-500">New name: &quot;{form.name.trim() || "Untitled"}&quot;, not saved yet</span> : null}
+      {/* The name is the page's title, edited in place; the status and its one action sit on the right. */}
+      <header className="flex min-w-0 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h1 className="sr-only">{form.name.trim() || "New playbook"}</h1>
+          <input
+            ref={nameRef}
+            aria-label="Playbook name"
+            value={form.name}
+            maxLength={120}
+            onKeyDown={onNameKey}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="Untitled playbook"
+            className="-mx-1.5 w-full min-w-0 max-w-2xl flex-1 basis-64 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-2xl font-bold placeholder:text-gray-400 hover:border-gray-300 focus:border-black focus:outline-none"
+          />
 
-        {playbook ? (
-          <span className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <StatusChip status={status} label={STATUS_LABEL[status] ?? status} />
-            <span className="text-xs text-gray-500">Version {playbook.version}</span>
-            {askLive ? (
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="text-sm">People who match from now on enter and get mail.</span>
-                <button
-                  type="button"
-                  onClick={() => changeStatus("live")}
-                  disabled={busy}
-                  className="inline-flex items-center gap-2 rounded-md bg-black px-3 py-1.5 text-xs font-bold text-[#e1f073] br-bold-press br-lime">
-                  {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
-                  Yes, go live
-                </button>
-                <button type="button" onClick={() => setAskLive(false)} className="px-2 text-xs font-semibold text-gray-500">
-                  Cancel
-                </button>
+          {playbook ? (
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <span title={`Version ${playbook.version}`}>
+                <StatusChip status={status} label={STATUS_LABEL[status] ?? status} />
               </span>
-            ) : (
-              <>
-                {status !== "live" ? (
-                  <button type="button" className={BTN} onClick={() => changeStatus("live")} disabled={busy}>
-                    {status === "paused" ? "Resume" : "Go live"}
+              {askLive ? (
+                <>
+                  <span className="text-sm">People who match from now on enter and get mail.</span>
+                  <button type="button" onClick={() => setAskLive(false)} className="px-2 text-xs font-semibold text-gray-500">
+                    Cancel
                   </button>
-                ) : (
-                  <button type="button" className={BTN} onClick={() => changeStatus("paused")} disabled={busy}>
-                    Pause
+                  <button
+                    type="button"
+                    onClick={() => changeStatus("live")}
+                    disabled={busy}
+                    className="inline-flex items-center gap-2 rounded-md bg-black px-3 py-1.5 text-xs font-bold text-[#e1f073] br-bold-press br-lime">
+                    {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+                    Yes, go live
                   </button>
-                )}
-                {status !== "draft" ? (
-                  <button type="button" className={BTN_LINK} onClick={() => changeStatus("draft")} disabled={busy}>
-                    Back to draft
-                  </button>
-                ) : null}
-              </>
-            )}
-          </span>
-        ) : null}
-      </div>
+                </>
+              ) : (
+                <>
+                  {status !== "live" ? (
+                    <button type="button" className={BTN} onClick={() => changeStatus("live")} disabled={busy}>
+                      {status === "paused" ? "Resume" : "Go live"}
+                    </button>
+                  ) : (
+                    <button type="button" className={BTN} onClick={() => changeStatus("paused")} disabled={busy}>
+                      Pause
+                    </button>
+                  )}
+                  {status !== "draft" ? (
+                    <Popover
+                      open={moreOpen}
+                      onClose={closeMore}
+                      label="More"
+                      align="right"
+                      panelClassName="min-w-0 p-1"
+                      trigger={
+                        <button
+                          type="button"
+                          aria-label="More"
+                          title="More"
+                          aria-expanded={moreOpen}
+                          onClick={() => setMoreOpen((o) => !o)}
+                          className={cn("flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-black", moreOpen && "bg-gray-100 text-black")}>
+                          <MoreHorizontal className="h-4 w-4" aria-hidden />
+                        </button>
+                      }>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setMoreOpen(false);
+                          changeStatus("draft");
+                        }}
+                        className="block w-full whitespace-nowrap rounded px-2.5 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100 hover:text-black disabled:opacity-60">
+                        Back to draft
+                      </button>
+                    </Popover>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
+        </div>
 
-      {/* The rules in one sentence. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-gray-300 bg-white px-4 py-2.5">
-        <span className="text-xs font-semibold text-gray-500">Rules</span>
-        <span className="min-w-0 flex-1 text-sm">{rulesSentence(form, liveActions)}</span>
-        <button type="button" className={BTN} onClick={() => setRulesOpen(true)} aria-haspopup="dialog">
-          Edit rules
+        {/* The rules in one quiet sentence; pressing it opens the drawer. */}
+        <button
+          type="button"
+          onClick={() => setRulesOpen(true)}
+          aria-haspopup="dialog"
+          className="group -mx-1.5 self-start rounded-md px-1.5 py-0.5 text-left text-sm text-gray-500 hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black">
+          {upperFirst(rulesSentence(form, liveActions))}
+          <span className="ml-2 text-xs font-semibold text-gray-600 underline-offset-2 group-hover:text-black group-hover:underline">Edit rules</span>
         </button>
-      </div>
 
-      {numbers}
+        {numbers}
+      </header>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,400px)]">
         {/* The flow: trigger, then the steps top to bottom. */}
-        <section aria-label="Steps" className="min-w-0 rounded-md border border-gray-300 bg-white p-4">
+        <section aria-label="Steps" className="min-w-0 rounded-md border border-gray-200 bg-white p-4">
           <ol className="flex flex-col">
             <li>
               <button
@@ -410,46 +429,46 @@ const PlaybookEditor: FC<Props> = ({ playbook, templates, offers, actions, audie
                 </li>
               </Fragment>
             ))}
-            <li aria-hidden className="ml-[23px] h-4 border-l border-gray-300" />
+            <li aria-hidden className="ml-[23px] h-3 border-l border-gray-300" />
             <li>
               {adding === form.steps.length ? (
                 <StepTypeMenu onPick={(type) => insertStep(form.steps.length, type)} onClose={() => setAdding(null)} />
               ) : (
                 <button type="button" className={`${BTN} gap-1.5`} onClick={() => setAdding(form.steps.length)}>
-                  <Plus className="h-3.5 w-3.5" aria-hidden /> Add step
+                  <Plus className="h-3.5 w-3.5" aria-hidden /> {form.steps.length ? "Add step" : "Add a step"}
                 </button>
               )}
             </li>
           </ol>
-          {!form.steps.length ? <p className="mt-3 text-xs text-gray-500">No steps yet. Add the first: usually a wait, then a send.</p> : null}
         </section>
 
-        {/* The inspector: only what the selected card needs. */}
-        <aside ref={inspectorRef} aria-label="Inspector" className="min-w-0 scroll-mt-4 rounded-md border border-gray-300 bg-white p-4 lg:sticky lg:top-4">
-          {selected?.kind === "trigger" ? (
-            <TriggerFields trigger={form.trigger} onChange={setTrigger} actions={liveActions} audiences={audiences} onNewTrigger={() => setNewTriggerOpen(true)} />
-          ) : selectedStep ? (
-            <StepInspector
-              key={selectedStep.id}
-              step={selectedStep}
-              index={selectedIndex}
-              ctx={ctx}
-              stats={statsFor(selectedStep.id)}
-              playbookId={playbook?.id ?? null}
-              onChange={(step) => setSteps(form.steps.map((x, j) => (j === selectedIndex ? step : x)))}
-              onMove={(by) => moveStep(selectedIndex, by)}
-              onRemove={() => removeStep(selectedIndex)}
-            />
-          ) : (
-            <div className="flex flex-col gap-2 text-sm text-gray-600">
-              <p className="font-semibold text-black">Pick a card to change it.</p>
-              <p>The trigger decides who enters. Steps run top to bottom; waits, branches and jumps move people along, and they leave after the last step or when the goal is met.</p>
-            </div>
-          )}
-        </aside>
+        {/* The inspector: only what the selected card needs; with nothing picked, one quiet line. */}
+        {selected?.kind === "trigger" || selectedStep ? (
+          <aside ref={inspectorRef} aria-label="Inspector" className="min-w-0 scroll-mt-4 rounded-md border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
+            {selected?.kind === "trigger" ? (
+              <TriggerFields trigger={form.trigger} onChange={setTrigger} actions={liveActions} audiences={audiences} onNewTrigger={() => setNewTriggerOpen(true)} />
+            ) : selectedStep ? (
+              <StepInspector
+                key={selectedStep.id}
+                step={selectedStep}
+                index={selectedIndex}
+                ctx={ctx}
+                stats={statsFor(selectedStep.id)}
+                playbookId={playbook?.id ?? null}
+                onChange={(step) => setSteps(form.steps.map((x, j) => (j === selectedIndex ? step : x)))}
+                onMove={(by) => moveStep(selectedIndex, by)}
+                onRemove={() => removeStep(selectedIndex)}
+              />
+            ) : null}
+          </aside>
+        ) : (
+          <aside ref={inspectorRef} aria-label="Inspector" className="hidden pt-3 text-sm text-gray-500 lg:sticky lg:top-4 lg:block">
+            Pick a card to edit it.
+          </aside>
+        )}
       </div>
 
-      <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-gray-300 bg-white/95 py-3">
+      <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t border-gray-300 bg-white/95 py-3 backdrop-blur">
         {playbook && status !== "draft" && dirty ? <Notice tone="warn">Saving makes version {playbook.version + 1}. People already in finish the version they started.</Notice> : null}
         {error ? (
           <ErrorBox className="flex flex-wrap items-center gap-2">
@@ -461,16 +480,16 @@ const PlaybookEditor: FC<Props> = ({ playbook, templates, offers, actions, audie
             ) : null}
           </ErrorBox>
         ) : null}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {dirty ? <span className="text-xs text-gray-500">Unsaved changes</span> : note ? <span className="text-xs text-[#5b6b12]">{note}</span> : null}
           <button type="submit" disabled={busy || (!dirty && Boolean(playbook))} className={BTN_PRIMARY}>
             {busy ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {playbook ? "Save" : "Create playbook"}
           </button>
-          {dirty ? <span className="text-xs text-gray-500">Unsaved changes</span> : note ? <span className="text-xs text-[#5b6b12]">{note}</span> : null}
         </div>
       </div>
 
-      <RulesDrawer open={rulesOpen} onOpenChange={setRulesOpen} form={form} update={update} actions={liveActions} keyLocked={Boolean(playbook)} />
+      <RulesDrawer open={rulesOpen} onOpenChange={setRulesOpen} form={form} update={update} actions={liveActions} keyLocked={Boolean(playbook)} version={playbook?.version} />
       <TriggersDrawer
         open={newTriggerOpen}
         onOpenChange={setNewTriggerOpen}
@@ -486,9 +505,9 @@ const PlaybookEditor: FC<Props> = ({ playbook, templates, offers, actions, audie
   );
 };
 
-/** The line between two cards, with a small "+" that opens the step types to insert there. */
+/** The line between two cards. A small "+" shows on hover or focus (always on touch screens) and opens the step types to insert there. */
 const Connector: FC<{ open: boolean; onOpen: () => void; onPick: (type: StepType) => void; onClose: () => void; label: string }> = ({ open, onOpen, onPick, onClose, label }) => (
-  <li className="relative ml-[23px] border-l border-gray-300 py-1.5 pl-5">
+  <li className="group relative ml-[23px] border-l border-gray-300 pl-5">
     <button
       type="button"
       onClick={onOpen}
@@ -496,12 +515,14 @@ const Connector: FC<{ open: boolean; onOpen: () => void; onPick: (type: StepType
       title={label}
       aria-expanded={open}
       className={cn(
-        "absolute left-0 top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-white",
-        open ? "border-black text-black" : "border-gray-300 text-gray-400 hover:border-black hover:text-black",
+        "absolute left-0 top-1/2 flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-white transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black",
+        open
+          ? "border-black text-black opacity-100"
+          : "border-gray-400 text-gray-500 opacity-0 hover:border-black hover:text-black focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
       )}>
-      {open ? <X className="h-3 w-3" aria-hidden /> : <Plus className="h-3 w-3" aria-hidden />}
+      {open ? <X className="h-2.5 w-2.5" aria-hidden /> : <Plus className="h-2.5 w-2.5" aria-hidden />}
     </button>
-    {open ? <StepTypeMenu onPick={onPick} onClose={onClose} compact /> : <span className="block h-3" />}
+    {open ? <StepTypeMenu onPick={onPick} onClose={onClose} compact /> : <span className="block h-5" />}
   </li>
 );
 

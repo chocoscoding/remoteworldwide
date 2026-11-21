@@ -44,7 +44,8 @@ const Editor = async ({ campaign }: { campaign: MailCampaign | null }) => {
   const [templates, audiences, offers, settings] = await Promise.all([listTemplates(), listAudiences(), listOffers(), getMailSettings()]);
   const failures = [templates.error && `templates (${templates.error})`, audiences.error && `audiences (${audiences.error})`, offers.error && `offers (${offers.error})`].filter(Boolean);
   return (
-    <MailShell title={campaign ? campaign.name || "Draft campaign" : "New campaign"} description={campaign ? "Draft" : undefined} back={BACK}>
+    // The editor's name field is the title here, edited in place.
+    <MailShell back={BACK}>
       {failures.length ? <ErrorBox className="mb-4">Some lists couldn&apos;t be loaded: {failures.join(", ")}.</ErrorBox> : null}
       <CampaignEditor
         campaign={campaign}

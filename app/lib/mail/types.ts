@@ -175,12 +175,70 @@ export type AudienceFilter = {
   neverOpened?: boolean;
   mailTags?: string[];
   subscriberSources?: string[];
+  /** People ticked by hand who don't match the filters (account ids for "users", subscriber ids for "subscribers"). */
+  includeIds?: string[];
+  /** People the filters match but were unticked. */
+  excludeIds?: string[];
+  /** True: the audience is only includeIds and the filters are ignored ("pick people by hand"). */
+  pickOnly?: boolean;
 };
+/** The most ids includeIds or excludeIds may hold (OUTREACH-REDESIGN-SPEC.md section 7). */
+export const AUDIENCE_PICK_MAX = 5000;
 
-export type MailAudience = { id: string; name: string; filter: AudienceFilter; createdAt?: When; updatedAt?: When };
+/** The two fixed audiences: every account, and every account that can get marketing mail now. */
+export type AudienceBuiltIn = "all_users" | "all_outreachable";
+export const AUDIENCE_BUILT_INS: readonly AudienceBuiltIn[] = ["all_users", "all_outreachable"];
+
+export type MailAudience = {
+  id: string;
+  name: string;
+  filter: AudienceFilter;
+  /** Set on the two fixed audiences (they can't be edited or deleted), null on saved ones. An older backend leaves it out. */
+  builtIn: AudienceBuiltIn | null;
+  /** People in it, when the backend sends it (the list sends it for the fixed audiences). */
+  count?: number;
+  /** Of those, how many can get mail now (sent for "all_users"). */
+  reachable?: number;
+  createdAt?: When;
+  updatedAt?: When;
+};
 export type AudienceInput = { name: string; filter: AudienceFilter };
 export type AudienceSample = { id: string; userId: string | null; email: string; name: string | null };
 export type AudienceCount = { count: number; sample: AudienceSample[] };
+
+/** The people list (POST /audiences/people): "audience" lists the audience's people, "everyone" every account (or subscriber) to tick in. */
+/** audience = the people in it; removed = the filters' matches taken out by hand; everyone = every account (or subscriber), to add from. */
+export type AudiencePeopleScope = "audience" | "removed" | "everyone";
+export const AUDIENCE_PAGE_SIZES = [25, 50, 100] as const;
+export type AudiencePageSize = (typeof AUDIENCE_PAGE_SIZES)[number];
+export type AudiencePeopleAsk = {
+  filter: AudienceFilter;
+  builtIn?: AudienceBuiltIn;
+  page: number;
+  pageSize: AudiencePageSize;
+  /** Name or email contains, any case. */
+  q?: string;
+  scope?: AudiencePeopleScope;
+};
+/** filter = the filters match; added = in includeIds; removed = in excludeIds; outside = not matched (scope "everyone"). */
+export type AudiencePersonHow = "filter" | "added" | "removed" | "outside";
+export type AudiencePerson = {
+  id: string;
+  userId: string | null;
+  subscriberId: string | null;
+  email: string;
+  name: string | null;
+  plan: string | null;
+  signedUpAt: string | null;
+  lastSeenAt: string | null;
+  /** Passes the base reach rules (address, not suppressed, verified, not being deleted, pref on). */
+  reachable: boolean;
+  /** In the audience after include and exclude. */
+  inAudience: boolean;
+  how: AudiencePersonHow;
+};
+export type AudiencePeopleCounts = { matching: number; added: number; removed: number; reachable: number };
+export type AudiencePeople = { rows: AudiencePerson[]; total: number; page: number; pages: number; counts: AudiencePeopleCounts };
 
 /* ----------------------------------------------------------------------------- campaigns */
 
