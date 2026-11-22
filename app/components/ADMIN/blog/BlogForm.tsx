@@ -22,6 +22,7 @@ import { AUTO, DEFAULT_INLINE_OFFERS, effectiveInlineOffers, offerToken, parseOf
 import Article from "@/app/components/blog/Article";
 import NoImage from "@/app/components/blog/NoImage";
 import { canRedo, canUndo, record, redo, settle, startHistory, undo, type History } from "@/app/lib/dashboard/resume/history";
+import { changeIndex, typingStep, type DeltaOp } from "@/app/lib/blog/undoSteps";
 import { cn } from "@/lib/utils";
 import BlogEditPill from "./BlogEditPill";
 import { useBlogAutosave } from "./useBlogAutosave";
@@ -147,6 +148,21 @@ function insertImages(quill: Quill, range: RangeStatic, urls: string[]) {
   quill.setSelection(Math.min(index + 1, quill.getLength() - 1), 0, "user");
 }
 
+/**
+ * After an undo or redo, puts the caret where the body changed (app/lib/blog/undoSteps.ts). Runs after
+ * react-quill's own restore (a microtask once it has swapped the body in), which keeps the old position
+ * number. Nothing moves when the step was outside the body, a title or a tag.
+ */
+function caretToChange(quillRef: QuillRef, before: ReturnType<Quill["getContents"]> | undefined) {
+  if (!before) return;
+  window.setTimeout(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    const index = changeIndex(before.diff(quill.getContents()).ops);
+    if (index !== null) quill.setSelection(Math.min(index, quill.getLength() - 1), 0, "api");
+  }, 0);
+}
+
 /** Everything the writer edits, as one value: a point in the undo history and what autosave sends. */
 interface Draft {
   title: string;
@@ -189,8 +205,11 @@ const FIELD_ERRORS: Record<PublishField, string> = {
 };
 
 // Typing in these folds into one undo step per pause; everything else is a step of its own.
-const TYPING_FIELDS = new Set<keyof Draft>(["title", "slug", "description", "content"]);
+// The body cuts its steps finer, a word or one action each (changeContent below).
+const TYPING_FIELDS = new Set<keyof Draft>(["title", "slug", "description"]);
 const TYPING_PAUSE_MS = 700;
+// Steps kept each way. A word each makes them small, so the blog keeps more than the resume's 100.
+const UNDO_STEPS = 300;
 
 /** A draft's slug that is still just its title's (or the placeholder), so it should keep following the title. */
 function followsTitle(slug: string, title: string) {
@@ -314,18 +333,47 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
     const current = history.present[key];
     if (Object.is(current, value) || (Array.isArray(value) && JSON.stringify(current) === JSON.stringify(value))) return;
     touched.current = true;
-    setHistory((h) => record(h, { ...h.present, [key]: value }, group));
+    setHistory((h) => record(h, { ...h.present, [key]: value }, group, UNDO_STEPS));
+  };
+
+  // The body's undo steps (app/lib/blog/undoSteps.ts): a word of typing, a run of deletes, or one action
+  // (bold, a link, a paste, an image, a table change). Compared inside the update, so two quick keys
+  // before a render can't be judged against a stale body.
+  const changeContent = (value: string, ops: readonly DeltaOp[], source: string) => {
+    // Only the writer's own edits are steps. Quill reshaping HTML it was handed (on load, or after an
+    // undo) just keeps the snapshot in step, so it never becomes an undo step.
+    if (source !== "user") {
+      setHistory((h) => (h.present.content === value ? h : { ...h, present: { ...h.present, content: value } }));
+      return;
+    }
+    touched.current = true;
+    const typing = typingStep(ops);
+    setHistory((h) => {
+      if (h.present.content === value) return h;
+      const next = { ...h.present, content: value };
+      if (!typing) return record(h, next, null, UNDO_STEPS);
+      const moved = record(h, next, `content:${typing.kind}`, UNDO_STEPS);
+      return typing.kind === "insert" && typing.endsWord ? settle(moved, UNDO_STEPS) : moved;
+    });
   };
 
   // A typing pause closes the run, so the next keystroke starts a new undo step.
   useEffect(() => {
     if (history.pending === null) return;
-    const timer = window.setTimeout(() => setHistory(settle), TYPING_PAUSE_MS);
+    const timer = window.setTimeout(() => setHistory((h) => settle(h, UNDO_STEPS)), TYPING_PAUSE_MS);
     return () => window.clearTimeout(timer);
   }, [history]);
 
-  const doUndo = useCallback(() => setHistory(undo), []);
-  const doRedo = useCallback(() => setHistory(redo), []);
+  const doUndo = useCallback(() => {
+    const before = quillRef.current?.getEditor().getContents();
+    setHistory((h) => undo(h, UNDO_STEPS));
+    caretToChange(quillRef, before);
+  }, []);
+  const doRedo = useCallback(() => {
+    const before = quillRef.current?.getEditor().getContents();
+    setHistory((h) => redo(h, UNDO_STEPS));
+    caretToChange(quillRef, before);
+  }, []);
 
   // Marks when the editor's toolbar has scrolled up to its pinned spot, which frosts the
   // strip above it (globals.css). Capture, since the admin scrolls an inner pane, not the window.
@@ -649,7 +697,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
               onChange={(e) => {
                 const value = e.target.value;
                 touched.current = true;
-                setHistory((h) => record(h, { ...h.present, slug: value, slugTouched: true }, "slug"));
+                setHistory((h) => record(h, { ...h.present, slug: value, slugTouched: true }, "slug", UNDO_STEPS));
               }}
               placeholder="auto from the title"
               className="min-w-0 flex-1 py-2 text-sm text-primary outline-none"
@@ -838,12 +886,7 @@ const BlogForm: FC<BlogFormProps> = ({ authors, me, magnets, ctas, blog }) => {
               forwardedRef={quillRef}
               value={text}
               theme="snow"
-              onChange={(value, _delta, source) => {
-                // Only the writer's own typing is an edit. Quill reshaping HTML it was handed (on load,
-                // or after an undo) just keeps the snapshot in step, so it never becomes an undo step.
-                if (source === "user") set("content", value);
-                else setHistory((h) => (h.present.content === value ? h : { ...h, present: { ...h.present, content: value } }));
-              }}
+              onChange={(value, delta, source) => changeContent(value, delta.ops, source)}
               modules={quillModules}
               placeholder="Write the post"
               className="post-editor mt-1"

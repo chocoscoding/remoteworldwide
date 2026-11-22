@@ -34,15 +34,19 @@ export interface History<S> {
 /** Steps kept in each direction. Typing pauses make steps, so this is generous. */
 export const HISTORY_LIMIT = 100;
 
+// Every function that adds a step takes `limit`, the steps kept in each
+// direction: an editor whose steps are smaller (the blog's, a word each) keeps
+// more of them. Omitted, it is HISTORY_LIMIT.
+
 export function startHistory<S>(present: S): History<S> {
   return { past: [], present, future: [], pending: null, group: null };
 }
 
 /** Closes the open run: the point it started from becomes one undo step. */
-export function settle<S>(h: History<S>): History<S> {
+export function settle<S>(h: History<S>, limit = HISTORY_LIMIT): History<S> {
   if (h.pending === null) return h;
   if (h.pending === h.present) return { ...h, pending: null, group: null };
-  return { past: [...h.past, h.pending].slice(-HISTORY_LIMIT), present: h.present, future: [], pending: null, group: null };
+  return { past: [...h.past, h.pending].slice(-limit), present: h.present, future: [], pending: null, group: null };
 }
 
 /**
@@ -50,34 +54,34 @@ export function settle<S>(h: History<S>): History<S> {
  * A step with nothing in it (the same point) still closes an open run — that is
  * a slider's commit landing on the value its drag already showed.
  */
-export function record<S>(h: History<S>, next: S, group: string | null = null): History<S> {
-  if (next === h.present) return group === null ? settle(h) : h;
+export function record<S>(h: History<S>, next: S, group: string | null = null, limit = HISTORY_LIMIT): History<S> {
+  if (next === h.present) return group === null ? settle(h, limit) : h;
   if (group !== null) {
     if (h.pending !== null && h.group === group) return { ...h, present: next };
-    const base = settle(h);
+    const base = settle(h, limit);
     return { past: base.past, present: next, future: [], pending: base.present, group };
   }
-  const base = settle(h);
-  return { past: [...base.past, base.present].slice(-HISTORY_LIMIT), present: next, future: [], pending: null, group: null };
+  const base = settle(h, limit);
+  return { past: [...base.past, base.present].slice(-limit), present: next, future: [], pending: null, group: null };
 }
 
-export function undo<S>(h: History<S>): History<S> {
-  const base = settle(h);
+export function undo<S>(h: History<S>, limit = HISTORY_LIMIT): History<S> {
+  const base = settle(h, limit);
   if (base.past.length === 0) return h;
   return {
     past: base.past.slice(0, -1),
     present: base.past[base.past.length - 1],
-    future: [base.present, ...base.future].slice(0, HISTORY_LIMIT),
+    future: [base.present, ...base.future].slice(0, limit),
     pending: null,
     group: null,
   };
 }
 
-export function redo<S>(h: History<S>): History<S> {
-  const base = settle(h);
+export function redo<S>(h: History<S>, limit = HISTORY_LIMIT): History<S> {
+  const base = settle(h, limit);
   if (base.future.length === 0) return h;
   const [next, ...rest] = base.future;
-  return { past: [...base.past, base.present].slice(-HISTORY_LIMIT), present: next, future: rest, pending: null, group: null };
+  return { past: [...base.past, base.present].slice(-limit), present: next, future: rest, pending: null, group: null };
 }
 
 export const canUndo = <S>(h: History<S>): boolean => h.past.length > 0 || (h.pending !== null && h.pending !== h.present);

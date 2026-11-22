@@ -16,6 +16,20 @@ const { canRedo, canUndo, everywhere, record, redo, settle, soleLeafPath, startH
 
 const point = (text, extra = {}) => ({ text, ...extra });
 
+describe("limit", () => {
+  it("keeps 100 steps each way unless told otherwise", () => {
+    let h = startHistory(point("0"));
+    for (let i = 1; i <= 150; i++) h = record(h, point(String(i)));
+    assert.equal(h.past.length, 100);
+    let wide = startHistory(point("0"));
+    for (let i = 1; i <= 150; i++) wide = record(wide, point(String(i)), null, 120);
+    assert.equal(wide.past.length, 120);
+    for (let i = 0; i < 130; i++) wide = undo(wide, 120);
+    assert.equal(wide.future.length, 120);
+    assert.equal(wide.present.text, "30");
+  });
+});
+
 describe("steps", () => {
   it("undoes and redoes one change at a time", () => {
     const a = point("a");
