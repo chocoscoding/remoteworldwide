@@ -114,7 +114,7 @@ async function proxy(req: Request, path: string[]): Promise<Response> {
     // for userId is discarded, not merged.
     parsed.userId = session.user.id;
     const guard = parsed.scoreGuard;
-    generatingBest = typeof guard === "object" && guard !== null && "best" in guard && Boolean(guard.best);
+    generatingBest = rest === "build" || parsed.best === true || typeof guard === "object" && guard !== null && "best" in guard && Boolean(guard.best);
     body = JSON.stringify(parsed);
     headers["content-type"] = "application/json";
   }
@@ -127,7 +127,7 @@ async function proxy(req: Request, path: string[]): Promise<Response> {
   const controller = new AbortController();
   const draftWrite = rest?.startsWith("resume/drafts") && (req.method === "POST" || req.method === "PATCH");
   // Whole-resume generation may verify several complete drafts before delivery.
-  const timeout = draftWrite ? (generatingBest ? 295_000 : 175_000) : TIMEOUT_MS;
+  const timeout = generatingBest ? 295_000 : draftWrite ? 175_000 : TIMEOUT_MS;
   const timer = setTimeout(() => controller.abort(), timeout);
   req.signal.addEventListener("abort", () => controller.abort(), { once: true });
 

@@ -22,10 +22,7 @@
 // application's session, so a refresh loses none of it.
 
 import { displayPostingQuestions } from "@/app/lib/apply/posting-question";
-import { roleCoaching, missingWorkPrompt } from "@/app/lib/resume/role-coaching";
-import LinkedNumbers from "@/app/components/dashboard/resume/LinkedNumbers";
-import WorkEvidence, { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
-import AddEmployer from "@/app/components/dashboard/resume/AddEmployer";
+import { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
 import FigurePlacement, { experienceOnly, skillProof } from "@/app/components/dashboard/resume/FigurePlacement";
 import ReviewedWording from "@/app/components/dashboard/resume/ReviewedWording";
 import { MAX_SCAN_SCORE } from "@/app/lib/ats/score";
@@ -82,7 +79,7 @@ import { applyQuantify, type FitAddition } from "@/app/lib/dashboard/resume/ai-t
 import { addedFigures, withAiFigures, withOwnFigures } from "@/app/lib/dashboard/resume/ai-figures";
 import { confirmMarketingReach, confirmAsks, factsFor, appliedAsks, openConfirmedAsks, mergeReviewedAsks, confirmationPlacements } from "@/app/lib/apply/confirmed-facts";
 import { requirementProgress, suggestionEvidence } from "@/app/lib/apply/requirement-progress";
-import { openEstimates, splitEstimates, withYourNumber, type EstimateAsk } from "@/app/lib/apply/impact-asks";
+import { openEstimates, withYourNumber, type EstimateAsk } from "@/app/lib/apply/impact-asks";
 import { strictnessCopy } from "@/app/lib/ats/strictness";
 import {
   RESUME_ACCEPT,
@@ -827,6 +824,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const paperEdits =
     editable && content
       ? {
+          onAddExperience: async (entry: import("@/app/lib/dashboard/types").ResumeExperienceEntry) =>
+            Boolean(await commitChange("Added experience", {...content, experience:[...content.experience,entry]})),
+          onExperienceField: (entryId: string, field: "role" | "company" | "dates", text: string) =>
+            commitEdit({label:"Updated experience", content:{...content,experience:content.experience.map(role =>
+              role.id === entryId ? {...role,[field]:text} : role)}}),
+          onAddBullet: (entryId: string, text: string) => commitEdit({label:"Added a bullet",content:{...content,experience:content.experience.map(role =>
+            role.id === entryId ? {...role,bullets:[...role.bullets,text]} : role)}}),
           onSummary: (text: string) => commitEdit(editSummary({ ...content, hiddenParts: shownHidden }, text)),
           onBullet: (entryId: string, index: number, text: string) =>
             commitEdit(editBullet({ ...content, hiddenParts: shownHidden }, entryId, index, text)),
@@ -886,14 +890,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   // while the person answers it (owner, 2026-10-22, fix plan B: "Google Analytics" was asked, then
   // written in through the broader "Analytics tools proficiency" chip).
   const openTerms = pendingTerms(shownAsks);
-  const workPrompt = roleCoaching(job.role ?? "", report, content) ??
-    (shownAsks.length === 0 && !(resume.asks ?? []).some(ask => ask.no || ask.confirmed || ask.reach) ? missingWorkPrompt(report) : undefined);
+
   const working = report ? workingItems(report, content) : [];
   const toolsIdle = editable && Boolean(content) && tools.running === null && !busy;
 
-  const reviewable = (content?.draftProposals ?? []).filter(p => p.before !== p.after && visible?.experience.some(role => role.id === p.entryId && role.bullets.includes(p.after)));
+  const reviewable = (content?.draftProposals ?? []).filter(p => p.kind === "detail" && p.before !== p.after && visible?.experience.some(role => role.id === p.entryId && role.bullets.includes(p.after)));
 
-  function useDraftWording(signature: string, replacement?: string, experience=true, skill?:string) {
+  function applyDraftWording(signature: string, replacement?: string, experience=true, skill?:string) {
     if (!content || !toolsIdle) return;
     const proposal = content.draftProposals?.find(p=>p.signature === signature);
     if (!proposal) return;
@@ -936,7 +939,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       if (made) {
         const details = (made.content.draftProposals ?? []).map(proposal => proposal.after);
         showOnPage(details, "experience");
-        toast(details.length ? "Resume updated. Review the proposed details below." : "Resume updated.");
+        toast("Resume updated.");
       }
     } finally {
       setBusy(null);
@@ -1354,12 +1357,11 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           const entry = sent.experience[proposal.entryIndex];
           return !shownHidden.includes(`exp:${entry.id}`) && !shownHidden.includes(`exp:${entry.id}:${proposal.bulletIndex}`);
         });
-      // Let the person choose their own number or accept the suggested estimate.
-      const { ready, asks } = splitEstimates(landed);
-      setImpactAsks(asks.filter(ask => !(state.resume.impactOwner === state.resume.baseId && (state.resume.impactDismissed ?? []).includes(impactKey(ask)))));
+      const ready = landed;
+      setImpactAsks([]);
       if (ready.length === 0) {
         // The service's own reason when it had nothing to change (owner, 2026-10-22, fix plan 1a).
-        if (asks.length === 0) setChangeError((proposals.length === 0 && proposals.note) || "Every bullet shown already opens strongly and carries a number.");
+        setChangeError((proposals.length === 0 && proposals.note) || "No additional bullet improvements were found in this pass.");
         return null;
       }
       rewritten = ready.map((proposal) => proposal.after);
@@ -1853,35 +1855,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
 
       {/* The score and the fixes, together */}
       <ResumeIntegrityNotice resumeId={sendingId} content={content} onReview={() => showOnPage([], "experience")} />
-      {content && editable && <LinkedNumbers content={content} disabled={!toolsIdle || saving>0} onSave={doc=>void commitChange("Updated confirmed figure",doc)} />}
-      {content && editable && <WorkEvidence key={workPrompt || "manual"} content={content} disabled={!toolsIdle || saving > 0}
-        prompt={workPrompt} preferExperience={!!workPrompt}
-        onSave={async fact=>Boolean(await (report && isCurrentScore(report) && !report.degraded
-          ? commitSuggestion("Added confirmed work",placeWork(content,fact),true)
-          : commitChange("Added confirmed work",placeWork(content,fact))))} />}
-      {content && editable && <AddEmployer scope="this application resume" disabled={!toolsIdle || saving > 0} additionalDestination={masterResume.data?.source==="built" ? "Also add this employer to my master resume" : "Also save this resume as a new copy in Resume Creator"}
-        onAdd={async (entry,alsoSave)=>{
-          const words={...content,experience:[...content.experience,entry]};
-          if (!await commitChange("Added employer",words)) return false;
-          if (alsoSave) {
-            const saveCopy=async()=>{
-              if (masterResume.data?.source==="built") {
-                const master=await getResumeDocument(masterResume.data.id);
-                if (!master.content.experience.some(r=>r.id===entry.id)) await saveResumeDocument(master.id,{
-                  expectedUpdatedAt:new Date(master.updatedAt).toISOString(),content:{...master.content,experience:[...master.content.experience,entry]}
-                });
-              } else {
-                const copy=await createResumeDocument({label:draftLabel,content:words});
-                update(s=>({...s,resume:{...s.resume,creatorDocId:copy.id,creatorSeen:textPrint(resumeContentToText(words))}}));
-              }
-            };
-            try {await saveCopy();} catch(error) {
-              toast.error("Employer saved to this application. The second save failed.",{description:apiMessage(error),action:{label:"Retry second save",onClick:()=>void saveCopy().catch(e=>toast.error(apiMessage(e)))}});
-            }
-          }
-          return true;
-        }} />}
-      {resume.baseId && content && editable && <RepairImport sourceId={resume.baseId} current={content} onUse={words => commitChange("Reviewed fresh import", words)} />}
+
       <section className="flex flex-col gap-[18px] rounded-2xl border border-[#222325]/8 bg-white p-5">
         {content && editable && (
           <div className="flex flex-wrap items-center gap-3">
@@ -1889,7 +1863,6 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
               <Sparkles className="h-4 w-4" />
               {busy === "Generating your best resume…" ? "Generating your resume…" : "Generate Best Resume"}
             </StickerButton>
-            <span className="text-sm text-[#5f6062]">Includes editable answers and impact estimates.</span>
           </div>
         )}
         {reviewable.length > 0 && (
@@ -1901,7 +1874,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
                 <li key={p.signature}>
                   <strong>{p.kind === "estimate" ? "Estimated impact" : "Proposed experience"}</strong>
                   <ProposalReview before={p.before} after={p.after} estimate={p.kind==="estimate"} disabled={!toolsIdle || saving>0}
-                    onConfirm={(line,experience,skill)=>useDraftWording(p.signature,line,experience,skill)} />
+                    onConfirm={(line,experience,skill)=>applyDraftWording(p.signature,line,experience,skill)} />
                   <button type="button" disabled={!toolsIdle || saving > 0} onClick={() => restoreDraftWording(p.signature)} className="mr-4 underline">Restore original</button>
                   <button type="button" onClick={() => showOnPage([p.after], "experience")} className="underline">Show line to edit</button>
                 </li>
@@ -1921,17 +1894,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           creditsHref={ATS_BILLING_HREF}
           onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
         />
-        {/* A job outside the resume's field: one line on what carries over, never a stop (owner, 2026-10-21). */}
-        {report?.titleFit?.kind === "unrelated" && (
-          <p role="status" className="rounded-lg bg-[#fff4df] p-3 text-sm text-primary">Possible career change: your resume describes {report.titleFit.resumeTitle}, while this job is {report.titleFit.jobTitle}. Check the core requirements and explain transferable experience. Tailoring cannot replace missing experience.</p>
-        )}
-        {report?.stretch && (
-          <p className="text-[13px] leading-snug text-[#5f6062]">
-            This role leans {report.stretch.leans}.
-            {report.stretch.carryOver.length > 0 ? ` Lead with ${report.stretch.carryOver.join(" and ")}.` : ""}
-          </p>
-        )}
+        {changeError && <p role="alert" className="text-sm text-[#b23c26]">{changeError}</p>}
         {report && (
+          <details className="border-t border-[#222325]/10 pt-3">
+            <summary className="cursor-pointer text-sm font-semibold text-[#5f6062]">Fine-tune your resume</summary>
           <FixesTabs
             hasScoreDrop={drops.length > 0}
             gaps={shownChips}
@@ -1961,9 +1927,11 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             onAnswerAsks={answerAsksTogether}
             note={stuffingView}
           />
+          </details>
         )}
       </section>
 
+      {resume.baseId && content && editable && <RepairImport sourceId={resume.baseId} current={content} onUse={words => commitChange("Reviewed fresh import", words)} />}
       {/* The resume, whole, with an eye beside each section, role and line */}
       {sendingId && (
         <section className="flex flex-col overflow-hidden rounded-2xl border border-[#222325]/8 bg-white">

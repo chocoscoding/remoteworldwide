@@ -1,12 +1,17 @@
+"use client";
+
 import type { FC } from "react";
 import { cn } from "@/lib/utils";
 import type { BulletGlyph, ResumeDesign } from "@/app/lib/dashboard/resume/design-types";
 import { displayDates } from "@/app/lib/resume/dates";
-import { BulletText, UnderlinedText, type UnderlineAt } from "./highlight";
+import { DraftText, usePaperHighlight, EditableLine, BulletText, UnderlinedText, type UnderlineAt } from "./highlight";
 
 export interface EntryHeaderProps {
   /** Role / degree / project or certification name. */
   primary: string;
+  onPrimaryChange?: (text: string) => void;
+  onSecondaryChange?: (text: string) => void;
+  onDatesChange?: (text: string) => void;
   /** Which line `primary` is, where "Fix tone & grammar" may underline it (a degree, a certification's name). */
   primaryAt?: UnderlineAt;
   /** Company / school / issuer. Pass "" for entry kinds with no counterpart (Projects). */
@@ -28,19 +33,20 @@ export interface EntryHeaderProps {
  * entry kind (Experience's bullets, Education's detail line, Projects' link)
  * is rendered by that section component AFTER this, not here.
  */
-const EntryHeaderBody: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, dates: storedDates, location, locationBelow = false, design }) => {
+const EntryHeaderBody: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, onPrimaryChange, onSecondaryChange, onDatesChange, dates: storedDates, location, locationBelow = false, design }) => {
   const { entries } = design;
   const dates = displayDates(storedDates, design.doc.dateFormat);
-  const showDates = entries.showDates && Boolean(dates);
+  const showDates = entries.showDates && Boolean(dates || onDatesChange);
+  const dateText = onDatesChange ? <EditableLine text={storedDates ?? ""} label="employment dates" onCommit={onDatesChange} /> : dates;
   const showLocation = entries.showLocation && Boolean(location);
 
   const primaryEl = (
     <span className="text-[length:var(--r-fs-entry)] font-bold leading-tight text-[color:var(--r-text)]">
-      {primaryAt ? <UnderlinedText at={primaryAt} text={primary} /> : primary}
+      {onPrimaryChange ? <EditableLine text={primary} label="job title" onCommit={onPrimaryChange} /> : primaryAt ? <UnderlinedText at={primaryAt} text={primary} /> : <DraftText text={primary} />}
     </span>
   );
-  const secondaryEl = secondary ? (
-    <span className="text-[length:var(--r-fs-entry)] italic leading-tight text-[color:var(--r-c-subtitle)]">{secondary}</span>
+  const secondaryEl = secondary || onSecondaryChange ? (
+    <span className="text-[length:var(--r-fs-entry)] italic leading-tight text-[color:var(--r-c-subtitle)]">{onSecondaryChange ? <EditableLine text={secondary} label="company" onCommit={onSecondaryChange} /> : secondary}</span>
   ) : null;
 
   const titleBlock =
@@ -80,7 +86,7 @@ const EntryHeaderBody: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, 
           {titleBlock}
           {showLocation && <p className="mt-[1pt] text-[length:var(--r-fs-small)] text-[color:var(--r-c-date)]">{location}</p>}
         </div>
-        {showDates && <span className="flex-none text-[length:var(--r-fs-small)] text-[color:var(--r-c-date)]">{dates}</span>}
+        {showDates && <span className="flex-none text-[length:var(--r-fs-small)] text-[color:var(--r-c-date)]">{dateText}</span>}
       </div>
     );
   }
@@ -91,7 +97,7 @@ const EntryHeaderBody: FC<EntryHeaderProps> = ({ primary, primaryAt, secondary, 
         "flex flex-none flex-col text-[length:var(--r-fs-small)] leading-tight text-[color:var(--r-c-date)]",
         align === "end" ? "items-end" : "items-start"
       )}>
-      {showDates && <span>{dates}</span>}
+      {showDates && <span>{dateText}</span>}
       {metaLocation && <span>{location}</span>}
     </div>
   );
@@ -163,7 +169,8 @@ export interface EntryBulletsProps {
  */
 export const EntryBullets: FC<EntryBulletsProps> = ({ items: allItems, design, entryId, customId }) => {
   // Each line keeps its index in the stored list, which is what the editor's pointers name.
-  const items = allItems.map((text, index) => ({ text, index })).filter((item) => item.text.trim());
+  const {edits} = usePaperHighlight();
+  const items = allItems.map((text, index) => ({ text, index })).filter((item) => item.text.trim() || (entryId && edits));
   if (items.length === 0) return null;
   const { bulletGlyph, indentBullets } = design.entries;
   const showGlyph = bulletGlyph !== "none";

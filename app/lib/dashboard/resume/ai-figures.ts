@@ -1,9 +1,5 @@
-// The numbers Quantify suggested, kept on the resume until the person says they checked them
-// (owner's design, 2026-10-18; RWW/ATS-QUALITY-PLAN.md, 13.8). Quantify is the one AI tool that
-// adds a number the person didn't write; every other tool refuses to. Stored in the content itself
-// (`aiFigures`, never printed), so it saves with the resume's own autosave.
-//
-// Pure and type-only in its imports.
+// Suggested numbers apply immediately and remain highlighted until edited or cleared.
+// Highlight metadata saves with the resume and is never printed.
 
 import type { ResumeAiFigure, ResumeContent } from "@/app/lib/dashboard/types";
 
@@ -83,21 +79,31 @@ export const withLonger = (content: ResumeContent, longer: ReadonlyArray<{ at: s
 
 const wordsOf = (value: string): string[] => value.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 2);
 
+/** Splitting a paragraph keeps its exact sentence, even when that sentence
+ * contains less than half the paragraph's words. */
+export const sameAiFigureLine = (text:string, original:string):boolean => {
+  const was=wordsOf(original),now=new Set(wordsOf(text));
+  return was.length===0 || was.filter(word=>now.has(word)).length*2>=was.length ||
+    (now.size>=4 && original.includes(text.trim()));
+};
+
+/** Keep a percentage highlighted when the writer puts a space before its unit. */
+export const findAiFigure = (line:string,figure:string) => {
+  if (!figure) return null;
+  const pattern=figure.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/\s*%$/,"\\s*%");
+  return new RegExp("(?<![\\d.])"+pattern+"(?!\\d)").exec(line);
+};
+
 /**
  * Whether a recorded number is still on the resume: some line still has that exact figure and keeps
  * at least half the words of the line Quantify wrote. Editing the number, or rewriting or deleting
  * the line, takes it off the list by itself.
  */
 const stillThere = (figure: ResumeAiFigure, lines: readonly string[]): boolean => {
-  const was = wordsOf(figure.line);
-  return lines.some((line) => {
-    if (!line.includes(figure.figure)) return false;
-    const now = new Set(wordsOf(line));
-    return was.length === 0 || was.filter((word) => now.has(word)).length * 2 >= was.length;
-  });
+  return lines.some(line=>Boolean(findAiFigure(line,figure.figure)) && sameAiFigureLine(line,figure.line));
 };
 
-/** The AI's numbers still waiting to be checked: none once cleared, and only those still on the resume. The person's own are not the AI's. */
+/** The AI's numbers still highlighted: none once cleared, and only those still on the resume. The person's own are not the AI's. */
 export const pendingAiFigures = (content: ResumeContent): ResumeAiFigure[] => {
   if (content.aiFiguresCleared) return [];
   const lines = linesOf(content);
@@ -135,5 +141,5 @@ export const withOwnFigures = (content: ResumeContent, before: string, after: st
   return { ...content, aiFigures: [...(content.aiFigures ?? []), ...fresh] };
 };
 
-/** "I've checked them": the AI's list is emptied and marked cleared; the person's own numbers stay. */
+/** "Clear highlights": the AI's list is emptied and marked cleared; the person's own numbers stay. */
 export const clearAiFigures = (content: ResumeContent): ResumeContent => ({ ...content, aiFigures: ownFigures(content), aiFiguresCleared: true });

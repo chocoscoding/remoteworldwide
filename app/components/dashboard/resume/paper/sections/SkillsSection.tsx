@@ -1,3 +1,5 @@
+"use client";
+
 import { Fragment, type CSSProperties, type FC } from "react";
 import { cn } from "@/lib/utils";
 import type { ResumeContent, ResumeSkillGroup } from "@/app/lib/dashboard/types";
@@ -29,6 +31,16 @@ const TITLE_CLASS = "font-semibold underline decoration-[0.75pt] underline-offse
 /** A title on its own line, over the group's grid or bubbles. */
 const GroupTitle: FC<{ title: string }> = ({ title }) => (title ? <p className={cn(TITLE_CLASS, "leading-[var(--r-lh)]")}>{title}</p> : null);
 
+const GroupSkill: FC<{group: ResumeSkillGroup; index: number}> = ({group,index}) => {
+  const {edits} = usePaperHighlight();
+  const skill = group.skills[index];
+  if (!edits?.onSkills) return <SkillText skill={skill} />;
+  return <EditableLine text={skill} label="skill" onCommit={text=>{
+    const skills = group.skills.map((value,i)=>i===index ? text : value).filter(value=>value.trim());
+    edits.onSkills!(group.id,(group.title ? group.title+": " : "")+skills.join(", "));
+  }} />;
+};
+
 /**
  * "Frontend: React, TypeScript, Next.js" — the title, then every skill on the one line it wraps from.
  * In the apply step the whole line retypes, title and all (owner, 2026-10-20).
@@ -44,7 +56,6 @@ const GroupLine: FC<{ group: ResumeSkillGroup; separator: SkillSeparator }> = ({
           text={text}
           label="these skills"
           onCommit={(next) => onSkills(group.id, next)}
-          hint={'Click to edit. "Name: a, b, c" groups them under a name. Clear it to remove them.'}
         />
       </p>
     );
@@ -103,7 +114,7 @@ const GroupGrid: FC<{ group: ResumeSkillGroup; separator: SkillSeparator }> = ({
             </span>
           )}
           <span>
-            <SkillText skill={skill} />
+            <GroupSkill group={group} index={i} />
             {separator === "comma" && i < group.skills.length - 1 ? "," : ""}
           </span>
         </li>
@@ -122,7 +133,7 @@ const GroupBubbles: FC<{ group: ResumeSkillGroup }> = ({ group }) => (
     <div className="flex flex-wrap gap-[5pt]">
       {group.skills.map((skill, i) => (
         <span key={`${i}-${skill}`} className={PILL_CLASS}>
-          <SkillText skill={skill} />
+          <GroupSkill group={group} index={i} />
         </span>
       ))}
     </div>
@@ -143,7 +154,8 @@ const GroupBubbles: FC<{ group: ResumeSkillGroup }> = ({ group }) => (
  */
 const SkillsSection: FC<SkillsSectionProps> = ({ content, design }) => {
   const groups = printableSkills(content);
-  if (groups.length === 0) return PLACEHOLDER;
+  const {edits} = usePaperHighlight();
+  if (groups.length === 0) return edits?.onSkills ? <EditableLine text="" label="Skills" onCommit={text=>edits.onSkills!("new",text)} /> : PLACEHOLDER;
   const { groupLayout, separator } = design.skills;
   return (
     <div className="flex flex-col gap-[var(--r-gap-half)] text-[length:var(--r-fs-small)]">

@@ -1,4 +1,5 @@
 "use client";
+import { findAiFigure, sameAiFigureLine } from "@/app/lib/dashboard/resume/ai-figures";
 
 // What the editor is pointing at on the paper (owner, 2026-10-04): whatever a
 // control on either side of the preview is about — the role being edited, a
@@ -88,6 +89,7 @@ export interface PaperEyes {
 }
 
 export interface PaperHighlight {
+  additions?: readonly {after:string}[];
   focus: PaperFocus | null;
   marks: PaperMark[];
   underlines?: PaperUnderline[];
@@ -107,6 +109,9 @@ export interface PaperHighlight {
  * and a few words, saved when the line loses focus. An emptied line is a deleted one.
  */
 export interface PaperEdits {
+  onAddExperience?: (entry: import("@/app/lib/dashboard/types").ResumeExperienceEntry) => Promise<boolean>;
+  onExperienceField?: (entryId: string, field: "role" | "company" | "dates", text: string) => void;
+  onAddBullet?: (entryId: string, text: string) => void;
   onSummary: (text: string) => void;
   onBullet: (entryId: string, index: number, text: string) => void;
   /** The name and the title under it, retyped the same way (owner, 2026-10-20). */
@@ -292,10 +297,11 @@ const sameLine = (a: UnderlineAt, b: UnderlineAt): boolean => {
  * 2026-10-04). `data-resume-mark`, so the PDF export strips the styling and keeps the words.
  */
 export const UnderlinedText: FC<{ at: UnderlineAt; text: string }> = ({ at, text }) => {
-  const { underlines = [], figures = [], figuresFading = false, edits } = usePaperHighlight();
-  if (edits && at.field === "summary") return <EditableLine text={text} label="Summary" onCommit={edits.onSummary} />;
+  const { underlines = [], figures = [], figuresFading = false, edits, additions=[] } = usePaperHighlight();
+  if (edits && at.field === "summary") return <EditableLine text={text} label="Summary" figures={figures} onCommit={edits.onSummary} />;
   if (edits && at.field === "bullet")
-    return <EditableLine text={text} label="this line" onCommit={(next) => edits.onBullet(at.entryId, at.index, next)} />;
+    return <EditableLine text={text} label="this line" figures={figures} onCommit={(next) => edits.onBullet(at.entryId, at.index, next)} />;
+  if (additions.some(item=>item.after===text)) return <DraftText text={text} />;
   const line = underlines.find((u) => u.text === text && sameLine(u.at, at));
   if (!line || line.ranges.length === 0) {
     const ranges = figureRanges(text, figures);
@@ -324,12 +330,14 @@ export const UnderlinedText: FC<{ at: UnderlineAt; text: string }> = ({ at, text
  * Plain text while editable, and remounted after every save or cancel, so React never has to
  * reconcile with what the browser's own editing wrote into the DOM.
  */
-export const EditableLine: FC<{ text: string; label: string; onCommit: (text: string) => void; hint?: string }> = ({
+export const EditableLine: FC<{ text: string; label: string; onCommit: (text: string) => void; hint?: string; figures?: readonly PaperFigure[] }> = ({
   text,
   label,
   onCommit,
-  hint = "Click to edit. Clear it to delete the line.",
+  hint,
+  figures = [],
 }) => {
+  const {additions=[]} = usePaperHighlight();
   const [round, setRound] = useState(0);
   const done = (element: HTMLElement, save: boolean) => {
     const next = (element.innerText ?? "").replace(/\s+/g, " ").trim();
@@ -342,6 +350,7 @@ export const EditableLine: FC<{ text: string; label: string; onCommit: (text: st
       role="textbox"
       aria-label={`Edit ${label}`}
       title={hint}
+      data-placeholder={label}
       contentEditable="plaintext-only"
       suppressContentEditableWarning
       spellCheck
@@ -356,33 +365,30 @@ export const EditableLine: FC<{ text: string; label: string; onCommit: (text: st
           event.currentTarget.blur();
         }
       }}
-      className="-mx-[2px] cursor-text rounded-sm px-[2px] outline-none transition-colors hover:bg-[#eef6ad]/60 focus:bg-[#fbfde9] focus:shadow-[0_0_0_1px_#222325]">
-      {text}
+      className="empty:before:text-black/35 empty:before:content-[attr(data-placeholder)] -mx-[2px] cursor-text rounded-sm px-[2px] outline-none transition-colors hover:bg-[#eef6ad]/60 focus:bg-[#fbfde9] focus:shadow-[0_0_0_1px_#222325]">
+      {additions.some(item=>item.after===text) ? <DraftText text={text} /> : figures.length ? <FigureMarks text={text} ranges={figureRanges(text, figures)} fading={false} /> : text}
     </span>
   );
 };
 
-/** Lowercase meaning words of a line, for "is this still the line the AI wrote?". */
-const wordsOf = (value: string): string[] =>
-  value
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((word) => word.length > 2);
+export const DraftText: FC<{text:string}> = ({text}) => {
+  const {additions=[]} = usePaperHighlight();
+  return additions.some(item=>item.after===text)
+    ? <span data-resume-mark data-ai-addition className="font-bold text-[#34853a]">{text}</span> : <>{text}</>;
+};
 
 /** Where each AI number sits in this line, when the line still keeps at least half the words it had. */
 const figureRanges = (text: string, figures: readonly PaperFigure[]): [number, number][] => {
   const ranges: [number, number][] = [];
-  const now = new Set(wordsOf(text));
   for (const { line, figure } of figures) {
-    const was = wordsOf(line);
-    if (was.length > 0 && was.filter((word) => now.has(word)).length * 2 < was.length) continue;
-    const at = text.indexOf(figure);
-    if (at !== -1 && !ranges.some(([start, end]) => at < end && at + figure.length > start)) ranges.push([at, at + figure.length]);
+    if (!sameAiFigureLine(text,line)) continue;
+    const found = findAiFigure(text,figure);
+    if (found && !ranges.some(([start, end]) => found.index < end && found.index + found[0].length > start)) ranges.push([found.index, found.index + found[0].length]);
   }
   return ranges.sort((a, b) => a[0] - b[0]);
 };
 
-/** The AI's numbers in lime, fading out when the pill's five seconds are up. `data-resume-mark`, so the PDF prints plain text. */
+/** Bold green suggested numbers. `data-resume-mark` keeps the exported PDF plain. */
 const FigureMarks: FC<{ text: string; ranges: [number, number][]; fading: boolean }> = ({ text, ranges, fading }) => {
   const runs: ReactNode[] = [];
   let from = 0;
@@ -392,11 +398,12 @@ const FigureMarks: FC<{ text: string; ranges: [number, number][]; fading: boolea
       <span
         key={i}
         data-resume-mark
+        data-ai-figure
         // rounded-sm as it reads (owner, 2026-10-18): padding cancelled by an equal negative margin
         // instead of a ring, so the corners stay 2px and the words don't move when it lights.
         className={cn(
           "-mx-[3px] rounded-sm px-[3px] transition-[background-color] duration-700 [box-decoration-break:clone]",
-          fading ? "bg-transparent" : "bg-[#f6d77a] text-[#222325]",
+          fading ? "bg-transparent" : "font-bold text-[#34853a]",
         )}>
         {text.slice(start, end)}
       </span>,

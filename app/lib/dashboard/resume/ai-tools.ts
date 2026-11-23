@@ -30,6 +30,7 @@ import type { ResumeContent } from "../types";
 export interface TailorResult {
   checkedTailor?: string;
   checkedScores?: {before:number; after:number};
+  checkedReport?: import("../../ats/types").ScanReport;
   content: ResumeContent;
   /** The JD terms woven in — surfaced in the done-caption. */
   woven: string[];

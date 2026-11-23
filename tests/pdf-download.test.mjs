@@ -187,13 +187,13 @@ describe("draftPaper", () => {
   });
 });
 
-it("restores pending experience before rendering either file and keeps the employer attribution",()=>{
+it("keeps applied numbers in both exports under their original employers",()=>{
   const old="Onboarded enterprise customers.";
   const estimate="Onboarded 40 enterprise customers.";
   const draft={name:"Alex",summary:"",skills:[],projects:[],education:[],certifications:[],
     experience:[{id:"a",role:"CSM",company:"First",dates:"",bullets:[estimate]},{id:"b",role:"CSM",company:"Second",dates:"",bullets:[estimate]}],
     draftProposals:[{entryId:"a",before:old,after:estimate,kind:"estimate",signature:"saved"}]};
-  assert.deepEqual(draftPaper(draft).content.experience.map(r=>r.bullets),[[old],[estimate]]);
+  assert.deepEqual(draftPaper(draft).content.experience.map(r=>r.bullets),[[estimate],[estimate]]);
   assert.equal(draft.experience[0].bullets[0],estimate);
 });
 

@@ -19,7 +19,6 @@ import { motion } from "motion/react";
 import StickerButton from "@/app/components/dashboard/ui/StickerButton";
 import type { ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
 import { cn } from "@/lib/utils";
-import { strictnessCopy } from "@/app/lib/ats/strictness";
 
 const PILL =
   "pointer-events-auto inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[#222325] bg-white px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-[#fbfbf7]";
@@ -49,7 +48,7 @@ export const AiFiguresPill: FC<{
 
   // The numbers stay lit while the card is open; any close, the pill going away included, tells the page.
   const hide = useRef(onHide);
-  hide.current = onHide;
+  useEffect(() => {hide.current = onHide;},[onHide]);
   useEffect(() => {
     if (!open) return;
     return () => hide.current?.();
@@ -81,7 +80,7 @@ export const AiFiguresPill: FC<{
         role="status"
       >
         <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
-        Numbers checked
+        Highlights cleared
       </span>
     );
   }
@@ -98,7 +97,7 @@ export const AiFiguresPill: FC<{
     timer.current = window.setTimeout(() => setCleared(false), CLEARED_MS);
   };
 
-  const label = `Check ${count} AI number${count === 1 ? "" : "s"}`;
+  const label = `${count} suggested number${count === 1 ? "" : "s"}`;
 
   // The pill itself grows into the card (owner, 2026-10-18: "put the popover in the pill, let it
   // grow"): one box, its size animated with motion's layout (FLIP) from pill to card and back.
@@ -149,7 +148,7 @@ export const AiFiguresPill: FC<{
               </span>
             </button>
             {/* The nudge, never a block (owner, 2026-10-21): the numbers stay unless the person changes them. */}
-            <p className="max-w-[15rem] text-[11px] leading-snug text-[#5b5b5b]">{strictnessCopy().numberNudge}</p>
+            <p className="max-w-[15rem] text-[11px] leading-snug text-[#5b5b5b]">Applied to your resume. Edit a highlighted number directly.</p>
             <div className="flex gap-2">
               <StickerButton variant="outline" size="sm" onClick={onShow}>
                 <Eye className="h-3.5 w-3.5" />
@@ -157,7 +156,7 @@ export const AiFiguresPill: FC<{
               </StickerButton>
               <StickerButton variant="primary" size="sm" onClick={clear}>
                 <Check className="h-3.5 w-3.5" />
-                Checked
+                Clear highlights
               </StickerButton>
             </div>
           </motion.div>

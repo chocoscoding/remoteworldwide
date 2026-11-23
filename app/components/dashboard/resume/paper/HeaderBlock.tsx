@@ -11,7 +11,7 @@ import type {
 } from "@/app/lib/dashboard/resume/design-types";
 import { ICON_SETS, type IconSet } from "@/app/lib/dashboard/resume/icon-sets";
 import { detectPlatform, displayUrl } from "@/app/lib/dashboard/resume/link-platforms";
-import { EditableLine, SectionFrame, usePaperHighlight } from "./highlight";
+import { DraftText, EditableLine, SectionFrame, usePaperHighlight } from "./highlight";
 
 export interface HeaderBlockProps {
   content: ResumeContent;
@@ -118,7 +118,7 @@ const HeaderBlock: FC<HeaderBlockProps> = ({ content, design }) => {
             {edits?.onTitle ? (
               <EditableLine text={content.title} label="your title" onCommit={edits.onTitle} hint="Click to edit your title. Clear it to remove it." />
             ) : (
-              content.title
+              <DraftText text={content.title} />
             )}
           </p>
         )}

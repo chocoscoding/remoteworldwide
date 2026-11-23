@@ -21,6 +21,9 @@ import { PagedResume } from "@/app/components/dashboard/resume/paper";
 import { PaperHighlightProvider, type PaperEdits, type PaperEyes } from "@/app/components/dashboard/resume/paper/highlight";
 import { DEFAULT_DESIGN, DEFAULT_SECTIONS, withContentSections } from "@/app/lib/dashboard/resume/design-defaults";
 import { ALL_FONT_VARS } from "@/app/lib/dashboard/resume/fonts";
+import { pendingAiFigures } from "@/app/lib/dashboard/resume/ai-figures";
+import {pendingAiAdditions} from "@/app/lib/dashboard/resume/ai-additions";
+import {AiDraftNotice} from "@/app/components/dashboard/resume/AiDraftNotice";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { highlightMarks, highlightTexts, resumeChanges, type HighlightMark, type ResumeChanges } from "@/app/lib/apply/changes";
 import { cn } from "@/lib/utils";
@@ -153,10 +156,13 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
   const hiddenKey = eyes ? eyes.hidden.join(SEP) : null;
   const idsKey = eyes ? eyes.experienceIds.join(SEP) : null;
   const hasEdits = edits !== undefined;
+  const hasAddExperience = Boolean(edits?.onAddExperience);
   const highlight = useMemo(
     () => ({
       focus: null,
       marks: [],
+      additions: pendingAiAdditions(content),
+      figures: pendingAiFigures(content).map(({line,figure}) => ({line,figure})),
       eyes:
         hiddenKey === null || idsKey === null
           ? undefined
@@ -167,6 +173,9 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
             },
       edits: hasEdits
         ? {
+            onAddExperience: hasAddExperience ? (entry: import("@/app/lib/dashboard/types").ResumeExperienceEntry) => editsRef.current!.onAddExperience!(entry) : undefined,
+            onExperienceField: (entryId: string, field: "role" | "company" | "dates", text: string) => editsRef.current?.onExperienceField?.(entryId, field, text),
+            onAddBullet: (entryId: string, text: string) => editsRef.current?.onAddBullet?.(entryId,text),
             onSummary: (text: string) => editsRef.current?.onSummary(text),
             onBullet: (entryId: string, index: number, text: string) => editsRef.current?.onBullet(entryId, index, text),
             onName: (text: string) => editsRef.current?.onName?.(text),
@@ -175,7 +184,7 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
           }
         : undefined,
     }),
-    [hiddenKey, idsKey, hasEdits],
+    [hiddenKey, idsKey, hasEdits, hasAddExperience, content],
   );
   const changes = useMemo(() => resumeChanges(before, content), [before, content]);
   const texts = useMemo(() => highlightTexts(changes), [changes]);
@@ -282,6 +291,7 @@ const ChangesPaper: FC<ChangesPaperProps> = ({ content: given, before, className
 
   return (
     <div ref={setBox} className={cn("w-full", className)}>
+      <AiDraftNotice content={content} />
       {!canHighlight && texts.length > 0 && <ChangeList changes={changes} />}
       {/* `rww-sent-paper`: sections with nothing in them are left off, as in every download. `isolate`
           keeps the eyes' z-index inside the paper, so they scroll under the sticky header (owner, 2026-10-22). */}

@@ -4,7 +4,7 @@
 // `node --test`.
 
 import type { ResumeContent, ResumeSkillGroup } from "@/app/lib/dashboard/types";
-import { entriesOf, entryIdFor, withEntries } from "@/app/lib/resume/skills";
+import { entriesOf, entryIdFor, withEntries, addSkills } from "@/app/lib/resume/skills";
 
 export interface LineEdit {
   content: ResumeContent;
@@ -42,7 +42,10 @@ export function editSkills(content: ResumeContent, blockId: string, text: string
   const entries = entriesOf(content);
   const plain = blockId.startsWith("plain:");
   const start = entries.findIndex((entry) => entry.id === (plain ? blockId.slice("plain:".length) : blockId));
-  if (start === -1) return null;
+  if (start === -1) {
+    if (blockId !== "new" || !text.trim()) return null;
+    return {content:addSkills(content,text.split(/[,;•★]/).map(s=>s.trim()).filter(Boolean)),label:"Added skills"};
+  }
 
   // The entries the line printed: one with sub skills, or the run of plain ones (skipping hidden
   // and blank entries, as printing does) up to the next entry with sub skills.

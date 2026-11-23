@@ -91,6 +91,14 @@ describe("the AI's numbers", () => {
     assert.deepEqual(pendingAiFigures(clearAiFigures(next)), []);
   });
 
+  it("keeps the suggested figure visible when its paragraph becomes separate achievement bullets", () => {
+    const sentence="Cut customer setup time by 30%.";
+    const paragraph="Led customer onboarding across enterprise accounts and worked with sales and support to improve the experience. "+sentence+" Built reporting for the leadership team and reviewed customer feedback after each launch.";
+    const next=withAiFigures(content({experience:[{...content().experience[0],bullets:[paragraph]}]}),[{before:"Led onboarding.",after:paragraph}]);
+    const split={...next,experience:[{...next.experience[0],bullets:paragraph.split(/(?<=[.!?])\s+/)}]};
+    assert.deepEqual(pendingAiFigures(split).map(f=>f.figure),["30%"]);
+  });
+
   it("brings the pill back with only the new number after 'I've checked them'", () => {
     const first = withAiFigures(content({ experience: [{ ...content().experience[0], bullets: [quantified.after] }] }), [quantified]);
     const checked = clearAiFigures(first);

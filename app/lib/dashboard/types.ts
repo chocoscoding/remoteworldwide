@@ -211,7 +211,18 @@ export interface DraftProposal {
   signature: string;
 }
 
+export interface ResumeAiAddition {
+  section: "title" | "summary" | "experience" | "skills" | "role";
+  entryId?: string;
+  before: string;
+  after: string;
+  reviewed: boolean;
+  addedAt: string;
+}
+
 export interface ResumeContent {
+  /** AI-drafted wording to review, separate from verified career facts. */
+  aiAdditions?: ResumeAiAddition[];
   /** Original parsed upload, used to preserve its scan evidence in an unchanged editor copy. */
   sourceUploadId?: string;
   draftProposals?: DraftProposal[];

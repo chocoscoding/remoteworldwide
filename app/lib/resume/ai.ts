@@ -90,6 +90,7 @@ export interface SuggestionInput {
   openers?: boolean;
   /** `tailor` only: the whole resume, line by line, toward the job ("Tailor to this job"), not just the summary and skills. */
   checkBeforeApply?: boolean;
+  best?: boolean;
   tailorScanId?: string;
   whole?: boolean;
   /** `shorten` only: "page" cuts to one page; absent trims to at most 750 words (owner, 2026-10-18). */
@@ -193,6 +194,7 @@ const bodyOf = (input: SuggestionInput) => ({
     openers: input.openers === true ? true : null,
     // "Tailor to this job" (2026-10-20: never sent, so the button ran the summary-and-skills Tailor).
     checkBeforeApply: input.checkBeforeApply === true,
+    best: input.best === true,
     tailorScanId: input.tailorScanId,
     whole: input.whole === true ? true : null,
     hints: input.hints && Object.keys(input.hints).length > 0 ? input.hints : null,

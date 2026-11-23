@@ -1,5 +1,6 @@
 "use client";
 import { overlappingRoles } from "@/app/lib/resume/date-overlaps";
+import { editSkills } from "@/app/lib/apply/edits";
 
 // The screen's actual body — header, 3-column layout, and every tab. Lives
 // INSIDE the per-document `ResumeDesignProvider` (see Client.tsx), so it's
@@ -46,14 +47,15 @@ import CustomizePanelsRail from "./CustomizePanelsRail";
 import AtsFloatingDock, { type AtsToolsProps } from "./AtsFloatingDock";
 import AtsDockedRail from "./AtsDockedRail";
 import { AiFiguresPill, ReadabilityPill } from "./AtsSidePills";
+import {AiDraftNotice} from "./AiDraftNotice";
+import {pendingAiAdditions} from "@/app/lib/dashboard/resume/ai-additions";
 import { addedFigures, changedLines, clearAiFigures, pendingAiFigures, withAiFigures, withOwnFigures, withLonger } from "@/app/lib/dashboard/resume/ai-figures";
 import { readabilityFlags, type ReadabilityFlag } from "@/app/lib/dashboard/resume/readability";
-import { confirmedContent, needsFigureReview } from "@/app/lib/resume/confirmed-content";
+import { confirmedContent } from "@/app/lib/resume/confirmed-content";
 import { showWorkSections } from "@/app/lib/dashboard/resume/design-defaults";
 import { roleCoaching, missingWorkPrompt } from "@/app/lib/resume/role-coaching";
 import LinkedNumbers from "@/app/components/dashboard/resume/LinkedNumbers";
 import WorkEvidence, { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
-import AddEmployer from "@/app/components/dashboard/resume/AddEmployer";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
 import { applyToneFix, pinToneFixes, proposalState, type ToneProposal } from "@/app/lib/resume/tone-fixes";
@@ -291,12 +293,15 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // render and the first client render agree.
   const [atsPlace, setAtsPlaceState] = useState<AtsPlace>("float");
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(ATS_PLACE_KEY);
-      if (saved === "dock" || saved === "strip") setAtsPlaceState(saved);
-    } catch {
-      // Storage blocked: floating it is.
-    }
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const saved = window.localStorage.getItem(ATS_PLACE_KEY);
+        if (saved === "dock" || saved === "strip") setAtsPlaceState(saved);
+      } catch {
+        // Storage blocked: floating it is.
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
   const setAtsPlace = (place: AtsPlace) => {
     setAtsPlaceState(place);
@@ -529,7 +534,6 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   const handleDownload = async (format: DownloadFormat, fileName: string) => {
     // The name from the download dialog's field: the suggestion below, or what they changed it to.
     const base = fileName;
-    if (needsFigureReview(content)) { toast.message("Review your unchecked figures before downloading this older draft."); return; }
     // Some applicant systems (Greenhouse among them) can't read a file over 2.5 MB, and a photo is
     // the usual cause (RWW/ATS-QUALITY-PLAN.md, 13.3). A DOCX is measured; the PDF is the browser's
     // own print, which can't be, so a photo is what's warned about.
@@ -670,6 +674,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     const resultCustom = new Map((result.customSections ?? []).map((section) => [section.id, section.items]));
     return {
       ...now,
+      aiAdditions: [...(now.aiAdditions ?? []),...(result.aiAdditions ?? [])],
       summary: now.summary === sent.summary ? result.summary : now.summary,
       experience: now.experience.map((entry) => {
         const before = sentById.get(entry.id);
@@ -823,9 +828,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   };
 
   /** Tailor lands here with the job in context, or from the job picker. */
-  const handleTailorJob = async (job: CheckPosting) => {
+  const handleTailorJob = async (job: CheckPosting, best = false) => {
     const snapshot=content;
-    const result=await runSuggestion("tailor",()=>tailorToJob({content:forAi(snapshot),jdText:job.description,company:job.company,role:job.role,whole:true,propose:true,checkBeforeApply:true}));
+    const result=await runSuggestion("tailor",()=>tailorToJob({content:forAi(snapshot),jdText:job.description,company:job.company,role:job.role,whole:true,propose:true,checkBeforeApply:true,best}));
     if (!result?.checkedScores) return;
     if (latest.current.content!==snapshot) {
       landNote("tailor","Your resume changed during tailoring. Run it again on the current wording.");
@@ -833,11 +838,19 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     }
     setBuilderQuestions(displayPostingQuestions(result.couldAdd ?? [],job.description));
     const {before,after}=result.checkedScores;
-    if (after<=before) {landNote("tailor",`Confirmed score ${before}. Review the remaining questions.`);return;}
+    if (after<before) return;
     // Use the exact checked result. Keep private custom sections omitted from the request.
     const checkedCustom = new Map(result.content.customSections?.map(section=>[section.id,section]));
     const checked = {...result.content,customSections:snapshot.customSections?.map(section=>checkedCustom.get(section.id) ?? section)};
-    landAiTool("tailor",`Confirmed score ${before} → ${after} for ${job.role}.`,now=>now!==snapshot ? now : checked);
+    dispatch({type:"edit",content:now=>now!==snapshot ? now : checked,
+      sections:prev=>showWorkSections(prev,checked.skills.length>snapshot.skills.length,false),
+      marks:m=>({captions:{...m.captions,tailor:`ATS score ${before} → ${after} for ${job.role}.`}})});
+    if (result.checkedReport) {
+      const landed: ResumeCheck = {report:result.checkedReport,at:new Date(),job:`${job.role} at ${job.company}`,posting:job,
+        text:resumeContentToText(forAi(checked)),contentKey:scoreContentKey(forAi(checked))};
+      dispatch({type:"learn",check:landed});
+      setDocuments(prev=>prev.map(d=>d.id===activeDocId ? {...d,check:landed} : d));
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -880,14 +893,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
    * Every reason starts from the same pick; cancelling it leaves the document as it was. The job
    * picked becomes the job in context, which Tailor and keywords use from then on without asking.
    */
-  const pickJobFor = async (use: "tailor" | "keywords" | "scan" | "pick") => {
+  const pickJobFor = async (use: "tailor" | "best" | "keywords" | "scan" | "pick") => {
     const result = await pickJob(RESUME_JOB_SPEC);
     if (result.status !== "picked") return;
     const job = postingOf(result.job);
     setPickedJob(job);
     if (use === "scan") checkAgainstJob(job);
     else if (use === "keywords") await handleKeywordsJob(job);
-    else if (use === "tailor") await handleTailorJob(job);
+    else if (use === "tailor" || use === "best") await handleTailorJob(job, use === "best");
     // "pick": the AI Tools job row only sets the job in context.
   };
 
@@ -1226,26 +1239,10 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     });
   };
 
-  // The AI's numbers still to check, and their highlight on the page: lit while the pill's card is
-  // open (the cursor on it), then gone 2.5s after it closes, the last 0.7s fading (owner, 2026-10-18).
+  // Suggested numbers stay visible on the paper until the user clears their highlights.
   const aiFigures = useMemo(() => pendingAiFigures(content), [content]);
-  const [figuresShown, setFiguresShown] = useState<"off" | "on" | "fading">("off");
-  const figureTimers = useRef<number[]>([]);
-  useEffect(() => () => figureTimers.current.forEach((id) => window.clearTimeout(id)), []);
-  const showAiFigures = () => {
-    figureTimers.current.forEach((id) => window.clearTimeout(id));
-    figureTimers.current = [];
-    setFiguresShown("on");
-  };
-  const hideAiFigures = () => {
-    figureTimers.current.forEach((id) => window.clearTimeout(id));
-    figureTimers.current = [window.setTimeout(() => setFiguresShown("fading"), 1_800), window.setTimeout(() => setFiguresShown("off"), 2_500)];
-  };
-  const clearChecked = () => {
-    figureTimers.current.forEach((id) => window.clearTimeout(id));
-    setFiguresShown("off");
-    dispatch({ type: "edit", content: clearAiFigures });
-  };
+  const showAiFigures = () => document.querySelector("[data-ai-figure]")?.scrollIntoView({behavior:"smooth",block:"center"});
+  const clearChecked = () => dispatch({ type:"edit", content:clearAiFigures });
 
   // Readability: what in the design makes the resume harder for a parser to read, each with its fix.
   const readability = useMemo(() => readabilityFlags(design, sections, content), [design, sections, content]);
@@ -1496,10 +1493,23 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       focus: pointFocus,
       marks: docTab === "ai" ? pinned : [],
       underlines,
-      figures: figuresShown === "off" ? [] : aiFigures.map(({ line, figure }) => ({ line, figure })),
-      figuresFading: figuresShown === "fading",
+      additions: pendingAiAdditions(content),
+      figures: aiFigures.map(({ line, figure }) => ({ line, figure })),
+      figuresFading: false,
+      edits: {
+        onAddExperience: async (entry: ResumeContent["experience"][number]) => {
+          dispatch({type:"edit",sections:prev=>showWorkSections(prev,false,true),content:prev=>({...prev,experience:[...prev.experience,entry]})});
+          return true;
+        },
+        onExperienceField: (id: string, field: "role" | "company" | "dates", text: string) => dispatch({type:"edit",content:prev=>({...prev,experience:prev.experience.map(e=>e.id===id ? {...e,[field]:text} : e)})}),
+        onAddBullet: (id: string,text: string) => dispatch({type:"edit",content:prev=>({...prev,experience:prev.experience.map(e=>e.id===id ? {...e,bullets:[...e.bullets,text]} : e)})}),
+        onBullet: (id: string,index: number,text: string) => dispatch({type:"edit",content:prev=>({...prev,experience:prev.experience.map(e=>e.id===id ? {...e,bullets:e.bullets.flatMap((b,i)=>i===index ? (text.trim() ? [text] : []) : [b])} : e)})}),
+        onSummary: (text: string) => dispatch({type:"edit",content:prev=>({...prev,summary:text})}),
+        onSkills: (id: string,text: string) => dispatch({type:"edit",content:prev=>editSkills(prev,id,text)?.content ?? prev}),
+        onTitle: (text: string) => dispatch({type:"edit",content:prev=>({...prev,title:text})}),
+      },
     }),
-    [pointFocus, docTab, pinned, underlines, figuresShown, aiFigures],
+    [pointFocus, docTab, pinned, underlines, aiFigures, content, dispatch],
   );
 
   // The ATS check and the ask box, the same wherever they sit (floating dock or docked rail).
@@ -1619,10 +1629,6 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 dispatch({type:"edit",content:prev=>placeWork(prev,fact),sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
                 return true;
               }} />}
-              {docTab === "ai" && <AddEmployer scope="this resume" onAdd={entry => {
-                dispatch({ type:"edit", sections:prev=>showWorkSections(prev,false,true), content:prev=>({...prev, experience:[...prev.experience,entry]}) });
-                return true;
-              }} />}
               {docTab === "ai" && aiLocked && (
                 <button
                   type="button"
@@ -1632,6 +1638,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   <PlanChip plan="basic" className="flex-none bg-white" />
                 </button>
               )}
+              {docTab === "ai" && <button type="button" disabled={Boolean(aiRunning)} onClick={() => aiLocked ? lockedAi() : jobInContext ? void handleTailorJob(jobInContext,true) : void pickJobFor("best")} className="mb-3 w-full rounded-xl bg-[#e1f073] px-4 py-3 text-sm font-semibold disabled:opacity-50">{aiRunning === "tailor" ? "Improving your resume…" : "Generate best resume"}</button>}
               {docTab === "ai" && (
                 <AiToolsList
                   aiRunning={aiRunning}
@@ -1772,6 +1779,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 </div>
               </div>
 
+              <AiDraftNotice content={content} />
               <div ref={matRef} data-resume-mat className="rounded-md bg-[#f0f0ea] p-1 overflow-x-auto overflow-y-hidden">
                 {/*
                 Fit-to-width sizer/scaler pair — the one other place in this
@@ -1821,7 +1829,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                 <div className="pointer-events-none sticky bottom-4 z-10 -mt-14 pt-2">
                   {(aiFigures.length > 0 || readability.length > 0) && (
                     <div className="mb-2 flex flex-wrap justify-center gap-2">
-                      <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onHide={hideAiFigures} onClear={clearChecked} />
+                      <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onClear={clearChecked} />
                       <ReadabilityPill flags={readability} onFix={fixReadability} />
                     </div>
                   )}
@@ -1853,7 +1861,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
               <aside className="sticky top-[88px]">
                 {(aiFigures.length > 0 || readability.length > 0) && (
                   <div className="mb-2 flex flex-wrap gap-2">
-                    <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onHide={hideAiFigures} onClear={clearChecked} opens="down" />
+                    <AiFiguresPill count={aiFigures.length} onShow={showAiFigures} onClear={clearChecked} opens="down" />
                     <ReadabilityPill flags={readability} onFix={fixReadability} opens="down" />
                   </div>
                 )}
