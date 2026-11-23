@@ -31,8 +31,8 @@ type Props = {
   onChange: (content: TemplateContent) => void;
   /** The brand default look from Outreach settings. Left out: read here. */
   brandDesign?: MailDesign | null;
-  /** A campaign's mail must name who can get it (no "No pref"). */
-  prefRequired?: boolean;
+  /** A campaign's mail: no pref means anyone with a marketing email on (not "not for marketing"). */
+  campaign?: boolean;
   /** The offer around this mail (a campaign's picker and its page). */
   offer?: OfferContext;
   /** Show the mail without editing it (a campaign using a template): this panel replaces the inspector. */
@@ -52,7 +52,7 @@ type Props = {
  * without markBlocks, so the sample data or the person previewed as fill real values.
  * When the preview fails, the plain block list takes the canvas's place so the mail stays editable.
  */
-const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, offer, locked, underBar }) => {
+const MailEditor: FC<Props> = ({ content, onChange, brandDesign, campaign, offer, locked, underBar }) => {
   const [picked, setPicked] = useState<number | null>(null);
   // Edit: canvas, block list and inspector. Preview: only the mail, as the reader gets it.
   const [view, setView] = useState<"edit" | "preview">("edit");
@@ -370,7 +370,7 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
                       {marked ? "Click any text in the mail to type in it. Click any other part, or pick a block from the list, to edit it here." : "Pick a block from the list to edit it."}
                     </p>
                     <Fold title="Mail settings" variant="line" className="border-t border-gray-200 pt-2" summary={mailSettingsSummary(content)}>
-                      <ContentFields content={content} onChange={onChange} prefRequired={prefRequired} />
+                      <ContentFields content={content} onChange={onChange} campaign={campaign} />
                     </Fold>
                   </div>
                 )}

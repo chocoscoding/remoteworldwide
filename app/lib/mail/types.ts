@@ -215,7 +215,13 @@ export type MailAudience = {
 };
 export type AudienceInput = { name: string; filter: AudienceFilter };
 export type AudienceSample = { id: string; userId: string | null; email: string; name: string | null };
-export type AudienceCount = { count: number; sample: AudienceSample[] };
+/** Why accounts the filter matches can't get the mail now, each counted once (the backend's order). */
+export type AudienceLeftOut = { noEmail: number; deleting: number; suppressed: number; unverified: number; prefOff: number };
+/**
+ * POST /audiences/count. For an accounts audience `total` is how many accounts the filter matches and
+ * `leftOut` why the ones outside `count` can't get the mail; both missing for subscribers (or an older backend).
+ */
+export type AudienceCount = { count: number; sample: AudienceSample[]; total?: number; leftOut?: AudienceLeftOut };
 
 /** The people list (POST /audiences/people): "audience" lists the audience's people, "everyone" every account (or subscriber) to tick in. */
 /** audience = the people in it; removed = the filters' matches taken out by hand; everyone = every account (or subscriber), to add from. */

@@ -17,6 +17,8 @@ export const metadata: Metadata = {
 const PREF_PHRASES: Record<string, string> = {
   emailOffers: "offers and early access emails",
   emailProductNews: "product news emails",
+  // A campaign sent with no "Only if": its opt-out turns off every marketing email.
+  marketing: "offers and product news emails",
   emailWeeklyDigest: "the weekly digest",
   emailReplyAlerts: "reply and status emails",
   emailPodActivity: "pod activity emails",

@@ -14,6 +14,7 @@ import { BackendError, backend, idSegment, isObjectId, type BackendInit } from "
 import type {
   ActionInput,
   AudienceCount,
+  MarketingPref,
   AudienceFilter,
   AudienceInput,
   AudiencePageSize,
@@ -50,7 +51,7 @@ import type {
   ThreadDetail,
   ThreadStatus,
 } from "@/app/lib/mail/types";
-import { AUDIENCE_BUILT_INS, AUDIENCE_PAGE_SIZES, AUDIENCE_PICK_MAX, OFFER_VALID_HOURS_MAX } from "@/app/lib/mail/types";
+import { AUDIENCE_BUILT_INS, AUDIENCE_PAGE_SIZES, AUDIENCE_PICK_MAX, MARKETING_PREFS, OFFER_VALID_HOURS_MAX } from "@/app/lib/mail/types";
 
 /** A write body without Mongo `_id` keys (a document read back and edited must not try to set them). */
 function strip(value: unknown): unknown {
@@ -269,13 +270,28 @@ export const deleteAudience = async (id: string) => {
 };
 
 /** How many people a filter reaches now, and 20 of them. */
-export const countAudience = async (filter: AudienceFilter) => {
+/**
+ * The live count for a filter. `pref` (a campaign's "Only if") is applied as the send will; left out,
+ * anyone with a marketing mail on counts. Accounts audiences also get `total` and `leftOut`.
+ */
+export const countAudience = async (filter: AudienceFilter, pref?: MarketingPref | null) => {
   await requireAdminAction();
+  const body: Record<string, unknown> = { filter };
+  if (pref === null || (pref && (MARKETING_PREFS as readonly string[]).includes(pref))) body.pref = pref;
   return run<AudienceCount>(
-    () => mail("/audiences/count", { method: "POST", body: { filter } }),
+    () => mail("/audiences/count", { method: "POST", body }),
     (raw) => {
       const r = (raw ?? {}) as Partial<AudienceCount>;
-      return { count: Number(r.count ?? 0) || 0, sample: Array.isArray(r.sample) ? r.sample : [] };
+      const left = r.leftOut && typeof r.leftOut === "object" ? r.leftOut : null;
+      const whole = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
+      return {
+        count: whole(r.count),
+        sample: Array.isArray(r.sample) ? r.sample : [],
+        ...(typeof r.total === "number" ? { total: whole(r.total) } : {}),
+        ...(left
+          ? { leftOut: { noEmail: whole(left.noEmail), deleting: whole(left.deleting), suppressed: whole(left.suppressed), unverified: whole(left.unverified), prefOff: whole(left.prefOff) } }
+          : {}),
+      };
     },
   );
 };

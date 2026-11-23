@@ -24,7 +24,7 @@ import { offerSampleOf } from "@/app/components/mail/content/offerPreview";
 import OfferPicker from "@/app/components/mail/OfferPicker";
 import { useAudienceCount } from "@/app/components/mail/useAudienceCount";
 import { BTN, BTN_LINK, BTN_PRIMARY, ErrorBox, INPUT, INPUT_SM, Switch } from "@/app/components/mail/ui";
-import { fromLocalInput, n, numOrUndef, offerChoiceProblem, toLocalInput } from "@/app/components/mail/format";
+import { fromLocalInput, leftOutLines, n, numOrUndef, offerChoiceProblem, toLocalInput } from "@/app/components/mail/format";
 import { cn } from "@/lib/utils";
 
 /** Over this many people, sending asks for the count to be typed. */
@@ -60,9 +60,11 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const [mode, setMode] = useState<"template" | "oneoff">(campaign && !campaign.templateId ? "oneoff" : "template");
   const [templateId, setTemplateId] = useState(campaign?.templateId ?? "");
   const [content, setContent] = useState<TemplateContent>(() => {
-    // A template's current content, with the pref the campaign chose.
-    if (initialTemplate) return { ...contentOf(initialTemplate), pref: campaign?.content?.pref ?? initialTemplate.pref ?? "emailProductNews" };
-    return campaign?.content ? pickContent(campaign.content) : { ...EMPTY_CONTENT };
+    // A template's current content, with the "Only if" the campaign chose. Nothing is picked until the
+    // admin picks it: none = anyone with a marketing email on.
+    const own = campaign?.content ? (campaign.content.pref ?? null) : null;
+    if (initialTemplate) return { ...contentOf(initialTemplate), pref: own };
+    return campaign?.content ? pickContent(campaign.content) : { ...EMPTY_CONTENT, pref: null };
   });
   const [audienceId, setAudienceId] = useState(campaign?.audienceId ?? "");
   const [offer, setOffer] = useState<OfferChoice | null>(campaign?.offer ?? null);
@@ -79,8 +81,12 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const [busy, start] = useTransition();
 
   const audience = audiences.find((a) => a.id === audienceId) ?? null;
-  const live = useAudienceCount(audience?.filter ?? null);
+  // Counted with the "Only if" the send will apply, so the number is who it actually reaches.
+  const live = useAudienceCount(audience?.filter ?? null, content.pref ?? null);
   const count = live.data?.count ?? null;
+  // How many accounts the audience matches, and why the ones outside `count` can't get it.
+  const total = live.data?.total ?? null;
+  const leftOut = leftOutLines(live.data?.leftOut, content.pref ?? null);
   const needsTyped = count !== null && count > CONFIRM_OVER;
   const usableTemplates = templates.filter((t) => !t.archived || t.id === templateId);
 
@@ -101,7 +107,8 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const pickTemplate = (id: string) => {
     setTemplateId(id);
     const t = templates.find((x) => x.id === id);
-    if (t) setContent((c) => ({ ...contentOf(t), pref: t.pref ?? c.pref ?? "emailProductNews" }));
+    // The campaign keeps its own "Only if" (picking a mail never sets one).
+    if (t) setContent((c) => ({ ...contentOf(t), pref: c.pref ?? null }));
   };
 
   const input = (): CampaignInput => ({
@@ -131,7 +138,6 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
     if (issue) return issue;
     if (!content.subject.trim()) return "The mail needs a subject.";
     if (!content.blocks.length) return "The mail needs at least one block.";
-    if (!content.pref) return "Pick who can get it (the pref).";
     if (!audienceId) return "Pick an audience.";
     if (count === 0) return "Nobody in this audience can get mail now.";
     if (when === "later") {
@@ -210,7 +216,8 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const hasMail = mode === "oneoff" || Boolean(templateId);
   // A one-off is written here, so its editor is always open; a saved mail is only previewed, on request.
   const mailOpen = mode === "oneoff" || showMail;
-  const pref = content.pref ?? "emailProductNews";
+  // null: no "Only if", so anyone with at least one marketing email on.
+  const pref = content.pref ?? null;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -289,7 +296,15 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
                   <span className="text-[#b23c26]">{live.error}</span>
                 ) : (
                   <>
-                    <strong className="tabular-nums text-black">{count !== null ? n(count) : "..."}</strong> can get it
+                    <strong className="tabular-nums text-black">{count !== null ? n(count) : "..."}</strong>
+                    {total !== null && count !== null && total !== count ? <span className="tabular-nums"> of {n(total)}</span> : null} can get it
+                    {/* Why the rest can't: on hover, and in full when nobody can. */}
+                    {leftOut.length && count !== 0 ? (
+                      <span title={leftOut.join("\n")} className="ml-1 inline-flex cursor-help align-[-2px] text-gray-400 hover:text-black">
+                        <Info className="h-3.5 w-3.5" aria-label={leftOut.join(". ")} />
+                      </span>
+                    ) : null}
+                    {leftOut.length && count === 0 ? <span className="mt-0.5 block text-gray-500">{leftOut.join(" · ")}</span> : null}
                   </>
                 )}
               </p>
@@ -299,10 +314,11 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
           <Row label="Only if">
             <div className="flex flex-wrap items-center gap-2">
               {(Object.keys(PREF_LABELS) as MarketingPref[]).map((p) => (
-                <Choice key={p} on={pref === p} onClick={() => setContent({ ...content, pref: p })}>
+                <Choice key={p} toggle on={pref === p} onClick={() => setContent({ ...content, pref: pref === p ? null : p })}>
                   {PREF_LABELS[p]} emails on
                 </Choice>
               ))}
+              {pref ? null : <span className="text-xs text-gray-400">Optional</span>}
             </div>
           </Row>
 
@@ -385,7 +401,7 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
           <MailEditor
             content={content}
             onChange={setContent}
-            prefRequired
+            campaign
             offer={{ picker: offerPicker, href: offer ? `/heroshima/outreach/offers/${offer.offerId}` : undefined, preview: offerPreview }}
             locked={
               mode === "template" ? (
@@ -463,11 +479,13 @@ const Row: FC<{ label: string; children: ReactNode }> = ({ label, children }) =>
 );
 
 /** One of a few choices, as a chip. */
-const Choice: FC<{ on: boolean; onClick: () => void; children: ReactNode }> = ({ on, onClick, children }) => (
+/** A chip. `toggle`: optional, so pressing the chosen one again clears it (a pressed button, not a radio). */
+const Choice: FC<{ on: boolean; onClick: () => void; toggle?: boolean; children: ReactNode }> = ({ on, onClick, toggle, children }) => (
   <button
     type="button"
-    role="radio"
-    aria-checked={on}
+    role={toggle ? undefined : "radio"}
+    aria-checked={toggle ? undefined : on}
+    aria-pressed={toggle ? on : undefined}
     onClick={onClick}
     className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", on ? "border-black bg-black text-[#e1f073]" : "border-gray-300 bg-white text-gray-700 hover:border-black")}>
     {children}

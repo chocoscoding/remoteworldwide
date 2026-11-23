@@ -1,6 +1,6 @@
 // Number, money and time formatting for the admin Mail screens. Pure, so server and client share it.
 
-import { DURATION_LABELS, ENGAGEMENT_LABELS, type AudienceFilter, type MailOffer, type OfferChoice, type Totals, type When } from "@/app/lib/mail/types";
+import { DURATION_LABELS, ENGAGEMENT_LABELS, type AudienceFilter, type AudienceLeftOut, type MailOffer, type MarketingPref, type OfferChoice, type Totals, type When } from "@/app/lib/mail/types";
 
 export const n = (value: number | null | undefined) => (Number(value) || 0).toLocaleString("en-GB");
 
@@ -140,3 +140,28 @@ export const filterSummary = (filter: AudienceFilter | null | undefined): string
 
 export const durationText = (o: Pick<MailOffer, "duration" | "durationMonths">) =>
   o.duration === "repeating" ? `First ${o.durationMonths ?? "?"} months` : (DURATION_LABELS[o.duration] ?? o.duration);
+
+/**
+ * Why accounts an audience matches can't get a mail now, as short lines (the biggest group first),
+ * for the count's "x of y" (`pref` is the campaign's "Only if"; none = any marketing email).
+ */
+export const leftOutLines = (left: AudienceLeftOut | undefined, pref: MarketingPref | null): string[] => {
+  if (!left) return [];
+  const line = (k: number, one: string, many: string) => (k > 0 ? { k, text: `${n(k)} ${k === 1 ? one : many}` } : null);
+  const prefLine =
+    pref === "emailProductNews"
+      ? line(left.prefOff, "hasn't turned on product news emails", "haven't turned on product news emails")
+      : pref === "emailOffers"
+        ? line(left.prefOff, "turned off offer emails", "turned off offer emails")
+        : line(left.prefOff, "turned off all marketing emails", "turned off all marketing emails");
+  return [
+    line(left.unverified, "hasn't confirmed their email", "haven't confirmed their email"),
+    prefLine,
+    line(left.suppressed, "bounced or marked a mail as spam", "bounced or marked a mail as spam"),
+    line(left.deleting, "is deleting their account", "are deleting their account"),
+    line(left.noEmail, "has no email address", "have no email address"),
+  ]
+    .filter((x): x is { k: number; text: string } => x !== null)
+    .sort((a, b) => b.k - a.k)
+    .map((x) => x.text);
+};

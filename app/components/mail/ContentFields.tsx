@@ -11,10 +11,11 @@ import { Field, INPUT } from "./ui";
  * content editor shows them under "Mail settings" when no block is picked. With `blocks`, the plain
  * block list follows (the form used when the preview can't be drawn).
  */
-const ContentFields: FC<{ content: TemplateContent; onChange: (content: TemplateContent) => void; prefRequired?: boolean; blocks?: boolean }> = ({
+/** `campaign`: a campaign's mail, where no pref means anyone with a marketing email on. */
+const ContentFields: FC<{ content: TemplateContent; onChange: (content: TemplateContent) => void; campaign?: boolean; blocks?: boolean }> = ({
   content,
   onChange,
-  prefRequired,
+  campaign,
   blocks,
 }) => {
   const set = <K extends keyof TemplateContent>(key: K, value: TemplateContent[K]) => onChange({ ...content, [key]: value });
@@ -34,7 +35,7 @@ const ContentFields: FC<{ content: TemplateContent; onChange: (content: Template
         </Field>
         <Field label="Who can get it" hint="Only people with this mail switched on. It names the unsubscribe link.">
           <select className={INPUT} value={content.pref ?? ""} onChange={(e) => set("pref", (e.target.value || null) as MarketingPref | null)}>
-            {!prefRequired ? <option value="">No pref (not for marketing)</option> : null}
+            <option value="">{campaign ? "Anyone with a marketing email on" : "No pref (not for marketing)"}</option>
             {MARKETING_PREFS.map((p) => (
               <option key={p} value={p}>
                 {PREF_LABELS[p]} on
