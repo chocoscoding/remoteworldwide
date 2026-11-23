@@ -25,30 +25,35 @@ import {
 
 // A job or company landing page (app/lib/landing/catalogue.ts): heading, intro, the list rendered
 // on the server with crawlable page links, links to the other landings, and its structured data.
-// Each route under app/(pages)/(general)/jobs/<slug> and /companies/<slug> is a two-line wrapper.
+// The job landings are cached pages (ISR): app/(pages)/(general)/jobs/landing/[slug] and
+// jobs/[id]/[segment], each with a [page] child that next.config.mjs rewrites ?page=N to, because a
+// cached page may not read the query string. Nothing here may read the request. The company
+// landings still render per request (companies/[slug] is force-dynamic) and pass their ?page= in.
 
+/** A company landing route's props: it reads ?page= itself. */
 export type LandingProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-/** The landing for a route, or a 404: unknown, not live yet (its data is missing), or a bad ?page. */
+/** Which page of the list: the ?page= value, or the [page] segment it was rewritten to. Missing is page 1. */
+export type LandingPageParam = string | string[] | undefined;
+
+/** The landing for a route, or a 404: unknown, not live yet (its data is missing), or a bad page number. */
 async function resolve(
   kind: Landing["kind"],
   slug: string,
-  searchParams: LandingProps["searchParams"],
+  pageValue: LandingPageParam,
 ) {
   const landing = landingBySlug(kind, slug);
-  const params = await searchParams;
-  const filtered = Object.keys(params).some((key) => key !== "page");
-  const page = pageParam(params.page);
+  const page = pageParam(pageValue);
   if (!landing || !isLive(landing) || page === null) notFound();
   const result =
     landing.kind === "jobs"
       ? await landingJobs(landing, page)
       : await landingCompanies(landing, page);
   // Past the last page is a real 404, not an empty copy of the list.
-  if (result && page > totalPages(result.count)) notFound();
-  return { landing, page, result, filtered };
+  if (page > totalPages(result.count)) notFound();
+  return { landing, page, result };
 }
 
 const countNoun = (kind: Landing["kind"], count: number) =>
@@ -68,20 +73,14 @@ const BREADCRUMB_ROOT = {
 export async function landingMetadata(
   kind: Landing["kind"],
   slug: string,
-  { searchParams }: LandingProps,
+  pageValue: LandingPageParam,
 ): Promise<Metadata> {
-  const { landing, page, result, filtered } = await resolve(
-    kind,
-    slug,
-    searchParams,
-  );
+  const { landing, page, result } = await resolve(kind, slug, pageValue);
   const path = landingPagePath(landing, page);
-  const countTitle = result
-    ? landing.metaTitle.replace(
-        " | ",
-        `: ${result.count.toLocaleString("en-US")} ${kind === "jobs" ? "Open Roles" : "Companies"} | `,
-      )
-    : landing.metaTitle;
+  const countTitle = landing.metaTitle.replace(
+    " | ",
+    `: ${result.count.toLocaleString("en-US")} ${kind === "jobs" ? "Open Roles" : "Companies"} | `,
+  );
   const title =
     page > 1 ? countTitle.replace(" | ", `, page ${page} | `) : countTitle;
   return {
@@ -90,10 +89,9 @@ export async function landingMetadata(
     description: landing.metaDescription,
     // Each page of the list is its own page (as /jobs?page=N is), so Google follows every listing on it.
     alternates: { canonical: path },
-    // Empty, thin or unreadable: kept out of the index, its links still followed.
-    ...(!filtered && indexable(result)
-      ? {}
-      : { robots: { index: false, follow: true } }),
+    // Empty or thin: kept out of the index, its links still followed. Any other query string
+    // (?utm_source=...) is the same cached page, and the canonical above names the clean address.
+    ...(indexable(result) ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
       type: "website",
       url: absoluteUrl(path),
@@ -139,20 +137,14 @@ function structuredData(landing: Landing, page: number, urls: string[]) {
 export default async function LandingPage({
   kind,
   slug,
-  searchParams,
-}: { kind: Landing["kind"]; slug: string } & LandingProps) {
-  const { landing, page, result } = await resolve(kind, slug, searchParams);
-  const items = result?.data ?? [];
-  const pages = totalPages(result?.count ?? 0);
-  const urls = result
-    ? landing.kind === "jobs"
-      ? (result.data as { slug: string }[]).map((j) =>
-          absoluteUrl(`/jobs/${j.slug}`),
-        )
-      : (result.data as { slug: string }[]).map((c) =>
-          absoluteUrl(`/companies/${c.slug}`),
-        )
-    : [];
+  page: pageValue,
+}: { kind: Landing["kind"]; slug: string; page: LandingPageParam }) {
+  const { landing, page, result } = await resolve(kind, slug, pageValue);
+  const items = result.data;
+  const pages = totalPages(result.count);
+  const urls = (result.data as { slug: string }[]).map((item) =>
+    absoluteUrl(`/${landing.kind}/${item.slug}`),
+  );
   const related = relatedLandings(landing);
   const others = related.length
     ? related
@@ -187,21 +179,15 @@ export default async function LandingPage({
             {paragraph}
           </p>
         ))}
-        {result ? (
-          <p className="mt-4 text-sm font-semibold text-primary">
-            {result.count === 0
-              ? "No matching listings right now."
-              : `${result.count.toLocaleString("en-US")} ${countNoun(landing.kind, result.count)}${pages > 1 ? `, page ${page} of ${pages}` : ""}`}
-          </p>
-        ) : null}
+        <p className="mt-4 text-sm font-semibold text-primary">
+          {result.count === 0
+            ? "No matching listings right now."
+            : `${result.count.toLocaleString("en-US")} ${countNoun(landing.kind, result.count)}${pages > 1 ? `, page ${page} of ${pages}` : ""}`}
+        </p>
       </header>
 
       <section className="mt-8" aria-label={landing.h1}>
-        {!result ? (
-          <p className="py-16 text-center text-gray-600">
-            This list could not load. Try again in a minute.
-          </p>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-lg font-bold text-primary">
               No matching listings right now

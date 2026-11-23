@@ -49,7 +49,7 @@ async function missingCompany(slug:string):Promise<never> {
 
 export async function generateMetadata({params,searchParams}:Props):Promise<Metadata> {
   const slug=(await params).slug;
-  if (landingBySlug("companies",slug)) return landingMetadata("companies",slug,{searchParams});
+  if (landingBySlug("companies",slug)) return landingMetadata("companies",slug,(await searchParams).page);
   const company=await fetchCompany(slug);
   if(!company) return {title:"Company Not Found",robots:{index:false,follow:true}};
   const page=pageParam((await searchParams).page);
@@ -65,7 +65,7 @@ export async function generateMetadata({params,searchParams}:Props):Promise<Meta
 
 export default async function Page({params,searchParams}:Props) {
   const slug=(await params).slug;
-  if(landingBySlug("companies",slug)) return <LandingPage kind="companies" slug={slug} searchParams={searchParams} />;
+  if(landingBySlug("companies",slug)) return <LandingPage kind="companies" slug={slug} page={(await searchParams).page} />;
   const page=pageParam((await searchParams).page);
   if(page===null) notFound();
   const company=await fetchCompany(slug);

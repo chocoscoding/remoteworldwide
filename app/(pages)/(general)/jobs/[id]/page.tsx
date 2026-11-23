@@ -7,10 +7,9 @@ import { Listing, listingMetadata } from "./listing";
 // expires. Crawlers walk all ~2,000 listings, so rendering per request (force-dynamic) would cost a
 // render and a backend read per crawl.
 //
-// Only listings arrive here. The landing pages share /jobs/<slug> but read the query string and
-// the request, which a cached route may not do (Next answers DYNAMIC_SERVER_USAGE, a 500), so
-// next.config.mjs rewrites every single-segment slug without a listing's mark (a long number, or
-// "-<8 hex>" at the end) to ../landing/[slug], which renders per request.
+// Only listings arrive here. The landing pages share /jobs/<slug>, so next.config.mjs rewrites
+// every single-segment slug without a listing's mark (a long number, or "-<8 hex>" at the end) to
+// ../landing/[slug], and its ?page=N to ../landing/[slug]/[page]; both are cached too.
 export const revalidate = 86400; // JOB_PAGE_REVALIDATE_S (app/lib/backend.ts); must be a literal.
 // An empty list is what lets listings not built at deploy be cached on their first visit.
 export async function generateStaticParams() {

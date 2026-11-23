@@ -10,11 +10,11 @@ import { jobFacts } from "@/app/lib/jobs/jobFacts";
 import { ANYWHERE, jobLocations } from "@/app/lib/jobs/publicJobFacts";
 import { backendCachedOrNull, jobReadCache, JOB_PAGE_REVALIDATE_S } from "@/app/lib/backend";
 
-// One listing's page, shared by its two routes: ./page.tsx (cached, every slug with the long
-// number the board puts on listings) and ../landing/[slug] (per request, a slug an admin wrote by
-// hand; next.config.mjs sends single-segment slugs without that number there, because the landing
-// pages share /jobs/<slug>). Nothing here may read the visitor (cookies, auth(), backend()): that
-// would make every listing render per request again.
+// One listing's page, shared by its two cached routes: ./page.tsx (every slug with a listing's
+// mark: the long number or the "-<8 hex>" ending the board puts on listings) and ../landing/[slug]
+// (a slug an admin wrote by hand; next.config.mjs sends single-segment slugs without that mark
+// there, because the landing pages share /jobs/<slug>). Nothing here may read the visitor (cookies,
+// auth(), backend()): that would make every listing render per request again.
 
 // One read per request (generateMetadata and the page share it). The cached HTML must never
 // advertise an expired job: ISR keeps the LOWEST revalidate of any fetch in the render, so a

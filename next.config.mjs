@@ -54,6 +54,13 @@ const CSP_REPORT_ONLY = [
   // Browsers ignore it in a report-only policy and log a console error saying so.
 ].join("; ");
 
+// A one-segment /jobs/<slug> that is not a listing (see the last rewrites): listing slugs carry a
+// long number (title-<hex><13-digit time>) or, since 2026-11-05, "-<8 hex>" at the end.
+const LANDING_SLUG = String.raw`(?![^/]*\d{10})(?![^/]*-[0-9a-f]{8}(?![^/]))[^/]+`;
+// ?page=N on a landing page, captured so the rewrite can put it in the path (a cached page may not
+// read the query string). Any non-empty value: the page itself 404s a bad one, as it always has.
+const PAGE_QUERY = [{ type: "query", key: "page", value: "(?<page>[^/]+)" }];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Dev only: lets phones and laptops on the same Wi-Fi open `next dev` at this machine's LAN
@@ -91,9 +98,11 @@ const nextConfig = {
       { source: "/jobs/frontend-developer", destination: "/jobs/frontend", permanent: true },
       { source: "/jobs/h1b-visa-sponsor", destination: "/jobs/h1b", permanent: true },
       { source: "/jobs/skilled-worker-visa-sponsor", destination: "/jobs/uk-visa-sponsorship", permanent: true },
-      // The per-request route behind /jobs/<slug> (see the last rewrite) is never a public address.
-      // Redirects only see the address that was asked for, so the rewrite itself still reaches it.
+      // The routes behind /jobs/<slug> and ?page=N (see the last rewrites) are never public addresses.
+      // Redirects only see the address that was asked for, so the rewrites themselves still reach them.
       { source: "/jobs/landing/:slug", destination: "/jobs/:slug", permanent: false },
+      { source: "/jobs/landing/:slug/:page", destination: "/jobs/:slug?page=:page", permanent: false },
+      { source: "/jobs/:id/:segment/:page", destination: "/jobs/:id/:segment?page=:page", permanent: false },
     ];
   },
   // Authentication is hosted by the Express backend (@auth/express).
@@ -347,20 +356,35 @@ const nextConfig = {
         source: "/api/mail/offers/current",
         destination: `${backend}/api/mail/offers/current`,
       },
-      // /jobs/<slug> is a listing or a landing page (app/lib/landing/catalogue.ts). Listings are
-      // cached (app/(pages)/(general)/jobs/[id]); landing pages read ?page= and the request, which
-      // a cached route may not. Listing slugs carry a mark no landing slug has: older ones a long
-      // number (title-<hex><13-digit time>), and since 2026-11-05 a dash and eight random hex
-      // characters at the end (title-f42ba172, the backend's jobSlug in jobAdminService.ts). A
-      // one-segment slug with neither goes to the per-request route, which shows the landing page,
-      // or the listing when an admin wrote its slug by hand. Missing the second shape sent every
-      // listing posted since Nov 5 to the per-request route: ~19K function runs in 12 hours
-      // (Vercel, 2026-11-21). An array of rewrites is checked after the filesystem, so the static
-      // landing folders (/jobs/latest, ...) and two-segment landings (jobs/[id]/[segment]) never
-      // reach this.
+      // /jobs/<slug> is a listing or a landing page (app/lib/landing/catalogue.ts). Both are cached
+      // pages, but a landing page shares the address shape and needs its own route. Listing slugs
+      // carry a mark no landing slug has (LANDING_SLUG above): older ones a long number, and since
+      // 2026-11-05 a dash and eight random hex characters at the end (title-f42ba172, the backend's
+      // jobSlug in jobAdminService.ts). Listings go to app/(pages)/(general)/jobs/[id]; a
+      // one-segment slug with neither mark goes to jobs/landing/[slug], which shows the landing
+      // page, or the listing when an admin wrote its slug by hand. Missing the second shape sent
+      // every listing posted since Nov 5 there while it still rendered per request: ~19K function
+      // runs in 12 hours (Vercel, 2026-11-21).
+      //
+      // ?page=N moves into the path (jobs/landing/[slug]/[page], jobs/[id]/[segment]/[page]): a
+      // cached page may not read the query string, and reading it made every landing visit a
+      // function run (~24K in 12 hours, Vercel, 2026-11-23). An array of rewrites is checked after
+      // the filesystem's static routes but before its dynamic ones, so these win over jobs/[id].
+      // Every one-segment landing goes through here: a static landing folder under /jobs would match
+      // first and show page 1 for every ?page=, so there are none any more.
       {
-        source: "/jobs/:slug((?![^/]*\\d{10})(?![^/]*-[0-9a-f]{8}(?![^/]))[^/]+)",
+        source: `/jobs/:slug(${LANDING_SLUG})`,
+        has: PAGE_QUERY,
+        destination: "/jobs/landing/:slug/:page",
+      },
+      {
+        source: `/jobs/:slug(${LANDING_SLUG})`,
         destination: "/jobs/landing/:slug",
+      },
+      {
+        source: "/jobs/:id/:segment",
+        has: PAGE_QUERY,
+        destination: "/jobs/:id/:segment/:page",
       },
     ];
   },

@@ -40,8 +40,9 @@ const listingsChanged = (...slugs: (string | undefined)[]) => {
   updateTag(BOARD_TAGS.companies);
   revalidatePath("/");
   // The /jobs page, not "/jobs" as a layout: that also expired every cached listing under it, so
-  // each post made the next crawler rebuild ~2,000 pages. The other pages under /jobs (the list,
-  // the landing pages) render per request, so only the listings were ever cached there.
+  // each post made the next crawler rebuild ~2,000 pages. The cached landing pages under /jobs
+  // (/jobs/europe, /jobs/software-engineer/uk, ...) read their lists with BOARD_TAGS.jobs, so the
+  // updateTag above expires them; each is rebuilt on its next visit (app/lib/landing/data.ts).
   revalidatePath("/jobs");
   revalidatePath("/companies", "layout");
   revalidatePath("/sitemap.xml");

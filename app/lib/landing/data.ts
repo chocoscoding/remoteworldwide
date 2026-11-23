@@ -1,9 +1,10 @@
 import { cache } from "react";
-import { backend, backendWithCount } from "@/app/lib/backend";
+import { backend, backendCachedWithCount, backendWithCount, BOARD_TAGS } from "@/app/lib/backend";
 import type { BoardJobItem } from "@/app/lib/jobs/searchJobs";
 import type { CompanyList } from "@/types/main";
 import {
   landingApiPath,
+  LANDING_REVALIDATE,
   MIN_INDEXABLE,
   type CompanyLanding,
   type JobLanding,
@@ -11,33 +12,23 @@ import {
 } from "./catalogue";
 export const PER_PAGE = 50;
 export type LandingPage<T> = { data: T[]; count: number } | null;
+// A landing page's list, from Next's data cache. The landing routes are cached pages (ISR), so this
+// must not read the visitor: backendWithCount() reads the request's headers, which made every visit
+// to /jobs/europe, /jobs/usa, ... a function run plus a backend search (~24K in 12 hours, Vercel,
+// 2026-11-23). The tags let an admin's listing or company write expire the lists at once
+// (libs/query.ts). A failed read throws instead of returning an empty list: a cached page keeps its
+// last good copy, rather than storing "could not load" (and noindex) for an hour.
+const LIST_CACHE = {
+  jobs: { revalidate: LANDING_REVALIDATE, tags: [BOARD_TAGS.jobs] },
+  companies: { revalidate: LANDING_REVALIDATE, tags: [BOARD_TAGS.companies, BOARD_TAGS.jobs] },
+};
 export const landingJobs = cache(
-  async (
-    landing: JobLanding,
-    page: number,
-  ): Promise<LandingPage<BoardJobItem>> => {
-    try {
-      return await backendWithCount<BoardJobItem[]>(
-        landingApiPath(landing, page),
-      );
-    } catch {
-      return null;
-    }
-  },
+  (landing: JobLanding, page: number) =>
+    backendCachedWithCount<BoardJobItem[]>(landingApiPath(landing, page), LIST_CACHE.jobs),
 );
 export const landingCompanies = cache(
-  async (
-    landing: CompanyLanding,
-    page: number,
-  ): Promise<LandingPage<CompanyList>> => {
-    try {
-      return await backendWithCount<CompanyList[]>(
-        landingApiPath(landing, page),
-      );
-    } catch {
-      return null;
-    }
-  },
+  (landing: CompanyLanding, page: number) =>
+    backendCachedWithCount<CompanyList[]>(landingApiPath(landing, page), LIST_CACHE.companies),
 );
 export const totalPages = (count: number) =>
   Math.max(1, Math.ceil(count / PER_PAGE));

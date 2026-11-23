@@ -1,5 +1,10 @@
 export const MIN_INDEXABLE = 5;
-export const LANDING_REVALIDATE = 300;
+/**
+ * How long a landing page and its list stay cached, in seconds: the page is rebuilt at most this
+ * often per address, or sooner when an admin writes a listing (libs/query.ts expires BOARD_TAGS.jobs).
+ * The landing routes repeat it as a literal (`export const revalidate`), which Next requires.
+ */
+export const LANDING_REVALIDATE = 3600;
 
 type Common = {
   slug: string;
