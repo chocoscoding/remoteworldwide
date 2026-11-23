@@ -20,7 +20,9 @@
 // as an uneditable token <span data-rww-var="name|fallback">. In interactive mode this script makes
 // those fields editable (the renderer never does) and turns what is typed back into template text:
 // text as text, a token as {{name|fallback}}, and in a paragraph field (data-rww-lines="many")
-// <strong> as **...**, a link as [text](address) and paragraphs as blank-line breaks. Without marks
+// <strong> as **...**, a link as [text](address) and paragraphs as blank-line breaks; in a
+// one-paragraph field that keeps line breaks (data-rww-lines="breaks": a heading, an offer line)
+// Enter makes a <br>, read back as one line break. Without marks
 // (an older renderer) the frame only reports its size and keeps links from navigating.
 //
 // TOKEN_STYLE, P_STYLE and LINK_STYLE mirror the events service's renderer (src/mail/render.ts), so a
@@ -32,7 +34,7 @@ const SCRIPT = String.raw`(function () {
   var TOKEN_STYLE = "display: inline-block; margin: 0 1px; padding: 0 6px; border: 1px solid #b7cdea; border-radius: 999px; background: #eef4fc; color: #1c5aa6; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8em; font-weight: 600; font-style: normal; line-height: 1.5; letter-spacing: 0; text-transform: none; text-decoration: none; vertical-align: baseline; white-space: nowrap; cursor: default;";
   var P_STYLE = "margin: 0 0 16px; font-size: 15px; line-height: 1.7; color: #222325;";
   var LINK_STYLE = "color: #222325; font-weight: 700; text-decoration: underline;";
-  var PLACEHOLDER = { text: "Heading", paragraph: "Write the paragraph.", label: "Button text", kicker: "Small line", headline: "Headline", button: "Button text" };
+  var PLACEHOLDER = { text: "Heading", paragraph: "Write the paragraph.", label: "Button text", kicker: "Small line", headline: "Headline", button: "Button text", detail: "Add a line" };
   var VAR_TEXT = /\{\{\s*([A-Za-z]+)\s*(?:\|([^{}]*))?\}\}/g;
   var LINK_TEXT = /\[([^\]\n]+)\]\(([^)\s]+)\)/g;
   var hover = null, selected = null;
@@ -84,6 +86,9 @@ const SCRIPT = String.raw`(function () {
   /* ------------------------------------------------------------------ fields: read back */
 
   function rich(el) { return el.getAttribute("data-rww-lines") === "many"; }
+  // A one-paragraph field that keeps line breaks (a heading, an offer line): Enter makes a new line.
+  function breaks(el) { return el.getAttribute("data-rww-lines") === "breaks"; }
+  function oneBreak(text) { return text.replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{2,}/g, "\n").replace(/^\n+|\n+$/g, ""); }
   function where(el) {
     var block = blockOf(el);
     return block ? { index: Number(block.getAttribute(ATTR)), field: el.getAttribute(FIELD) } : null;
@@ -129,6 +134,7 @@ const SCRIPT = String.raw`(function () {
   function clean(text) { return text.replace(/ /g, " ").replace(/​/g, ""); }
   function serialize(el) {
     if (rich(el)) return clean(paragraphsOf(el).join("\n\n"));
+    if (breaks(el)) return oneBreak(clean(childrenText(el, false)));
     return clean(childrenText(el, false)).replace(/\s*\n+\s*/g, " ");
   }
 
@@ -141,7 +147,7 @@ const SCRIPT = String.raw`(function () {
     return '<span ' + VAR + '="' + esc(fallback === undefined ? name : name + "|" + fallback) + '" contenteditable="false" style="' + TOKEN_STYLE + '">' + esc(name) + "</span>";
   }
   // Template text as the renderer's editor view draws it: escaped, variables as tokens; md also bold and line breaks.
-  function textHtml(text, md) {
+  function textHtml(text, md, br) {
     var tokens = [];
     var lifted = text.replace(/[]/g, "").replace(VAR_TEXT, function (_, name, fallback) {
       tokens.push(tokenHtml(name, fallback));
@@ -149,6 +155,7 @@ const SCRIPT = String.raw`(function () {
     });
     var out = esc(lifted);
     if (md) out = out.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br />");
+    else if (br) out = out.replace(/\n/g, "<br />");
     return out.replace(/(\d+)/g, function (_, at) { return tokens[Number(at)] || ""; });
   }
   function inlineHtml(text) {
@@ -166,7 +173,7 @@ const SCRIPT = String.raw`(function () {
       el.innerHTML = text.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean)
         .map(function (p) { return '<p style="' + P_STYLE + '">' + inlineHtml(p) + "</p>"; }).join("");
     } else {
-      el.innerHTML = textHtml(text, false);
+      el.innerHTML = textHtml(text, false, breaks(el));
     }
     markEmpty(el);
   }
@@ -295,13 +302,22 @@ const SCRIPT = String.raw`(function () {
       if (!el) return;
       var type = event.inputType || "";
       if (type.indexOf("format") === 0 && !(rich(el) && type === "formatBold")) event.preventDefault();
-      else if ((type === "insertParagraph" || type === "insertLineBreak") && !rich(el)) event.preventDefault();
+      else if (type === "insertParagraph" && breaks(el)) {
+        // A new paragraph (a phone's Enter) becomes a line break: the field stays one paragraph.
+        event.preventDefault();
+        document.execCommand("insertLineBreak");
+      }
+      else if ((type === "insertParagraph" || type === "insertLineBreak") && !rich(el) && !breaks(el)) event.preventDefault();
       else if (type === "insertFromDrop") event.preventDefault();
     });
     document.addEventListener("keydown", function (event) {
       var el = fieldOf(event.target);
       if (!el) return;
-      if (event.key === "Enter" && !rich(el)) event.preventDefault();
+      if (event.key === "Enter" && breaks(el)) {
+        event.preventDefault();
+        document.execCommand("insertLineBreak");
+      }
+      else if (event.key === "Enter" && !rich(el)) event.preventDefault();
       else if (event.key === "Escape") el.blur();
     });
     document.addEventListener("paste", function (event) {
@@ -311,7 +327,8 @@ const SCRIPT = String.raw`(function () {
       event.preventDefault();
       var text = (event.clipboardData && event.clipboardData.getData("text/plain")) || "";
       text = text.replace(/\r\n?/g, "\n");
-      if (!rich(el)) text = text.replace(/\s*\n+\s*/g, " ");
+      if (breaks(el)) text = oneBreak(text);
+      else if (!rich(el)) text = text.replace(/\s*\n+\s*/g, " ");
       if (text) document.execCommand("insertText", false, text);
     });
     document.addEventListener("drop", function (event) {

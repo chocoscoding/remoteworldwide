@@ -92,6 +92,8 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
   const offerSample = offerChoices.find((c) => c.value === offerValue)?.sample ?? undefined;
   // Until the offers are in, the first render would draw the sample and then redraw: wait for them.
   const offersReady = !hasOffer || Boolean(pageOffer) || offers !== null;
+  // The inspector's offer fields: the page's context, plus whether the previewed offer counts down.
+  const offerContext = { ...offer, countdown: offerValue !== "none" && Boolean(offerSample?.look.countdown) };
   const preview = usePreview({ content, sampleOffer: offerValue !== "none", offerSample, userId, markBlocks: editing }, !empty && offersReady);
   const brand = brandDesign === undefined ? fetchedBrand : (brandDesign ?? DEFAULT_DESIGN);
 
@@ -183,7 +185,7 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
       {locked || previewing ? null : (
         <div className="rounded-md border border-gray-300 bg-white p-3">
           <p className="mb-2 text-xs text-gray-600">You can keep editing the blocks here meanwhile.</p>
-          <BlockEditor blocks={blocks} onChange={setBlocks} offer={offer} />
+          <BlockEditor blocks={blocks} onChange={setBlocks} offer={offerContext} />
         </div>
       )}
     </div>
@@ -354,7 +356,7 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
                     block={blocks[selected]}
                     index={selected}
                     count={blocks.length}
-                    offer={offer}
+                    offer={offerContext}
                     confirmDelete={confirmDelete === selected}
                     onChange={(b) => changeFromInspector(selected, b)}
                     onMove={(by) => move(selected, by)}

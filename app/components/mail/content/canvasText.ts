@@ -1,4 +1,4 @@
-import { OFFER_COPY_DEFAULTS, OFFER_COPY_MAX, type Block } from "@/app/lib/mail/types";
+import { OFFER_COPY_DEFAULTS, OFFER_COPY_MAX, OFFER_DETAIL_MAX, type Block } from "@/app/lib/mail/types";
 import type { CanvasField } from "./MailFrame";
 
 // Text typed in the canvas (the editor render's fields) and the blocks it belongs to. Pure, so the
@@ -23,6 +23,14 @@ export function withCanvasText(block: Block, field: CanvasField, text: string): 
     case "button":
       return field === "label" ? { ...block, label: text.slice(0, TEXT_MAX.button) } : null;
     case "offer": {
+      if (field === "detail") {
+        // The code line: empty (or emptied) is the default, which the box draws (none beside a countdown).
+        const value = text.slice(0, OFFER_DETAIL_MAX);
+        const next: OfferBlock = { ...block };
+        if (!value.trim()) delete next.detail;
+        else next.detail = value;
+        return next;
+      }
       if (!isOfferKey(field)) return null;
       const value = text.slice(0, OFFER_COPY_MAX[field]);
       const next: OfferBlock = { ...block };
@@ -44,6 +52,8 @@ const shownText = (block: Block, field: CanvasField): string | null => {
     case "button":
       return field === "label" ? block.label ?? "" : null;
     case "offer": {
+      // The code line's default depends on the offer (its countdown, its style): the server's render draws it.
+      if (field === "detail") return block.detail ?? "";
       if (!isOfferKey(field)) return null;
       const own = block[field] ?? "";
       return own.trim() ? own : OFFER_COPY_DEFAULTS[field];
@@ -57,7 +67,7 @@ const FIELDS_OF: Partial<Record<Block["type"], CanvasField[]>> = {
   heading: ["text"],
   paragraph: ["text"],
   button: ["label"],
-  offer: ["kicker", "headline", "button"],
+  offer: ["kicker", "headline", "button", "detail"],
 };
 
 /** The canvas fields an inspector edit changed, with what each should now show (drawn at once in the frame). */

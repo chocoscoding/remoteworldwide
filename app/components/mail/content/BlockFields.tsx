@@ -2,7 +2,7 @@
 
 import type { FC, ReactNode } from "react";
 import Link from "next/link";
-import { OFFER_COPY_DEFAULTS, OFFER_COPY_MAX, type Block, type OfferSampleAsk } from "@/app/lib/mail/types";
+import { OFFER_COPY_DEFAULTS, OFFER_COPY_MAX, OFFER_DETAIL_DEFAULT, OFFER_DETAIL_MAX, type Block, type OfferSampleAsk } from "@/app/lib/mail/types";
 import { Notice } from "../ui";
 import Fold from "./Fold";
 import TextField from "./TextField";
@@ -16,6 +16,8 @@ export type OfferContext = {
   href?: string;
   /** The offer the page has chosen (a campaign's), with its overrides: the preview draws the box from it. */
   preview?: { name: string; sample: OfferSampleAsk };
+  /** The previewed offer shows a live countdown: the code line is then left out unless the block writes one. */
+  countdown?: boolean;
 };
 
 const NOTES: Partial<Record<Block["type"], string>> = {
@@ -34,7 +36,7 @@ const LINK_PRESETS = [
 const BlockFields: FC<{ block: Block; onChange: (block: Block) => void; offer?: OfferContext }> = ({ block, onChange, offer }) => {
   switch (block.type) {
     case "heading":
-      return <TextField label="Heading" value={block.text} maxLength={200} onChange={(text) => onChange({ ...block, text })} placeholder="Hi {{firstName|there}}" />;
+      return <TextField label="Heading" lines={2} value={block.text} maxLength={200} onChange={(text) => onChange({ ...block, text })} placeholder="Hi {{firstName|there}}" />;
     case "paragraph":
       return (
         <TextField
@@ -83,7 +85,7 @@ const BlockFields: FC<{ block: Block; onChange: (block: Block) => void; offer?: 
 };
 
 type OfferBlock = Extract<Block, { type: "offer" }>;
-type CopyKey = "kicker" | "headline" | "button";
+type CopyKey = "kicker" | "headline" | "button" | "detail";
 
 /** The offer box: the campaign's offer (when there is one), then its three lines of copy. */
 const OfferFields: FC<{ block: OfferBlock; onChange: (block: Block) => void; offer?: OfferContext }> = ({ block, onChange, offer }) => {
@@ -101,12 +103,20 @@ const OfferFields: FC<{ block: OfferBlock; onChange: (block: Block) => void; off
           {offer.picker}
         </div>
       ) : (
-        <Notice className="text-xs">The offer comes from the campaign or playbook step. The preview shows a sample: 20% off, valid 72 hours.</Notice>
+        <Notice className="text-xs">The offer comes from the campaign or playbook step. The preview uses the one picked in Sample data.</Notice>
       )}
-      <TextField label="Small line" value={block.kicker ?? ""} maxLength={OFFER_COPY_MAX.kicker} placeholder={OFFER_COPY_DEFAULTS.kicker} onChange={(v) => set("kicker", v)} />
-      <TextField label="Headline" value={block.headline ?? ""} maxLength={OFFER_COPY_MAX.headline} placeholder={OFFER_COPY_DEFAULTS.headline} onChange={(v) => set("headline", v)} />
+      <TextField label="Small line" lines={1} value={block.kicker ?? ""} maxLength={OFFER_COPY_MAX.kicker} placeholder={OFFER_COPY_DEFAULTS.kicker} onChange={(v) => set("kicker", v)} />
+      <TextField label="Headline" lines={2} value={block.headline ?? ""} maxLength={OFFER_COPY_MAX.headline} placeholder={OFFER_COPY_DEFAULTS.headline} onChange={(v) => set("headline", v)} />
+      <TextField
+        label="Code line"
+        lines={2}
+        value={block.detail ?? ""}
+        maxLength={OFFER_DETAIL_MAX}
+        placeholder={offer?.countdown ? "Hidden while the countdown shows" : OFFER_DETAIL_DEFAULT}
+        onChange={(v) => set("detail", v)}
+      />
       <TextField label="Button text" value={block.button ?? ""} maxLength={OFFER_COPY_MAX.button} placeholder={OFFER_COPY_DEFAULTS.button} onChange={(v) => set("button", v)} />
-      <p className="text-[11px] text-gray-500">Empty lines use the text shown in grey. The code and its end time are added under the headline.</p>
+      <p className="text-[11px] text-gray-500">Empty lines use the text shown in grey.</p>
       <Fold title="Discount rules" variant="line" className="border-t border-gray-200 pt-1">
         <p className="text-xs text-gray-600">
           How much, how long the code lasts, which plans and the monthly cap are set on the offer, not in the mail.{" "}

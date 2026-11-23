@@ -23,13 +23,21 @@ export type Block =
   | { type: "divider" }
   | { type: "signature" }
   | { type: "feedback" }
-  /** The offer box. Empty text falls back to OFFER_COPY_DEFAULTS; all three may use the variables. */
-  | { type: "offer"; kicker?: string; headline?: string; button?: string };
+  /**
+   * The offer box. Empty text falls back to OFFER_COPY_DEFAULTS; all may use the variables. `detail` is the
+   * line under the figure: empty draws "Code X, valid until Y", or nothing while the offer's countdown shows.
+   * The kicker, headline and detail may hold line breaks.
+   */
+  | { type: "offer"; kicker?: string; headline?: string; button?: string; detail?: string };
 export type BlockType = Block["type"];
 
 /** What an offer box says when its block leaves a line empty (OUTREACH-REDESIGN-SPEC.md section 1). */
 export const OFFER_COPY_DEFAULTS = { kicker: "Your personal offer", headline: "{{offerDiscount}} off", button: "Use my discount" } as const;
 export const OFFER_COPY_MAX = { kicker: 60, headline: 80, button: 40 } as const;
+/** The offer box's detail line (under the figure); the backend refuses longer. */
+export const OFFER_DETAIL_MAX = 160;
+/** What the detail line says when the block leaves it empty and there is no countdown. */
+export const OFFER_DETAIL_DEFAULT = "Code {{offerCode}}, valid until {{offerExpiresAt}}";
 
 /* ----------------------------------------------------------------------------- design */
 

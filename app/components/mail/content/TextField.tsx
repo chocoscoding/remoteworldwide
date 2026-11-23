@@ -9,7 +9,8 @@ import { useDismiss } from "./useDismiss";
 
 /**
  * A labelled text input (or textarea) with a small "Variable" menu that puts {{name}} where the
- * caret was. Short fields show how many characters are left.
+ * caret was. Short fields show how many characters are left. `lines`: a short text that may break
+ * into lines (a heading, an offer line), drawn as a textarea that many rows tall.
  */
 const TextField: FC<{
   label: string;
@@ -22,7 +23,8 @@ const TextField: FC<{
   vars?: boolean;
   className?: string;
   inputClassName?: string;
-}> = ({ label, value, onChange, placeholder, maxLength, multiline, hint, vars = true, className, inputClassName }) => {
+  lines?: number;
+}> = ({ label, value, onChange, placeholder, maxLength, multiline, hint, vars = true, className, inputClassName, lines }) => {
   const id = useId();
   const field = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const caret = useRef<[number, number] | null>(null);
@@ -91,6 +93,8 @@ const TextField: FC<{
       </div>
       {multiline ? (
         <textarea {...common} rows={5} className={cn(INPUT, "min-h-[110px] font-[inherit] leading-relaxed", inputClassName)} />
+      ) : lines ? (
+        <textarea {...common} rows={lines} className={cn(INPUT, "resize-y font-[inherit] leading-snug", inputClassName)} />
       ) : (
         <input {...common} className={cn(INPUT, inputClassName)} />
       )}

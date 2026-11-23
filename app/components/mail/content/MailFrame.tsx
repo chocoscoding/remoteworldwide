@@ -4,7 +4,7 @@ import { useEffect, useImperativeHandle, useMemo, useRef, useState, type FC, typ
 import { withFrameScript } from "./frameScript";
 
 /** The fields the editor render lets the canvas type into (heading/paragraph text, button label, offer lines). */
-export const CANVAS_FIELDS = ["text", "label", "kicker", "headline", "button"] as const;
+export const CANVAS_FIELDS = ["text", "label", "kicker", "headline", "button", "detail"] as const;
 export type CanvasField = (typeof CANVAS_FIELDS)[number];
 
 /** Longer than any field the backend keeps (a paragraph's 5000): anything past it is not a real edit. */
