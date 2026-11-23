@@ -22,6 +22,7 @@ export type OfferContext = {
 
 const NOTES: Partial<Record<Block["type"], string>> = {
   divider: "A thin line between parts of the mail.",
+  spacer: "An empty line between blocks. Add more for more space.",
   signature: "Theo's sign-off. The name comes from Outreach settings.",
   feedback: "\"How is it going?\" with four faces. Each tap is recorded with the mail.",
 };

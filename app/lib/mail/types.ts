@@ -21,6 +21,8 @@ export type Block =
   | { type: "button"; label: string; url: string }
   | { type: "image"; src: string; alt: string; href?: string }
   | { type: "divider" }
+  /** A line break: an empty line of space between blocks. */
+  | { type: "spacer" }
   | { type: "signature" }
   | { type: "feedback" }
   /**
@@ -61,13 +63,14 @@ export const ACCENT_COLORS: Record<MailAccent, { fill: string; text: string; edg
   orange: { fill: "#c2511f", text: "#ffffff", edge: "#8f3a15" },
 };
 export const DEFAULT_DESIGN: MailDesign = { look: "brand", accent: "lime", button: "square" };
-export const BLOCK_TYPES: readonly BlockType[] = ["heading", "paragraph", "button", "image", "divider", "signature", "feedback", "offer"];
+export const BLOCK_TYPES: readonly BlockType[] = ["heading", "paragraph", "button", "image", "divider", "spacer", "signature", "feedback", "offer"];
 export const BLOCK_LABELS: Record<BlockType, string> = {
   heading: "Heading",
   paragraph: "Paragraph",
   button: "Button",
   image: "Image",
   divider: "Divider",
+  spacer: "Line break",
   signature: "Signature",
   feedback: "How is it going?",
   offer: "Offer box",

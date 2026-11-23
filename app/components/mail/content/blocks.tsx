@@ -1,4 +1,4 @@
-import { Heading, Image as ImageIcon, Minus, MousePointerClick, PenLine, Pilcrow, Smile, TicketPercent, type LucideIcon } from "lucide-react";
+import { CornerDownLeft, Heading, Image as ImageIcon, Minus, MousePointerClick, PenLine, Pilcrow, Smile, TicketPercent, type LucideIcon } from "lucide-react";
 import { DEFAULT_DESIGN, type Block, type BlockType, type MailDesign, type TemplateContent } from "@/app/lib/mail/types";
 
 // Small pure helpers the content editor, the block outline and the library cards share. No
@@ -13,6 +13,7 @@ export const BLOCK_ICONS: Record<BlockType, LucideIcon> = {
   button: MousePointerClick,
   image: ImageIcon,
   divider: Minus,
+  spacer: CornerDownLeft,
   signature: PenLine,
   feedback: Smile,
   offer: TicketPercent,
@@ -70,6 +71,8 @@ export const blockSummary = (block: Block): string => {
       return block.alt?.trim() || (block.src ? "Image" : "No image yet");
     case "divider":
       return "Line";
+    case "spacer":
+      return "Empty line";
     case "signature":
       return "Theo's sign-off";
     case "feedback":

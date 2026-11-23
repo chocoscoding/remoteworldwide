@@ -57,6 +57,8 @@ const ThumbBlock: FC<{ block: Block; design: MailDesign }> = ({ block, design })
       return <div className="h-7 w-full rounded bg-gray-100" />;
     case "divider":
       return <div className="my-0.5 border-t border-gray-200" />;
+    case "spacer":
+      return <div className="h-1.5" aria-hidden />;
     case "signature":
       return <p className="text-[9px] font-extrabold text-[#222325]">Theo</p>;
     case "feedback":
