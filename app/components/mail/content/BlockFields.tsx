@@ -2,7 +2,7 @@
 
 import type { FC, ReactNode } from "react";
 import Link from "next/link";
-import { OFFER_COPY_DEFAULTS, OFFER_COPY_MAX, type Block } from "@/app/lib/mail/types";
+import { OFFER_COPY_DEFAULTS, OFFER_COPY_MAX, type Block, type OfferSampleAsk } from "@/app/lib/mail/types";
 import { Notice } from "../ui";
 import Fold from "./Fold";
 import TextField from "./TextField";
@@ -14,6 +14,8 @@ export type OfferContext = {
   picker?: ReactNode;
   /** Where "Discount rules" leads: the chosen offer's page, else the offers list. */
   href?: string;
+  /** The offer the page has chosen (a campaign's), with its overrides: the preview draws the box from it. */
+  preview?: { name: string; sample: OfferSampleAsk };
 };
 
 const NOTES: Partial<Record<Block["type"], string>> = {

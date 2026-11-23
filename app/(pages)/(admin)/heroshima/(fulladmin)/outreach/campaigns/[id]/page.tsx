@@ -1,11 +1,12 @@
 import type { FC } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCampaign, getCampaignReport, getMailSettings, listAudiences, listOffers, listTemplates } from "@/libs/mail-admin";
+import { getCampaign, getCampaignReport, getMailSettings, getOffer, listAudiences, listOffers, listTemplates } from "@/libs/mail-admin";
 import { CAMPAIGN_STATUS_LABELS, DEFAULT_SETTINGS, UNSUBSCRIBE_REASON_LABELS, type CampaignReport, type MailCampaign } from "@/app/lib/mail/types";
 import { BarList, Panel, StatTile } from "@/app/components/ADMIN/analytics/Charts";
 import MailShell from "@/app/components/mail/MailShell";
 import MailPreview from "@/app/components/mail/MailPreview";
+import { offerSampleOf } from "@/app/components/mail/content/offerPreview";
 import { Bars, Funnel, FunnelTrend, HBars, METRIC, num } from "@/app/components/mail/charts";
 import { FeedbackBlock } from "@/app/components/mail/reports";
 import { shortLink } from "@/app/lib/mail/userMail";
@@ -59,7 +60,9 @@ const Editor = async ({ campaign }: { campaign: MailCampaign | null }) => {
 };
 
 const Report = async ({ campaign: c }: { campaign: MailCampaign }) => {
-  const report = await getCampaignReport(c.id);
+  // The offer that went out with it, for "What was sent" (a failed read falls back to the sample offer).
+  const [report, sentOffer] = await Promise.all([getCampaignReport(c.id), c.offer ? getOffer(c.offer.offerId) : Promise.resolve(null)]);
+  const offerSample = c.offer && sentOffer?.data ? offerSampleOf(sentOffer.data, c.offer) : undefined;
   const k = c.counts ?? { recipients: 0, sent: 0, deferred: 0, skippedCap: 0, skippedPref: 0, skippedSuppressed: 0, failed: 0 };
   const subjectA = c.content?.subject ?? "";
   const timeline = [
@@ -138,7 +141,7 @@ const Report = async ({ campaign: c }: { campaign: MailCampaign }) => {
           <details className="rounded-md border border-gray-300 bg-white p-4">
             <summary className="cursor-pointer text-sm font-bold">What was sent</summary>
             <div className="mt-3">
-              <MailPreview content={c.content} />
+              <MailPreview content={c.content} offerSample={offerSample} />
             </div>
           </details>
         ) : null}

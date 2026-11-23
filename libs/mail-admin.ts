@@ -210,25 +210,31 @@ export const previewMail = async ({
   await requireAdminAction();
   const body: Record<string, unknown> = { content, sampleOffer: Boolean(sampleOffer) };
   if (markBlocks) body.markBlocks = true;
-  if (sampleOffer && offerSample) {
-    body.offerSample = {
-      discountLabel: String(offerSample.discountLabel ?? "").trim().slice(0, 20),
-      validHours: int(offerSample.validHours, 72, 1, OFFER_VALID_HOURS_MAX),
-      look: offerSample.look,
-      link: offerSample.link,
-    };
-  }
+  if (sampleOffer && offerSample) body.offerSample = cleanOfferSample(offerSample);
   if (userId && okId(userId)) body.userId = userId;
   return run<MailPreview>(() => mail("/preview", { method: "POST", body }));
 };
 
-/** Sends a test (subject prefixed "[Test]") to `to`, or to the admin's own address when empty. */
-export const sendTestMail = async ({ content, to, userId }: { content: TemplateContent; to?: string; userId?: string }) => {
+/** An offer sample as the backend takes it: a short discount, whole hours in range, the look and link as given. */
+const cleanOfferSample = (offerSample: OfferSampleAsk) => ({
+  discountLabel: String(offerSample.discountLabel ?? "").trim().slice(0, 20),
+  validHours: int(offerSample.validHours, 72, 1, OFFER_VALID_HOURS_MAX),
+  look: offerSample.look,
+  link: offerSample.link,
+});
+
+/**
+ * Sends a test (subject prefixed "[Test]") to `to`, or to the admin's own address when empty. Filled
+ * with `userId`'s details, else the address's account, else the admin's (the backend decides).
+ * `offerSample`: the offer the editor previews with, so the test's offer box matches the canvas.
+ */
+export const sendTestMail = async ({ content, to, userId, offerSample }: { content: TemplateContent; to?: string; userId?: string; offerSample?: OfferSampleAsk }) => {
   await requireAdminAction();
   const body: Record<string, unknown> = { content };
   const address = typeof to === "string" ? to.trim().slice(0, 254) : "";
   if (address) body.to = address;
   if (userId && okId(userId)) body.userId = userId;
+  if (offerSample) body.offerSample = cleanOfferSample(offerSample);
   return run<{ ok: boolean; sendId?: string }>(() => mail("/test", { method: "POST", body }));
 };
 

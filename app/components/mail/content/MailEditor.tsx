@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState, type FC, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Braces, LoaderCircle, Monitor, Smartphone, SlidersHorizontal, Trash2 } from "lucide-react";
-import { getMailSettings } from "@/libs/mail-admin";
-import { BLOCK_LABELS, DEFAULT_DESIGN, type Block, type BlockType, type MailDesign, type TemplateContent } from "@/app/lib/mail/types";
+import { getMailSettings, listOffers } from "@/libs/mail-admin";
+import { BLOCK_LABELS, DEFAULT_DESIGN, type Block, type BlockType, type MailDesign, type MailOffer, type OfferSampleAsk, type TemplateContent } from "@/app/lib/mail/types";
 import { cn } from "@/lib/utils";
 import BlockEditor, { IconButton } from "../BlockEditor";
 import ContentFields from "../ContentFields";
-import { ErrorBox } from "../ui";
+import { ErrorBox, INPUT_SM } from "../ui";
 import BlockFields, { type OfferContext } from "./BlockFields";
 import BlockOutline, { AddBlockMenu } from "./BlockOutline";
 import DesignPanel from "./DesignPanel";
@@ -19,6 +19,7 @@ import TestSend from "./TestSend";
 import { VarMenu } from "./TextField";
 import { BLOCK_ICONS, freshBlock } from "./blocks";
 import { canvasPatches, withCanvasText } from "./canvasText";
+import { liveOffers, offerDiscountLabel, offerSampleOf, usesOffer } from "./offerPreview";
 import { useDismiss } from "./useDismiss";
 import { usePreview } from "./usePreview";
 
@@ -58,7 +59,9 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
   const previewing = view === "preview";
   const [tab, setTab] = useState<"content" | "design">("content");
   const [width, setWidth] = useState<keyof typeof WIDTHS>("desktop");
-  const [sampleOffer, setSampleOffer] = useState(true);
+  // Which offer fills the offer box: null follows the default (the campaign's offer, else the newest live one).
+  const [offerPick, setOfferPick] = useState<string | null>(null);
+  const [offers, setOffers] = useState<MailOffer[] | null>(null);
   const [asUser, setAsUser] = useState("");
   const [marked, setMarked] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
@@ -74,8 +77,36 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
   const empty = !blocks.length && !content.subject.trim();
   // Edit shows the editor render (fields and variable tokens); Preview and a locked mail show real values.
   const editing = !locked && !previewing;
-  const preview = usePreview({ content, sampleOffer, userId, markBlocks: editing }, !empty);
+  // The offer box is drawn from a real offer (its discount, validity, look and countdown, its link), so the
+  // canvas shows what readers get: the campaign's chosen offer, else the newest live offer, else a sample.
+  const hasOffer = usesOffer(content);
+  const pageOffer = offer?.preview ?? null;
+  const offerChoices: OfferOption[] = [
+    ...(pageOffer ? [{ value: "page", label: `${pageOffer.name} (this campaign's)`, sample: pageOffer.sample }] : []),
+    ...(offers ?? []).map((o) => ({ value: o.id, label: `${o.name} · ${offerDiscountLabel(o)} off`, sample: offerSampleOf(o) })),
+    { value: "sample", label: "A sample offer (20% off)", sample: null },
+    { value: "none", label: "No offer", sample: null },
+  ];
+  const defaultOffer = pageOffer ? "page" : (offers?.[0]?.id ?? "sample");
+  const offerValue = offerPick && offerChoices.some((c) => c.value === offerPick) ? offerPick : defaultOffer;
+  const offerSample = offerChoices.find((c) => c.value === offerValue)?.sample ?? undefined;
+  // Until the offers are in, the first render would draw the sample and then redraw: wait for them.
+  const offersReady = !hasOffer || Boolean(pageOffer) || offers !== null;
+  const preview = usePreview({ content, sampleOffer: offerValue !== "none", offerSample, userId, markBlocks: editing }, !empty && offersReady);
   const brand = brandDesign === undefined ? fetchedBrand : (brandDesign ?? DEFAULT_DESIGN);
+
+  // The live offers, once the mail has an offer in it.
+  useEffect(() => {
+    if (!hasOffer || offers !== null) return;
+    let live = true;
+    listOffers().then(
+      (res) => live && setOffers(liveOffers(res.data ?? [])),
+      () => live && setOffers([]),
+    );
+    return () => {
+      live = false;
+    };
+  }, [hasOffer, offers]);
 
   // The brand default, when the page didn't pass it.
   useEffect(() => {
@@ -257,10 +288,17 @@ const MailEditor: FC<Props> = ({ content, onChange, brandDesign, prefRequired, o
                 }}
               />
             ) : null}
-            <PreviewOptions sampleOffer={sampleOffer} setSampleOffer={setSampleOffer} asUser={asUser} setAsUser={setAsUser} />
+            <PreviewOptions
+              offerChoices={hasOffer ? offerChoices : null}
+              offerValue={offerValue}
+              setOfferValue={setOfferPick}
+              offerChanged={offerValue !== defaultOffer}
+              asUser={asUser}
+              setAsUser={setAsUser}
+            />
             {preview.loading ? <LoaderCircle className="h-4 w-4 animate-spin text-gray-500" aria-label="Updating the preview" /> : null}
             <div className="ml-auto">
-              <TestSend content={content} userId={userId} disabled={empty} />
+              <TestSend content={content} userId={userId} offerSample={offerValue === "none" ? undefined : offerSample} disabled={empty} />
             </div>
           </div>
 
@@ -429,15 +467,24 @@ const CanvasVariable: FC<{ enabled: boolean; open: boolean; setOpen: (open: bool
   );
 };
 
-/** The preview's options, folded: the sample offer and "preview as" a user. */
-const PreviewOptions: FC<{ sampleOffer: boolean; setSampleOffer: (v: boolean) => void; asUser: string; setAsUser: (v: string) => void }> = ({ sampleOffer, setSampleOffer, asUser, setAsUser }) => {
+type OfferOption = { value: string; label: string; sample: OfferSampleAsk | null };
+
+/** The preview's options, folded: which offer fills the offer box, and "preview as" a user. */
+const PreviewOptions: FC<{
+  offerChoices: OfferOption[] | null;
+  offerValue: string;
+  setOfferValue: (v: string) => void;
+  offerChanged: boolean;
+  asUser: string;
+  setAsUser: (v: string) => void;
+}> = ({ offerChoices, offerValue, setOfferValue, offerChanged, asUser, setAsUser }) => {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(box, open, close);
   // The name of the person picked to preview as; the editor itself keeps only their id.
   const [asWho, setAsWho] = useState<{ id: string; label: string } | null>(null);
-  const changed = !sampleOffer || Boolean(asUser.trim());
+  const changed = (offerChoices !== null && offerChanged) || Boolean(asUser.trim());
   return (
     <div ref={box} className="relative">
       <button
@@ -449,9 +496,18 @@ const PreviewOptions: FC<{ sampleOffer: boolean; setSampleOffer: (v: boolean) =>
       </button>
       {open ? (
         <div className="absolute left-0 top-full z-30 mt-1 flex w-72 flex-col gap-3 rounded-md border border-gray-300 bg-white p-3 text-xs">
-          <label className="flex items-center gap-2 font-semibold text-gray-700">
-            <input type="checkbox" checked={sampleOffer} onChange={(e) => setSampleOffer(e.target.checked)} /> Fill the offer box with a sample offer
-          </label>
+          {offerChoices ? (
+            <label className="flex flex-col gap-1 font-semibold text-gray-700">
+              Offer box
+              <select value={offerValue} onChange={(e) => setOfferValue(e.target.value)} className={cn(INPUT_SM, "w-full text-xs font-normal")}>
+                {offerChoices.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="flex flex-col gap-1 font-semibold text-gray-700">
             Preview as someone
             <PreviewUserPicker

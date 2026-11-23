@@ -20,6 +20,7 @@ import {
 } from "@/app/lib/mail/types";
 import MailEditor from "@/app/components/mail/content/MailEditor";
 import { pickContent } from "@/app/components/mail/content/blocks";
+import { offerSampleOf } from "@/app/components/mail/content/offerPreview";
 import OfferPicker from "@/app/components/mail/OfferPicker";
 import { useAudienceCount } from "@/app/components/mail/useAudienceCount";
 import { BTN, BTN_LINK, BTN_PRIMARY, ErrorBox, INPUT, INPUT_SM, Switch } from "@/app/components/mail/ui";
@@ -203,6 +204,9 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const templateName = templates.find((t) => t.id === templateId)?.name ?? "this mail";
   const hasOfferBlock = content.blocks.some((b) => b.type === "offer");
   const offerPicker = <OfferPicker offers={offers} value={offer} onChange={setOffer} maxDiscountPercent={maxDiscountPercent} />;
+  // The chosen offer with its overrides: the mail's preview and test draw the offer box from it.
+  const chosenOffer = offer ? offers.find((o) => o.id === offer.offerId) : undefined;
+  const offerPreview = chosenOffer && offer ? { name: chosenOffer.name, sample: offerSampleOf(chosenOffer, offer) } : undefined;
   const hasMail = mode === "oneoff" || Boolean(templateId);
   // A one-off is written here, so its editor is always open; a saved mail is only previewed, on request.
   const mailOpen = mode === "oneoff" || showMail;
@@ -382,7 +386,7 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
             content={content}
             onChange={setContent}
             prefRequired
-            offer={{ picker: offerPicker, href: offer ? `/heroshima/outreach/offers/${offer.offerId}` : undefined }}
+            offer={{ picker: offerPicker, href: offer ? `/heroshima/outreach/offers/${offer.offerId}` : undefined, preview: offerPreview }}
             locked={
               mode === "template" ? (
                 <div className="flex flex-col gap-3 text-sm text-gray-700">

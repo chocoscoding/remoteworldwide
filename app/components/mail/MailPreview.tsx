@@ -2,7 +2,7 @@
 
 import { useState, type FC } from "react";
 import { LoaderCircle, Monitor, Smartphone } from "lucide-react";
-import type { TemplateContent } from "@/app/lib/mail/types";
+import type { OfferSampleAsk, TemplateContent } from "@/app/lib/mail/types";
 import MailFrame from "./content/MailFrame";
 import TestSend from "./content/TestSend";
 import { usePreview } from "./content/usePreview";
@@ -12,13 +12,14 @@ import { cn } from "@/lib/utils";
 /**
  * A read-only look at a mail as the events service renders it (a sent campaign's "What was sent"):
  * phone or desktop width, the sample offer on or off, and "Send me a test". Editing happens in the
- * content editor (content/MailEditor), whose canvas is the same render.
+ * content editor (content/MailEditor), whose canvas is the same render. `offerSample`: the offer that
+ * went out with it, so the box shows its discount, look and countdown (left out: the fixed sample).
  */
-const MailPreview: FC<{ content: TemplateContent; className?: string }> = ({ content, className }) => {
+const MailPreview: FC<{ content: TemplateContent; offerSample?: OfferSampleAsk; className?: string }> = ({ content, offerSample, className }) => {
   const [width, setWidth] = useState<"phone" | "desktop">("desktop");
   const [sampleOffer, setSampleOffer] = useState(true);
   const empty = !content.blocks.length && !content.subject.trim();
-  const preview = usePreview({ content, sampleOffer }, !empty);
+  const preview = usePreview({ content, sampleOffer, offerSample }, !empty);
 
   return (
     <section aria-label="Preview" className={cn("flex flex-col gap-3 rounded-md border border-gray-300 bg-white p-3", className)}>
@@ -42,11 +43,11 @@ const MailPreview: FC<{ content: TemplateContent; className?: string }> = ({ con
           ))}
         </div>
         <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
-          <input type="checkbox" checked={sampleOffer} onChange={(e) => setSampleOffer(e.target.checked)} /> Sample offer
+          <input type="checkbox" checked={sampleOffer} onChange={(e) => setSampleOffer(e.target.checked)} /> {offerSample ? "Offer" : "Sample offer"}
         </label>
         {preview.loading ? <LoaderCircle className="h-4 w-4 animate-spin text-gray-500" aria-label="Updating" /> : null}
         <div className="ml-auto">
-          <TestSend content={content} disabled={empty} />
+          <TestSend content={content} offerSample={offerSample} disabled={empty} />
         </div>
       </div>
 

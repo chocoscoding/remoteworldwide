@@ -3,12 +3,16 @@
 import { useState, useTransition, type FC } from "react";
 import { LoaderCircle, Send } from "lucide-react";
 import { sendTestMail } from "@/libs/mail-admin";
-import type { TemplateContent } from "@/app/lib/mail/types";
+import type { OfferSampleAsk, TemplateContent } from "@/app/lib/mail/types";
 import { cn } from "@/lib/utils";
 import { BTN, INPUT_SM } from "../ui";
 
-/** "Send me a test": to the admin's own address, or (folded) to another one. */
-const TestSend: FC<{ content: TemplateContent; userId?: string; disabled?: boolean }> = ({ content, userId, disabled }) => {
+/**
+ * "Send me a test": to the admin's own address, or (folded) to another one. It greets the person
+ * previewed as, else whoever the address belongs to (the admin, for "me"), and draws the offer box
+ * from `offerSample`, the offer the preview shows.
+ */
+const TestSend: FC<{ content: TemplateContent; userId?: string; offerSample?: OfferSampleAsk; disabled?: boolean }> = ({ content, userId, offerSample, disabled }) => {
   const [other, setOther] = useState(false);
   const [to, setTo] = useState("");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -19,7 +23,7 @@ const TestSend: FC<{ content: TemplateContent; userId?: string; disabled?: boole
       setNote(null);
       const address = other ? to.trim() : "";
       try {
-        const res = await sendTestMail({ content, to: address || undefined, userId: userId || undefined });
+        const res = await sendTestMail({ content, to: address || undefined, userId: userId || undefined, offerSample });
         setNote(res.error ? { ok: false, text: res.error } : { ok: true, text: `Test sent${address ? ` to ${address}` : " to you"}.` });
       } catch {
         setNote({ ok: false, text: "The test could not be sent." });
