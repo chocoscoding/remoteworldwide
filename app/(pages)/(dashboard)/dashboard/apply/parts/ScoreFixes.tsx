@@ -6,7 +6,7 @@
 // next. Everything here is drawn from props; ResumeStep decides what the buttons do.
 
 import { Fragment, useLayoutEffect, useRef, useState, type FC, type ReactNode } from "react";
-import { experienceDraft, suggestedExperienceRole, type DraftRole } from "@/app/lib/apply/experience-draft";
+import { experienceDraft, experiencePlacement, type DraftRole } from "@/app/lib/apply/experience-draft";
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, MoreHorizontal, Plus, RotateCw, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -528,7 +528,7 @@ export interface Suggestion {
   input?: { placeholder: string; label: string; mode?: "text" | "decimal"; initialValue?: string; onSubmit: (value: string) => void };
   /** A Yes/No ask that can be ticked with others and answered together: its term (owner, 2026-10-22). */
   batch?: string;
-  placement?: { initialDetail?: string; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: DraftRole[]; onChange: (skills: boolean, experience: boolean, detail: string, entryId: string) => void; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
+  placement?: { initialDetail?: string; detailEdited?: boolean; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: DraftRole[]; onChange: (skills: boolean, experience: boolean, detail: string, entryId: string, detailEdited: boolean) => void; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
 }
 
 /** A small square tick box, the light-brutalism way: hairline when off, lime with a check when on. */
@@ -547,13 +547,13 @@ const TickBox: FC<{ on: boolean }> = ({ on }) => (
 const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolean; onSelect?: () => void }> = ({ row, disabled, selected, onSelect }) => {
   const [skills, setSkills] = useState(row.placement?.useSkills ?? !row.placement?.skillsAdded);
   const [experience, setExperience] = useState(row.placement?.useExperience ?? false);
-  const suggestedRole = suggestedExperienceRole(row.title, row.placement?.roles ?? []);
-  const initialRole = row.placement?.roles.find(role => role.id === row.placement?.entryId) ?? suggestedRole;
-  const [entryId, setEntryId] = useState(initialRole?.id ?? "");
-  const [detail, setDetail] = useState(row.placement?.initialDetail || (initialRole ? experienceDraft(row.detail ?? row.title, initialRole) : ""));
-  const [editedDetail, setEditedDetail] = useState(Boolean(row.placement?.initialDetail));
-  const saveDraft = (next: { skills?: boolean; experience?: boolean; detail?: string; entryId?: string }) => {
-    row.placement?.onChange(next.skills ?? skills, next.experience ?? experience, next.detail ?? detail, next.entryId ?? entryId);
+  const draftTopic = /^Add evidence for:/i.test(row.title) ? row.title : row.detail ?? row.title;
+  const initial = experiencePlacement(draftTopic,row.placement?.roles ?? [],{...row.placement,detail:row.placement?.initialDetail});
+  const [entryId, setEntryId] = useState(initial.entryId);
+  const [detail, setDetail] = useState(initial.detail);
+  const [editedDetail, setEditedDetail] = useState(initial.detailEdited);
+  const saveDraft = (next: { skills?: boolean; experience?: boolean; detail?: string; entryId?: string; detailEdited?: boolean }) => {
+    row.placement?.onChange(next.skills ?? skills, next.experience ?? experience, next.detail ?? detail, next.entryId ?? entryId,next.detailEdited ?? editedDetail);
   };
   const detailRef = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -603,7 +603,7 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
           <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => {
             setEntryId(event.target.value);
             const role = row.placement?.roles.find(item => item.id === event.target.value);
-            const nextDetail = editedDetail ? detail : role ? experienceDraft(row.detail ?? row.title, role) : "";
+            const nextDetail = editedDetail ? detail : role ? experienceDraft(draftTopic, role) : "";
             setDetail(nextDetail);
             saveDraft({ entryId: event.target.value, detail: nextDetail });
           }} disabled={disabled} className="min-w-0 max-w-full rounded-md border border-black/15 bg-white px-2 py-1 text-xs text-primary">
@@ -613,10 +613,10 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
         </label>
         <label className="block text-xs font-semibold text-primary">
           <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span>Your work example</span>
-            <span className="text-[11px] font-normal text-[#73746d]">Describe what you did in this role.</span>
+            <span>Suggested work example</span>
+            <span className="text-[11px] font-normal text-[#73746d]">Edit it or add it as written.</span>
           </span>
-          <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => { setDetail(event.target.value); setEditedDetail(true); saveDraft({ detail: event.target.value }); }} disabled={disabled} rows={1} maxLength={500}
+          <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => { setDetail(event.target.value); setEditedDetail(true); saveDraft({ detail: event.target.value, detailEdited: true }); }} disabled={disabled} rows={1} maxLength={500}
             placeholder="What did you do, and what changed?"
             className="mt-1.5 block w-full resize-none overflow-y-auto rounded-lg border border-black/20 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-primary outline-none focus:border-[#222325] focus:ring-1 focus:ring-[#222325] disabled:opacity-50" />
         </label>

@@ -114,6 +114,8 @@ export interface FitAsk {
   confirmed?: boolean;
   /** Optional role and example, supplied by the candidate rather than inferred from the posting. */
   detail?: string;
+  /** Distinguishes an editable starting point from text the user wrote or cleared. */
+  detailEdited?: boolean;
   entryId?: string;
   useSkills?: boolean;
   useExperience?: boolean;
@@ -277,6 +279,7 @@ function readAsks(value: unknown): FitAsk[] {
       addedIn: str(item.addedIn),
       ...(item.confirmed === true ? { confirmed: true } : {}),
       ...(typeof item.detail === "string" ? { detail: item.detail.slice(0, 500) } : {}),
+      ...(typeof item.detailEdited === "boolean" ? { detailEdited: item.detailEdited } : {}),
       ...(typeof item.entryId === "string" ? { entryId: item.entryId.slice(0, 120) } : {}),
       ...(typeof item.useSkills === "boolean" ? { useSkills: item.useSkills } : {}),
       ...(typeof item.useExperience === "boolean" ? { useExperience: item.useExperience } : {}),

@@ -22,6 +22,7 @@
 // application's session, so a refresh loses none of it.
 
 import { displayPostingQuestions } from "@/app/lib/apply/posting-question";
+import { experiencePlacement } from "@/app/lib/apply/experience-draft";
 import { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
 import FigurePlacement, { experienceOnly, skillProof } from "@/app/components/dashboard/resume/FigurePlacement";
 import ReviewedWording from "@/app/components/dashboard/resume/ReviewedWording";
@@ -1177,7 +1178,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   }
 
   function answerAsksTogether(terms: readonly string[], yes: boolean) {
-    const items = shownAsks.filter(ask => terms.includes(ask.term));
+    const roles = (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({id:entry.id, role:entry.role, company:entry.company, label:[entry.role,entry.company,entry.dates].filter(Boolean).join(' · '),context:entry.bullets.filter((_,index)=>!content?.hiddenParts?.includes(`exp:${entry.id}:${index}`)).join('\n')}));
+    const items = shownAsks.filter(ask => terms.includes(ask.term)).map(item => item.useExperience ? {...item,...experiencePlacement(/^Add evidence for:/i.test(item.ifTrue) ? item.ifTrue : item.term,roles,item)} : item);
     if (!yes) {
       for (const item of items) answerAsk(item, { no: true });
       return;
@@ -1566,13 +1568,14 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       detail: item.term,
       placement: {
         initialDetail: item.detail,
+        detailEdited: item.detailEdited,
         entryId: item.entryId,
         useSkills: item.useSkills,
         useExperience: item.useExperience,
         skillsAdded: content?.skills.some(skill => skill.trim().toLowerCase() === item.term.trim().toLowerCase()),
         roles: (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({ id: entry.id, role: entry.role, company: entry.company, context: entry.bullets.filter((_, index) => !content?.hiddenParts?.includes(`exp:${entry.id}:${index}`)).join("\n"), label: [entry.role, entry.company, entry.dates].filter(Boolean).join(" · ") })),
-        onChange: (skills: boolean, experience: boolean, detail: string, entryId: string) => update(s => {
-          const edited = { ...item, useSkills: skills, useExperience: experience, detail: detail.slice(0, 500), entryId };
+        onChange: (skills: boolean, experience: boolean, detail: string, entryId: string, detailEdited: boolean) => update(s => {
+          const edited = { ...item, useSkills: skills, useExperience: experience, detail: detail.slice(0, 500), entryId, detailEdited };
           const asks = s.resume.asks ?? [];
           return { ...s, resume: { ...s.resume, asks: asks.some(ask => ask.term === item.term) ? asks.map(ask => ask.term === item.term ? { ...ask, ...edited } : ask) : [...asks, edited] } };
         }),
