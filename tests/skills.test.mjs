@@ -10,6 +10,9 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { registerHooks } from 'node:module';
+import { existsSync } from 'node:fs';
+registerHooks({resolve(specifier,context,next){if(specifier.startsWith('.') && !/\.[a-z]+$/i.test(specifier)){const url=new URL(specifier+'.ts',context.parentURL);if(existsSync(url))return next(url.href,context);}return next(specifier,context);}});
 
 const {
   addSkillNear,
@@ -28,6 +31,12 @@ const {
 } = await import("../app/lib/resume/skills.ts");
 
 const base = { name: "", skills: ["React", "Figma"] };
+
+it('extracts skill names instead of inserting job requirements and workflow arrows',()=>{
+ const updated=addSkills({skills:[]},['Strong SQL skills (BigQuery or similar)','Strong analytical thinking and ability to translate data','Analyze funnel performance (click → install → payment →)','Identify data quality issues and collaborate with data','Work with attribution data and marketing sources (Meta,','BI tools (Tableau)','Experience with Amplitude, AppsFlyer']);
+ for(const name of ['SQL','BigQuery','Data analysis','Funnel analysis','Data quality','Marketing attribution','Meta','Tableau','Amplitude','AppsFlyer']) assert.ok(updated.skills.includes(name),JSON.stringify(updated.skills));
+ assert.ok(updated.skills.every(s=>!/[→★✓]|Strong |Work with |Analyze |Experience with |Identify /.test(s)));
+});
 
 it("keeps manually added skills in the existing categorized format",()=>{
   const groups=[{id:"code",title:"Programming Languages",skills:["SQL"]},{id:"db",title:"Database",skills:["PostgreSQL"]}];

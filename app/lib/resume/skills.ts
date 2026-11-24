@@ -18,6 +18,7 @@
 
 import type { ResumeContent, ResumeSkillGroup } from "@/app/lib/dashboard/types";
 import type { SkillSeparator } from "@/app/lib/dashboard/resume/design-types";
+import { skillNames, isSkillSentence } from "./skill-labels";
 
 /** A skill is a few words. Longer than this is a sentence, and it would stretch a grid column across the page. */
 export const SKILL_MAX_CHARS = 50;
@@ -158,9 +159,10 @@ function placeNew(entries: ResumeSkillGroup[], fresh: ResumeSkillGroup[], taken:
     const families:Array<[RegExp,RegExp,string]>=[
       [/bigquery|snowflake|postgres|mongodb|mysql|redis|databricks/i,/database|data platform|storage/i,"Databases & data platforms"],
       [/^(?:python|sql|r|typescript|javascript|java|c\+\+|c#|go|rust)$/i,/programming|languages/i,"Programming Languages"],
-      [/tableau|power bi|looker|analytics|analysis|statistics|statistical|visuali[sz]ation|a\/b|\b(?:ltv|cac|roi|romi)\b/i,/analytic|reporting|business intelligence/i,"Analytics & reporting"],
-      [/google ads|meta ads|^meta$|appsflyer|amplitude|attribution|marketing/i,/marketing|advertising/i,"Marketing tools"],
+      [/tableau|power bi|looker|analytics|analysis|statistics|statistical|visuali[sz]ation|a\/b|data (?:quality|management|science)|machine learning|(?:marketing metrics|attribution)|\b(?:ltv|cac|roi|romi)\b/i,/analytic|reporting|business intelligence/i,"Analytics & reporting"],
+      [/google ads|meta ads|^meta$|appsflyer|amplitude|hubspot|mailchimp/i,/marketing|advertising/i,"Marketing tools"],
       [/\b(?:aws|gcp|azure|cloud)\b/i,/cloud/i,"Cloud Platforms"],
+      [/debugging|observability|profiling|test generation|test automation|security hardening|pipeline design/i,/engineering practices|testing|quality|devops|security/i,"Engineering practices"],
     ];
     const grouped=entries.map(group=>({...group,skills:[...group.skills]}));
     const remaining:ResumeSkillGroup[]=[];
@@ -188,7 +190,10 @@ function placeNew(entries: ResumeSkillGroup[], fresh: ResumeSkillGroup[], taken:
 }
 
 /** Whether the resume lists this skill already, whatever its case. */
-export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string): boolean => content.skills.some((have) => key(have) === key(skill));
+export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string): boolean => {
+  const names=skillNames(skill);
+  return names.length>0 && names.every(name=>content.skills.some(have=>key(have)===key(name)));
+};
 
 /**
  * The content with these skills added, only if it is not there already, where
@@ -196,9 +201,18 @@ export const hasSkill = (content: Pick<ResumeContent, "skills">, skill: string):
  * object when nothing was new.
  */
 export function addSkills(content: ResumeContent, skills: string[]): ResumeContent {
-  const fresh = flattenGroups(skills.map((skill) => ({ id: "", title: skill, skills: [] }))).filter((skill) => !hasSkill(content, skill));
+  content=cleanSkillWording(content);
+  const fresh = flattenGroups(skills.flatMap(skillNames).map((skill) => ({ id: "", title: skill, skills: [] }))).filter((skill) => !hasSkill(content, skill));
   if (fresh.length === 0) return content;
   return reconcileGroups({ ...content, skills: [...content.skills, ...fresh] });
+}
+
+/** Repair old generated requirement prose, placing extracted names through the
+ * same category logic as a new addition. Keep valid names and user separators. */
+export function cleanSkillWording(content:ResumeContent):ResumeContent {
+  if(!content.skills.some(isSkillSentence))return content;
+  const names=content.skills.flatMap(skill=>isSkillSentence(skill) ? skillNames(skill) : [skill]);
+  return reconcileGroups({...content,skills:[...new Map(names.map(name=>[key(name),name])).values()]});
 }
 
 /**
@@ -207,6 +221,8 @@ export function addSkills(content: ResumeContent, skills: string[]): ResumeConte
  * had gone in after "Rapid prototyping"). Without such an entry, as `addSkills`.
  */
 export function addSkillNear(content: ResumeContent, skill: string, near: readonly string[]): ResumeContent {
+  const names=skillNames(skill);
+  if(names.length!==1 || names[0]!==skill.trim())return addSkills(content,names);
   if (hasSkill(content, skill)) return content;
   const base = reconcileGroups(content);
   const entries = base.skillGroups ?? [];

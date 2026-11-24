@@ -43,6 +43,17 @@ test("a shared generic word is not enough to recycle unrelated work", () => {
   assert.equal(experienceDraft('Customer training', role), 'Delivered customer training for new users.');
 });
 
+test('dataset suggestions state an action, deliverable and relevant scale from this employer',()=>{
+ const role={id:'rawura',label:'Fullstack Developer',context:'Resolved cross-service failures across 500+ daily transactions.\nReduced query response times by 35%.'};
+ for(const requirement of ['Experience working with large-scale datasets (transaction-level, event-level)','Work with core datasets (spend, revenue, LTV, attribution)']) {
+   const draft=experienceDraft(requirement,role);
+   assert.doesNotMatch(draft,/Worked (?:on|with)|Experience working|documented the approach/);
+   assert.match(draft,/500\+ daily transactions/);
+   assert.doesNotMatch(draft,/35%/);
+   assert.match(draft,/report|analys|validat|reconcil/i);
+ }
+});
+
 test('single and bulk placement get the same editable default and preserve intentional edits',()=>{
   const roles=[{id:'a',label:'Engineer',context:'Wrote SQL queries to audit transaction data.'},{id:'b',label:'Analyst',context:'Wrote SQL queries to prepare weekly marketing reports.'}];
   const single=experiencePlacement('SQL',roles);

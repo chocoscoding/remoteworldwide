@@ -1,13 +1,13 @@
 import type { FitAsk } from './state';
 import type { ResumeContent } from '../dashboard/types';
 import type { KeywordInjection } from '../dashboard/resume/ai-tools';
-import { actionableSkillLabel } from '../resume/skill-labels';
+import { actionableSkillLabel, skillNames } from '../resume/skill-labels';
 
 const key = (text: string): string => text.trim().toLowerCase();
 
 /** Both the row button and bulk add use the same independent destinations. */
 export function confirmationPlacements(item: FitAsk): FitAsk[] {
-  const skills = item.useSkills ?? true;
+  const skills = (item.useSkills ?? true) && skillNames(item.term).length>0;
   const experience = item.useExperience ?? false;
   return [
     ...(skills ? [{ ...item, place: 'skills' as const }] : []),
@@ -40,7 +40,7 @@ export function appliedAsks(items: readonly FitAsk[], content: ResumeContent, re
   const skills = new Set(content.skills.map(key));
   const lines = new Set(content.experience.flatMap(entry => entry.bullets).map(key));
   const applied = items.filter(item => item.place === 'skills'
-    ? skills.has(key(item.term))
+    ? skillNames(item.term).length>0 && skillNames(item.term).every(name=>skills.has(key(name)))
     : (result?.placed?.[item.term] ?? []).some(line => line !== 'Skills' && lines.has(key(line))));
   // A single term can target both destinations; complete it only when both landed.
   return applied.filter(item => items.filter(wanted => key(wanted.term) === key(item.term)).every(wanted => applied.includes(wanted)));

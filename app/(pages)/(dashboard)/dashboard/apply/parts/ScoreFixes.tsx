@@ -7,6 +7,7 @@
 
 import { Fragment, useLayoutEffect, useRef, useState, type FC, type ReactNode } from "react";
 import { experienceDraft, experiencePlacement, type DraftRole } from "@/app/lib/apply/experience-draft";
+import { skillNames } from "@/app/lib/resume/skill-labels";
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, MoreHorizontal, Plus, RotateCw, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -545,8 +546,9 @@ const TickBox: FC<{ on: boolean }> = ({ on }) => (
 
 /** Choose destinations together before committing a single resume change. */
 const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolean; onSelect?: () => void }> = ({ row, disabled, selected, onSelect }) => {
-  const [skills, setSkills] = useState(row.placement?.useSkills ?? !row.placement?.skillsAdded);
-  const [experience, setExperience] = useState(row.placement?.useExperience ?? false);
+  const canAddSkills=skillNames(row.detail ?? row.title).length>0;
+  const [skills, setSkills] = useState(canAddSkills && (row.placement?.useSkills ?? !row.placement?.skillsAdded));
+  const [experience, setExperience] = useState(row.placement?.useExperience ?? !canAddSkills);
   const draftTopic = /^Add evidence for:/i.test(row.title) ? row.title : row.detail ?? row.title;
   const initial = experiencePlacement(draftTopic,row.placement?.roles ?? [],{...row.placement,detail:row.placement?.initialDetail});
   const [entryId, setEntryId] = useState(initial.entryId);
@@ -582,7 +584,7 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
         <strong className="min-w-0 flex-1 text-[13px]">{row.title}</strong>
         <span className="text-xs text-[#5f6062]">Add to either or both:</span>
         {([{ label: "Skills", on: skills, toggle: () => { setSkills(!skills); saveDraft({ skills: !skills }); } }, { label: "Experience", on: experience, toggle: () => { setExperience(!experience); saveDraft({ experience: !experience }); } }]).map(option => (
-          <button key={option.label} type="button" role="checkbox" aria-checked={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled} onClick={option.toggle}
+          <button key={option.label} type="button" role="checkbox" aria-checked={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled || option.label==='Skills' && !canAddSkills} onClick={option.toggle}
             className={cn("flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-[11px] font-semibold disabled:opacity-50", option.on ? "border-[#dce89c] bg-[#f2f9c9] text-[#343a18]" : "border-black/15 bg-white text-[#55564f]")}>
             <TickBox on={option.on} />{option.label}
           </button>

@@ -55,7 +55,7 @@ import { confirmedContent } from "@/app/lib/resume/confirmed-content";
 import { showWorkSections } from "@/app/lib/dashboard/resume/design-defaults";
 import { roleCoaching, missingWorkPrompt } from "@/app/lib/resume/role-coaching";
 import LinkedNumbers from "@/app/components/dashboard/resume/LinkedNumbers";
-import WorkEvidence, { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
+import WorkEvidence, { placeWork, type WorkPlacement } from "@/app/components/dashboard/resume/WorkEvidence";
 import AiToolsList, { type AiToolPointer } from "./AiToolsList";
 import PagePicker, { type PageTarget, type PickKinds, type PickSection } from "./PagePicker";
 import { applyToneFix, pinToneFixes, proposalState, type ToneProposal } from "@/app/lib/resume/tone-fixes";
@@ -815,6 +815,18 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
 
   /** A proposal ticked in: into Skills (the last group, when grouped), one undo step. */
   const acceptKeyword = (term: string) => dispatch({ type: "edit", sections:prev=>showWorkSections(prev,true,false), content: (prev) => addSkills(prev, [term]) });
+  async function incorporateSelectedWork(fact:WorkPlacement,term:string) {
+    if(aiRunning)return false;
+    let next=placeWork(content,{...fact,detail:''});
+    if(fact.detail){
+      const result=await runSuggestion('keywords',()=>injectKeywords({content:next,jdText:jobInContext?.description,role:jobInContext?.role,
+        keywords:[term],places:['bullets'],insist:true,confirmed:[{term,detail:fact.detail,entryId:fact.entryId}]}));
+      if(!result?.placed?.[term]?.length){if(result?.notShown?.[0]?.advice)toast.error(result.notShown[0].advice);return false;}
+      next=result.content;
+    }
+    dispatch({type:'edit',content:next,sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
+    return true;
+  }
 
   /** A proposal set aside: a step, so Undo brings it back. */
   const rejectKeyword = (term: string) => {
@@ -1620,8 +1632,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
 
               {docTab === "ai" && <LinkedNumbers content={content} onSave={doc=>dispatch({type:"edit",content:doc})} />}
               {docTab === "ai" && builderQuestions.map(q=><WorkEvidence key={q.term} content={content} prompt={q.ifTrue} preferExperience={q.place==="experience"} initialSkill={q.term}
-                onSave={fact=>{
-                  dispatch({type:"edit",content:prev=>placeWork(prev,fact),sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
+                disabled={Boolean(aiRunning)} onSave={async fact=>{
+                  if(!await incorporateSelectedWork(fact,q.term))return false;
                   setBuilderQuestions(current=>current.filter(item=>item.term!==q.term));
                   return true;
                 }} />)}
@@ -1666,10 +1678,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   keywordsFound={cards.find((card) => card.kind === "keywords")?.terms?.length ?? null}
                   keywordProposals={keywordProposals ? keywordRows : null}
                   keywordPlacement={term=><WorkEvidence key={term} initialSkill={term} prompt={"Place "+term+" in Skills or Experience"} content={content}
-                    onSave={fact=>{
-                      dispatch({type:"edit",content:prev=>placeWork(prev,fact),sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
-                      return true;
-                    }} />}
+                    disabled={Boolean(aiRunning)} onSave={fact=>incorporateSelectedWork(fact,term)} />}
                   onAcceptKeyword={acceptKeyword}
                   onRejectKeyword={rejectKeyword}
                   onAcceptAllKeywords={acceptAllKeywords}

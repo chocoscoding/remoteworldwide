@@ -23,6 +23,7 @@
 
 import { displayPostingQuestions } from "@/app/lib/apply/posting-question";
 import { experiencePlacement } from "@/app/lib/apply/experience-draft";
+import { skillNames } from "@/app/lib/resume/skill-labels";
 import { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
 import FigurePlacement, { experienceOnly, skillProof } from "@/app/components/dashboard/resume/FigurePlacement";
 import ReviewedWording from "@/app/components/dashboard/resume/ReviewedWording";
@@ -96,7 +97,7 @@ import {
   visibleContent,
   type ImportedResume,
 } from "@/app/lib/resume/api";
-import { addSkillNear, addSkills, reconcileGroups, removeSkills } from "@/app/lib/resume/skills";
+import { addSkillNear, addSkills, hasSkill, reconcileGroups, removeSkills } from "@/app/lib/resume/skills";
 import { useIngestedResumeQuery, useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
 import { useMasterResumeQuery } from "@/hooks/queries/useMasterResume";
 import { useResumeSuggestion } from "@/hooks/mutations/useResumeSuggestion";
@@ -1134,18 +1135,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       if (made) for (const item of applied) answerAsk(item, { addedIn: made.stepId });
       if ((made || result?.notShown?.length) && applied.length < items.length) {
         const saved = made?.content ?? content;
-        const inSkills = toSkills.filter(item => saved.skills.some(skill => skill.trim().toLowerCase() === item.term.trim().toLowerCase()));
+        const inSkills = toSkills.filter(item => hasSkill(saved,item.term));
         setChangeError(previous => previous ?? `${inSkills.length ? `${inSkills.map(item => item.term).join(", ")} added to Skills. ` : ""}Experience was not updated. ${result?.notShown?.[0]?.advice ?? "Your example is saved. Retry the update."}`);
       }
     };
-    if (toLines.length && toLines.every(item=>item.detail?.trim() && base.experience.some(role=>role.id===item.entryId && !role.hidden))) {
-      const placed=toLines.reduce((doc,item)=>placeWork(doc,{skill:"",detail:item.detail!.trim(),entryId:item.entryId!}),base);
-      setBusy("Saving confirmed experience...");
-      void commitSuggestion(label,placed,true).then(made=>{
-        if (made) for (const item of items) answerAsk(item,{addedIn:made.stepId});
-      }).finally(()=>setBusy(null));
-      return;
-    }
     if (toLines.length === 0) {
       setBusy(`${label} and rescoring...`);
       void commitSuggestion(`${label} to Skills`, base, true)
@@ -1179,7 +1172,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
 
   function answerAsksTogether(terms: readonly string[], yes: boolean) {
     const roles = (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({id:entry.id, role:entry.role, company:entry.company, label:[entry.role,entry.company,entry.dates].filter(Boolean).join(' · '),context:entry.bullets.filter((_,index)=>!content?.hiddenParts?.includes(`exp:${entry.id}:${index}`)).join('\n')}));
-    const items = shownAsks.filter(ask => terms.includes(ask.term)).map(item => item.useExperience ? {...item,...experiencePlacement(/^Add evidence for:/i.test(item.ifTrue) ? item.ifTrue : item.term,roles,item)} : item);
+    const items = shownAsks.filter(ask => terms.includes(ask.term)).map(item => {
+      const useExperience=item.useExperience ?? skillNames(item.term).length===0;
+      return useExperience ? {...item,useExperience,...experiencePlacement(/^Add evidence for:/i.test(item.ifTrue) ? item.ifTrue : item.term,roles,item)} : item;
+    });
     if (!yes) {
       for (const item of items) answerAsk(item, { no: true });
       return;
@@ -1188,7 +1184,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       setChangeError("Choose a role and add a short example for the selected Experience suggestions.");
       return;
     }
-    applyConfirmed(items.flatMap(item => confirmationPlacements({ ...item, useSkills: item.useSkills ?? !content?.skills.some(skill => skill.trim().toLowerCase() === item.term.trim().toLowerCase()) })));
+    applyConfirmed(items.flatMap(item => confirmationPlacements({ ...item, useSkills: item.useSkills ?? !(content && hasSkill(content,item.term)) })));
   }
 
   /**
@@ -1572,7 +1568,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         entryId: item.entryId,
         useSkills: item.useSkills,
         useExperience: item.useExperience,
-        skillsAdded: content?.skills.some(skill => skill.trim().toLowerCase() === item.term.trim().toLowerCase()),
+        skillsAdded: content ? hasSkill(content,item.term) : false,
         roles: (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({ id: entry.id, role: entry.role, company: entry.company, context: entry.bullets.filter((_, index) => !content?.hiddenParts?.includes(`exp:${entry.id}:${index}`)).join("\n"), label: [entry.role, entry.company, entry.dates].filter(Boolean).join(" · ") })),
         onChange: (skills: boolean, experience: boolean, detail: string, entryId: string, detailEdited: boolean) => update(s => {
           const edited = { ...item, useSkills: skills, useExperience: experience, detail: detail.slice(0, 500), entryId, detailEdited };
@@ -1900,7 +1896,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
           creditsHref={ATS_BILLING_HREF}
           onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
         />
-        {changeError && <p role="alert" className="text-sm text-[#b23c26]">{changeError}</p>}
+        {!report && changeError && <p role="alert" className="text-sm text-[#b23c26]">{changeError}</p>}
         {report && (
           <section className="border-t border-[#222325]/10 pt-3" aria-label="Fine-tune your resume">
             <h3 className="mb-3 text-sm font-semibold text-[#5f6062]">Fine-tune your resume</h3>

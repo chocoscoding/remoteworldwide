@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ResumeContent } from "@/app/lib/dashboard/types";
 import { addSkillNear } from "@/app/lib/resume/skills";
+import { experiencePlacement, experienceDraft } from "@/app/lib/apply/experience-draft";
 import ReviewedWording from "./ReviewedWording";
 
 export type WorkPlacement = {skill: string; detail: string; entryId: string};
@@ -19,10 +20,13 @@ export default function WorkEvidence({content, onSave, disabled, prompt, initial
   const [skills,setSkills]=useState(!preferExperience);
   const [experience,setExperience]=useState(preferExperience);
   const [skill,setSkill]=useState(initialSkill ?? "");
-  const [detail,setDetail]=useState("");
-  const [entryId,setEntryId]=useState("");
-  const [saving,setSaving]=useState(false);
   const roles=content.experience.filter(r=>!r.hidden && !content.hiddenParts?.includes("exp:"+r.id));
+  const draftRoles=roles.map(r=>({...r,label:r.role+' · '+r.company,context:r.bullets.filter((_,i)=>!content.hiddenParts?.includes(`exp:${r.id}:${i}`)).join('\n')}));
+  const initial=initialSkill ? experiencePlacement(initialSkill,draftRoles) : {detail:'',entryId:''};
+  const [detail,setDetail]=useState(initial.detail);
+  const [entryId,setEntryId]=useState(initial.entryId);
+  const [edited,setEdited]=useState(false);
+  const [saving,setSaving]=useState(false);
   const valid=(skills||experience) && (!skills||skill.trim()) && (!experience||(detail.trim() && roles.some(r=>r.id===entryId)));
   async function save() {
     if (!valid || saving) return;
@@ -39,10 +43,10 @@ export default function WorkEvidence({content, onSave, disabled, prompt, initial
       <div className="flex gap-3"><label><input type="checkbox" checked={skills} onChange={e=>setSkills(e.target.checked)} /> Skills</label>
       <label><input type="checkbox" checked={experience} onChange={e=>setExperience(e.target.checked)} /> Experience</label></div>
       {skills && <label>Skill<input value={skill} onChange={e=>setSkill(e.target.value)} maxLength={50} className="block w-full rounded border p-1" /></label>}
-      {experience && <><label>Employer and role<select value={entryId} onChange={e=>setEntryId(e.target.value)} className="block w-full rounded border p-1">
+      {experience && <><label>Employer and role<select value={entryId} onChange={e=>{setEntryId(e.target.value);const role=draftRoles.find(r=>r.id===e.target.value);if(initialSkill && role && !edited)setDetail(experienceDraft(initialSkill,role));}} className="block w-full rounded border p-1">
         <option value="">Choose a role</option>{roles.map(r=><option key={r.id} value={r.id}>{[r.role,r.company,r.dates].filter(Boolean).join(" · ")}</option>)}
       </select></label>{!roles.length && <p>Add the employer where you did this work first.</p>}
-      <label>What did you do?<textarea value={detail} maxLength={500} onChange={e=>setDetail(e.target.value)} className="block w-full rounded border p-1" /></label></>}
+      <label>{initialSkill ? 'Suggested work example' : 'What did you do?'}<textarea value={detail} maxLength={500} onChange={e=>{setDetail(e.target.value);setEdited(true);}} className="block w-full rounded border p-1" /></label></>}
       {skills && skill && <p>Skills · <ReviewedWording before="" after={skill} /></p>}
       {experience && detail && <p>Experience · <ReviewedWording before="" after={detail} /></p>}
       <button type="button" disabled={!valid} className="w-fit rounded bg-black px-3 py-1 text-white disabled:opacity-40" onClick={save}>Confirm and add</button>
