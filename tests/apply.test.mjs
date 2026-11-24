@@ -425,6 +425,20 @@ describe("the draft's change history", () => {
 });
 
 describe("the score card's fixes", () => {
+  it('does not turn every routine duty into a manual evidence request', async()=>{
+    const duties=['Hold the customer and Chili Piper teams accountable to meeting defined success criteria.','Proactively solve and act as a point of escalation for technical issues.','Ensure internal visibility by providing regular updates, status and next steps through Slack and Email, and via weekly 1:1s with your Manager.','Produce internal best practices and customer user stories to make customers lives easier.','Collaborate closely with cross-functional teams to support the success of your customers.','Build customer advocates by developing customer case studies and references to support the growth of Chili Piper.','Identify upsell and cross sell opportunities which are shared with the Account Management team who will then drive commercial negotiations.'];
+    const verdicts=duties.map((text,i)=>({requirement:{id:String(i),text,category:'responsibility',type:'required'},state:'partial'}));
+    assert.deepEqual(manualRequirementAsks({verdicts},[]),[]);
+    const {displayPostingQuestions}=await import('../app/lib/apply/posting-question.ts');
+    assert.deepEqual(displayPostingQuestions(duties.map(term=>({term,ifTrue:'Add evidence for: '+term})),duties.join('\n')),[]);
+  });
+  it('uses plain labels for both new and saved useful suggestions',async()=>{
+    const text='Strong SQL skills (BigQuery or similar).';
+    const asks=manualRequirementAsks({verdicts:[{requirement:{id:'sql',text,category:'skill',type:'required'},state:'missing'}]},[]);
+    assert.equal(asks[0].ifTrue,text);
+    const {displayPostingQuestions}=await import('../app/lib/apply/posting-question.ts');
+    assert.equal(displayPostingQuestions([{term:'SQL',ifTrue:'Add evidence for: '+text}],text)[0].ifTrue,text);
+  });
   it("never offers perks or eligibility as manual evidence, including old scans", async () => {
     const { displayPostingQuestions } = await import('../app/lib/apply/posting-question.ts');
     const texts=['Strong SQL skills (BigQuery or similar).','Experience with Amplitude, AppsFlyer.','Time-off Policy - unlimited Out of office days.','Remote or Hybrid work. The choice is yours.','Wellness compensations.','Health insurance.','Team buildings and offsites (Spain, Italy, Poland, Portugal and others).','Merch.','Special Occasions Presents.'];
@@ -436,7 +450,7 @@ describe("the score card's fixes", () => {
     saved.push({term:'Access to a learning platform',ifTrue:'Add evidence for: Access to a learning platform.'});
     const posting=['Requirements',...texts.slice(0,2),'What you get with us',...texts.slice(2),'Access to a learning platform.'].join('\n');
     assert.deepEqual(displayPostingQuestions(saved,posting).map(a=>a.term),texts.slice(0,2));
-    const hr={term:'Health insurance',ifTrue:'Add evidence for: Manage health insurance enrollment.'};
+    const hr={term:'Health insurance',ifTrue:'Have you managed health insurance enrollment?'};
     assert.equal(displayPostingQuestions([hr],'Responsibilities\nManage health insurance enrollment.').length,1);
   });
   it("offers all unresolved requirements as manual controls and respects answered choices",()=>{

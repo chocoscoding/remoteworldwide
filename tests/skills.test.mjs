@@ -32,6 +32,11 @@ const {
 
 const base = { name: "", skills: ["React", "Figma"] };
 
+it('keeps only names from the customer-success screenshot when adding Skills',()=>{
+ const actual=addSkills({skills:[]},['Own customer onboarding, ensuring fast time to value.','Motivated, Solutions Driven and Conscientious person who.','Technical experience is required, e.g., implementing.','Basic understanding of Javascript, HTML, CSS.','Strong proficiency and experience using Salesforce 1-2+.','Strong proficiency and experience using Marketing, SFDC implementation, data model (standard and custom).','Communicate effectively via oral & written formats.','Freedom and flexibility.','Solve interesting problems.','Autonomy and ownership.','Be helpful.','Annual professional development stipend of $2,000 USD.','Equity - all Pipers receive stock options.']);
+ assert.deepEqual(new Set(actual.skills),new Set(['Customer onboarding','JavaScript','HTML','CSS','Salesforce','Salesforce implementation','Data modeling','Communication']));
+});
+
 it('extracts skill names instead of inserting job requirements and workflow arrows',()=>{
  const updated=addSkills({skills:[]},['Strong SQL skills (BigQuery or similar)','Strong analytical thinking and ability to translate data','Analyze funnel performance (click → install → payment →)','Identify data quality issues and collaborate with data','Work with attribution data and marketing sources (Meta,','BI tools (Tableau)','Experience with Amplitude, AppsFlyer']);
  for(const name of ['SQL','BigQuery','Data analysis','Funnel analysis','Data quality','Marketing attribution','Meta','Tableau','Amplitude','AppsFlyer']) assert.ok(updated.skills.includes(name),JSON.stringify(updated.skills));

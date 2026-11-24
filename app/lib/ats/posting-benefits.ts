@@ -1,20 +1,36 @@
 /** Employer offers are not candidate qualifications. Mirrored in the website;
  * a contract test keeps stored-question filtering and extraction in agreement. */
 const clean = (text: string) => text.replace(/<[^>]*>/g, ' ').replace(/[*_#]/g, '').replace(/^\s*[-•–]\s*/, '').replace(/\s+/g, ' ').trim();
-const offerHeading = /^(?:(?:our |your |employee |full.time employee )?(?:benefits?|perks?)(?:\s+(?:and|&)\s+(?:benefits?|perks?))?|(?:what )?we (?:can )?(?:offer|provide)(?: you)?|what you(?:['’]ll| will)? (?:get|receive)(?: with us| in return)?|what(?:['’]s| is) in it for you|why (?:join us|work (?:with|for) us)|how we take care of you|compensation(?: and benefits)?)[\s:?!.-]*$/i;
+const offerHeading = /^(?:(?:our |your |employee |full.time employee )?(?:benefits?|perks?)(?:\s+(?:and|&)\s+(?:benefits?|perks?))?|(?:what )?we (?:can )?(?:offer|provide)(?: you)?|what you(?:['’]ll| will)? (?:get|receive)(?: with us| in return)?|what(?:['’]s| is) in it for you|why (?:join us|work (?:with|for) us)|how we take care of you|compensation(?: and benefits)?|(?:our |company )?culture|life at .+|what makes us different)[\s:?!.-]*$/i;
 const candidateHeading = /^(?:(?:key |main |core |your |job )?(?:responsibilities|duties)|(?:minimum |basic |preferred )?(?:qualifications|requirements)|skills(?: and experience)?|what you(?:['’]ll| will)? (?:do|need)|what we(?:['’]re| are)? looking for|about you|who you are|your (?:role|profile|background|impact)|nice.to.haves?|bonus(?: points)?)(?:\s*:.*|[?!.-]*)$/i;
 const benefit = /\b(?:paid time off|time.off policy|out of office days|unlimited (?:pto|vacation|leave|holidays)|pto|health insurance|(?:medical|dental|vision|life) (?:insurance|coverage)|wellness (?:compensations?|allowance|benefits?|budget)|team buildings?|offsites?|merch(?:andise)?|special occasions? (?:presents|gifts)|parental leave|pension|401\(?k\)?|gym membership|(?:learning|education|home office) (?:budget|stipend|allowance))\b/i;
 // The same nouns are legitimate work for HR, insurance, retail and operations.
 const candidateWork = /^(?:(?:you (?:will|must|should)|you['’]ll|responsible for|(?:proven |hands.on |prior |strong |solid )*(?:experience|knowledge|understanding|expertise|proficiency|familiarity|ability|skills) (?:with|in|of|to)|\d+\+? years (?:of )?experience (?:with|in))\s+)?(?:manage|administer|design|develop|build|implement|analy[sz]e|sell|advise|process|coordinate|organize|lead|support|deliver|audit|oversee|maintain|negotiate|create|handle|track|plan|work)(?:s|d|ed|ing)?\b/i;
 
 export function isEmployerOffer(value: string): boolean {
-  const text = clean(value).replace(/^add evidence for:\s*/i, '').replace(/,?\s*if you have used it[.!]?$/i, '').trim();
+  const text = clean(value).replace(/^add evidence for:\s*/i, '').replace(/^(?:have you(?: ever)?|did you|do you)\s+/i,'').replace(/,?\s*if you have used it[.!]?$/i, '').trim();
   if (offerHeading.test(text)) return true;
+  // These describe the employer/environment, even when they start with "Work".
+  if (/^work (?:in|for) (?:an? |the )?(?:business|company|organi[sz]ation)\b.*\b(?:fairly|transparent|transparently|ethical|inclusive)\b|^work with (?:an? )?(?:(?:immensely|highly|exceptionally|incredibly) )?(?:talented|amazing|great|world.class)\b.*\bteam\b|^we (?:lead by example|believe|value|celebrate|have fun)\b/i.test(text)) return true;
   if (/^(?:(?:proven|hands.on|prior|strong|solid|demonstrated)\s+)*(?:experience|knowledge|understanding|expertise|proficiency|familiarity)\s+(?:with|in|of)\b/i.test(text)) return false;
   if (/\b(?:industry experience|administration|claims processing|sales experience|management skills)\s*[.!]?$/i.test(text)) return false;
   if (/^(?:managing|administering|designing|developing|building|implementing|analy[sz]ing|selling|advising|processing|coordinating|organizing|leading|supporting|delivering|auditing|overseeing|maintaining|negotiating|creating|handling|tracking|planning)\b/i.test(text)) return false;
   if (candidateWork.test(text)) return false;
+  if (/\b(?:competitive pay|(?:company|annual|team) retreats?|professional development (?:stipend|budget|allowance)|stock options|equity (?:package|grant)|(?:equipment|software|tech).{0,30}(?:you need|you'll need|you need to do your job))\b/i.test(text) || /^equity\s*[-–—:]|^(?:any |all |the )?equipment\/software\/tech\b/i.test(text)) return true;
   return benefit.test(text) || /^(?:(?:fully |flexible )?(?:remote|hybrid|on.site)(?:\s+(?:or|and|\/)\s*(?:remote|hybrid|on.site))?\s+(?:work|working|workplace|options?)\b|(?:competitive|attractive|generous) (?:salary|compensation|benefits)|(?:we |you will |you['’]ll )?(?:offer|provide|receive|enjoy)\b.*\b(?:benefits|insurance|holidays|vacation|stipend|equipment)\b)/i.test(text);
+}
+
+/** Personality/culture fragments aren't skill names or evidence requests. */
+export function isPostingTrait(value:string):boolean {
+  const text=clean(value).replace(/^add evidence for:\s*/i,'').replace(/[.!?]+$/,'');
+  return /^(?:motivated|self.motivated|solutions? driven|conscientious(?: person)?|be helpful|freedom and flexibility|autonomy and ownership|solve interesting problems|(?:have )?fun)(?:[,;]|\s+(?:and|person|who)\b.*|$)/i.test(text);
+}
+
+/** Identify copied imperative duties, including saved auto-generated checklist rows.
+ * Real questions about specific work remain available. */
+export function isPostingDuty(value:string):boolean {
+  const text=clean(value).replace(/^add evidence for:\s*/i,'').replace(/^(?:proactively|closely|regularly)\s+/i,'');
+  return candidateWork.test(text) || /^(?:own|hold|solve|ensure|produce|collaborate|identify|communicate|drive|act|report)\b/i.test(text);
 }
 
 /** Preserve newlines and subsequent qualifications, including bulleted headings.
@@ -26,7 +42,7 @@ export function withoutEmployerOffers(posting: string): string {
     const head = line.split(':')[0].trim();
     if (offerHeading.test(head)) { inBenefits = true; return false; }
     if (candidateHeading.test(line)) { inBenefits = false; return true; }
-    return !inBenefits && !isEmployerOffer(line);
+    return !inBenefits && !isEmployerOffer(line) && !isPostingTrait(line);
   }).map(raw => candidateHeading.test(clean(raw)) ? clean(raw) : raw).join('\n');
 }
 

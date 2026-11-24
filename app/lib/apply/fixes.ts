@@ -10,7 +10,7 @@ import type { FitAsk } from "./state";
 import { opensWithStrongVerb } from "./impact";
 import { actionableSkillLabel } from "../resume/skill-labels";
 import { isPostingNote } from "../ats/types";
-import { isEmployerOffer } from "../ats/posting-benefits";
+import { isEmployerOffer, isPostingTrait } from "../ats/posting-benefits";
 
 export type ScoreHue = "low" | "mid" | "high";
 
@@ -240,11 +240,11 @@ export function manualRequirementAsks(report:Pick<ScanReport,"verdicts">,answere
   const seen=new Set([...answered.filter(a=>a.no || a.superseded || a.addedIn),...open].map(a=>fold(a.term)));
   return report.verdicts.flatMap(verdict=>{
     const req=verdict.requirement;
-    if(isPostingNote(req) || isEmployerOffer(req.text) || req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state))return [];
+    if(isPostingNote(req) || req.category==='responsibility' || isEmployerOffer(req.text) || isPostingTrait(req.text) || req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state))return [];
     const term=req.label?.trim() || req.text.trim();
     if(!term || seen.has(fold(term)))return [];
     seen.add(fold(term));
-    return [{term,ifTrue:"Add evidence for: "+req.text.replace(/[.!?]+$/,"")+".",place:req.category==="skill" ? "skills" as const : "experience" as const,
+    return [{term,ifTrue:req.text.replace(/[.!?]+$/,"")+".",place:req.category==="skill" ? "skills" as const : "experience" as const,
       fromStep:null,no:false,addedIn:null}];
   });
 }
