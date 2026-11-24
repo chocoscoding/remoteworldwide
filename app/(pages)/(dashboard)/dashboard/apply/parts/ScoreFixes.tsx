@@ -312,16 +312,10 @@ export const ScoreRow: FC<{
         partial={state.kind === "partial"}
       />
     </div>
-    {state.kind === "ready" && progress.length > 0 && (
-      <p className="text-xs text-[#5f6062]" role="status">
-        Stronger evidence for: {progress.join(", ")}.
-        {report?.score === previousScore ? " Your overall score is unchanged." : ""}
-      </p>
-    )}
     {state.kind === "ready" && previousScore !== null && report?.score === previousScore && progress.length === 0 && drops.length === 0 && (
       <details className="text-xs text-[#73746d]">
         <summary className="cursor-pointer">Saved · score unchanged</summary>
-        <p className="mt-1 max-w-2xl leading-relaxed">The edit is saved. This scan did not change your rounded overall score. Adding a skill can strengthen the resume without changing a requirement's existing credit; experience shows how you used it.</p>
+        <p className="mt-1 max-w-2xl leading-relaxed">The edit is saved. This scan did not change your rounded overall score. Adding a skill can strengthen the resume without changing a requirement&apos;s existing credit; experience shows how you used it.</p>
       </details>
     )}
     {state.kind === "ready" && drops.length > 0 && (
@@ -713,7 +707,7 @@ export const FixesTabs: FC<{
     onAnswerAsks(tickedNow, yes);
     setTicked(new Set());
   };
-  const missingCount = new Set([...gaps.map(gap => gap.label.toLowerCase()), ...skillsOnly.map(gap => gap.label.toLowerCase()), ...suggestions.flatMap(row => row.id === "punctuation" ? ["fix:punctuation"] : [])]).size;
+  const missingCount = new Set([...gaps.map(gap => gap.label.toLowerCase()), ...skillsOnly.map(gap => gap.label.toLowerCase()), ...suggestions.flatMap(row => row.id === "punctuation" ? ["fix:punctuation"] : row.batch ? [row.batch.toLowerCase()] : [])]).size;
   const pickedCount = gaps.filter((gap) => picked.has(gap.id) && !gap.choices).length;
   const bulletsOn = places.includes("bullets");
   const prove = skillsOnly.length > 0;
@@ -745,7 +739,7 @@ export const FixesTabs: FC<{
                   )}>
                   {id === "missing" ? missingCount : working.length}
                 </span>
-                {id === "missing" && batchTerms.length > 0 && <span className="ml-1 text-[11px] font-normal text-[#73746d]">· {batchTerms.length} {batchTerms.length === 1 ? "question" : "questions"}</span>}
+                {id === "missing" && batchTerms.length > 0 && <span className="ml-1 text-[11px] font-normal text-[#73746d]">· {batchTerms.length} {batchTerms.length === 1 ? "choice" : "choices"}</span>}
               </button>
             );
           })}
@@ -901,13 +895,15 @@ export const FixesTabs: FC<{
             </div>
             )}
             {index === capped.toggleAfter && (
+              <div className={cn("flex justify-center", !asksOpen && "relative -mt-2 bg-gradient-to-t from-white via-white/95 to-transparent pb-1 pt-7")}>
               <button
                 type="button"
                 aria-expanded={asksOpen}
                 onClick={() => setAsksOpen((open) => !open)}
-                className="cursor-pointer self-start px-3 py-0.5 text-xs font-bold text-[#5f6062] underline decoration-black/25 underline-offset-2 hover:text-primary hover:decoration-[#222325]">
-                {asksOpen ? "Show less" : `Show ${capped.hidden} more`}
+                className="cursor-pointer rounded-full border border-black/10 bg-white px-4 py-2 text-xs font-bold text-primary shadow-sm hover:bg-[#f6f6f6] focus-visible:outline-2 focus-visible:outline-offset-2">
+                {asksOpen ? "See less" : `See more (${capped.hidden})`}
               </button>
+              </div>
             )}
             </Fragment>
           ))}

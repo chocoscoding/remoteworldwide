@@ -154,6 +154,26 @@ export function reconcileGroups<C extends Pick<ResumeContent, "skills" | "skillG
  */
 function placeNew(entries: ResumeSkillGroup[], fresh: ResumeSkillGroup[], taken: Set<string>): ResumeSkillGroup[] {
   if (fresh.length === 0) return entries;
+  if (entries.filter(group=>!group.hidden && group.skills.length>0).length>=2) {
+    const families:Array<[RegExp,RegExp,string]>=[
+      [/bigquery|snowflake|postgres|mongodb|mysql|redis|databricks/i,/database|data platform|storage/i,"Databases & data platforms"],
+      [/^(?:python|sql|r|typescript|javascript|java|c\+\+|c#|go|rust)$/i,/programming|languages/i,"Programming Languages"],
+      [/tableau|power bi|looker|analytics|analysis|statistics|statistical|visuali[sz]ation|a\/b|\b(?:ltv|cac|roi|romi)\b/i,/analytic|reporting|business intelligence/i,"Analytics & reporting"],
+      [/google ads|meta ads|^meta$|appsflyer|amplitude|attribution|marketing/i,/marketing|advertising/i,"Marketing tools"],
+      [/\b(?:aws|gcp|azure|cloud)\b/i,/cloud/i,"Cloud Platforms"],
+    ];
+    const grouped=entries.map(group=>({...group,skills:[...group.skills]}));
+    const remaining:ResumeSkillGroup[]=[];
+    for(const skill of fresh){
+      const family=families.find(([pattern])=>pattern.test(skill.title));
+      if(!family){remaining.push(skill);continue;}
+      let group=grouped.find(entry=>!entry.hidden && family[1].test(entry.title) && entry.skills.length>0);
+      if(!group){group={id:entryIdFor(family[2],taken),title:family[2],skills:[]};grouped.push(group);}
+      group.skills.push(skill.title);
+    }
+    // Only recurse after at least one item was placed; unknown skills retain the existing fallback.
+    if(remaining.length<fresh.length)return placeNew(grouped,remaining,taken);
+  }
   let after = -1;
   entries.forEach((group, i) => {
     if (!group.hidden && group.title.trim() && !group.skills.some((skill) => skill.trim())) after = i;

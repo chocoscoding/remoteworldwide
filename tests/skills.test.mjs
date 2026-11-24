@@ -28,6 +28,12 @@ const {
 } = await import("../app/lib/resume/skills.ts");
 
 const base = { name: "", skills: ["React", "Figma"] };
+
+it("keeps manually added skills in the existing categorized format",()=>{
+  const groups=[{id:"code",title:"Programming Languages",skills:["SQL"]},{id:"db",title:"Database",skills:["PostgreSQL"]}];
+  const updated=addSkills({skills:flattenGroups(groups),skillGroups:groups},["BigQuery","Tableau"]);
+  assert.deepEqual(updated.skillGroups.map(g=>[g.title,g.skills]),[["Programming Languages",["SQL"]],["Database",["PostgreSQL","BigQuery"]],["Analytics & reporting",["Tableau"]]]);
+});
 const entry = (id, title, skills = [], extra = {}) => ({ id, title, skills, ...extra });
 
 describe("entries and the flat list", () => {

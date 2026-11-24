@@ -51,6 +51,7 @@ const {
   worthGapChip,
   fitGap,
   exampleAsks,
+  manualRequirementAsks,
   askedFor,
   bulletsWithoutResult,
   fixFirstId,
@@ -424,6 +425,13 @@ describe("the draft's change history", () => {
 });
 
 describe("the score card's fixes", () => {
+  it("offers all unresolved requirements as manual controls and respects answered choices",()=>{
+    const verdicts=Array.from({length:9},(_,i)=>({requirement:{id:"gap"+i,label:"Skill "+i,text:"Use skill "+i+" in reports",category:"skill"},state:"missing"}));
+    const asks=manualRequirementAsks({verdicts},[{term:"Skill 0",no:true}],[{term:"Skill 1"}]);
+    assert.equal(asks.length,7);
+    assert.equal(asks.at(-1).term,"Skill 8");
+    assert.match(asks[0].ifTrue,/Use skill 2 in reports/);
+  });
   const verdict = (id, state, sections) => ({
     requirement: { id, text: `Wants ${id}`, label: id, category: "skill", importance: "required" },
     state,
@@ -443,7 +451,7 @@ describe("the score card's fixes", () => {
     const asks = exampleAsks(report, { skills: ["AWS", "GCP"] }, []);
     assert.deepEqual(
       asks.map((ask) => ask.term),
-      ["Java", "Azure", "Facebook API", "Instagram API"],
+      ["Java", "Azure", "Facebook API", "Instagram API", "WhatsApp API"],
     );
     assert.deepEqual(asks[0], { term: "Java", ifTrue: "Java, if you have used it", place: "skills", fromStep: null, no: false, addedIn: null, near: ["Python", "SQL"] });
     // Answered no, or already in Skills: not asked.

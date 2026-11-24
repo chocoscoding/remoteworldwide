@@ -56,6 +56,7 @@ import {
   workingItems,
   worthGapChip,
   exampleAsks,
+  manualRequirementAsks,
   askedFor,
 } from "@/app/lib/apply/fixes";
 import { scoreDrops } from "@/app/lib/apply/score-changes";
@@ -855,7 +856,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   // A term an open ask names (Tailor's, or an example ask) is no chip: the person answers the ask, and
   // a yes puts it in (fix plan 3c, owner 2026-10-22: Mandarin and Web3 were asked, then added by chip).
   // One answered "No" keeps its chip away too (`chipAsks`, review 2026-10-22).
-  const askedNow = chipAsks(openAsks, resume.asks ?? [], !report || !visible ? [] : exampleAsks(report, visible, resume.asks ?? []));
+  const manualAsks = report && visible ? manualRequirementAsks(report,resume.asks ?? [],openAsks) : [];
+  const askedNow = chipAsks([...openAsks,...manualAsks], resume.asks ?? [], !report || !visible ? [] : exampleAsks(report, visible, resume.asks ?? []));
   const gapChips: GapChip[] = worthGaps
     .filter((gap) => !askedFor(gap.label, askedNow))
     .map((gap) => ({
@@ -885,6 +887,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const shownAsks = displayPostingQuestions([
     ...openAsks,
     ...(!report || !visible ? [] : exampleAsks(report, visible, resume.asks ?? []).filter((ask) => !tailorAsked.has(ask.term.toLowerCase()))),
+    ...manualAsks,
   ],job.description ?? "");
   // The asks on show, sent as `pending` on every keywords and Tailor call: the AI never writes one in
   // while the person answers it (owner, 2026-10-22, fix plan B: "Google Analytics" was asked, then
@@ -1896,8 +1899,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
         />
         {changeError && <p role="alert" className="text-sm text-[#b23c26]">{changeError}</p>}
         {report && (
-          <details className="border-t border-[#222325]/10 pt-3">
-            <summary className="cursor-pointer text-sm font-semibold text-[#5f6062]">Fine-tune your resume</summary>
+          <section className="border-t border-[#222325]/10 pt-3" aria-label="Fine-tune your resume">
+            <h3 className="mb-3 text-sm font-semibold text-[#5f6062]">Fine-tune your resume</h3>
           <FixesTabs
             hasScoreDrop={drops.length > 0}
             gaps={shownChips}
@@ -1927,7 +1930,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             onAnswerAsks={answerAsksTogether}
             note={stuffingView}
           />
-          </details>
+          </section>
         )}
       </section>
 

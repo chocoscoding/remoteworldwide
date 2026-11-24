@@ -203,9 +203,6 @@ export function tailorTargets(report: Pick<ScanReport, "score" | "verdicts">) {
     .map(v => ({ id:v.requirement.id, label:v.requirement.label || v.requirement.text }));
 }
 
-/** Example asks shown at once, at most. */
-const MAX_EXAMPLE_ASKS = 4;
-
 /**
  * The examples a posting names that the resume does not ("such as Java, Python, SQL", met on Python
  * and SQL), each a yes or no that puts it in Skills (owner, 2026-10-21: "Java and Azure" left the page
@@ -232,7 +229,23 @@ export function exampleAsks(
       out.push({ term, ifTrue: `${term}, if you have used it`, place: "skills", fromStep: null, no: false, addedIn: null, near });
     }
   }
-  return out.slice(0, MAX_EXAMPLE_ASKS);
+  // Presentation collapses the list; never discard the remaining opportunities.
+  return out;
+}
+
+/** Complete optional controls for job requirements, available before one-click generation. */
+export function manualRequirementAsks(report:Pick<ScanReport,"verdicts">,answered:ReadonlyArray<Pick<FitAsk,"term"|"no"|"superseded"|"addedIn">>,open:ReadonlyArray<{term:string}>=[]):FitAsk[] {
+  const seen=new Set([...answered.filter(a=>a.no || a.superseded || a.addedIn),...open].map(a=>fold(a.term)));
+  return report.verdicts.flatMap(verdict=>{
+    const req=verdict.requirement;
+    if(req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state) ||
+      /\b(?:work authori[sz]ation|visa|relocation|salary|compensation|equal opportunit|apply (?:now|here))\b/i.test(req.text))return [];
+    const term=req.label?.trim() || req.text.trim();
+    if(!term || seen.has(fold(term)))return [];
+    seen.add(fold(term));
+    return [{term,ifTrue:"Add evidence for: "+req.text.replace(/[.!?]+$/,"")+".",place:req.category==="skill" ? "skills" as const : "experience" as const,
+      fromStep:null,no:false,addedIn:null}];
+  });
 }
 
 /** As `fold`, keeping "+" and "#" as the AI's keyword guard does: "C++", "C#" and "C" are three names (review, 2026-10-22). */
