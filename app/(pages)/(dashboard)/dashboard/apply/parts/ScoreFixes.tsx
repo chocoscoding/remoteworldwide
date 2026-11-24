@@ -510,6 +510,7 @@ export interface Suggestion {
   id: string;
   title: string;
   detail?: string;
+  error?: string;
   action: string;
   icon: "quantify" | "tailor";
   onClick?: () => void;
@@ -554,6 +555,7 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
   const [entryId, setEntryId] = useState(initial.entryId);
   const [detail, setDetail] = useState(initial.detail);
   const [editedDetail, setEditedDetail] = useState(initial.detailEdited);
+  const [editing, setEditing] = useState(false);
   const saveDraft = (next: { skills?: boolean; experience?: boolean; detail?: string; entryId?: string; detailEdited?: boolean }) => {
     row.placement?.onChange(next.skills ?? skills, next.experience ?? experience, next.detail ?? detail, next.entryId ?? entryId,next.detailEdited ?? editedDetail);
   };
@@ -575,14 +577,13 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
     });
     observer.observe(field);
     return () => observer.disconnect();
-  }, [detail, experience]);
+  }, [detail, experience, editing]);
   const destination = skills && experience ? "both" : experience ? "Experience" : "Skills";
   return (
     <div className="rounded-[10px] bg-[#f6f6f6] pl-3 pr-2 py-1.5">
       <div className="flex min-h-8 flex-wrap items-center gap-2">
         {onSelect && <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select: ${row.title}`} disabled={disabled} onClick={onSelect} className="cursor-pointer"><TickBox on={selected} /></button>}
-        <strong className="min-w-0 flex-1 text-[13px]">{row.title}</strong>
-        <span className="text-xs text-[#5f6062]">Add to either or both:</span>
+        <strong className="min-w-[140px] flex-1 text-[13px] leading-5 line-clamp-2">{row.detail || row.title}</strong>
         {([{ label: "Skills", on: skills, toggle: () => { setSkills(!skills); saveDraft({ skills: !skills }); } }, { label: "Experience", on: experience, toggle: () => { setExperience(!experience); saveDraft({ experience: !experience }); } }]).map(option => (
           <button key={option.label} type="button" role="checkbox" aria-checked={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled || option.label==='Skills' && !canAddSkills} onClick={option.toggle}
             className={cn("flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-[11px] font-semibold disabled:opacity-50", option.on ? "border-[#dce89c] bg-[#f2f9c9] text-[#343a18]" : "border-black/15 bg-white text-[#55564f]")}>
@@ -590,6 +591,7 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
           </button>
         ))}
         {row.placement?.skillsAdded && <span className="text-[11px] text-[#63761a]">In Skills</span>}
+        {experience && <button type="button" disabled={disabled} aria-expanded={editing} onClick={()=>setEditing(!editing)} className="h-7 cursor-pointer rounded px-2 text-xs font-semibold text-[#55564f] hover:bg-black/5">{editing ? 'Done' : 'Edit'}</button>}
         <button type="button" disabled={disabled || (!skills && !experience) || (experience && (!detail.trim() || !entryId))}
           aria-label={`Add ${row.title} to ${destination}`}
           onClick={() => row.placement?.onApply(skills, experience, detail.trim(), entryId)}
@@ -600,7 +602,11 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
           <button type="button" disabled={disabled} aria-label={`Dismiss ${row.title} suggestion`} title={`Dismiss ${row.title} suggestion`} onClick={choice.onClick} className="grid h-6 w-6 cursor-pointer place-content-center rounded text-[#777870] hover:bg-black/5 hover:text-primary disabled:opacity-50"><X aria-hidden className="h-3.5 w-3.5" /></button>
         </span>)}
       </div>
-      {experience && <div className="mt-2 border-t border-black/8 pt-2 pb-1 pr-1">
+      {experience && !editing && <button type="button" disabled={disabled} onClick={()=>setEditing(true)} aria-label={`Edit example for ${row.detail || row.title}`} className="mt-1 flex w-full min-w-0 items-center gap-2 pb-1 text-left text-xs text-[#65665f] hover:text-primary">
+        <span className="min-w-0 truncate">{detail || 'Edit example'}</span>
+      </button>}
+      {experience && editing && <div className="mt-2 border-t border-black/8 pt-2 pb-1 pr-1">
+        {row.detail && row.detail!==row.title && <p className="mb-2 text-xs text-[#65665f]">{row.title}</p>}
         <label className="mb-2 flex items-center gap-2 text-xs text-[#5f6062]">Role
           <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => {
             setEntryId(event.target.value);
@@ -614,28 +620,15 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
           </select>
         </label>
         <label className="block text-xs font-semibold text-primary">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span>Suggested work example</span>
-            <span className="text-[11px] font-normal text-[#73746d]">Edit it or add it as written.</span>
-          </span>
+          <span className="sr-only">Experience wording</span>
           <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => { setDetail(event.target.value); setEditedDetail(true); saveDraft({ detail: event.target.value, detailEdited: true }); }} disabled={disabled} rows={1} maxLength={500}
             placeholder="What did you do, and what changed?"
             className="mt-1.5 block w-full resize-none overflow-y-auto rounded-lg border border-black/20 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-primary outline-none focus:border-[#222325] focus:ring-1 focus:ring-[#222325] disabled:opacity-50" />
         </label>
       </div>}
+      {row.error && <p role="alert" className="mt-1 text-xs text-[#b23c26]">{row.error}</p>}
     </div>
   );
-};
-
-const PLACE_LABELS: Record<ResumePlace, string> = { summary: "Summary", bullets: "Bullets", skills: "Skills" };
-const PLACES: ResumePlace[] = ["summary", "bullets", "skills"];
-
-/** A requirement's label short enough for a button: cut at a word, about 28 characters. */
-const shortLabel = (label: string): string => {
-  const clean = label.trim();
-  if (clean.length <= 28) return clean;
-  const cut = clean.slice(0, 28);
-  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 12)).trim()}…`;
 };
 
 const TOOL_BUTTON =
@@ -674,12 +667,9 @@ export const FixesTabs: FC<{
   onClear,
   working,
   suggestions,
-  places,
-  onPlaces,
   busy,
   disabled,
   onAddPicked,
-  onProve,
   error,
   creditsHref,
   note,
@@ -711,10 +701,6 @@ export const FixesTabs: FC<{
   };
   const missingCount = new Set([...gaps.map(gap => gap.label.toLowerCase()), ...skillsOnly.map(gap => gap.label.toLowerCase()), ...suggestions.flatMap(row => row.id === "punctuation" ? ["fix:punctuation"] : row.batch ? [row.batch.toLowerCase()] : [])]).size;
   const pickedCount = gaps.filter((gap) => picked.has(gap.id) && !gap.choices).length;
-  const bulletsOn = places.includes("bullets");
-  const prove = skillsOnly.length > 0;
-  const togglePlace = (place: ResumePlace) =>
-    onPlaces(places.includes(place) ? places.filter((p) => p !== place) : PLACES.filter((p) => p === place || places.includes(p)));
 
   return (
     <div className="flex flex-col gap-3 border-t border-[#222325]/10 pt-4">
@@ -943,34 +929,13 @@ export const FixesTabs: FC<{
         </p>
       )}
 
-      {tab === "missing" && (gaps.some((gap) => !gap.choices) || prove) && (
+      {tab === "missing" && pickedCount > 0 && (
         <div className="flex flex-wrap items-center gap-2.5 border-t border-[#222325]/10 pt-3">
-          <span className="text-xs font-bold text-[#5f6062]">Add to</span>
-          {PLACES.map((place) => {
-            const on = places.includes(place);
-            return (
-              <button
-                key={place}
-                type="button"
-                aria-pressed={on}
-                disabled={disabled}
-                onClick={() => togglePlace(place)}
-                className={cn(
-                  "flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-xs font-bold disabled:cursor-default",
-                  on ? "border-[#222325] bg-[#eef6ad] text-primary" : "border-[#222325]/20 bg-white text-[#8a8b85]",
-                )}>
-                {on ? <Check className="h-[11px] w-[11px]" strokeWidth={3} /> : <X className="h-2.5 w-2.5" strokeWidth={2.6} />}
-                {PLACE_LABELS[place]}
-              </button>
-            );
-          })}
-          {(pickedCount > 0 || prove) && <span aria-hidden className="mx-1 h-6 w-px bg-[#222325]/15" />}
           {pickedCount > 0 ? (
             <>
               <button
                 type="button"
-                disabled={disabled || Boolean(busy) || places.length === 0}
-                title={places.length > 0 ? undefined : "Turn on a part under Add to"}
+                disabled={disabled || Boolean(busy)}
                 onClick={onAddPicked}
                 className={cn(
                   TOOL_BUTTON,
@@ -983,19 +948,6 @@ export const FixesTabs: FC<{
               </button>
             </>
           ) : null}
-          {prove && (
-            <button
-              type="button"
-              disabled={disabled || Boolean(busy) || !bulletsOn}
-              title={bulletsOn ? undefined : "Turn on Bullets under Add to"}
-              onClick={onProve}
-              className={cn(TOOL_BUTTON, "border-[1.5px] border-[#222325] bg-[#222325] text-white disabled:opacity-50")}>
-              <Plus className="h-[10px] w-[10px]" strokeWidth={2.6} />
-              {/* What it does, said plainly (owner, 2026-10-21: "Add the 1 to resume." meant nothing): these are
-                  shown only in Skills, and the button works them into a line of experience. */}
-              {skillsOnly.length === 1 ? `Show ${shortLabel(skillsOnly[0].label)} in your experience` : `Show all ${skillsOnly.length} in your experience`}
-            </button>
-          )}
         </div>
       )}
     </div>

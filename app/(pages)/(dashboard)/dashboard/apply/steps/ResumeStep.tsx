@@ -197,6 +197,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   // starts, never the old "Up to date" while the save is in flight (owner, 2026-10-20).
   const [saving, setSaving] = useState(0);
   const [changeError, setChangeError] = useState<string | null>(null);
+  const [placementErrors,setPlacementErrors]=useState<Record<string,string>>({});
   // The −1 pt note set aside ("Keep as is") for this score.
   const [keptStuffing, setKeptStuffing] = useState<string | null>(null);
   // "Show in resume": the lines lit on the page now, and a key so the same lines light again.
@@ -1123,6 +1124,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   /** Save the assertion first; only close questions whose saved placement is verified. */
   function applyConfirmed(items: FitAsk[]) {
     if (!content || !toolsIdle || items.length === 0) return;
+    setPlacementErrors(previous=>Object.fromEntries(Object.entries(previous).filter(([term])=>!items.some(item=>item.term===term))));
     const confirmed = confirmAsks(resume.asks ?? [], items);
     update((s) => ({ ...s, resume: { ...s.resume, asks: confirmAsks(s.resume.asks ?? [], items) } }));
     const toSkills = items.filter(item => item.place === "skills");
@@ -1133,10 +1135,10 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     const finish = (made: CommittedStep | null, result: KeywordInjection | null) => {
       const applied = made ? appliedAsks(items, made.content, result) : [];
       if (made) for (const item of applied) answerAsk(item, { addedIn: made.stepId });
-      if ((made || result?.notShown?.length) && applied.length < items.length) {
+      if (applied.length < items.length) {
         const saved = made?.content ?? content;
-        const inSkills = toSkills.filter(item => hasSkill(saved,item.term));
-        setChangeError(previous => previous ?? `${inSkills.length ? `${inSkills.map(item => item.term).join(", ")} added to Skills. ` : ""}Experience was not updated. ${result?.notShown?.[0]?.advice ?? "Your example is saved. Retry the update."}`);
+        setPlacementErrors(previous=>({...previous,...Object.fromEntries(items.filter(item=>!applied.includes(item)).map(item=>[item.term,item.place==='skills' ? 'Couldn’t add skill. Try again.' : `${hasSkill(saved,item.term) ? 'Skills saved. ' : ''}Couldn’t add experience. Try again.`]))}));
+        setChangeError(null);
       }
     };
     if (toLines.length === 0) {
@@ -1194,6 +1196,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
    */
   function addPicked() {
     if (!content || !toolsIdle) return;
+    const destinations:ResumePlace[]=places.length ? places : ['skills','bullets'];
     // A language is answered by its level, picked on its chip; never sent to be "added" bare.
     const chosen = gapChips.filter((chip) => picked.has(chip.id) && !isLanguageChip(chip));
     const labels = chosen.map((chip) => chip.label);
@@ -1205,7 +1208,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     );
     const n = labels.length;
     const noun = n === 1 ? "keyword" : "keywords";
-    const where = places.includes("bullets") ? "your experience" : places.includes("summary") ? "your summary" : "Skills";
+    const where = destinations.includes("bullets") ? "your experience" : destinations.includes("summary") ? "your summary" : "Skills";
     let outcome: KeywordInjection | null = null;
     void runAndCommit(
       `Worked ${n} ${noun} into ${where}`,
@@ -1218,7 +1221,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             company: job.company,
             role: job.role,
             keywords: labels,
-            places,
+            places: destinations,
             insist: true,
             hints,
             pending: openTerms,
@@ -1232,7 +1235,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     ).then((made) => {
       // Kept even when nothing changed: what it found already there, or could place nowhere, is
       // never offered again to change nothing (50-job run, 2026-10-19).
-      if (outcome) rememberWorked(outcome, places);
+      if (outcome) rememberWorked(outcome, destinations);
       if (outcome) tellAwaiting(outcome);
       if (!made) return;
       setPicked(new Set());
@@ -1264,7 +1267,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   /** A word on the terms the AI held for an open ask: they wait for the person's answer (fix plan B). */
   function tellAwaiting(outcome: KeywordInjection) {
     const unresolved = outcome.outcomes?.filter(item => item.status !== "added") ?? [];
-    if (unresolved.length) setChangeError(unresolved.map(item => `${item.term}: ${item.reason}`).join(" "));
+    if (unresolved.length) setChangeError("Some changes couldn’t be saved. Your edits are kept. Try again.");
     const note = awaitingNote(outcome.awaitingAnswer ?? []);
     if (note) toast(note);
   }
@@ -1562,6 +1565,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       // Ticked with others and answered together (answerAsksTogether).
       batch: item.term,
       detail: item.term,
+      error: placementErrors[item.term],
       placement: {
         initialDetail: item.detail,
         detailEdited: item.detailEdited,
@@ -1922,7 +1926,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             disabled={!toolsIdle}
             onAddPicked={addPicked}
             onProve={() => prove()}
-            error={changeError ?? (tools.failure && !tools.running ? tools.failure.message : null)}
+            error={changeError ?? (!Object.keys(placementErrors).length && tools.failure && !tools.running ? tools.failure.message : null)}
             creditsHref={tools.failure?.needsCredits ? ATS_BILLING_HREF : null}
             unchecked={live?.status !== "recovering" && report.degraded ? report.verdicts.filter((verdict) => verdict.state === "undetermined").length : 0}
             onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
