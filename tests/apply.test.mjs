@@ -425,6 +425,20 @@ describe("the draft's change history", () => {
 });
 
 describe("the score card's fixes", () => {
+  it("never offers perks or eligibility as manual evidence, including old scans", async () => {
+    const { displayPostingQuestions } = await import('../app/lib/apply/posting-question.ts');
+    const texts=['Strong SQL skills (BigQuery or similar).','Experience with Amplitude, AppsFlyer.','Time-off Policy - unlimited Out of office days.','Remote or Hybrid work. The choice is yours.','Wellness compensations.','Health insurance.','Team buildings and offsites (Spain, Italy, Poland, Portugal and others).','Merch.','Special Occasions Presents.'];
+    const verdicts=texts.map((text,i)=>({requirement:{id:String(i),text,label:text,category:'skill'},state:'missing',unnamed:[text]}));
+    verdicts.push({requirement:{id:'visa',text:'Must reside in Europe',category:'eligibility'},state:'missing'});
+    assert.deepEqual(manualRequirementAsks({verdicts},[]).map(a=>a.term),texts.slice(0,2));
+    assert.ok(exampleAsks({verdicts},{skills:[]},[]).every(a=>texts.slice(0,2).includes(a.term)));
+    const saved=texts.map(term=>({term,ifTrue:'Add evidence for: '+term}));
+    saved.push({term:'Access to a learning platform',ifTrue:'Add evidence for: Access to a learning platform.'});
+    const posting=['Requirements',...texts.slice(0,2),'What you get with us',...texts.slice(2),'Access to a learning platform.'].join('\n');
+    assert.deepEqual(displayPostingQuestions(saved,posting).map(a=>a.term),texts.slice(0,2));
+    const hr={term:'Health insurance',ifTrue:'Add evidence for: Manage health insurance enrollment.'};
+    assert.equal(displayPostingQuestions([hr],'Responsibilities\nManage health insurance enrollment.').length,1);
+  });
   it("offers all unresolved requirements as manual controls and respects answered choices",()=>{
     const verdicts=Array.from({length:9},(_,i)=>({requirement:{id:"gap"+i,label:"Skill "+i,text:"Use skill "+i+" in reports",category:"skill"},state:"missing"}));
     const asks=manualRequirementAsks({verdicts},[{term:"Skill 0",no:true}],[{term:"Skill 1"}]);

@@ -1,3 +1,5 @@
+import { isEmployerOffer, isExcludedPostingText } from "../ats/posting-benefits";
+
 /** A listed job title is already visible to the editor. */
 export function asksForTitle(question: string, term = "") {
   if (/\b(?:title|titled)\b/i.test(term) && /\b(?:role|resume|position|official|candidate|source|confirm|held|hold|employer|manager|engineer|director)\b/i.test(term+" "+question)) return true;
@@ -126,6 +128,7 @@ export function postingQuestion(term: string, proposed: string, posting: string)
 /** Apply the same presentation checks to stored and newly returned follow-ups. */
 export function displayPostingQuestions<T extends {term:string;ifTrue:string;place?:string;reach?:unknown}>(items:T[], posting:string) {
   return items.flatMap(item=>{
+    if (isEmployerOffer(item.ifTrue || item.term) || isExcludedPostingText(item.ifTrue, posting) || isExcludedPostingText(item.term, posting)) return [];
     if (item.reach) return [item];
     if (asksForTitle(item.ifTrue,item.term) || /\b(?:employed|worked|served)\b.{0,50}\b(?:job )?title\b/i.test(item.ifTrue)) return [];
     const task=postingWorkflow(item.term,item.ifTrue,posting);

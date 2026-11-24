@@ -9,6 +9,8 @@ import type { ResumePlace } from "@/app/lib/resume/ai";
 import type { FitAsk } from "./state";
 import { opensWithStrongVerb } from "./impact";
 import { actionableSkillLabel } from "../resume/skill-labels";
+import { isPostingNote } from "../ats/types";
+import { isEmployerOffer } from "../ats/posting-benefits";
 
 export type ScoreHue = "low" | "mid" | "high";
 
@@ -220,7 +222,7 @@ export function exampleAsks(
   const out: FitAsk[] = [];
   const ordered = [...report.verdicts].sort((a, b) => Number(b.requirement.type === "required") - Number(a.requirement.type === "required"));
   for (const verdict of ordered) {
-    if (verdict.requirement.id.startsWith("role:")) continue;
+    if (verdict.requirement.id.startsWith("role:") || isPostingNote(verdict.requirement) || isEmployerOffer(verdict.requirement.text ?? verdict.requirement.label ?? "")) continue;
     for (const term of verdict.unnamed ?? []) {
       const key = fold(term);
       if (!key || !actionableSkillLabel(term) || seen.has(key) || listed.has(key) || declined.has(key)) continue;
@@ -238,8 +240,7 @@ export function manualRequirementAsks(report:Pick<ScanReport,"verdicts">,answere
   const seen=new Set([...answered.filter(a=>a.no || a.superseded || a.addedIn),...open].map(a=>fold(a.term)));
   return report.verdicts.flatMap(verdict=>{
     const req=verdict.requirement;
-    if(req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state) ||
-      /\b(?:work authori[sz]ation|visa|relocation|salary|compensation|equal opportunit|apply (?:now|here))\b/i.test(req.text))return [];
+    if(isPostingNote(req) || isEmployerOffer(req.text) || req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state))return [];
     const term=req.label?.trim() || req.text.trim();
     if(!term || seen.has(fold(term)))return [];
     seen.add(fold(term));

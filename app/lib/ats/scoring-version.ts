@@ -1,2 +1,2 @@
 /** Bump whenever metric rules change; also invalidates stored comparisons. */
-export const SCORING_VERSION = 62;
+export const SCORING_VERSION = 63;
