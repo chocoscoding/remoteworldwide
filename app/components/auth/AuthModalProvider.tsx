@@ -37,26 +37,33 @@ export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AuthModalContext.Provider value={value}>
       <Dialog onOpenChange={setOpen} open={open}>
-        <DialogContent aria-describedby={undefined} className="max-h-[90dvh] w-[92vw] max-w-lg  rounded-lg border-2 border-black bg-white p-0 shadow-none drop-shadow-primary2">
+        {/* Never taller than the window (owner, 2026-11-25): the box stops 12px short of the top and
+            bottom and the form scrolls inside it, so the close button stays put and nothing hides
+            below the fold. The forms tighten their spacing on short windows so most fit whole. */}
+        <DialogContent
+          aria-describedby={undefined}
+          className="flex max-h-[calc(100dvh-1.5rem)] w-[92vw] max-w-lg flex-col gap-0 overflow-hidden rounded-lg border-2 border-black bg-white p-0 shadow-none drop-shadow-primary2">
           <DialogTitle className="sr-only">{view === "login" ? "Log in to continue" : "Create an account"}</DialogTitle>
-          {view === "login" && open ? (
-            <LoginForm
-              idPrefix="dialog-login"
-              oauthCallbackUrl={destination ?? pathname}
-              onSuccess={onSuccess}
-              onSwitchToSignup={() => setView("signup")}
-            />
-          ) : null}
+          <div className="min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+            {view === "login" && open ? (
+              <LoginForm
+                idPrefix="dialog-login"
+                oauthCallbackUrl={destination ?? pathname}
+                onSuccess={onSuccess}
+                onSwitchToSignup={() => setView("signup")}
+              />
+            ) : null}
 
-          {view === "signup" && open ? (
-            <SignupForm
-              embedded
-              idPrefix="dialog-signup"
-              oauthCallbackUrl={destination ?? pathname}
-              onSuccess={onSuccess}
-              onSwitchToLogin={() => setView("login")}
-            />
-          ) : null}
+            {view === "signup" && open ? (
+              <SignupForm
+                embedded
+                idPrefix="dialog-signup"
+                oauthCallbackUrl={destination ?? pathname}
+                onSuccess={onSuccess}
+                onSwitchToLogin={() => setView("login")}
+              />
+            ) : null}
+          </div>
         </DialogContent>
       </Dialog>
       {children}

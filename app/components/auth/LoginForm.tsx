@@ -17,12 +17,20 @@ import { AuthLogo, GitHubIcon } from "./AuthIcons";
 import {
   AuthDivider,
   AuthFormError,
+  authBody,
+  authField,
+  authForm,
+  authHeader,
+  authLogo,
+  authSubmit,
   brutalistCard,
   brutalistCardFrame,
   brutalistFooter,
   brutalistInput,
   brutalistLink,
   brutalistLogoTile,
+  brutalistSubtitle,
+  brutalistTitle,
 } from "./authStyles";
 import { FcGoogle } from "react-icons/fc";
 
@@ -88,16 +96,16 @@ export default function LoginForm({
 
   return (
     <Card className={cn(brutalistCard, embedded && brutalistCardFrame)}>
-      <CardHeader className="flex flex-col items-center space-y-3 px-8 pt-8 pb-4 text-center">
+      <CardHeader className={authHeader}>
         <div className={brutalistLogoTile}>
-          <AuthLogo aria-hidden={true} className="h-9 w-9 text-primary" />
+          <AuthLogo aria-hidden={true} className={authLogo} />
         </div>
         <div className="space-y-1">
-          <h2 className="text-balance font-bold text-2xl text-primary">Sign in to your account</h2>
-          <p className="text-pretty text-gray-600 text-sm">Welcome back! Sign in to continue.</p>
+          <h2 className={brutalistTitle}>Sign in to your account</h2>
+          <p className={brutalistSubtitle}>Welcome back! Sign in to continue.</p>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6 px-8 pb-8">
+      <CardContent className={authBody}>
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
           <Button
             className="w-full flex-1 bg-white font-bold"
@@ -119,8 +127,8 @@ export default function LoginForm({
 
         <AuthDivider />
 
-        <form className="space-y-5" noValidate onSubmit={handleCredentialsLogin} onChange={() => setError(null)}>
-          <div className="space-y-2">
+        <form className={authForm} noValidate onSubmit={handleCredentialsLogin} onChange={() => setError(null)}>
+          <div className={authField}>
             <Label className="font-bold" htmlFor={`email-${idPrefix}`}>
               Email
             </Label>
@@ -136,7 +144,7 @@ export default function LoginForm({
               value={email}
             />
           </div>
-          <div className="space-y-2">
+          <div className={authField}>
             <div className="flex items-baseline justify-between gap-3">
               <Label className="font-bold" htmlFor={`password-${idPrefix}`}>
                 Password
@@ -170,7 +178,7 @@ export default function LoginForm({
             </div>
           </div>
           <AuthFormError message={error} />
-          <Button className="w-full rounded-md font-bold" disabled={submitting} type="submit" variant="brutalist-accent">
+          <Button className={cn("w-full rounded-md font-bold", authSubmit)} disabled={submitting} type="submit" variant="brutalist-accent">
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
         </form>

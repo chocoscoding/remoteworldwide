@@ -22,6 +22,12 @@ import {
   AuthDivider,
   AuthFieldError,
   AuthFormError,
+  authBody,
+  authField,
+  authForm,
+  authHeader,
+  authLogo,
+  authSubmit,
   brutalistCard,
   brutalistCardFrame,
   brutalistCheckbox,
@@ -168,16 +174,16 @@ export default function SignupForm({
 
   return (
     <Root className={cn(brutalistCard, !embedded && brutalistCardFrame)}>
-      <Header className="flex flex-col items-center space-y-3 px-8 pt-8 pb-4 text-center sm:text-center">
+      <Header className={authHeader}>
         <div className={brutalistLogoTile}>
-          <AuthLogo aria-hidden={true} className="h-9 w-9 text-primary" />
+          <AuthLogo aria-hidden={true} className={authLogo} />
         </div>
         <div className="space-y-1">
           <Title className={brutalistTitle}>Create an account</Title>
           <Subtitle className={brutalistSubtitle}>Welcome! Create an account to get started.</Subtitle>
         </div>
       </Header>
-      <Body className="space-y-6 px-8 pb-8">
+      <Body className={authBody}>
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
           <Button
             className="w-full flex-1 bg-white font-bold"
@@ -199,9 +205,9 @@ export default function SignupForm({
 
         <AuthDivider />
 
-        <form className="space-y-5" noValidate onSubmit={handleSignup} onChange={() => setError(null)}>
+        <form className={authForm} noValidate onSubmit={handleSignup} onChange={() => setError(null)}>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className={authField}>
               <Label className="font-bold" htmlFor={`firstName-${idPrefix}`}>
                 First name
               </Label>
@@ -214,7 +220,7 @@ export default function SignupForm({
                 value={firstName}
               />
             </div>
-            <div className="space-y-2">
+            <div className={authField}>
               <Label className="font-bold" htmlFor={`lastName-${idPrefix}`}>
                 Last name
               </Label>
@@ -229,7 +235,7 @@ export default function SignupForm({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className={authField}>
             <Label className="font-bold" htmlFor={`email-${idPrefix}`}>
               Email address
             </Label>
@@ -251,7 +257,7 @@ export default function SignupForm({
             <AuthFieldError id={`email-${idPrefix}-hint`} message={emailHint} />
           </div>
 
-          <div className="space-y-2">
+          <div className={authField}>
             <Label className="font-bold" htmlFor={`password-${idPrefix}`}>
               Password
             </Label>
@@ -286,7 +292,7 @@ export default function SignupForm({
             <PasswordStrength id={`password-rules-${idPrefix}`} open={passwordTouched} password={password} />
           </div>
 
-          <div className="space-y-2">
+          <div className={authField}>
             <Label className="font-bold" htmlFor={`confirmPassword-${idPrefix}`}>
               Confirm password
             </Label>
@@ -341,7 +347,7 @@ export default function SignupForm({
 
           <AuthFormError message={error} />
           <Button
-            className="w-full rounded-md disabled:cursor-not-allowed disabled:opacity-50"
+            className={cn("w-full rounded-md disabled:cursor-not-allowed disabled:opacity-50", authSubmit)}
             disabled={!canSubmit}
             size={"lg"}
             type="submit"
