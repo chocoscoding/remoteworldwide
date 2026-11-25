@@ -386,6 +386,16 @@ export const resumeCampaign = async (id: string) => {
   return campaignAction(id, "resume");
 };
 
+/**
+ * Deletes a draft or a finished campaign (sent, canceled, failed). One still going must be cancelled
+ * first: the backend answers that as the error. The mails it sent stay in people's mail history.
+ */
+export const deleteCampaign = async (id: string) => {
+  await requireAdminAction();
+  if (!okId(id)) return bad("Campaign not found");
+  return run<{ id: string }>(() => mail(`/campaigns/${idSegment(id)}`, { method: "DELETE" }));
+};
+
 export const duplicateCampaign = async (id: string) => {
   await requireAdminAction();
   return campaignAction(id, "duplicate");

@@ -4,7 +4,7 @@ import { useState, useTransition, type FC, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Info, LoaderCircle } from "lucide-react";
-import { createCampaign, scheduleCampaign, updateCampaign } from "@/libs/mail-admin";
+import { createCampaign, deleteCampaign, scheduleCampaign, updateCampaign } from "@/libs/mail-admin";
 import {
   EMPTY_CONTENT,
   PREF_LABELS,
@@ -23,7 +23,7 @@ import { pickContent } from "@/app/components/mail/content/blocks";
 import { offerSampleOf } from "@/app/components/mail/content/offerPreview";
 import OfferPicker from "@/app/components/mail/OfferPicker";
 import { useAudienceCount } from "@/app/components/mail/useAudienceCount";
-import { BTN, BTN_LINK, BTN_PRIMARY, ErrorBox, INPUT, INPUT_SM, Switch } from "@/app/components/mail/ui";
+import { BTN, BTN_DANGER, BTN_LINK, BTN_PRIMARY, ErrorBox, INPUT, INPUT_SM, Switch } from "@/app/components/mail/ui";
 import { fromLocalInput, leftOutLines, n, numOrUndef, offerChoiceProblem, toLocalInput } from "@/app/components/mail/format";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +78,22 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
   const [showMail, setShowMail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, start] = useTransition();
+
+  // A saved draft can be thrown away; nothing has gone out from it.
+  const removeDraft = () =>
+    savedId &&
+    start(async () => {
+      setError(null);
+      const res = await deleteCampaign(savedId);
+      if (res.error) {
+        setConfirmDelete(false);
+        setError(res.error);
+        return;
+      }
+      router.push("/heroshima/outreach/campaigns");
+    });
 
   const audience = audiences.find((a) => a.id === audienceId) ?? null;
   // Counted with the "Only if" the send will apply, so the number is who it actually reaches.
@@ -432,6 +447,22 @@ const CampaignEditor: FC<Props> = ({ campaign, templates, audiences, offers, max
             {busy && !confirming ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
             Save draft
           </button>
+          {savedId ? (
+            confirmDelete ? (
+              <span className="flex items-center gap-1">
+                <button type="button" onClick={removeDraft} disabled={busy} className="rounded-md bg-[#b23c26] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">
+                  Yes, delete
+                </button>
+                <button type="button" onClick={() => setConfirmDelete(false)} className="px-2 text-xs font-semibold text-gray-500">
+                  Keep it
+                </button>
+              </span>
+            ) : (
+              <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy} className={BTN_DANGER}>
+                Delete
+              </button>
+            )
+          ) : null}
           {note ? <span className="text-xs text-[#5b6b12]">{note}</span> : null}
           <span className="ml-auto flex flex-wrap items-center gap-2">
             <span title="Daily and weekly limits per person and quiet hours apply; people over a limit are skipped and counted." className="text-gray-400">
