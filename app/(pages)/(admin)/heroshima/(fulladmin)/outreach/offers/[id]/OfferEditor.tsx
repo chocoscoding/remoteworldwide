@@ -419,8 +419,9 @@ const OfferEditor: FC<{ offer: MailOffer | null; maxDiscountPercent: number; bra
                       placeholder="any"
                       onChange={(e) => set("monthlyCap", numOrUndef(e.target.value) ?? null)}
                     />
-                    <span>codes a month</span>
+                    <span>codes a month, across everyone</span>
                   </label>
+                  <p className="text-[11px] text-gray-500">Not per person. A campaign that reaches the cap pauses until you raise it.</p>
                   <p className="text-[11px] text-gray-500">Always on: never for people already paying, one offer per person every 90 days, accounts at least 3 days old.</p>
                 </div>
               </Fold>

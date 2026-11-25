@@ -290,6 +290,8 @@ export type CampaignCounts = {
   skippedCap: number;
   skippedPref: number;
   skippedSuppressed: number;
+  /** Refused an offer code for a reason of their own (already pays, an offer in the last 90 days, no account). An older backend leaves it out. */
+  skippedOffer?: number;
   failed: number;
 };
 

@@ -87,7 +87,9 @@ const Report = async ({ campaign: c }: { campaign: MailCampaign }) => {
       <div className="flex flex-col gap-4">
         {c.pausedReason ? (
           <Notice tone="warn">
-            Paused: <strong>{c.pausedReason}</strong>
+            {/* Older reasons already start with "Paused automatically:". */}
+            {/^paused\b/i.test(c.pausedReason) ? null : "Paused: "}
+            <strong>{c.pausedReason}</strong>
           </Notice>
         ) : null}
 
@@ -121,13 +123,14 @@ const Report = async ({ campaign: c }: { campaign: MailCampaign }) => {
           ) : null}
         </p>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
           <StatTile label="People" value={k.recipients} dark />
           <StatTile label="Sent" value={k.sent} hint={pct(ratio(k.sent, k.recipients), 0)} />
           <StatTile label="Waiting" value={k.deferred} hint="quiet hours" />
           <StatTile label="Over the cap" value={k.skippedCap} />
           <StatTile label="Pref off" value={k.skippedPref} />
           <StatTile label="Suppressed" value={k.skippedSuppressed} />
+          <StatTile label="No code" value={k.skippedOffer ?? 0} hint="already pays or had an offer" />
           <StatTile label="Failed" value={k.failed} />
         </div>
 

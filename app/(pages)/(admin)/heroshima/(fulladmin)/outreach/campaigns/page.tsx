@@ -51,7 +51,7 @@ const Page = async () => {
             <tbody>
               {res.data.map((c) => {
                 const k = c.counts ?? { recipients: 0, sent: 0, deferred: 0, skippedCap: 0, skippedPref: 0, skippedSuppressed: 0, failed: 0 };
-                const skipped = (k.skippedCap ?? 0) + (k.skippedPref ?? 0) + (k.skippedSuppressed ?? 0);
+                const skipped = (k.skippedCap ?? 0) + (k.skippedPref ?? 0) + (k.skippedSuppressed ?? 0) + (k.skippedOffer ?? 0);
                 return (
                   <tr key={c.id} className={`${ROW} hover:bg-gray-50`}>
                     <td className={TD}>
@@ -67,7 +67,7 @@ const Page = async () => {
                     <td className={`${TD} text-right tabular-nums`}>{n(k.recipients)}</td>
                     <td className={`${TD} text-right tabular-nums`}>{n(k.sent)}</td>
                     <td className={`${TD} text-right tabular-nums`}>{n(k.deferred)}</td>
-                    <td className={`${TD} text-right tabular-nums`} title={`cap ${k.skippedCap ?? 0} · pref ${k.skippedPref ?? 0} · suppressed ${k.skippedSuppressed ?? 0}`}>
+                    <td className={`${TD} text-right tabular-nums`} title={`cap ${k.skippedCap ?? 0} · pref ${k.skippedPref ?? 0} · suppressed ${k.skippedSuppressed ?? 0} · no code ${k.skippedOffer ?? 0}`}>
                       {n(skipped)}
                     </td>
                     <td className={`${TD} text-right tabular-nums ${k.failed ? "text-[#b23c26]" : ""}`}>{n(k.failed)}</td>
