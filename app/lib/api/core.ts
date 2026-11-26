@@ -13,6 +13,8 @@
 // is what makes SSR hydration safe: the cache the server fills and the cache
 // the browser fills hold the same shapes.
 
+import { SESSION_REFUSED_EVENT } from "@/app/lib/auth/sessionEnded";
+
 /** Keys the backend sends as ISO strings and the UI wants as real Dates. */
 const DATE_KEYS = new Set([
   "createdAt",
@@ -91,6 +93,16 @@ const sendToVerifyEmail = (error: BackendError): void => {
 };
 
 /**
+ * A 401 in the browser: the call was refused for want of a session. SessionWatch (root layout) asks
+ * the backend whether the session really ended and signs the tab out if so; a signed-out visitor's
+ * 401s, and any 401 that is not about the session, change nothing.
+ */
+const announceSessionRefused = (error: BackendError): void => {
+  if (error.status !== 401 || typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SESSION_REFUSED_EVENT));
+};
+
+/**
  * Walks a parsed JSON payload turning known date keys into `Date` objects.
  *
  * Exported because the query-cache persister has to run it again on restore:
@@ -134,6 +146,7 @@ export async function unwrapEnvelope<T>(res: Response): Promise<{ data: T; messa
     );
     announcePlanLimit(error);
     sendToVerifyEmail(error);
+    announceSessionRefused(error);
     throw error;
   }
   return { data: revive(json?.data) as T, message: json?.message ?? "" };

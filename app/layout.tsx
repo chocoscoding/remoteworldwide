@@ -4,6 +4,7 @@ import { Manrope } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { SessionProvider } from "next-auth/react";
 import AuthSessionLogger from "./components/AuthSessionLogger";
+import SessionWatch from "./components/SessionWatch";
 import QueryProvider from "@/app/components/providers/QueryProvider";
 import ActivityTracker from "@/app/components/providers/ActivityTracker";
 import { ToastContainer, Slide } from "react-toastify";
@@ -119,8 +120,13 @@ export default function RootLayout({
           theme="dark"
           transition={Slide}
         />
-        <SessionProvider>
+        {/* Asks the backend once per page load, not every time a tab comes back into view: each of
+            those was a /api/auth/session call against the visitor's budget there. Signing in or out
+            still reaches every open tab (next-auth tells the others itself). */}
+        <SessionProvider refetchOnWindowFocus={false}>
           <AuthSessionLogger />
+          {/* The backend is the authority: when it refuses this tab's session, the tab signs out. */}
+          <SessionWatch />
           <ActivityTracker />
           {/* Inside SessionProvider so anything that reads the session is
               available to queries; outside everything else so one cache serves

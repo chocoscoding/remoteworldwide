@@ -18,6 +18,9 @@
 //     return only active listings and public fields.
 
 import { revalidatePath, updateTag } from "next/cache";
+// Every catch below that rewraps or answers an error lets Next's own through first: a refused
+// session redirects to sign-in by throwing (app/lib/auth/sessionEndedAction.ts).
+import { unstable_rethrow } from "next/navigation";
 import { backend, BackendError, backendCached, backendOrNull, BOARD_TAGS, idSegment, isObjectId, jobPageTag, type BackendInit } from "@/app/lib/backend";
 import type { Company, CompanyWithJobsCount, FilterData, Job } from "@/types/main";
 import type { PublicJobFacts, CompanyHiringProfile } from "@/types/main";
@@ -31,6 +34,7 @@ import { requireAdminAction, requireRoleAction, requireUserAction } from "@/app/
 
 /** A board refusal in the backend's own words ("Company already exist", "Job not found"), as the Prisma actions threw them. */
 const boardError = (error: unknown): never => {
+  unstable_rethrow(error);
   throw new Error(error instanceof BackendError ? error.message : "something went wrong");
 };
 
@@ -158,6 +162,7 @@ export const findCompanyJobs = async (companyId: string, page: number) => {
 // admin can fix ("Company already exist", "This company still has jobs") comes back as `{ error }`
 // in the backend's words, because production hides a thrown action's message.
 const boardRefused = (error: unknown): { error: string } => {
+  unstable_rethrow(error);
   if (error instanceof BackendError && error.status < 500) return { error: error.message };
   console.error("[query] board write:", error);
   return { error: "something went wrong" };
@@ -261,6 +266,7 @@ export const getAdminDashboardInfo = async () => {
 
     return { ...board, blogsCount };
   } catch (error) {
+    unstable_rethrow(error);
     throw new Error("something went wrong");
   }
 };
@@ -268,6 +274,7 @@ export const getAdminDashboardInfo = async () => {
 const admin = <T,>(path: string, init: BackendInit = {}) => backend<T>(`/blog/admin${path}`, { ...init, session: true });
 
 const surface = (error: unknown): never => {
+  unstable_rethrow(error);
   throw new Error(error instanceof BackendError ? error.message : "something went wrong");
 };
 
@@ -449,6 +456,7 @@ export const deleteBlog = async (id: string) => {
 // fixed copy, so the detail stays in the server log and the caller gets the same words
 // in every environment.
 const opaque = (action: string, error: unknown): never => {
+  unstable_rethrow(error);
   console.error(`[query] ${action}:`, error);
   throw new Error("something went wrong");
 };

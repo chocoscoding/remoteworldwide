@@ -8,6 +8,8 @@
 // working unchanged.
 
 import { headers } from "next/headers";
+import { forgetSession } from "@/auth";
+import { redirectEndedSession } from "@/app/lib/auth/sessionEndedAction";
 import { BackendError, unwrapResponse } from "@/app/lib/api/core";
 import { clientIpHeaders } from "@/app/lib/api/clientIp";
 
@@ -136,12 +138,20 @@ async function send(path: string, init: BackendInit): Promise<Response> {
     const cookie = incoming.get("cookie");
     if (cookie) h.cookie = cookie;
   }
-  return fetch(`${BACKEND_URL}/api${path}`, {
+  const res = await fetch(`${BACKEND_URL}/api${path}`, {
     method: init.method ?? "GET",
     headers: h,
     body: init.body === undefined ? undefined : multipart ? (init.body as FormData) : JSON.stringify(init.body),
     cache: "no-store",
   });
+  // The backend's guards answer 401 only for a missing or dead session (middleware/auth.ts), so
+  // this one is over: drop the answer auth() holds for it, and the next render finds them signed out.
+  // Inside a server action, also send them to sign in now (app/lib/auth/sessionEndedAction.ts).
+  if (res.status === 401 && h.cookie) {
+    forgetSession(h.cookie);
+    await redirectEndedSession();
+  }
+  return res;
 }
 
 export async function backendOrNull<T>(path: string, init: BackendInit = {}): Promise<T | null> {

@@ -12,7 +12,8 @@
 // return, and a thrown error reaches the caller as a failed call (with the message
 // hidden in production), which is what a refused call should look like.
 
-import { auth } from "@/auth";
+import { sessionAnswer } from "@/auth";
+import { redirectEndedSession } from "@/app/lib/auth/sessionEndedAction";
 
 export type ActionRole = "USER" | "ADMIN" | "AUTHOR";
 
@@ -39,9 +40,15 @@ export class ActionAuthError extends Error {
  * deletion) goes through these guards; that runs on the backend's AllowLocked routes.
  */
 export async function requireUserAction(): Promise<ActionUser> {
-  const session = await auth();
+  const { session, failed } = await sessionAnswer();
   const user = session?.user;
-  if (!user?.id) throw new ActionAuthError("Unauthorized", 401);
+  if (!user?.id) {
+    // The backend says nobody is signed in on a request that still carried a session cookie: the
+    // session ended elsewhere, so the action sends them to sign in (sessionEndedAction.ts). Not when
+    // the lookup failed: a 429 or a 5xx says nothing about the session.
+    if (!failed) await redirectEndedSession();
+    throw new ActionAuthError("Unauthorized", 401);
+  }
   if (user.deletionDueAt) throw new ActionAuthError("Account locked", 423);
   return { id: user.id, role: user.role };
 }
