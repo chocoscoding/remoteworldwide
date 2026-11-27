@@ -22,6 +22,7 @@
 // application's session, so a refresh loses none of it.
 
 import { displayPostingQuestions } from "@/app/lib/apply/posting-question";
+import { isExcludedPostingText } from "@/app/lib/ats/posting-benefits";
 import { experiencePlacement } from "@/app/lib/apply/experience-draft";
 import { skillNames } from "@/app/lib/resume/skill-labels";
 import { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
@@ -855,7 +856,9 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   // "Prove" always works in bullets, so what it could not place is read against Bullets alone.
   const worked = visible ? workedIn(state.resume.worked ?? [], visible, places) : new Set<string>();
   const proved = visible ? provedIn(state.resume.worked ?? [], visible) : new Set<string>();
-  const worthGaps = gaps.filter((gap) => worthGapChip(verdictById.get(gap.id)) && !worked.has(gap.label.toLowerCase()));
+  // A gap read from the posting's offers section is the employer's, never the candidate's (owner, 2026-11-27).
+  const worthGaps = gaps.filter((gap) => worthGapChip(verdictById.get(gap.id)) && !worked.has(gap.label.toLowerCase())
+    && !isExcludedPostingText(verdictById.get(gap.id)?.requirement.text ?? gap.label, job.description ?? ""));
   // A term an open ask names (Tailor's, or an example ask) is no chip: the person answers the ask, and
   // a yes puts it in (fix plan 3c, owner 2026-10-22: Mandarin and Web3 were asked, then added by chip).
   // One answered "No" keeps its chip away too (`chipAsks`, review 2026-10-22).

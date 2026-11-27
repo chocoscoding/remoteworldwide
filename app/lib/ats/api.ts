@@ -1,4 +1,5 @@
 import { toReport } from './report';
+import { requirementLabel } from "./requirement-label";
 // Browser-side calls for the ATS scorer.
 //
 // Every route lives in the AI service and goes through the session proxy at
@@ -474,31 +475,14 @@ export const missingGaps = (report: ScanReport) => {
 };
 
 /**
- * A requirement as a chip.
- *
- * Mirrors `gapLabel` in the AI service's `scoringService.ts`, which is what
- * trimmed the labels on `report.gaps`. The covered chips are built here from
- * the verdicts — the report carries only what is missing — so without the same
- * trim one half of the keyword panel would read "Proven experience with
- * Kubernetes in production" beside the other half's "Kubernetes in
- * production". Mirrored rather than shared because the two projects have no
- * shared build, the same way `scanTier` is; the service's contract test keeps
- * the two spellings honest.
+ * A requirement as a chip: the AI service's own label rule (`requirementLabel`, byte for byte with
+ * its src/lib/requirementLabel.ts), which is what labelled `report.gaps`. The covered chips are
+ * built here from the verdicts, the report carrying only what is missing, so without the same rule
+ * one half of the keyword panel would read "Proven experience with Kubernetes in production" beside
+ * the other half's "Kubernetes in production".
  */
-const LABEL_PREAMBLE =
-  /^(?:(?:proven|demonstrated|strong|solid|excellent|deep|hands[-\s]?on|extensive|prior|relevant|working)\s+)*(?:experience|expertise|proficiency|proficient|knowledge|familiarity|background|ability|understanding)\s+(?:with|in|of|using|across|building|developing|to)\s+/i;
-
-const MAX_LABEL_CHARS = 60;
-
 export function keywordLabel(text: string): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  const trimmed = normalized.replace(LABEL_PREAMBLE, "").replace(/[.;:,]+$/, "");
-  const label = trimmed.length > 0 ? trimmed : normalized;
-  if (label.length <= MAX_LABEL_CHARS) return label;
-  // Cut on a word boundary when there is one, as the service does.
-  const hard = label.slice(0, MAX_LABEL_CHARS);
-  const boundary = hard.lastIndexOf(" ");
-  return boundary > 0 ? hard.slice(0, boundary) : hard;
+  return requirementLabel(text);
 }
 
 /** The requirements the resume covered, as chips — the other half of the keyword panel. */

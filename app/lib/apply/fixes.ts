@@ -173,6 +173,8 @@ export const worthGapChip = (verdict: RequirementVerdict | undefined): boolean =
     !onlyInSkills(verdict) &&
     verdict.requirement.category === "skill" &&
     !TRAIT_LABEL.test(verdict.requirement.label ?? verdict.requirement.text) &&
+    // What the employer offers or says about its team is never a keyword to add (owner, 2026-11-27).
+    !isEmployerOffer(verdict.requirement.text) && !isPostingTrait(verdict.requirement.text) &&
     // A skill has a short name; a window of a requirement line ("Own go-to-market for everything
     // Flex ships") is a duty or a trait, never a keyword chip (owner, 2026-10-20).
     (verdict.requirement.label ?? verdict.requirement.text).trim().split(/\s+/).length <= MAX_CHIP_WORDS);
@@ -236,13 +238,17 @@ export function exampleAsks(
 }
 
 /** Complete optional controls for job requirements, available before one-click generation. */
-export function manualRequirementAsks(report:Pick<ScanReport,"verdicts">,answered:ReadonlyArray<Pick<FitAsk,"term"|"no"|"superseded"|"addedIn">>,open:ReadonlyArray<{term:string}>=[]):FitAsk[] {
-  const seen=new Set([...answered.filter(a=>a.no || a.superseded || a.addedIn),...open].map(a=>fold(a.term)));
+export function manualRequirementAsks(report:Pick<ScanReport,"verdicts">,answered:ReadonlyArray<Pick<FitAsk,"term"|"no"|"superseded"|"addedIn"> & {ifTrue?:string}>,open:ReadonlyArray<{term:string;ifTrue?:string}>=[]):FitAsk[] {
+  const done=[...answered.filter(a=>a.no || a.superseded || a.addedIn),...open];
+  const seen=new Set(done.map(a=>fold(a.term)));
+  // A requirement relabelled since it was answered is still answered (2026-11-27: labels now keep their
+  // whole phrase, so "And experience with ..." reads "Key technology concepts, ..."): matched by its sentence too.
+  const sentences=new Set(done.map(a=>fold(a.ifTrue ?? "")).filter(Boolean));
   return report.verdicts.flatMap(verdict=>{
     const req=verdict.requirement;
     if(isPostingNote(req) || req.category==='responsibility' || isEmployerOffer(req.text) || isPostingTrait(req.text) || req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state))return [];
     const term=req.label?.trim() || req.text.trim();
-    if(!term || seen.has(fold(term)))return [];
+    if(!term || seen.has(fold(term)) || sentences.has(fold(req.text)))return [];
     seen.add(fold(term));
     return [{term,ifTrue:req.text.replace(/[.!?]+$/,"")+".",place:req.category==="skill" ? "skills" as const : "experience" as const,
       fromStep:null,no:false,addedIn:null}];

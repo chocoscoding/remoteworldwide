@@ -439,6 +439,26 @@ describe("the score card's fixes", () => {
     const {displayPostingQuestions}=await import('../app/lib/apply/posting-question.ts');
     assert.equal(displayPostingQuestions([{term:'SQL',ifTrue:'Add evidence for: '+text}],text)[0].ifTrue,text);
   });
+  // Owner, 2026-11-27: "never add info and perks about team into ATS. NEVER". A Kayzen posting's
+  // "What do we offer?" lines were rows to add; a scan already saved must lose them too.
+  it("never offers a posting's perks or team lines, from a scan already saved", async () => {
+    const { displayPostingQuestions } = await import('../app/lib/apply/posting-question.ts');
+    const offers=['Exceptional career growth and learning opportunity','A unique opportunity to be part of an experienced team of industry experts and entrepreneurs who bring massive change to the Adtech market','Direct, day-to-day work experience with the management','A fun, driven, and multinational team located across Germany, India, UK, Argentina, Ukraine, Turkey, Spain and many more countries','A flexible work-from-home arrangement','A 500-dollar home-office setup budget','A 1000-dollar annual learning and development budget'];
+    const real='Hands-on experience with programmatic or digital advertising platforms.';
+    const posting=['Requirements','- '+real,'What do we offer?',...offers.map(s=>'- '+s)].join('\n');
+    const verdicts=[real,...offers].map((text,i)=>({requirement:{id:String(i),text,label:text.slice(0,60),category:i===3?'experience':'skill',type:'required'},state:'partial'}));
+    const shown=displayPostingQuestions(manualRequirementAsks({verdicts},[]),posting).map(ask=>ask.ifTrue);
+    assert.deepEqual(shown,[real]);
+    for (const verdict of verdicts.slice(1)) assert.equal(worthGapChip(verdict),false);
+  });
+  it("keeps a requirement answered when a new scan relabels it", () => {
+    const text='Understanding of and experience with key technology concepts, such as SaaS and APIs';
+    const verdicts=[{requirement:{id:'saas',text,label:'Key technology concepts, such as SaaS and APIs',category:'experience',type:'required'},state:'partial'}];
+    const old={term:'And experience with key technology concepts, such as SaaS',ifTrue:text+'.',no:false,superseded:false,addedIn:'step-1'};
+    assert.deepEqual(manualRequirementAsks({verdicts},[old]),[]);
+    assert.deepEqual(manualRequirementAsks({verdicts},[],[{term:old.term,ifTrue:old.ifTrue}]),[]);
+    assert.equal(manualRequirementAsks({verdicts},[]).length,1);
+  });
   it("never offers perks or eligibility as manual evidence, including old scans", async () => {
     const { displayPostingQuestions } = await import('../app/lib/apply/posting-question.ts');
     const texts=['Strong SQL skills (BigQuery or similar).','Experience with Amplitude, AppsFlyer.','Time-off Policy - unlimited Out of office days.','Remote or Hybrid work. The choice is yours.','Wellness compensations.','Health insurance.','Team buildings and offsites (Spain, Italy, Poland, Portugal and others).','Merch.','Special Occasions Presents.'];

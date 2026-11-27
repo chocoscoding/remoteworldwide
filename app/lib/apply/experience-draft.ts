@@ -10,6 +10,7 @@ export function experiencePlacement(skill: string, roles: readonly DraftRole[], 
 
 const topicOf = (value: string) => value.trim()
   .replace(/^Add evidence for:\s*/i, '')
+  .replace(/^(?:(?:good|nice)[\s-]to[\s-]have|bonus(?: points)?|plus|preferred|optional)\s*[:–—-]\s*/i, '')
   .replace(/^You have (?:used|worked with)\s+/i, '')
   .replace(/,?\s*if you have used it[.!]?$/i, '')
   .replace(/^(?:(?:proven|demonstrated|strong|solid|excellent|deep|hands.on|extensive|prior|relevant|working)\s+)*(?:(?:experience|expertise|proficiency|knowledge|familiarity|background|ability|understanding)\s+(?:working\s+)?(?:with|in|of|using|to)\s+)?/i, '')
