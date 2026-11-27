@@ -16,8 +16,10 @@ export function placeWork(doc: ResumeContent, fact: WorkPlacement): ResumeConten
       ? {...role,bullets:[...role.bullets,fact.detail]} : role)};
 }
 
-export default function WorkEvidence({content, onSave, disabled, prompt, initialSkill, jdText, preferExperience=false}: {
+export default function WorkEvidence({content, onSave, disabled, prompt, initialSkill, jdText, preferExperience=false, defaultOpen=false}: {
   content: ResumeContent; onSave:(fact: WorkPlacement)=>boolean|Promise<boolean>; disabled?:boolean; prompt?:string; initialSkill?:string; jdText?:string; preferExperience?:boolean;
+  /** Open from the start: the AI's prepared wording waiting on a confirm (an ATS fix card's terms). */
+  defaultOpen?:boolean;
 }) {
   const [skills,setSkills]=useState(!preferExperience);
   const [experience,setExperience]=useState(preferExperience);
@@ -49,7 +51,7 @@ export default function WorkEvidence({content, onSave, disabled, prompt, initial
       }
     } finally {setSaving(false);}
   }
-  return <details className="rounded-md border border-black/10 p-2.5 text-sm">
+  return <details open={defaultOpen || undefined} className="rounded-md border border-black/10 p-2.5 text-sm">
     <summary className="cursor-pointer font-semibold">{prompt || "Add a skill or work example"}</summary>
     <fieldset disabled={saving || disabled} className="mt-2 grid gap-2">
       <div className="flex gap-3">{canSkills && <label><input type="checkbox" checked={addSkills} onChange={e=>setSkills(e.target.checked)} /> Skills</label>}

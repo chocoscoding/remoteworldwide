@@ -24,6 +24,7 @@ import { ATS_BILLING_HREF } from "@/app/lib/ats/api";
 import type { PickedJob } from "@/app/lib/jobs/fields";
 import { TEMPLATE_OPTIONS } from "@/app/lib/dashboard/resume/templates";
 import { buildResume, type StoredResumeDocument } from "@/app/lib/resume/api";
+import type { CheckPosting } from "./resume-document";
 import { useIngestedResumesQuery } from "@/hooks/queries/useAtsQueries";
 
 const SENIORITIES = ["Entry level", "Mid level", "Senior", "Lead", "Principal"] as const;
@@ -49,8 +50,8 @@ const SelectField: FC<{ value: string; onChange: (value: string) => void; childr
 export interface BuildResumeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The saved document the builder returned; the caller opens it. */
-  onBuilt: (document: StoredResumeDocument) => void;
+  /** The saved document the builder returned; the caller opens it, and tailors it to `posting` when one was picked. */
+  onBuilt: (document: StoredResumeDocument, posting: CheckPosting | null) => void;
 }
 
 const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onBuilt }) => {
@@ -103,7 +104,9 @@ const BuildResumeDialog: FC<BuildResumeDialogProps> = ({ open, onOpenChange, onB
         setFailure({ message: "Your resume was built but couldn't be saved. Please try again.", credits: false });
         return;
       }
-      onBuilt(built.document);
+      // A build for a posting goes on like the apply step: the editor tailors it to that posting
+      // as it opens and asks what the resume doesn't show (owner, 2026-11-27: it "just pastes in my resume").
+      onBuilt(built.document, job?.description ? { ...(job.id ? { id: job.id } : {}), company: job.company, role: job.role, description: job.description } : null);
       onOpenChange(false);
     } catch (error) {
       setFailure({ message: apiMessage(error), credits: error instanceof BackendError && error.status === 402 });

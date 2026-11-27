@@ -261,9 +261,13 @@ export interface ResumeScreenBodyProps {
   onSaved: (id: string, updatedAt: Date) => void;
   banner?: ReactNode;
   tailorPreset?: TailorPreset | null;
+  /** A resume just built for this posting: tailored to it once as it opens, like the apply step (owner, 2026-11-27). */
+  tailorOnOpen?: CheckPosting | null;
+  /** Said once that tailoring began, so it never runs twice. */
+  onTailorStarted?: () => void;
 }
 
-const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, setDocuments, onSaved, banner, tailorPreset = null }) => {
+const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, setDocuments, onSaved, banner, tailorPreset = null, tailorOnOpen = null, onTailorStarted }) => {
   // The open resume — its look, words, check and what was done about its AI suggestions — lives
   // in the provider's one undo history (`editor-state.ts`), so the pill above the preview undoes
   // anything done on any tab.
@@ -726,11 +730,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     return `Worked in ${parts.filter(Boolean).join(" and ")}.${left}${notShownNote(notShown)}`;
   };
 
-  /** What the resume's history doesn't show yet, said with the first piece of advice. */
+  /** What the resume doesn't show yet: prepared below for the person to confirm, never refused (owner, 2026-11-27). */
   const notShownNote = (notShown: TermAdvice[]) =>
     notShown.length === 0
       ? ""
-      : ` Your resume doesn't show ${notShown.length === 1 ? quote([notShown[0].term]) : `${notShown.length} of them`} yet, so nothing was written in for ${notShown.length === 1 ? "it" : "those"}: ${notShown[0].advice}`;
+      : ` Confirm ${notShown.length === 1 ? quote([notShown[0].term]) : `the other ${notShown.length}`} below to add ${notShown.length === 1 ? "it" : "them"}.`;
 
   const runAiTool = (id: string) => {
     // A link's job still loading: Run waits for it rather than asking for another.
@@ -815,9 +819,11 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
 
   /** A proposal ticked in: into Skills (the last group, when grouped), one undo step. */
   const acceptKeyword = (term: string) => dispatch({ type: "edit", sections:prev=>showWorkSections(prev,true,false), content: (prev) => addSkills(prev, [term]) });
-  async function incorporateSelectedWork(fact:WorkPlacement,term:string) {
-    if(aiRunning)return false;
-    let next=placeWork(content,{...fact,detail:''});
+  async function incorporateSelectedWork(fact:WorkPlacement,term:string,queued=false) {
+    // Queued confirmations already take turns with the cards; `aiRunning` here would be the value from the click.
+    if(aiRunning && !queued){toast.error("Wait for the AI change in progress to finish, then confirm again.");return false;}
+    // The words as they stand now: a queued confirmation runs after earlier changes landed.
+    let next=placeWork(latest.current.content,{...fact,detail:''});
     if(fact.detail){
       const result=await runSuggestion('keywords',()=>injectKeywords({content:next,jdText:jobInContext?.description,role:jobInContext?.role,
         keywords:[term],places:['bullets'],insist:true,confirmed:[{term,detail:fact.detail,entryId:fact.entryId}]}));
@@ -864,6 +870,23 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       setDocuments(prev=>prev.map(d=>d.id===activeDocId ? {...d,check:landed} : d));
     }
   };
+
+  // A resume just built for a posting goes straight on to what the apply step does with it:
+  // tailored to that posting with the best-resume pass, its keywords worked in where the history
+  // backs them, and what it doesn't show asked in the AI tab (owner, 2026-11-27). Once only.
+  const tailoredOnOpen = useRef(false);
+  useEffect(() => {
+    if (!tailorOnOpen || tailoredOnOpen.current) return;
+    tailoredOnOpen.current = true;
+    const posting = tailorOnOpen;
+    window.requestAnimationFrame(() => {
+      onTailorStarted?.();
+      if (aiLocked) return;
+      setPickedJob(posting);
+      setDocTab("ai");
+      void handleTailorJob(posting, true);
+    });
+  });
 
   // -------------------------------------------------------------------------
   // The ATS card's own checks — score only, never a content rewrite. A real
@@ -1274,6 +1297,36 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
    * `runSuggestion` as the AI Tools tab, so "one tool at a time", the failure
    * toast and the credit-meter refresh are the same everywhere.
    */
+  // Fix cards never disable each other (owner, 2026-11-27): "Use this line" applies at once, and
+  // "Add them" and the confirmations it leaves take turns in a queue, each reading the resume as it
+  // stands when its turn comes (the AI runner keeps only its newest run, so two at once would drop one).
+  const [cardBusy, setCardBusy] = useState<Record<string, "running" | "queued">>({});
+  const cardQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const enqueue = <T,>(task: () => Promise<T>): Promise<T> => {
+    const next = cardQueue.current.catch(() => undefined).then(task);
+    cardQueue.current = next;
+    return next;
+  };
+  const queueCheckSuggestion = (suggestion: CheckSuggestion) => {
+    if (suggestion.kind !== "keywords") {
+      void runCheckSuggestion(suggestion);
+      return;
+    }
+    if (cardBusy[suggestion.id]) return;
+    setCardBusy((prev) => ({ ...prev, [suggestion.id]: "queued" }));
+    void enqueue(async () => {
+      setCardBusy((prev) => ({ ...prev, [suggestion.id]: "running" }));
+      try {
+        await runCheckSuggestion(suggestion);
+      } finally {
+        setCardBusy((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => id !== suggestion.id)));
+      }
+    });
+  };
+  // Terms a keywords card could not write in, by card: the AI prepares wording for each, and the
+  // person confirms it (owner, 2026-11-27: ask to confirm, never say it can't be added).
+  const [toConfirm, setToConfirm] = useState<Record<string, string[]>>({});
+
   const runCheckSuggestion = async (suggestion: CheckSuggestion) => {
     // A card that changed the words: the change and its outcome are one undo step, so Undo brings
     // the card's button back. One that changed nothing only learned something, and stays settled.
@@ -1285,11 +1338,14 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       // The check's own missing terms as the want-list, so the tool works in
       // exactly what the scan found missing rather than re-deriving a list
       // from the posting. WHICH are still missing is decided by the service.
-      const sent = content;
+      // The words as they stand now: a queued run starts after earlier cards changed them.
+      const sent = latest.current.content;
       const result = await runSuggestion("keywords", () => injectKeywords({ content: sent, keywords: suggestion.terms }));
       if (!result) return;
+      const unplaced = (result.notShown ?? []).map((item) => item.term);
+      if (unplaced.length > 0) setToConfirm((prev) => ({ ...prev, [suggestion.id]: unplaced }));
       if (result.added.length === 0) {
-        settle((result.notShown ?? []).length > 0 ? `Nothing written in.${notShownNote(result.notShown ?? [])}` : "Already covered. Nothing to add.");
+        settle(unplaced.length > 0 ? notShownNote(result.notShown ?? []).trim() : "Already covered. Nothing to add.");
         return;
       }
       // Merged onto the content as it is NOW: the summary and bullets only where they are still
@@ -1508,11 +1564,9 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       additions: pendingAiAdditions(content),
       figures: aiFigures.map(({ line, figure }) => ({ line, figure })),
       figuresFading: false,
+      // No "+ Add experience" form on the paper here (owner, 2026-11-27): the Content panel's "Add a
+      // role" is the creator's way in. The apply step keeps its own.
       edits: {
-        onAddExperience: async (entry: ResumeContent["experience"][number]) => {
-          dispatch({type:"edit",sections:prev=>showWorkSections(prev,false,true),content:prev=>({...prev,experience:[...prev.experience,entry]})});
-          return true;
-        },
         onExperienceField: (id: string, field: "role" | "company" | "dates", text: string) => dispatch({type:"edit",content:prev=>({...prev,experience:prev.experience.map(e=>e.id===id ? {...e,[field]:text} : e)})}),
         onAddBullet: (id: string,text: string) => dispatch({type:"edit",content:prev=>({...prev,experience:prev.experience.map(e=>e.id===id ? {...e,bullets:[...e.bullets,text]} : e)})}),
         onBullet: (id: string,index: number,text: string) => dispatch({type:"edit",content:prev=>({...prev,experience:prev.experience.map(e=>e.id===id ? {...e,bullets:e.bullets.flatMap((b,i)=>i===index ? (text.trim() ? [text] : []) : [b])} : e)})}),
@@ -1539,7 +1593,19 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
     onRecheck: recheck,
     onDismissCheckFailure: checker.clearFailure,
     suggestionOutcomes,
-    onRunSuggestion: (suggestion) => void runCheckSuggestion(suggestion),
+    onRunSuggestion: queueCheckSuggestion,
+    cardBusy,
+    // The AI's prepared wording for each term a card could not write in, to confirm and add.
+    cardExtra: (card) => (toConfirm[card.id] ?? []).map((term) => (
+      <WorkEvidence key={term} defaultOpen jdText={jobInContext?.description ?? check?.posting?.description ?? undefined} content={content}
+        initialSkill={term} prompt={`Confirm ${term}`}
+        onSave={(fact) => enqueue(async () => {
+          if (!(await incorporateSelectedWork(fact, term, true))) return false;
+          setToConfirm((prev) => ({ ...prev, [card.id]: (prev[card.id] ?? []).filter((item) => item !== term) }));
+          return true;
+        })} />
+    )),
+    dateNotices: overlappingRoles(content.experience.filter((entry) => !entry.hidden)),
     onDismissSuggestion: dismissCheckSuggestion,
     onPointAt: (suggestion) => setPointFocus(focusOfSuggestion(suggestion)),
     aiRunning,
@@ -1602,7 +1668,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
       </header>
 
       <main className="px-6 py-7 pb-14 max-w-[2200px] mx-auto">
-        {overlappingRoles(content.experience.filter(entry => !entry.hidden)).map((notice) => <p key={notice} role="status" className="mb-2 rounded-lg bg-[#fff4df] p-3 text-xs text-primary">Date review: {notice}</p>)}
+        {/* Overlapping role dates are in the ATS bar and panel, not across the top (owner, 2026-11-27). */}
         {banner && <div className="mb-4">{banner}</div>}
         <div className={cn("grid gap-4 items-start", gridCols(atsPlace, sidebarCollapsed, docTab))}>
           {/* LEFT SIDEBAR — Overview has none; its old "N pages · N roles ·

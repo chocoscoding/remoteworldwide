@@ -61,7 +61,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import JobContextBanner from "@/app/components/dashboard/jobs/JobContextBanner";
 import { ResumeDesignProvider } from "@/app/components/dashboard/resume/ResumeDesignContext";
-import { createBlankContent, fromStored, importLabel, type ResumeDocument } from "@/app/components/dashboard/resume/resume-document";
+import { createBlankContent, fromStored, importLabel, type CheckPosting, type ResumeDocument } from "@/app/components/dashboard/resume/resume-document";
 import { BackendError, apiMessage } from "@/app/lib/api/core";
 import { usePlanLock } from "@/app/components/dashboard/billing/PlanLock";
 import { FREE_ALLOWANCE_GATES } from "@/app/lib/settings/planGates";
@@ -234,8 +234,12 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
   const buildLocked = buildLock.locked;
   const [buildOpen, setBuildOpen] = useState(false);
   const startBuild = () => (buildLocked ? buildLock.upgrade() : setBuildOpen(true));
-  const openBuilt = (stored: StoredResumeDocument) => {
-    open(fromStored(stored));
+  // A build for a posting is tailored to it as it opens, like the apply step (owner, 2026-11-27).
+  const [builtFor, setBuiltFor] = useState<{ docId: string; posting: CheckPosting } | null>(null);
+  const openBuilt = (stored: StoredResumeDocument, posting: CheckPosting | null) => {
+    const doc = fromStored(stored);
+    setBuiltFor(posting ? { docId: doc.id, posting } : null);
+    open(doc);
     void queryClient.invalidateQueries({ queryKey: qk.billing.overview() });
   };
 
@@ -290,6 +294,8 @@ const ResumeWorkspace: FC<ResumeWorkspaceProps> = ({ initialDocuments, initialOp
         onSaved={markSaved}
         banner={banner}
         tailorPreset={tailorPreset}
+        tailorOnOpen={builtFor?.docId === activeDoc.id ? builtFor.posting : null}
+        onTailorStarted={() => setBuiltFor(null)}
       />
     </ResumeDesignProvider>
   );

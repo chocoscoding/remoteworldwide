@@ -27,6 +27,7 @@ import { useEffect, useRef, useState, type FC, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowUp,
+  CalendarClock,
   Check,
   ChevronDown,
   Hash,
@@ -148,7 +149,29 @@ export interface AiAssistRailProps {
   variant?: "rail" | "float";
   /** A row above the score card: the docked rail's title and its undock and collapse buttons. */
   header?: ReactNode;
+  /** Roles whose dates overlap, to confirm or label (owner, 2026-11-27: here, not across the top of the page). */
+  dateNotices?: string[];
+  /** A card's own run state, so one running or queued card never disables another (owner, 2026-11-27). */
+  cardBusy?: Record<string, "running" | "queued">;
+  /** What a card asks the person to confirm after it ran (the AI's prepared wording for terms it could not write in). */
+  cardExtra?: (card: RailCard) => ReactNode;
 }
+
+/** Overlapping role dates, listed for the person to confirm. Shared by the floating panel and the docked rail. */
+export const DateNotices: FC<{ notices: string[] }> = ({ notices }) =>
+  notices.length === 0 ? null : (
+    <section aria-label="Dates to check" className="flex flex-col gap-1.5 rounded-[14px] border border-[#f1d7a2] bg-[#fff7e6] p-2.5">
+      <span className="flex items-center gap-1.5 px-0.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#8a5a00]">
+        <CalendarClock aria-hidden className="h-3.5 w-3.5" strokeWidth={2.4} />
+        Dates to check · {notices.length}
+      </span>
+      {notices.map((notice) => (
+        <p key={notice} className="px-0.5 text-xs leading-snug text-primary">
+          {notice}
+        </p>
+      ))}
+    </section>
+  );
 
 /** A radio row on the dark card, as the design has it: a ring that fills lime when picked. */
 const PickRow: FC<{
@@ -246,6 +269,9 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   jobLabel = null,
   variant = "rail",
   header,
+  dateNotices = [],
+  cardBusy = {},
+  cardExtra,
 }) => {
   const floating = variant === "float";
   // Docked, the rail ends level with the foot of the resume page, so the ask box sits beside the
@@ -578,7 +604,11 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
               {cards.map((card) => {
                 const outcome = suggestionOutcomes[card.id];
                 const tool = SUGGESTION_TOOL[card.kind];
-                const running = tool !== null && aiRunning === tool;
+                // Its own run only: "Add them" queues behind another, "Use this line" applies at once
+                // (owner, 2026-11-27: one card never disables another).
+                const busy = cardBusy[card.id];
+                const running = busy === "running" || (!busy && tool !== null && tool !== "keywords" && aiRunning === tool);
+                const ownQueue = card.kind === "keywords" || card.kind === "rewrite";
                 const open = shownRow === card.id;
                 const Icon =
                   card.kind === "rewrite" ? null : SUGGESTION_ICON[card.kind];
@@ -690,16 +720,20 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
                         )}
 
                         {outcome ? (
-                          <p className="flex items-start gap-1.5 text-xs font-semibold text-[#6c7a1e]">
-                            <Check className="mt-px h-3.5 w-3.5 flex-none" />
-                            {outcome}
-                          </p>
+                          <>
+                            <p className="flex items-start gap-1.5 text-xs font-semibold text-[#6c7a1e]">
+                              <Check className="mt-px h-3.5 w-3.5 flex-none" />
+                              {outcome}
+                            </p>
+                            {cardExtra?.(card)}
+                          </>
                         ) : (
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              // One AI run at a time, whoever started it.
-                              disabled={aiRunning !== null}
+                              // A keyword or rewrite card waits on its own run only; the other tools
+                              // still take turns with whatever AI run is out.
+                              disabled={ownQueue ? Boolean(busy) : aiRunning !== null}
                               onClick={() => onRunSuggestion(card)}
                               className={cn(
                                 "inline-flex h-7 items-center gap-1.5 rounded-[7px] border-[1.5px] border-[#222325] px-2.5 text-xs font-extrabold text-primary br-shadow-press disabled:cursor-default disabled:opacity-50",
@@ -713,6 +747,8 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
                                   <Loader2 className="h-3 w-3 animate-spin" />
                                   Working…
                                 </>
+                              ) : busy === "queued" ? (
+                                "Queued…"
                               ) : (
                                 SUGGESTION_ACTION[card.kind](card)
                               )}
@@ -851,6 +887,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
       {header}
       <div className="scrollbar-hover flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden pr-1">
         {scoreCard}
+        <DateNotices notices={dateNotices} />
         {fixes}
       </div>
       {ask}

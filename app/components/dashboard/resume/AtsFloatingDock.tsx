@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState, type FC } from "react";
 import {
   ArrowUp,
+  CalendarClock,
   Check,
   ChevronDown,
   Loader2,
@@ -113,6 +114,8 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
   // Partly checked against a job: faded, and said where the dock names its state.
   const partial = Boolean(check?.report && check.job && scanCoverage(check.report).partial);
   const toReview = fixesToReview(props);
+  // Overlapping role dates: counted on the bar, listed in the panel (owner, 2026-11-27).
+  const dates = props.dateNotices?.length ?? 0;
   const asking = aiRunning === "ask";
   const failed = !!checkFailure && !checking;
 
@@ -447,6 +450,23 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
             </button>
           )}
 
+          {dates > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setPanel(true);
+                setMenu(false);
+                setAsk(false);
+              }}
+              title="Role dates to check"
+              aria-label={`${dates} role ${dates === 1 ? "date" : "dates"} to check`}
+              className="ml-1 flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[7px] border border-[#f1d7a2] bg-[#fff7e6] px-2 text-xs font-extrabold text-[#8a5a00]"
+            >
+              <CalendarClock className="h-3.5 w-3.5" strokeWidth={2.4} />
+              {dates} {dates === 1 ? "date" : "dates"}
+            </button>
+          )}
+
           <span aria-hidden className="mx-1 h-[22px] w-px bg-[#222325]/15" />
 
           {asking ? (
@@ -507,6 +527,12 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
                   {toReview}
                 </span>
               )}
+            </span>
+          )}
+          {dates > 0 && (
+            <span title="Role dates to check" className="flex h-8 items-center gap-1 px-1.5 text-[11px] font-extrabold text-[#8a5a00]">
+              <CalendarClock aria-hidden className="h-3.5 w-3.5" strokeWidth={2.4} />
+              {dates}
             </span>
           )}
           <span aria-hidden className="h-5 w-px bg-[#222325]/15" />
