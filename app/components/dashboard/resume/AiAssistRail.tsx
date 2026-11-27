@@ -151,27 +151,58 @@ export interface AiAssistRailProps {
   header?: ReactNode;
   /** Roles whose dates overlap, to confirm or label (owner, 2026-11-27: here, not across the top of the page). */
   dateNotices?: string[];
+  /** The person has seen these date notices (the list went away after showing, or they clicked it). */
+  onDatesSeen?: (notices: string[]) => void;
   /** A card's own run state, so one running or queued card never disables another (owner, 2026-11-27). */
   cardBusy?: Record<string, "running" | "queued">;
   /** What a card asks the person to confirm after it ran (the AI's prepared wording for terms it could not write in). */
   cardExtra?: (card: RailCard) => ReactNode;
 }
 
-/** Overlapping role dates, listed for the person to confirm. Shared by the floating panel and the docked rail. */
-export const DateNotices: FC<{ notices: string[] }> = ({ notices }) =>
-  notices.length === 0 ? null : (
-    <section aria-label="Dates to check" className="flex flex-col gap-1.5 rounded-[14px] border border-[#f1d7a2] bg-[#fff7e6] p-2.5">
-      <span className="flex items-center gap-1.5 px-0.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#8a5a00]">
+/**
+ * Overlapping role dates, listed for the person to confirm. Shared by the floating panel and the
+ * docked rail. Shown once (owner, 2026-11-27): clicking the list hides it, and a list that was on
+ * screen counts as seen when it goes (the panel closes, the page changes). The call waits a tick,
+ * so React's development remount does not count as going.
+ */
+export const DateNotices: FC<{ notices: string[]; onSeen?: (notices: string[]) => void }> = ({ notices, onSeen }) => {
+  const shown = useRef<string[]>(notices);
+  const seen = useRef(onSeen);
+  const leaving = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    shown.current = notices;
+    seen.current = onSeen;
+  });
+  useEffect(() => {
+    window.clearTimeout(leaving.current);
+    return () => {
+      const list = shown.current;
+      const report = seen.current;
+      if (list.length > 0 && report) leaving.current = window.setTimeout(() => report(list), 0);
+    };
+  }, []);
+  if (notices.length === 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => onSeen?.(notices)}
+      title="Hide"
+      aria-label={`Dates to check: ${notices.join(" ")} Click to hide.`}
+      className="flex cursor-pointer flex-col gap-1.5 rounded-[14px] border border-[#f1d7a2] bg-[#fff7e6] p-2.5 text-left transition-colors hover:bg-[#fff1d6]"
+    >
+      <span className="flex w-full items-center gap-1.5 px-0.5 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#8a5a00]">
         <CalendarClock aria-hidden className="h-3.5 w-3.5" strokeWidth={2.4} />
-        Dates to check · {notices.length}
+        <span className="flex-1">Dates to check · {notices.length}</span>
+        <X aria-hidden className="h-3.5 w-3.5" strokeWidth={2.4} />
       </span>
       {notices.map((notice) => (
-        <p key={notice} className="px-0.5 text-xs leading-snug text-primary">
+        <span key={notice} className="block px-0.5 text-xs font-normal leading-snug text-primary">
           {notice}
-        </p>
+        </span>
       ))}
-    </section>
+    </button>
   );
+};
 
 /** A radio row on the dark card, as the design has it: a ring that fills lime when picked. */
 const PickRow: FC<{
@@ -270,6 +301,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
   variant = "rail",
   header,
   dateNotices = [],
+  onDatesSeen,
   cardBusy = {},
   cardExtra,
 }) => {
@@ -887,7 +919,7 @@ const AiAssistRail: FC<AiAssistRailProps> = ({
       {header}
       <div className="scrollbar-hover flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden pr-1">
         {scoreCard}
-        <DateNotices notices={dateNotices} />
+        <DateNotices notices={dateNotices} onSeen={onDatesSeen} />
         {fixes}
       </div>
       {ask}

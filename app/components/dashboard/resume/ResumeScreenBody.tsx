@@ -1327,6 +1327,42 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
   // person confirms it (owner, 2026-11-27: ask to confirm, never say it can't be added).
   const [toConfirm, setToConfirm] = useState<Record<string, string[]>>({});
 
+  // Overlapping role dates show until the person has seen the list or opened a role to fix them,
+  // then not again for this resume, reloads included (owner, 2026-11-27). A notice whose dates
+  // change reads differently, so it is a new one. Nothing shows until storage is read after mount,
+  // so a notice already seen never flashes up.
+  const datesSeenKey = `rww:dates-seen:${activeDocId}`;
+  const [datesSeen, setDatesSeen] = useState<string[] | null>(null);
+  const datesSeenRef = useRef<string[]>([]);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      let stored: string[] = [];
+      try {
+        const parsed: unknown = JSON.parse(window.localStorage.getItem(datesSeenKey) ?? "[]");
+        if (Array.isArray(parsed)) stored = parsed.filter((item): item is string => typeof item === "string");
+      } catch {
+        // Storage blocked or garbled: seen only for this visit.
+      }
+      datesSeenRef.current = stored;
+      setDatesSeen(stored);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [datesSeenKey]);
+  // Written straight away rather than from state: it is also called as the panel unmounts.
+  const markDatesSeen = useCallback((notices: readonly string[]) => {
+    const next = [...new Set([...datesSeenRef.current, ...notices])];
+    if (next.length === datesSeenRef.current.length) return;
+    datesSeenRef.current = next;
+    try {
+      window.localStorage.setItem(datesSeenKey, JSON.stringify(next.slice(-50)));
+    } catch {
+      // Storage blocked: seen only for this visit.
+    }
+    setDatesSeen(next);
+  }, [datesSeenKey]);
+  const allDateNotices = overlappingRoles(content.experience.filter((entry) => !entry.hidden));
+  const dateNotices = datesSeen === null ? [] : allDateNotices.filter((notice) => !datesSeen.includes(notice));
+
   const runCheckSuggestion = async (suggestion: CheckSuggestion) => {
     // A card that changed the words: the change and its outcome are one undo step, so Undo brings
     // the card's button back. One that changed nothing only learned something, and stays settled.
@@ -1605,7 +1641,8 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
           return true;
         })} />
     )),
-    dateNotices: overlappingRoles(content.experience.filter((entry) => !entry.hidden)),
+    dateNotices,
+    onDatesSeen: markDatesSeen,
     onDismissSuggestion: dismissCheckSuggestion,
     onPointAt: (suggestion) => setPointFocus(focusOfSuggestion(suggestion)),
     aiRunning,
@@ -1687,6 +1724,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   summarySuggestion={marks.summarySuggestion}
                   onAcceptSummarySuggestion={acceptSummarySuggestion}
                   onDismissSummarySuggestion={dismissSummarySuggestion}
+                  onOpenExperience={() => markDatesSeen(allDateNotices)}
                 />
               )}
 

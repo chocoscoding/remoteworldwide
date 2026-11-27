@@ -61,6 +61,8 @@ export interface EntryListEditorProps<T extends { id: string }> {
   hideable?: boolean;
   /** Rows: open this entry for editing (a section that was just added with one empty entry). */
   autoEditId?: string | null;
+  /** Rows: the person opened an entry for editing. */
+  onOpenEntry?: (id: string) => void;
 }
 
 const ICON_BUTTON =
@@ -110,6 +112,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
   hideable = false,
   autoEditId = null,
   validate,
+  onOpenEntry,
 }: EntryListEditorProps<T>) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -128,6 +131,11 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
     setAutoEdited(autoEditId);
     setEditingId(autoEditId);
   }
+
+  const openEntry = (id: string) => {
+    setEditingId(id);
+    onOpenEntry?.(id);
+  };
 
   // An entry removed some other way (Undo) can't stay open.
   const editing = editingId && items.some((item) => item.id === editingId) ? editingId : null;
@@ -310,7 +318,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditingId(item.id)}
+                  onClick={() => openEntry(item.id)}
                   className="flex min-w-0 flex-1 cursor-pointer flex-col py-0.5 text-left">
                   <span className={cn("truncate text-[13px] font-bold", hidden ? "text-[#5f6062]" : "text-primary")}>{name}</span>
                   {invalid(item) ? (
@@ -322,7 +330,7 @@ export function EntryListEditor<T extends { id: string; hidden?: boolean }>({
                 {hideable && eye}
                 <button
                   type="button"
-                  onClick={() => setEditingId(item.id)}
+                  onClick={() => openEntry(item.id)}
                   aria-label={`Edit ${name}`}
                   title="Edit"
                   className={ICON_BUTTON}>

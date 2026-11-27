@@ -114,7 +114,7 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
   // Partly checked against a job: faded, and said where the dock names its state.
   const partial = Boolean(check?.report && check.job && scanCoverage(check.report).partial);
   const toReview = fixesToReview(props);
-  // Overlapping role dates: counted on the bar, listed in the panel (owner, 2026-11-27).
+  // Overlapping role dates not yet seen: counted on the bar, listed in the panel (owner, 2026-11-27).
   const dates = props.dateNotices?.length ?? 0;
   const asking = aiRunning === "ask";
   const failed = !!checkFailure && !checking;
@@ -450,7 +450,8 @@ const AtsFloatingDock: FC<AtsToolsProps & { onDock: () => void }> = (props) => {
             </button>
           )}
 
-          {dates > 0 && (
+          {/* Gone while the panel is open: the list is there, and seen once it closes. */}
+          {dates > 0 && !panel && (
             <button
               type="button"
               onClick={() => {

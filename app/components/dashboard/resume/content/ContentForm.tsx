@@ -67,6 +67,8 @@ export interface ContentFormProps {
   summarySuggestion: "pending" | "accepted" | "dismissed";
   onAcceptSummarySuggestion: () => void;
   onDismissSummarySuggestion: () => void;
+  /** The person opened Experience or one of its roles: the role dates to check have been acted on (owner, 2026-11-27). */
+  onOpenExperience?: () => void;
 }
 
 /** A date picker's name for a screen reader: "Dates for Designer at Kite Labs", or just "Dates" on a blank entry. */
@@ -110,11 +112,15 @@ const ContentForm: FC<ContentFormProps> = ({
   summarySuggestion,
   onAcceptSummarySuggestion,
   onDismissSummarySuggestion,
+  onOpenExperience,
 }) => {
   // One open at a time (owner, 2026-10-04). Opens where the work is: the details for a blank
   // resume, the roles for one that has a name.
   const [open, setOpen] = useState<ContentGroupId | null>(() => (content.name.trim() ? "experience" : "personal"));
-  const toggle = (id: ContentGroupId) => setOpen((prev) => (prev === id ? null : id));
+  const toggle = (id: ContentGroupId) => {
+    if (id === "experience" && open !== "experience") onOpenExperience?.();
+    setOpen((prev) => (prev === id ? null : id));
+  };
 
   const setField = <K extends keyof ResumeContent>(key: K, value: ResumeContent[K]) => {
     setContent((prev) => ({ ...prev, [key]: value }));
@@ -351,6 +357,7 @@ const ContentForm: FC<ContentFormProps> = ({
         summarize={summarizeRole}
         noun="role"
         hideable
+        onOpenEntry={onOpenExperience}
         renderFields={(item, update) => (
           <>
             <div className="grid grid-cols-2 gap-2.5">
