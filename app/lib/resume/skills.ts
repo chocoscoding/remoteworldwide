@@ -1,3 +1,4 @@
+import { isLanguageSkill } from './skill-labels';
 // Skills as ENTRIES (owner, 2026-10-08, after FlowCV's Skills list): every entry
 // is a skill with a name ("Python", or "Soft Skills"), and may carry sub skills,
 // typed as text separated by commas ("Effective Communication, Teamwork"). There
@@ -155,6 +156,14 @@ export function reconcileGroups<C extends Pick<ResumeContent, "skills" | "skillG
  */
 function placeNew(entries: ResumeSkillGroup[], fresh: ResumeSkillGroup[], taken: Set<string>): ResumeSkillGroup[] {
   if (fresh.length === 0) return entries;
+  const languages=fresh.filter(skill=>isLanguageSkill(skill.title));
+  if(languages.length && entries.some(group=>!group.hidden && group.skills.length>0)) {
+    const groups=entries.map(group=>({...group,skills:[...group.skills]}));
+    let group=groups.find(g=>!g.hidden && /^(?:(?:spoken|foreign|natural|human)\s+)?languages?$/i.test(g.title));
+    if(!group){group={id:entryIdFor('Languages',taken),title:'Languages',skills:[]};groups.push(group);}
+    group.skills.push(...languages.map(skill=>skill.title));
+    return placeNew(groups,fresh.filter(skill=>!languages.includes(skill)),taken);
+  }
   if (entries.filter(group=>!group.hidden && group.skills.length>0).length>=2) {
     const families:Array<[RegExp,RegExp,string]>=[
       [/bigquery|snowflake|postgres|mongodb|mysql|redis|databricks/i,/database|data platform|storage/i,"Databases & data platforms"],

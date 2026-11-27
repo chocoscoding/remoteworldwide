@@ -23,6 +23,7 @@
 
 import { displayPostingQuestions } from "@/app/lib/apply/posting-question";
 import { isExcludedPostingText } from "@/app/lib/ats/posting-benefits";
+import { useSuggestionDrafts, prepareDrafts } from "@/app/lib/resume/use-suggestion-drafts";
 import { experiencePlacement } from "@/app/lib/apply/experience-draft";
 import { skillNames } from "@/app/lib/resume/skill-labels";
 import { placeWork } from "@/app/components/dashboard/resume/WorkEvidence";
@@ -890,7 +891,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   // The examples the posting names and the resume does not ("Java", "Azure"), asked whether Tailor
   // ran or not (owner, 2026-10-21); one Tailor already asks about is not asked twice.
   const tailorAsked = new Set(openAsks.map((ask) => ask.term.toLowerCase()));
-  const shownAsks = displayPostingQuestions([
+  const pendingAsks = displayPostingQuestions([
     ...openAsks,
     ...(!report || !visible ? [] : exampleAsks(report, visible, resume.asks ?? []).filter((ask) => !tailorAsked.has(ask.term.toLowerCase()))),
     ...manualAsks,
@@ -898,6 +899,12 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   // The asks on show, sent as `pending` on every keywords and Tailor call: the AI never writes one in
   // while the person answers it (owner, 2026-10-22, fix plan B: "Google Analytics" was asked, then
   // written in through the broader "Analytics tools proficiency" chip).
+  const draftBank=useSuggestionDrafts(visible,pendingAsks.map(item=>({term:item.term})),job.description ?? undefined);
+  const shownAsks=pendingAsks.map(item=>{
+    const draft=draftBank.data?.find(d=>d.term===item.term);
+    return draft && !item.detailEdited && !item.draftPrepared ? {...item,skillTerms:draft.skills,allowExperience:draft.experience,draftPrepared:true,detail:draft.detail,entryId:draft.entryId,detailEdited:false,
+      useSkills:draft.skills.length>0 && (item.useSkills ?? (item.place==='skills' || !draft.experience)),useExperience:draft.experience && (item.useExperience ?? (item.place==='experience' || !draft.skills.length))} : item;
+  });
   const openTerms = pendingTerms(shownAsks);
 
   const working = report ? workingItems(report, content) : [];
@@ -1132,7 +1139,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     update((s) => ({ ...s, resume: { ...s.resume, asks: confirmAsks(s.resume.asks ?? [], items) } }));
     const toSkills = items.filter(item => item.place === "skills");
     const toLines = items.filter(item => item.place === "experience");
-    const placed = toSkills.reduce((words, item) => addSkillNear(words, item.term, item.near ?? []), content);
+    const placed = toSkills.reduce((words, item) => (item.skillTerms ?? skillNames(item.term)).reduce((doc,name)=>addSkillNear(doc,name,item.near ?? []),words), content);
     const base = toSkills.length && placed.hiddenParts?.includes("skills") ? {...placed, hiddenParts:placed.hiddenParts.filter(id=>id!=="skills")} : placed;
     const label = `Added ${[...new Set(items.map(item => item.term))].join(", ")}`;
     const finish = (made: CommittedStep | null, result: KeywordInjection | null, unchanged = false) => {
@@ -1190,11 +1197,15 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   function answerAsksTogether(terms: readonly string[], yes: boolean) {
     const roles = (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({id:entry.id, role:entry.role, company:entry.company, label:[entry.role,entry.company,entry.dates].filter(Boolean).join(' · '),context:entry.bullets.filter((_,index)=>!content?.hiddenParts?.includes(`exp:${entry.id}:${index}`)).join('\n')}));
     const items = shownAsks.filter(ask => terms.includes(ask.term)).map(item => {
-      const useExperience=item.useExperience ?? skillNames(item.term).length===0;
+      const useExperience=item.allowExperience!==false && (item.useExperience ?? (item.skillTerms ?? skillNames(item.term)).length===0);
       return useExperience ? {...item,useExperience,...experiencePlacement(/^Add evidence for:/i.test(item.ifTrue) ? item.ifTrue : item.term,roles,item)} : item;
     });
     if (!yes) {
       for (const item of items) answerAsk(item, { no: true });
+      return;
+    }
+    if (yes && items.some(item=>!item.draftPrepared && !item.detailEdited)) {
+      setChangeError("Suggestions are still being prepared. Try again shortly.");
       return;
     }
     if (items.some(item => item.useExperience && (!item.detail?.trim() || !item.entryId))) {
@@ -1571,7 +1582,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       }];
     }),
     ...shownAsks.map((item) => ({
-      id: `if-true-${item.term}`,
+      id: `if-true-${item.term}-${item.draftPrepared ? "ready" : "pending"}`,
       title: item.ifTrue || item.term,
       action: "",
       icon: "tailor" as const,
@@ -1582,12 +1593,20 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       detail: item.term,
       error: placementErrors[item.term],
       placement: {
+        skillTerms:item.skillTerms,
+        allowExperience:item.allowExperience,
+        draftPrepared:item.draftPrepared,
+        unprepared:!item.draftPrepared && !item.detailEdited,
+        preparing:!item.draftPrepared && !item.detailEdited && draftBank.isFetching,
+        prepareError:!draftBank.isFetching && item===shownAsks.find(ask=>!ask.draftPrepared && !ask.detailEdited),
+        retry:()=>{void draftBank.refetch();},
+        onDraft:async (entryId:string)=>content ? (await prepareDrafts(content,[{term:item.term,entryId}],job.description ?? undefined))[0]?.detail ?? '' : '',
         initialDetail: item.detail,
         detailEdited: item.detailEdited,
         entryId: item.entryId,
         useSkills: item.useSkills,
         useExperience: item.useExperience,
-        skillsAdded: content ? hasSkill(content,item.term) : false,
+        skillsAdded: content ? (item.skillTerms ?? skillNames(item.term)).length>0 && (item.skillTerms ?? skillNames(item.term)).every(name=>hasSkill(content,name)) : false,
         roles: (content?.experience ?? []).filter(entry => !entry.hidden && !content?.hiddenParts?.includes(`exp:${entry.id}`)).map(entry => ({ id: entry.id, role: entry.role, company: entry.company, context: entry.bullets.filter((_, index) => !content?.hiddenParts?.includes(`exp:${entry.id}:${index}`)).join("\n"), label: [entry.role, entry.company, entry.dates].filter(Boolean).join(" · ") })),
         onChange: (skills: boolean, experience: boolean, detail: string, entryId: string, detailEdited: boolean) => update(s => {
           const edited = { ...item, useSkills: skills, useExperience: experience, detail: detail.slice(0, 500), entryId, detailEdited };

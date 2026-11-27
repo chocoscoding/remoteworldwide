@@ -32,6 +32,14 @@ const work = ask('Figma');
 const line = 'Designed mobile onboarding in Figma.';
 const content = { skills: ['Excel'], experience: [{ bullets: [line] }] };
 
+it('uses prepared canonical names and only supported destinations for single and bulk additions',()=>{
+  const language={...ask('Chinese language skills'),skillTerms:['Chinese'],allowExperience:false,useSkills:true,useExperience:true};
+  assert.deepEqual(confirmationPlacements(language).map(i=>i.place),['skills']);
+  assert.equal(appliedAsks([{...language,place:'skills'}],{skills:['Chinese'],experience:[]},null).length,1);
+  const experience={...ask('Strategic Client Management and Campaign Excellence'),skillTerms:[],allowExperience:true,useSkills:true,useExperience:true,entryId:'a',detail:line};
+  assert.deepEqual(confirmationPlacements(experience).map(i=>i.place),['experience']);
+});
+
 it('bulk add preserves both destinations and the edited example', () => {
   const selected = { ...work, useSkills: true, useExperience: true, detail: line, entryId: 'role' };
   assert.deepEqual(confirmationPlacements(selected).map(item => item.place), ['skills', 'experience']);
@@ -69,6 +77,16 @@ it('retains confirmed facts and context through save/reload while failed inserti
   assert.deepEqual(factsFor(restored), [{ term: 'Figma', detail: 'Used Figma at Example for mobile onboarding.' }]);
   assert.equal(restored[0].addedIn, null);
   assert.deepEqual(pendingTerms(restored), []);
+});
+it('preserves prepared destinations and wording through save/reload',()=>{
+  const item={...work,skillTerms:['Figma'],allowExperience:true,draftPrepared:true,detailEdited:false,detail:line,entryId:'role',useSkills:true,useExperience:true};
+  const restored=readApplyState(JSON.parse(JSON.stringify({resume:{asks:[item]}}))).resume.asks[0];
+  assert.equal(restored.draftPrepared,true);
+  assert.equal(restored.detail,line);
+  assert.equal(restored.detailEdited,false);
+  assert.equal(restored.allowExperience,true);
+  assert.deepEqual(restored.skillTerms,['Figma']);
+  assert.deepEqual(confirmationPlacements(restored).map(i=>i.place),['skills','experience']);
 });
 it('partial batch failure completes only the saved Skills item', () => {
   assert.deepEqual(appliedAsks([skills, work], content, null), [skills]);

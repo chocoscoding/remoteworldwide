@@ -2,12 +2,12 @@ export interface DraftRole { id: string; label: string; company?: string; role?:
 
 /** The row and bulk Add use the same default. An intentional edit, including
  * clearing the text, always wins over the generated starting point. */
-export function experiencePlacement(skill: string, roles: readonly DraftRole[], saved: {detail?: string; entryId?: string; detailEdited?: boolean} = {}) {
+export function experiencePlacement(skill: string, roles: readonly DraftRole[], saved: {detail?: string; entryId?: string; detailEdited?: boolean;draftPrepared?:boolean} = {}) {
   const role = roles.find(role => role.id === saved.entryId) ?? suggestedExperienceRole(skill, roles);
   const detailEdited = saved.detailEdited ?? Boolean(saved.detail?.trim());
   // A starting point saved unedited is made again by today's rules (2026-11-27: an old draft that only
   // repeated the posting stayed on its row); a detail of unknown origin (a writer's) is kept.
-  const regenerate = saved.detailEdited === false;
+  const regenerate = saved.detailEdited === false && !saved.draftPrepared;
   return {entryId:role?.id ?? '', detail:detailEdited ? saved.detail ?? '' : (!regenerate && saved.detail?.trim()) || (role ? experienceDraft(skill,role) : ''), detailEdited};
 }
 

@@ -107,6 +107,9 @@ export interface ApplyResumeState {
 }
 
 export interface FitAsk {
+  skillTerms?: string[];
+  allowExperience?: boolean;
+  draftPrepared?: boolean;
   reach?: {entryId:string; before:string; unit:string};
   /** An editorial review replaced or resolved this unanswered label. */
   superseded?: boolean;
@@ -280,6 +283,9 @@ function readAsks(value: unknown): FitAsk[] {
       ...(item.confirmed === true ? { confirmed: true } : {}),
       ...(typeof item.detail === "string" ? { detail: item.detail.slice(0, 500) } : {}),
       ...(typeof item.detailEdited === "boolean" ? { detailEdited: item.detailEdited } : {}),
+      ...(Array.isArray(item.skillTerms) ? {skillTerms:item.skillTerms.filter((s):s is string=>typeof s==='string').slice(0,8)} : {}),
+      ...(typeof item.allowExperience==='boolean' ? {allowExperience:item.allowExperience} : {}),
+      ...(item.draftPrepared===true ? {draftPrepared:true} : {}),
       ...(typeof item.entryId === "string" ? { entryId: item.entryId.slice(0, 120) } : {}),
       ...(typeof item.useSkills === "boolean" ? { useSkills: item.useSkills } : {}),
       ...(typeof item.useExperience === "boolean" ? { useExperience: item.useExperience } : {}),

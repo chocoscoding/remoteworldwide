@@ -1631,13 +1631,13 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
               )}
 
               {docTab === "ai" && <LinkedNumbers content={content} onSave={doc=>dispatch({type:"edit",content:doc})} />}
-              {docTab === "ai" && builderQuestions.map(q=><WorkEvidence key={q.term} content={content} prompt={q.ifTrue} preferExperience={q.place==="experience"} initialSkill={q.term}
+              {docTab === "ai" && builderQuestions.map(q=><WorkEvidence jdText={jobInContext?.description ?? undefined} key={q.term} content={content} prompt={q.ifTrue} preferExperience={q.place==="experience"} initialSkill={q.term}
                 disabled={Boolean(aiRunning)} onSave={async fact=>{
                   if(!await incorporateSelectedWork(fact,q.term))return false;
                   setBuilderQuestions(current=>current.filter(item=>item.term!==q.term));
                   return true;
                 }} />)}
-              {docTab === "ai" && <WorkEvidence content={content} prompt={roleCoaching(jobInContext?.role ?? content.title,check?.report,content) ?? (!builderQuestions.length ? missingWorkPrompt(check?.report) : undefined)} onSave={fact => {
+              {docTab === "ai" && <WorkEvidence jdText={jobInContext?.description ?? undefined} content={content} prompt={roleCoaching(jobInContext?.role ?? content.title,check?.report,content) ?? (!builderQuestions.length ? missingWorkPrompt(check?.report) : undefined)} onSave={fact => {
                 dispatch({type:"edit",content:prev=>placeWork(prev,fact),sections:prev=>showWorkSections(prev,!!fact.skill,!!fact.detail)});
                 return true;
               }} />}
@@ -1677,7 +1677,7 @@ const ResumeScreenBody: FC<ResumeScreenBodyProps> = ({ activeDocId, activeDoc, s
                   onApplyAllFixes={applyAllToneProposals}
                   keywordsFound={cards.find((card) => card.kind === "keywords")?.terms?.length ?? null}
                   keywordProposals={keywordProposals ? keywordRows : null}
-                  keywordPlacement={term=><WorkEvidence key={term} initialSkill={term} prompt={"Place "+term+" in Skills or Experience"} content={content}
+                  keywordPlacement={term=><WorkEvidence jdText={jobInContext?.description ?? undefined} key={term} initialSkill={term} prompt={"Place "+term+" in Skills or Experience"} content={content}
                     disabled={Boolean(aiRunning)} onSave={fact=>incorporateSelectedWork(fact,term)} />}
                   onAcceptKeyword={acceptKeyword}
                   onRejectKeyword={rejectKeyword}

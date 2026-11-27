@@ -2,6 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { experienceDraft, experiencePlacement, suggestedExperienceRole } from "../app/lib/apply/experience-draft.ts";
 
+test('prepared model wording survives single and bulk placement without falling back to blank',()=>{
+  const roles=[{id:'a',label:'Senior CSM',context:'Managed 100 enterprise accounts.'}];
+  const prepared={entryId:'a',detail:'Analyzed account health in Salesforce to prioritize quarterly customer success plans.',detailEdited:false,draftPrepared:true};
+  assert.equal(experiencePlacement('Strategic Client Management and Campaign Excellence',roles,prepared).detail,prepared.detail);
+  assert.equal(experiencePlacement('Strategic Client Management',roles,{...prepared,detail:'My own sentence.',detailEdited:true}).detail,'My own sentence.');
+});
+
 test("experience suggestions are ready to edit with at most one simple amount", () => {
   const role = { id: "csm", label: "Senior Customer Success Manager", role: "Senior Customer Success Manager", company: "Contractor Foreman" };
   for (const skill of ["Customer training", "Recruiting", "Account management", "Python", "Customer success"]) {

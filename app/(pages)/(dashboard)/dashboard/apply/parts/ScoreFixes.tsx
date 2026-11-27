@@ -7,7 +7,7 @@
 
 import { Fragment, useLayoutEffect, useRef, useState, type FC, type ReactNode } from "react";
 import { experienceDraft, experiencePlacement, type DraftRole } from "@/app/lib/apply/experience-draft";
-import { skillNames } from "@/app/lib/resume/skill-labels";
+import { skillNames, isLanguageSkill } from "@/app/lib/resume/skill-labels";
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, MoreHorizontal, Plus, RotateCw, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -530,7 +530,7 @@ export interface Suggestion {
   input?: { placeholder: string; label: string; mode?: "text" | "decimal"; initialValue?: string; onSubmit: (value: string) => void };
   /** A Yes/No ask that can be ticked with others and answered together: its term (owner, 2026-10-22). */
   batch?: string;
-  placement?: { initialDetail?: string; detailEdited?: boolean; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: DraftRole[]; onChange: (skills: boolean, experience: boolean, detail: string, entryId: string, detailEdited: boolean) => void; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
+  placement?: { skillTerms?:string[]; allowExperience?:boolean; draftPrepared?:boolean; unprepared?:boolean; preparing?:boolean; prepareError?:boolean; retry?:()=>void; onDraft?:(entryId:string)=>Promise<string>; initialDetail?: string; detailEdited?: boolean; entryId?: string; useSkills?: boolean; useExperience?: boolean; skillsAdded?: boolean; roles: DraftRole[]; onChange: (skills: boolean, experience: boolean, detail: string, entryId: string, detailEdited: boolean) => void; onApply: (skills: boolean, experience: boolean, detail: string, entryId: string) => void };
 }
 
 /** A small square tick box, the light-brutalism way: hairline when off, lime with a check when on. */
@@ -547,15 +547,32 @@ const TickBox: FC<{ on: boolean }> = ({ on }) => (
 
 /** Choose destinations together before committing a single resume change. */
 const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolean; onSelect?: () => void }> = ({ row, disabled, selected, onSelect }) => {
-  const canAddSkills=skillNames(row.detail ?? row.title).length>0;
+  const canAddSkills=(row.placement?.skillTerms ?? skillNames(row.detail ?? row.title)).length>0;
+  const canAddExperience=(row.placement?.allowExperience ?? !isLanguageSkill(row.detail ?? row.title)) && Boolean(row.placement?.roles.length);
   const [skills, setSkills] = useState(canAddSkills && (row.placement?.useSkills ?? !row.placement?.skillsAdded));
-  const [experience, setExperience] = useState(row.placement?.useExperience ?? !canAddSkills);
+  const [experience, setExperience] = useState(canAddExperience && (row.placement?.useExperience ?? !canAddSkills));
   const draftTopic = /^Add evidence for:/i.test(row.title) ? row.title : row.detail ?? row.title;
   const initial = experiencePlacement(draftTopic,row.placement?.roles ?? [],{...row.placement,detail:row.placement?.initialDetail});
   const [entryId, setEntryId] = useState(initial.entryId);
   const [detail, setDetail] = useState(initial.detail);
   const [editedDetail, setEditedDetail] = useState(initial.detailEdited);
   const [editing, setEditing] = useState(false);
+  const [drafting,setDrafting]=useState(false);
+  const [draftError,setDraftError]=useState(false);
+  const preparing=Boolean(row.placement?.preparing || drafting);
+  const unavailable=preparing || row.placement?.unprepared || row.placement?.prepareError || draftError;
+  async function changeRole(id:string) {
+    setEntryId(id);
+    if(editedDetail){saveDraft({entryId:id});return;}
+    const role=row.placement?.roles.find(item=>item.id===id);
+    if(!role)return;
+    setDrafting(true);setDraftError(false);
+    try {
+      const next=row.placement?.onDraft ? await row.placement.onDraft(id) : experienceDraft(draftTopic,role);
+      if(!next)throw new Error('No draft');
+      setDetail(next);saveDraft({entryId:id,detail:next,detailEdited:false});
+    } catch {setDraftError(true);} finally {setDrafting(false);}
+  }
   const saveDraft = (next: { skills?: boolean; experience?: boolean; detail?: string; entryId?: string; detailEdited?: boolean }) => {
     row.placement?.onChange(next.skills ?? skills, next.experience ?? experience, next.detail ?? detail, next.entryId ?? entryId,next.detailEdited ?? editedDetail);
   };
@@ -584,15 +601,15 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
       <div className="flex min-h-8 flex-wrap items-center gap-2">
         {onSelect && <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select: ${row.title}`} disabled={disabled} onClick={onSelect} className="cursor-pointer"><TickBox on={selected} /></button>}
         <strong className="min-w-[140px] flex-1 text-[13px] leading-5 line-clamp-2">{row.detail || row.title}</strong>
-        {([{ label: "Skills", on: skills, toggle: () => { setSkills(!skills); saveDraft({ skills: !skills }); } }, { label: "Experience", on: experience, toggle: () => { setExperience(!experience); saveDraft({ experience: !experience }); } }]).map(option => (
-          <button key={option.label} type="button" role="checkbox" aria-checked={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled || option.label==='Skills' && !canAddSkills} onClick={option.toggle}
+        {([{ label: "Skills", on: skills, toggle: () => { setSkills(!skills); saveDraft({ skills: !skills }); } }, { label: "Experience", on: experience, toggle: () => { setExperience(!experience); saveDraft({ experience: !experience }); } }]).filter(option=>option.label==='Skills' ? canAddSkills : canAddExperience).map(option => (
+          <button key={option.label} type="button" role="checkbox" aria-checked={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled || preparing} onClick={option.toggle}
             className={cn("flex h-6 cursor-pointer items-center gap-1 rounded-full border px-2 text-[11px] font-semibold disabled:opacity-50", option.on ? "border-[#dce89c] bg-[#f2f9c9] text-[#343a18]" : "border-black/15 bg-white text-[#55564f]")}>
             <TickBox on={option.on} />{option.label}
           </button>
         ))}
         {row.placement?.skillsAdded && <span className="text-[11px] text-[#63761a]">In Skills</span>}
-        {experience && <button type="button" disabled={disabled} aria-expanded={editing} onClick={()=>setEditing(!editing)} className="h-7 cursor-pointer rounded px-2 text-xs font-semibold text-[#55564f] hover:bg-black/5">{editing ? 'Done' : 'Edit'}</button>}
-        <button type="button" disabled={disabled || (!skills && !experience) || (experience && (!detail.trim() || !entryId))}
+        {experience && <button type="button" disabled={disabled || unavailable} aria-expanded={editing} onClick={()=>setEditing(!editing)} className="h-7 cursor-pointer rounded px-2 text-xs font-semibold text-[#55564f] hover:bg-black/5">{editing ? 'Done' : 'Edit'}</button>}
+        <button type="button" disabled={disabled || unavailable || (!skills && !experience) || (experience && (!detail.trim() || !entryId))}
           aria-label={`Add ${row.title} to ${destination}`}
           onClick={() => row.placement?.onApply(skills, experience, detail.trim(), entryId)}
           className="ml-2 flex h-6 cursor-pointer items-center gap-1 rounded-md bg-[#222325] px-2 text-[11px] font-bold text-white disabled:cursor-default disabled:opacity-40">
@@ -602,19 +619,15 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
           <button type="button" disabled={disabled} aria-label={`Dismiss ${row.title} suggestion`} title={`Dismiss ${row.title} suggestion`} onClick={choice.onClick} className="grid h-6 w-6 cursor-pointer place-content-center rounded text-[#777870] hover:bg-black/5 hover:text-primary disabled:opacity-50"><X aria-hidden className="h-3.5 w-3.5" /></button>
         </span>)}
       </div>
-      {experience && !editing && <button type="button" disabled={disabled} onClick={()=>setEditing(true)} aria-label={`Edit example for ${row.detail || row.title}`} className="mt-1 flex w-full min-w-0 items-center gap-2 pb-1 text-left text-xs text-[#65665f] hover:text-primary">
-        <span className="min-w-0 truncate">{detail || 'Edit example'}</span>
+      {experience && !editing && !unavailable && <button type="button" disabled={disabled} onClick={()=>setEditing(true)} aria-label={`Edit wording for ${row.detail || row.title}`} className="mt-1 flex w-full min-w-0 items-center gap-2 pb-1 text-left text-xs text-[#65665f] hover:text-primary">
+        <span className="min-w-0 truncate">{detail}</span>
       </button>}
+      {preparing && <p className="py-1 text-xs text-[#65665f]" role="status">Preparing suggestion…</p>}
+      {!preparing && (row.placement?.prepareError || draftError) && <button type="button" onClick={()=>draftError ? void changeRole(entryId) : row.placement?.retry?.()} className="py-1 text-xs underline">Couldn’t prepare this suggestion. Retry</button>}
       {experience && editing && <div className="mt-2 border-t border-black/8 pt-2 pb-1 pr-1">
         {row.detail && row.detail!==row.title && <p className="mb-2 text-xs text-[#65665f]">{row.title}</p>}
         <label className="mb-2 flex items-center gap-2 text-xs text-[#5f6062]">Role
-          <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => {
-            setEntryId(event.target.value);
-            const role = row.placement?.roles.find(item => item.id === event.target.value);
-            const nextDetail = editedDetail ? detail : role ? experienceDraft(draftTopic, role) : "";
-            setDetail(nextDetail);
-            saveDraft({ entryId: event.target.value, detail: nextDetail });
-          }} disabled={disabled} className="min-w-0 max-w-full rounded-md border border-black/15 bg-white px-2 py-1 text-xs text-primary">
+          <select aria-label={`Role for ${row.title}`} value={entryId} onChange={event => {void changeRole(event.target.value);}} disabled={disabled || drafting} className="min-w-0 max-w-full rounded-md border border-black/15 bg-white px-2 py-1 text-xs text-primary">
             <option value="">Choose a role</option>
             {row.placement?.roles.map(role => <option key={role.id} value={role.id}>{role.label}</option>)}
           </select>
@@ -622,7 +635,7 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
         <label className="block text-xs font-semibold text-primary">
           <span className="sr-only">Experience wording</span>
           <textarea ref={detailRef} aria-label={`How did you use ${row.title}?`} value={detail} onChange={event => { setDetail(event.target.value); setEditedDetail(true); saveDraft({ detail: event.target.value, detailEdited: true }); }} disabled={disabled} rows={1} maxLength={500}
-            placeholder="What did you do, and what changed?"
+            placeholder="Suggested experience"
             className="mt-1.5 block w-full resize-none overflow-y-auto rounded-lg border border-black/20 bg-white px-3 py-1.5 text-sm font-normal leading-5 text-primary outline-none focus:border-[#222325] focus:ring-1 focus:ring-[#222325] disabled:opacity-50" />
         </label>
       </div>}

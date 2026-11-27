@@ -7,10 +7,20 @@ export function actionableSkillLabel(value: string): boolean {
   return Boolean(label) && !/^(?:language polyglot|polyglot|growth opportunities|analytics tools?|content|train|trainer|trainee|center|centre|excellence|team|teams|brand|product|business|company|candidate|ability|proficiency|experience|skills?|strong|excellent)$/.test(label);
 }
 
+export const LANGUAGE_NAME = /\b(?:Chinese|Mandarin|Cantonese|English|French|German|Spanish|Portuguese|Arabic|Japanese|Korean|Hindi|Russian|Italian|Dutch|Polish|Ukrainian|Turkish|Swedish|Danish|Norwegian|Finnish|Hebrew|Swahili|Yoruba|Igbo|Hausa|Indonesian|Vietnamese|Thai|Bengali|Urdu|Greek|Romanian|Czech|Hungarian|Malay|Tagalog|Tamil|Telugu|Persian)\b/gi;
+/** A language requirement is not an instruction to fabricate language use at an employer. */
+export function isLanguageSkill(value:string):boolean {
+  return Boolean(value.match(LANGUAGE_NAME)) && !/\b(?:client|customer|campaign|support|translat(?:e|ion)|locali[sz]|deliver|present|negotiat|market|report)\w*/i.test(value);
+}
+
 /** Convert posting wording into names, never a sentence pasted into Skills. */
 export function skillNames(value: string): string[] {
   const text=value.replace(/[\p{Extended_Pictographic}\uFE0F★✓✔•]/gu,' ').replace(/\s+/g,' ').trim();
   if(isEmployerOffer(text) || isPostingTrait(text))return [];
+  // A stated level is the applicant's to keep: "Japanese language proficiency (business level)" stays whole.
+  if(isLanguageSkill(text) && !/^[A-Za-z]+\s*[-–:]\s*(?:fluent|native|[ABC][12]|professional|intermediate)/i.test(text) && !/\b(?:level|native|business|professional|conversational|basic|intermediate|advanced|[ABC][12])\b/i.test(text) && /language skills?|\b(?:fluency|fluent|proficien\w*|speaking|spoken|written|command)\b/i.test(text)) {
+    return [...new Set((text.match(LANGUAGE_NAME) ?? []).map(name=>name[0].toUpperCase()+name.slice(1).toLowerCase()))];
+  }
   const toolAttribution=/^(Meta(?: Ads)?|Google Ads|Amplitude|AppsFlyer)\s+attribution$/i.exec(text);
   if(toolAttribution)return [toolAttribution[1]];
   const concepts:Array<[RegExp,string]>=[
@@ -20,7 +30,7 @@ export function skillNames(value: string): string[] {
     [/\bJavaScript\b/i,'JavaScript'],[/\bHTML\b/i,'HTML'],[/\bCSS\b/i,'CSS'],
     [/\bSalesforce\b/i,'Salesforce'],[/\b(?:Salesforce|SFDC) implementation\b/i,'Salesforce implementation'],[/\bdata model(?:ing|ling)?\b/i,'Data modeling'],
     [/\bcommunicat(?:e|ion)\b/i,'Communication'],
-    [/\b(?:analytical thinking|translate data|data analysis)\b/i,'Data analysis'],
+    [/\b(?:analytical (?:thinking|skills)|translate data|data analysis)\b/i,'Data analysis'],
     [/\bfunnel (?:performance|analysis|analytics)\b/i,'Funnel analysis'],[/\bdata quality\b/i,'Data quality'],
     [/\b(?:attribution data|marketing attribution)\b/i,'Marketing attribution'],
     [/\b(?:large.scale datasets|data management|core datasets)\b/i,'Data management'],
@@ -30,9 +40,11 @@ export function skillNames(value: string): string[] {
     [/\b(?:reports and dashboards|reporting dashboards|business intelligence)\b/i,'Business intelligence'],
     [/\bcustomer onboarding\b/i,'Customer onboarding'],[/\bstakeholder management\b/i,'Stakeholder management'],
     [/\bproject management\b/i,'Project management'],[/\brecruit(?:ing|ment)\b/i,'Recruiting'],
-    [/\bfinancial (?:analysis|modeling|modelling)\b/i,'Financial analysis'],[/\bpayment data\b/i,'Payment analytics'],
+    [/\bfinancial (?:modeling|modelling)\b/i,'Financial modeling'],[/\bfinancial analysis\b/i,'Financial analysis'],[/\bpayment data\b/i,'Payment analytics'],
   ];
   const namedConcepts=concepts.filter(([pattern])=>pattern.test(text));
+  const exactConcept=namedConcepts.find(([pattern])=>text.match(pattern)?.[0]?.length===text.length);
+  if(exactConcept)return [exactConcept[1]];
   if (/\b(?:understanding of|proficiency (?:in|with|and)|experience (?:using|is required)|communicate effectively|person who)\b/i.test(text))return [...new Set(namedConcepts.map(([,name])=>name))];
   const toolList=/\s+(?:and|or)\s+/i.test(text) && (namedConcepts.length>1 || /^[A-Z][\w.+#-]*(?:\s+(?:and|or)\s+[A-Z][\w.+#-]*)+$/.test(text));
   if(!isSkillSentence(text) && !/[,;|:]/.test(text) && !/^(?:BI tools?|marketing metrics|tools|technologies)\b/i.test(text) && !toolList && actionableSkillLabel(text))return [text];
@@ -60,6 +72,7 @@ export function skillNames(value: string): string[] {
 }
 
 export function isSkillSentence(value:string):boolean {
+  if(isLanguageSkill(value) && /language skills?|\b(?:fluency|fluent in|proficiency in|command of)\b/i.test(value))return true;
   if(isEmployerOffer(value) || isPostingTrait(value) || /\b(?:understanding of|proficiency (?:in|with|and)|experience (?:using|is required)|communicate effectively|person who)\b/i.test(value))return true;
   return /^(?:strong|solid|excellent|experience (?:with|in|working)|familiarity with|knowledge of|understanding of|ability to|work(?:ed|ing)?|analy[sz]e|identify|support|assist|prepare|develop|build|manage|lead|collaborate|ensure|maintain|deliver|implement|create|drive|monitor)\b|\bor similar\b|[→←↔⇒★✓✔]|\p{Extended_Pictographic}/iu.test(value) || value.split(/\s+/).length>7;
 }

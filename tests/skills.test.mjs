@@ -32,6 +32,19 @@ const {
 
 const base = { name: "", skills: ["React", "Figma"] };
 
+it('adds Chinese as a language, preserves existing languages and never places it in programming',()=>{
+  const grouped={skills:['TypeScript','English - fluent'],skillGroups:[
+    {id:'code',title:'Programming Languages',skills:['TypeScript']},
+    {id:'spoken',title:'Languages',skills:['English - fluent']},
+  ]};
+  const result=addSkills(grouped,['Chinese language skills']);
+  assert.deepEqual(result.skillGroups.find(g=>g.id==='spoken').skills,['English - fluent','Chinese']);
+  assert.deepEqual(result.skillGroups.find(g=>g.id==='code').skills,['TypeScript']);
+  assert.deepEqual(addSkills({skills:[]},['Chinese language skills']).skills,['Chinese']);
+  const newCategory=addSkills({skills:['TypeScript'],skillGroups:[grouped.skillGroups[0]]},['Chinese language skills']);
+  assert.deepEqual(newCategory.skillGroups.find(g=>g.title==='Languages').skills,['Chinese']);
+});
+
 it('keeps only names from the customer-success screenshot when adding Skills',()=>{
  const actual=addSkills({skills:[]},['Own customer onboarding, ensuring fast time to value.','Motivated, Solutions Driven and Conscientious person who.','Technical experience is required, e.g., implementing.','Basic understanding of Javascript, HTML, CSS.','Strong proficiency and experience using Salesforce 1-2+.','Strong proficiency and experience using Marketing, SFDC implementation, data model (standard and custom).','Communicate effectively via oral & written formats.','Freedom and flexibility.','Solve interesting problems.','Autonomy and ownership.','Be helpful.','Annual professional development stipend of $2,000 USD.','Equity - all Pipers receive stock options.']);
  assert.deepEqual(new Set(actual.skills),new Set(['Customer onboarding','JavaScript','HTML','CSS','Salesforce','Salesforce implementation','Data modeling','Communication']));
