@@ -132,6 +132,26 @@ export function fixFirstId(report: Pick<ScanReport, "metrics">): string | null {
   return lowest && lowest.value < 65 ? lowest.id : null;
 }
 
+/**
+ * The fix "Fix first" stands before (owner, 2026-11-27): the first one toward the check that most
+ * needs work, never the check's name. On screen the chips come first, then the rows. Keyword match
+ * and impact language are the checks with fixes of their own; any other check gets no badge.
+ */
+export function fixFirstTarget(
+  metricId: string | null,
+  chips: number,
+  rows: ReadonlyArray<{ id: string; batch?: string; note?: boolean }>,
+): "chips" | string | null {
+  if (metricId === "keyword-match") {
+    if (chips > 0) return "chips";
+    return rows.find((row) => !row.note && (Boolean(row.batch) || ["title", "fit", "language"].includes(row.id)))?.id ?? null;
+  }
+  if (metricId === "impact-language") {
+    return rows.find((row) => row.id === "impact" || row.id.startsWith("impact-ask-") || row.id.startsWith("reach-"))?.id ?? null;
+  }
+  return null;
+}
+
 /** Each measured check's value, by id, to say how far a change moved it. */
 export const metricValues = (report: Pick<ScanReport, "metrics">): Record<string, number> =>
   Object.fromEntries(measured(report).map((metric) => [metric.id, Math.round(metric.value)]));

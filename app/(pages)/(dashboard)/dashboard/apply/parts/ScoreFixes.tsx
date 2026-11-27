@@ -11,11 +11,11 @@ import { skillNames, isLanguageSkill } from "@/app/lib/resume/skill-labels";
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, Check, Crosshair, Eye, Hash, Loader2, MoreHorizontal, Plus, RotateCw, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { METRIC_GROUPS, fixFirstId, scoreColorOf, type WorkingItem } from "@/app/lib/apply/fixes";
+import { METRIC_GROUPS, fixFirstTarget, scoreColorOf, type WorkingItem } from "@/app/lib/apply/fixes";
 import type { ScoreDrop } from "@/app/lib/apply/score-changes";
 import { capAsks } from "@/app/lib/apply/ask-cap";
 import type { ScanReport } from "@/app/lib/ats/types";
-import { displayedScore, HEADLINE_SHARES } from "@/app/lib/ats/score";
+import { displayedScore } from "@/app/lib/ats/score";
 import type { ResumePlace } from "@/app/lib/resume/ai";
 
 // ---- The score ------------------------------------------------------------------------------
@@ -211,7 +211,7 @@ const ScoreSide: FC<{
   );
 };
 
-/** Pass the AI / Pass the human: a grey panel each, every check with its bar, its "Fix first" and how it moved. */
+/** Pass the AI / Pass the human: a grey panel each, every check with its bar and how it moved. "Fix first" is on the fix itself. */
 const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<string, number>; partial?: boolean }> = ({
   report,
   previousMetrics,
@@ -221,9 +221,6 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
   const byId = new Map(
     (report?.metrics ?? []).filter((metric) => !(partial && metric.id === "keyword-match")).map((metric) => [metric.id, metric]),
   );
-  const first = report && !partial ? fixFirstId(report) : null;
-  const keyword = byId.get("keyword-match");
-  const weighted = keyword?.checked !== false && typeof keyword?.value === "number";
   return (
     <>
       {METRIC_GROUPS.map((group) => (
@@ -248,10 +245,8 @@ const StagePanels: FC<{ report: ScanReport | null; previousMetrics?: Record<stri
             return (
               <div key={id} className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="flex-1 text-[13px] font-bold text-primary">{label}<span className="ml-1 text-[10px] font-normal text-black/50">{weighted ? `${HEADLINE_SHARES[id as keyof typeof HEADLINE_SHARES]}% of total` : id === "keyword-match" ? "not included" : "⅓ of general score"}</span></span>
-                  {first === id && (
-                    <span className="rounded-full bg-[#fbe9e5] px-[7px] text-[11px] font-extrabold text-[#b23c26]">Fix first</span>
-                  )}
+                  {/* No weights beside the names (owner, 2026-11-27: "remove this"): the recipe reads as a keyword matcher. */}
+                  <span className="flex-1 text-[13px] font-bold text-primary">{label}</span>
                   <span className="text-[13px] font-extrabold text-primary">
                     {value ?? (notChecked ? <span className="text-xs font-bold text-[#a06f00]">not checked</span> : "–")}
                     {value !== null && <span className="text-[11px] font-semibold text-[#9a9b95]"> / 100</span>}
@@ -545,8 +540,13 @@ const TickBox: FC<{ on: boolean }> = ({ on }) => (
   </span>
 );
 
+/** In front of the one fix to start with, until the person's first change (owner, 2026-11-27). */
+const FixFirst = () => (
+  <span className="flex-none rounded-full bg-[#fbe9e5] px-[7px] text-[11px] font-extrabold leading-5 text-[#b23c26]">Fix first</span>
+);
+
 /** Choose destinations together before committing a single resume change. */
-const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolean; onSelect?: () => void }> = ({ row, disabled, selected, onSelect }) => {
+const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolean; onSelect?: () => void; fixFirst?: boolean }> = ({ row, disabled, selected, onSelect, fixFirst = false }) => {
   const canAddSkills=(row.placement?.skillTerms ?? skillNames(row.detail ?? row.title)).length>0;
   const canAddExperience=(row.placement?.allowExperience ?? !isLanguageSkill(row.detail ?? row.title)) && Boolean(row.placement?.roles.length);
   const [skills, setSkills] = useState(canAddSkills && (row.placement?.useSkills ?? !row.placement?.skillsAdded));
@@ -600,6 +600,7 @@ const ConfirmationRow: FC<{ row: Suggestion; disabled: boolean; selected: boolea
     <div className="rounded-[10px] bg-[#f6f6f6] pl-3 pr-2 py-1.5">
       <div className="flex min-h-8 flex-wrap items-center gap-2">
         {onSelect && <button type="button" role="checkbox" aria-checked={selected} aria-label={`Select: ${row.title}`} disabled={disabled} onClick={onSelect} className="cursor-pointer"><TickBox on={selected} /></button>}
+        {fixFirst && <FixFirst />}
         <strong className="min-w-[140px] flex-1 text-[13px] leading-5 line-clamp-2">{row.detail || row.title}</strong>
         {([{ label: "Skills", on: skills, toggle: () => { setSkills(!skills); saveDraft({ skills: !skills }); } }, { label: "Experience", on: experience, toggle: () => { setExperience(!experience); saveDraft({ experience: !experience }); } }]).filter(option=>option.label==='Skills' ? canAddSkills : canAddExperience).map(option => (
           <button key={option.label} type="button" role="checkbox" aria-checked={option.on} aria-label={`${row.title}: ${option.label}`} disabled={disabled || preparing} onClick={option.toggle}
@@ -671,6 +672,8 @@ export const FixesTabs: FC<{
   onRescore?: () => void;
   /** Answers the ticked asks together: yes adds them all in one change, no marks them all answered. */
   onAnswerAsks?: (terms: string[], yes: boolean) => void;
+  /** The check to fix first (fixFirstId), or null once the person has made a change: "Fix first" stands before its first fix. */
+  fixFirst?: string | null;
 }> = ({
   hasScoreDrop = false,
   gaps,
@@ -689,10 +692,12 @@ export const FixesTabs: FC<{
   unchecked = 0,
   onRescore,
   onAnswerAsks,
+  fixFirst = null,
 }) => {
   const [tab, setTab] = useState<"missing" | "working">("missing");
   const [asksOpen, setAsksOpen] = useState(false);
   const capped = capAsks(suggestions, (row) => row.ask === true, asksOpen);
+  const firstFix = fixFirstTarget(fixFirst, gaps.length + skillsOnly.length, capped.rows);
   // Ticked asks (owner, 2026-10-22: "batch select this, not one by one"); an answered ask leaves the
   // list, so only terms still showing count.
   const batchTerms = onAnswerAsks ? suggestions.flatMap((row) => (row.batch ? [row.batch] : [])) : [];
@@ -778,7 +783,8 @@ export const FixesTabs: FC<{
 
       {tab === "missing" && !busy && missingCount > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {firstFix === "chips" && <FixFirst />}
             {skillsOnly.map((chip) => (
               <Chip key={chip.id} chip={chip} tone="proof" />
             ))}
@@ -827,7 +833,7 @@ export const FixesTabs: FC<{
               )}
             </div>
           )}
-            {row.batch ? <ConfirmationRow row={row} disabled={disabled} selected={ticked.has(row.batch)} onSelect={onAnswerAsks ? () => tick(row.batch!) : undefined} /> : (
+            {row.batch ? <ConfirmationRow row={row} disabled={disabled} selected={ticked.has(row.batch)} onSelect={onAnswerAsks ? () => tick(row.batch!) : undefined} fixFirst={firstFix === row.id} /> : (
             <div
               onClick={row.onShow}
               className={cn(
@@ -856,6 +862,7 @@ export const FixesTabs: FC<{
               ) : (
                 <span className="h-1.5 w-1.5 flex-none rounded-full bg-[#d99a00]" />
               )}
+              {firstFix === row.id && <FixFirst />}
               <span className="flex-1 text-[13px]">
                 <strong>{row.title}</strong>
                 {row.detail && <span className={row.note ? "text-[#d3d1c7]" : "text-[#5f6062]"}> {row.detail}</span>}

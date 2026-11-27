@@ -35,7 +35,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FC, type ReactN
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Sparkles, Check, Download, ExternalLink, Eye, Layers, MoreHorizontal, RotateCw, Upload, type LucideIcon } from "lucide-react";
+import { Check, Download, ExternalLink, Eye, Layers, MoreHorizontal, RotateCw, Upload, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Bone, Loading, RowsSkeleton } from "@/app/components/dashboard/ui/Skeleton";
@@ -62,6 +62,7 @@ import {
   exampleAsks,
   manualRequirementAsks,
   askedFor,
+  fixFirstId,
 } from "@/app/lib/apply/fixes";
 import { scoreDrops } from "@/app/lib/apply/score-changes";
 import { impactMisses } from "@/app/lib/apply/impact";
@@ -121,6 +122,9 @@ import SelectResumeDialog, { type PickedResume } from "../parts/SelectResumeDial
 import ResumeIntegrityNotice from "../parts/ResumeIntegrityNotice";
 import RepairImport from "../parts/RepairImport";
 import { useResumeDownload } from "../parts/useResumeDownload";
+
+/** Set after the person's first change on step 2: "Fix first" is a one-time pointer. */
+const FIX_FIRST_DONE_KEY = "rww:fix-first-done";
 
 export interface ResumeStepProps {
   job: StartedJob;
@@ -513,6 +517,23 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
   const draftLabel = `${content?.name?.trim() || withoutExtension(resume.baseName ?? "Resume")}_${job.company}`;
   const history = resume.history;
   const historyAt = resume.historyAt;
+  // "Fix first" points at one fix until the person's first change, then never again, on any job
+  // (owner, 2026-11-27). The history is empty until that first change. Hidden until storage is read
+  // after mount, so the server's render and the first client render agree.
+  const changedOnce = history.length > 0;
+  const [fixFirstDone, setFixFirstDone] = useState(true);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        if (changedOnce) window.localStorage.setItem(FIX_FIRST_DONE_KEY, "1");
+        setFixFirstDone(changedOnce || window.localStorage.getItem(FIX_FIRST_DONE_KEY) === "1");
+      } catch {
+        // Storage blocked: shown only until this application's first change.
+        setFixFirstDone(changedOnce);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [changedOnce]);
   // "Tailor to this job"'s asks still open where the draft stands: the Tailor that asked is not
   // undone, no "No", and no "Yes" step standing (undo past the "Yes" asks again, owner 2026-10-20).
   const standing = new Set(history.slice(0, historyAt + 1).map((step) => step.id));
@@ -942,24 +963,6 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       pending: [...new Set([...openTerms, ...asks.filter(ask => ask.confirmed && ask.addedIn).map(ask => ask.term)])],
       excluded: asks.filter(ask => ask.no).map(ask => ask.term),
     };
-  }
-
-  async function generateBest() {
-    if (!content || !job.description || !toolsIdle || !report?.scanId || report.degraded || !isCurrentScore(report)) return;
-    setBusy("Generating your best resume…");
-    try {
-      const made = await commitChange("Generated best resume", { ...content, hiddenParts: shownHidden }, {
-        scanId: report.scanId, jdText: job.description ?? "",
-        best: tailoringContext(),
-      });
-      if (made) {
-        const details = (made.content.draftProposals ?? []).map(proposal => proposal.after);
-        showOnPage(details, "experience");
-        toast("Resume updated.");
-      }
-    } finally {
-      setBusy(null);
-    }
   }
 
   function commitSuggestion(label: string, words: ResumeContent, applicantFact = false, checkedTailor?: string): Promise<CommittedStep | null> {
@@ -1897,14 +1900,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       <ResumeIntegrityNotice resumeId={sendingId} content={content} onReview={() => showOnPage([], "experience")} />
 
       <section className="flex flex-col gap-[18px] rounded-2xl border border-[#222325]/8 bg-white p-5">
-        {content && editable && (
-          <div className="flex flex-wrap items-center gap-3">
-            <StickerButton size="sm" disabled={!job.description || !toolsIdle || !report?.scanId || report.degraded || !isCurrentScore(report) || scoring || saving > 0} onClick={generateBest}>
-              <Sparkles className="h-4 w-4" />
-              {busy === "Generating your best resume…" ? "Generating your resume…" : "Generate Best Resume"}
-            </StickerButton>
-          </div>
-        )}
+        {/* No "Generate Best Resume" here: "Tailor CV to this job." in the fixes does the same (owner, 2026-11-27). */}
         {reviewable.length > 0 && (
           <details className="rounded-lg border border-[#222325]/15 px-4 py-3 text-sm">
             <summary className="cursor-pointer font-semibold">Review {reviewable.length} generated {reviewable.length === 1 ? "line" : "lines"}</summary>
@@ -1966,6 +1962,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
             onRescore={sendingId && version !== null ? () => runScore(sendingId, version) : undefined}
             onAnswerAsks={answerAsksTogether}
             note={stuffingView}
+            fixFirst={!fixFirstDone && !scanCoverage(report).partial ? fixFirstId(report) : null}
           />
           </section>
         )}

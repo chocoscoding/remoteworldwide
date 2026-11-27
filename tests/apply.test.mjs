@@ -55,6 +55,7 @@ const {
   askedFor,
   bulletsWithoutResult,
   fixFirstId,
+  fixFirstTarget,
   matchMoves,
   onlyInSkills,
   scoreHue,
@@ -602,6 +603,18 @@ describe("the score card's fixes", () => {
       }),
       null,
     );
+  });
+
+  // owner, 2026-11-27: "Fix first" stands before the first fix toward the check, not beside its name.
+  it("puts Fix first before the first fix toward that check", () => {
+    const rows = [{ id: "punctuation" }, { id: "fit" }, { id: "if-true-SQL-ready", batch: "SQL" }, { id: "impact" }];
+    assert.equal(fixFirstTarget("keyword-match", 2, rows), "chips");
+    assert.equal(fixFirstTarget("keyword-match", 0, rows), "fit");
+    assert.equal(fixFirstTarget("keyword-match", 0, [{ id: "punctuation" }, { id: "if-true-SQL-ready", batch: "SQL" }]), "if-true-SQL-ready");
+    assert.equal(fixFirstTarget("keyword-match", 0, [{ id: "punctuation" }, { id: "best-match", note: true }]), null);
+    assert.equal(fixFirstTarget("impact-language", 3, rows), "impact");
+    assert.equal(fixFirstTarget("parseability", 3, rows), null);
+    assert.equal(fixFirstTarget(null, 3, rows), null);
   });
 
   it("finds keywords matched only in Skills", () => {
