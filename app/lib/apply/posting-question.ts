@@ -125,10 +125,22 @@ export function postingQuestion(term: string, proposed: string, posting: string)
   return proposed;
 }
 
+/**
+ * A capability with nothing to name ("Proven ability to build and drive processes that truly move the
+ * needle for clients"): no skill to list and no work to show, so never a row to add (owner, 2026-11-27:
+ * "it being something to add a skill and experience to is wrong"). A named tool keeps it.
+ */
+const VAGUE_ABILITY = /^(?:(?:proven|demonstrated|strong|solid|excellent|great)\s+)*(?:ability|capable|able|capacity)\s+(?:to|of)\s+/i;
+/** A tool, product or acronym past the opening word: "SQL", "HubSpot", "Kayzen DSP". */
+const namesSomething = (text: string): boolean => text.trim().split(/\s+/).slice(1).some((word) => /^[A-Z0-9]/.test(word) || /[a-z][A-Z]/.test(word));
+export const vagueAbility = (text: string): boolean => VAGUE_ABILITY.test(text.trim()) && !namesSomething(text);
+
 /** Apply the same presentation checks to stored and newly returned follow-ups. */
 export function displayPostingQuestions<T extends {term:string;ifTrue:string;place?:string;reach?:unknown}>(items:T[], posting:string) {
   return items.flatMap(item=>{
     if (isEmployerOffer(item.ifTrue || item.term) || isPostingTrait(item.ifTrue || item.term) || isExcludedPostingText(item.ifTrue, posting) || isExcludedPostingText(item.term, posting)) return [];
+    // Also a row confirmed before this rule, still stored as open.
+    if (!item.reach && vagueAbility(item.ifTrue.replace(/^Add evidence for:\s*/i, ''))) return [];
     if (/^Add evidence for:/i.test(item.ifTrue) && isPostingDuty(item.ifTrue)) return [];
     item={...item,ifTrue:item.ifTrue.replace(/^Add evidence for:\s*/i,'')};
     if (item.reach) return [item];

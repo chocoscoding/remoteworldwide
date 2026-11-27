@@ -31,11 +31,25 @@ test("a proposed recruiting example does not invent a measured outcome", () => {
 
 test("full requirement wording produces usable examples without placeholder homework", () => {
   const role = {id:'a',label:'Developer',context:'Built internal analytics dashboards.'};
-  for (const requirement of ['Strong SQL skills (BigQuery or similar)', 'Solid understanding of marketing metrics: CAC, LTV, ROI/ROMI, payback', 'Collaborate with design and product teams', 'Experience with Amplitude, AppsFlyer']) {
+  for (const requirement of ['Strong SQL skills (BigQuery or similar)', 'Solid understanding of marketing metrics: CAC, LTV, ROI/ROMI, payback', 'Experience with Amplitude, AppsFlyer']) {
     const draft = experienceDraft(requirement,role);
     assert.ok(draft.length > 25, requirement);
     assert.doesNotMatch(draft, /\[|Strong SQL skills|Solid understanding|Applied .*process/);
   }
+});
+
+// Owner, 2026-11-27: "Built and drive processes that truly move the needle for clients." was the posting
+// with its verb put in the past, and Add made it a bullet; "Industry Knowledge and Trends" offered a
+// support-ticket line for its "knowledge base".
+test("never says the posting back or recycles a line for one shared word: it asks instead", () => {
+  const role = { id: 'a', label: 'Senior CSM', context: 'Took recurring support tickets from 45 a month to 35 by rewriting the Notion knowledge base.\nPromoted to lead a team of two CSMs while managing 100+ enterprise accounts, coaching on onboarding and lifecycle management.' };
+  for (const requirement of ['Build and drive processes that truly move the needle for clients', 'Collaborate with design and product teams', 'Leading in Industry Knowledge and Trends', 'Strategic Client Management and Campaign Excellence', 'Some unfamiliar duty nobody has a template for']) {
+    assert.equal(experienceDraft(requirement, role), '', requirement);
+  }
+  assert.equal(experiencePlacement('Leading in Industry Knowledge and Trends', [role]).detail, '');
+  // An unedited saved starting point is made again; an edited one stays.
+  assert.equal(experiencePlacement('Build and drive processes that truly move the needle for clients', [role], { detail: 'Built and drive processes that truly move the needle for clients.', detailEdited: false }).detail, '');
+  assert.equal(experiencePlacement('Build and drive processes', [role], { detail: 'Rebuilt the renewal playbook.', detailEdited: true }).detail, 'Rebuilt the renewal playbook.');
 });
 
 test("a shared generic word is not enough to recycle unrelated work", () => {

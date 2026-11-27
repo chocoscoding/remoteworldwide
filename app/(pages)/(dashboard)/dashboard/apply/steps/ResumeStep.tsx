@@ -1141,10 +1141,17 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       const here = made ?? (unchanged && result ? { content, stepId: history[historyAt]?.id } : null);
       const applied = here?.stepId ? appliedAsks(items, here.content, result) : [];
       for (const item of applied) answerAsk(item, { addedIn: here!.stepId! });
-      if (!made && applied.length > 0) toast("That example is already on your resume.");
+      // Said whenever an example was already a bullet, even beside a change (owner, 2026-11-27: "I add
+      // these 3 and this only is what it added").
+      const lines = new Set(content.experience.flatMap((entry) => entry.bullets).map((line) => line.trim().toLowerCase()));
+      const already = applied.filter((item) => item.place === "experience" && (result?.placed?.[item.term] ?? []).length > 0
+        && (result?.placed?.[item.term] ?? []).every((line) => lines.has(line.trim().toLowerCase()))).length;
+      if (already > 0) toast(already === 1 ? "That example is already on your resume, so it was left as it is." : `${already} examples are already on your resume, so they were left as they are.`);
       if (applied.length < items.length) {
         const saved = made?.content ?? content;
-        setPlacementErrors(previous=>({...previous,...Object.fromEntries(items.filter(item=>!applied.includes(item)).map(item=>[item.term,item.place==='skills' ? 'Couldn’t add skill. Try again.' : `${hasSkill(saved,item.term) ? 'Skills saved. ' : ''}Couldn’t add experience. Try again.`]))}));
+        // The writer's reason when it gave one ("That example repeats the job post..."), never "Try again" for it.
+        const adviceFor = (term: string) => result?.notShown?.find((note) => note.term.trim().toLowerCase() === term.trim().toLowerCase())?.advice;
+        setPlacementErrors(previous=>({...previous,...Object.fromEntries(items.filter(item=>!applied.includes(item)).map(item=>[item.term,item.place==='skills' ? 'Couldn’t add skill. Try again.' : `${hasSkill(saved,item.term) ? 'Skills saved. ' : ''}${adviceFor(item.term) ?? 'Couldn’t add experience. Try again.'}`]))}));
         setChangeError(null);
       }
     };

@@ -11,6 +11,7 @@ import { opensWithStrongVerb } from "./impact";
 import { actionableSkillLabel } from "../resume/skill-labels";
 import { isPostingNote } from "../ats/types";
 import { isEmployerOffer, isPostingTrait } from "../ats/posting-benefits";
+import { vagueAbility } from "./posting-question";
 
 export type ScoreHue = "low" | "mid" | "high";
 
@@ -246,7 +247,7 @@ export function manualRequirementAsks(report:Pick<ScanReport,"verdicts">,answere
   const sentences=new Set(done.map(a=>fold(a.ifTrue ?? "")).filter(Boolean));
   return report.verdicts.flatMap(verdict=>{
     const req=verdict.requirement;
-    if(isPostingNote(req) || req.category==='responsibility' || isEmployerOffer(req.text) || isPostingTrait(req.text) || req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state))return [];
+    if(isPostingNote(req) || req.category==='responsibility' || isEmployerOffer(req.text) || isPostingTrait(req.text) || vagueAbility(req.text) || req.id.startsWith("role:") || !["missing","partial"].includes(verdict.state))return [];
     const term=req.label?.trim() || req.text.trim();
     if(!term || seen.has(fold(term)) || sentences.has(fold(req.text)))return [];
     seen.add(fold(term));

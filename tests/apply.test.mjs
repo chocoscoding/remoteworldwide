@@ -451,6 +451,16 @@ describe("the score card's fixes", () => {
     assert.deepEqual(shown,[real]);
     for (const verdict of verdicts.slice(1)) assert.equal(worthGapChip(verdict),false);
   });
+  // Owner, 2026-11-27: "it being something to add a skill and experience to is wrong".
+  it("never makes a row of a capability that names nothing, and keeps one that names a tool", async () => {
+    const texts=['Proven ability to build and drive processes that truly move the needle for clients.','Demonstrated ability to deliver results that matter','Ability to write SQL queries for weekly reporting.','Hands-on experience with programmatic or digital advertising platforms.'];
+    const verdicts=texts.map((text,i)=>({requirement:{id:String(i),text,label:text,category:'experience',type:'required'},state:'partial'}));
+    assert.deepEqual(manualRequirementAsks({verdicts},[]).map(ask=>ask.ifTrue),[texts[2],texts[3]]);
+    // A row confirmed before the rule, still stored as open, is not shown either.
+    const { displayPostingQuestions } = await import('../app/lib/apply/posting-question.ts');
+    const stored={term:'Build and drive processes that truly move the needle for clients',ifTrue:texts[0],confirmed:true,no:false,addedIn:null};
+    assert.deepEqual(displayPostingQuestions([stored],texts.join('\n')),[]);
+  });
   it("keeps a requirement answered when a new scan relabels it", () => {
     const text='Understanding of and experience with key technology concepts, such as SaaS and APIs';
     const verdicts=[{requirement:{id:'saas',text,label:'Key technology concepts, such as SaaS and APIs',category:'experience',type:'required'},state:'partial'}];
