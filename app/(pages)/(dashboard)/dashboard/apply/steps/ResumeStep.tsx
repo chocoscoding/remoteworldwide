@@ -1132,9 +1132,13 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
     const placed = toSkills.reduce((words, item) => addSkillNear(words, item.term, item.near ?? []), content);
     const base = toSkills.length && placed.hiddenParts?.includes("skills") ? {...placed, hiddenParts:placed.hiddenParts.filter(id=>id!=="skills")} : placed;
     const label = `Added ${[...new Set(items.map(item => item.term))].join(", ")}`;
-    const finish = (made: CommittedStep | null, result: KeywordInjection | null) => {
-      const applied = made ? appliedAsks(items, made.content, result) : [];
-      if (made) for (const item of applied) answerAsk(item, { addedIn: made.stepId });
+    const finish = (made: CommittedStep | null, result: KeywordInjection | null, unchanged = false) => {
+      // Nothing new to write and the writer's line already on the page (owner, 2026-11-26: the example
+      // picked was a bullet already there, so "Try again" could never work): answered where the draft stands.
+      const here = made ?? (unchanged && result ? { content, stepId: history[historyAt]?.id } : null);
+      const applied = here?.stepId ? appliedAsks(items, here.content, result) : [];
+      for (const item of applied) answerAsk(item, { addedIn: here!.stepId! });
+      if (!made && applied.length > 0) toast("That example is already on your resume.");
       if (applied.length < items.length) {
         const saved = made?.content ?? content;
         setPlacementErrors(previous=>({...previous,...Object.fromEntries(items.filter(item=>!applied.includes(item)).map(item=>[item.term,item.place==='skills' ? 'Couldn’t add skill. Try again.' : `${hasSkill(saved,item.term) ? 'Skills saved. ' : ''}Couldn’t add experience. Try again.`]))}));
@@ -1149,6 +1153,7 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       return;
     }
     let outcome: KeywordInjection | null = null;
+    let unchanged = false;
     void runAndCommit("Updated resume with confirmed details", "Adding your confirmed experience...", async () => {
       const result = await tools.run("keywords", () => injectKeywords({
         content: base,
@@ -1166,8 +1171,8 @@ const ResumeStep: FC<ResumeStepProps> = ({ job, state, update, editable, scan, a
       // A failed experience insertion may still save independently selected Skills.
       // No fallback turns a work claim into a Skills label.
       return result ? { content: result.content } : base === content ? null : { content: base };
-    }, null, true).then(made => {
-      finish(made, outcome);
+    }, null, true, () => { unchanged = true; }).then(made => {
+      finish(made, outcome, unchanged);
       // Per-destination feedback above is more precise than the writer's generic failure message.
     });
   }
