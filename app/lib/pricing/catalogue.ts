@@ -157,9 +157,9 @@ export const FALLBACK_CATALOGUE: PricingCatalogue = {
       priceCents: 0,
       currency: "USD",
       interval: "month",
-      monthlyCredits: 45,
+      monthlyCredits: 15,
       prioritySupport: false,
-      features: ["Job board, autofill and saved answers", "Application tracking and drafts", "1 resume and 1 cover letter", "45 AI credits a month"],
+      features: ["Job board, autofill and saved answers", "Application tracking and drafts", "1 resume and 1 cover letter", "15 AI credits a month"],
     },
     {
       key: "basic",
